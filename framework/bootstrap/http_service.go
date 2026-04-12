@@ -1,0 +1,305 @@
+// Package bootstrap HTTP 服务启动封装
+package bootstrap
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework"
+	"github.com/ngq/gorp/framework/container"
+	"github.com/ngq/gorp/framework/contract"
+	gingin "github.com/ngq/gorp/framework/provider/gin"
+	"github.com/ngq/gorp/framework/provider/host"
+
+	gormpkg "gorm.io/gorm"
+)
+
+// HTTPServiceOptions HTTP 服务启动选项
+type HTTPServiceOptions struct {
+	// ExtraProviders 服务专属 Provider 列表
+	ExtraProviders []contract.ServiceProvider
+
+	// DisableRedis 禁用 Redis Provider
+	DisableRedis bool
+
+	// DisableGorm 禁用 Gorm Provider
+	DisableGorm bool
+
+	// DisableMetrics 禁用 Prometheus 指标采集
+	DisableMetrics bool
+}
+
+// HTTPServiceRuntime HTTP 服务运行时
+//
+// 中文说明：
+// - 封装 HTTP 服务启动阶段需要的公共运行时对象；
+// - 包含框架核心能力：Logger、Engine、Config、DB；
+// - 用于简化业务服务的 main.go 启动代码。
+type HTTPServiceRuntime struct {
+	App         *framework.Application
+	Container   contract.Container
+	Logger      contract.Logger
+	Engine      *gin.Engine
+	DB          *gormpkg.DB
+	Config      contract.Config
+	ServiceName string
+}
+
+// NewHTTPServiceRuntime 创建 HTTP 服务运行时
+//
+// 中文说明：
+// - 初始化框架并返回运行时对象；
+// - 自动注册默认 Provider 组；
+// - 支持通过选项定制：追加 Provider 或禁用某些能力。
+func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPServiceRuntime, error) {
+	app := framework.NewApplication()
+	c := app.Container()
+
+	// 构建 Provider 列表
+	providers := buildHTTPProviders(opts)
+	if err := c.RegisterProviders(providers...); err != nil {
+		return nil, fmt.Errorf("注册 Provider 失败: %w", err)
+	}
+	if err := RegisterSelectedMicroserviceProviders(c); err != nil {
+		return nil, fmt.Errorf("注册主链路能力失败: %w", err)
+	}
+
+	rt := &HTTPServiceRuntime{
+		App:         app,
+		Container:   c,
+		Logger:      container.MustMakeLogger(c),
+		Engine:      container.MustMakeEngine(c),
+		Config:      container.MustMakeConfig(c),
+		ServiceName: serviceName,
+	}
+
+	if !opts.DisableGorm {
+		rt.DB = container.MustMakeGorm(c)
+	}
+
+	return rt, nil
+}
+
+// buildHTTPProviders 构建 HTTP 服务 Provider 列表
+func buildHTTPProviders(opts HTTPServiceOptions) []contract.ServiceProvider {
+	providers := make([]contract.ServiceProvider, 0)
+
+	// 基础能力
+	providers = append(providers, FoundationProviders()...)
+
+	// ORM/Runtime
+	if !opts.DisableGorm {
+		providers = append(providers, ORMRuntimeProviders()...)
+	}
+
+	// 业务减负
+	if !opts.DisableRedis {
+		providers = append(providers, BusinessSimplificationProviders()...)
+	}
+
+	// 服务专属
+	providers = append(providers, opts.ExtraProviders...)
+
+	return providers
+}
+
+// BootHTTPService 启动 HTTP 服务
+//
+// 中文说明：
+// - 统一处理：初始化 -> 可选迁移 -> 服务装配回调 -> 健康检查 -> Prometheus 指标 -> RunHTTP；
+// - 业务项目只需要提供自己的装配逻辑；
+// - 自动注册 /healthz 和 /metrics 端点。
+//
+// 使用示例：
+//
+//	err := bootstrap.BootHTTPService("user-service", bootstrap.HTTPServiceOptions{}, migrate, setup)
+func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) error, setup func(*HTTPServiceRuntime) error) error {
+	rt, err := NewHTTPServiceRuntime(serviceName, opts)
+	if err != nil {
+		return fmt.Errorf("初始化失败: %w", err)
+	}
+
+	rt.Logger.Info(fmt.Sprintf("%s 正在启动...", serviceName))
+
+	// 执行数据库迁移
+	if migrate != nil {
+		if err := migrate(rt); err != nil {
+			return fmt.Errorf("表结构迁移失败: %w", err)
+		}
+		rt.Logger.Info("表结构迁移完成")
+	}
+
+	// 执行服务装配
+	if setup != nil {
+		if err := setup(rt); err != nil {
+			return fmt.Errorf("服务装配失败: %w", err)
+		}
+	}
+
+	// 注册基础端点
+	RegisterHealthCheck(rt.Engine, serviceName)
+	if !opts.DisableMetrics {
+		RegisterMetricsEndpoint(rt.Engine)
+		rt.Engine.Use(gingin.MetricsMiddleware())
+	}
+
+	return RunHTTP(rt.Container, rt.Logger)
+}
+
+// RegisterHealthCheck 注册健康检查端点
+//
+// 中文说明：
+// - 添加标准 /healthz 端点，返回服务状态；
+// - serviceName 用于标识当前服务名称。
+func RegisterHealthCheck(engine *gin.Engine, serviceName string) {
+	engine.GET("/healthz", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":  "healthy",
+			"service": serviceName,
+			"version": "1.0.0",
+		})
+	})
+}
+
+// RegisterMetricsEndpoint 注册 Prometheus 指标端点
+//
+// 中文说明：
+// - 暴露 /metrics 端点供 Prometheus 采集；
+// - 自动收集 HTTP 请求指标；
+// - 包含 Go runtime 指标。
+func RegisterMetricsEndpoint(engine *gin.Engine) {
+	// 注册 Go runtime 指标
+	gingin.RegisterGoRuntimeMetrics()
+	// 注册 /metrics 端点
+	engine.GET("/metrics", gingin.PrometheusHandler())
+}
+
+// RunHTTP 启动 HTTP 服务，封装信号处理和优雅关闭
+//
+// 中文说明：
+// - 自动从容器获取 Host 和 HTTP 服务；
+// - 注册信号处理（SIGINT、SIGTERM）；
+// - 支持优雅关闭，超时时间 10 秒；
+// - 如果 Host 未注册，则直接启动 HTTP（不依赖 Host）。
+func RunHTTP(c contract.Container, logger contract.Logger) error {
+	// 尝试获取 Host 服务
+	hostSvc, err := container.MakeHost(c)
+	if err != nil {
+		// Host 未注册，直接启动 HTTP
+		return runHTTPDirectly(c, logger)
+	}
+
+	// 获取 HTTP 服务
+	httpSvc, err := container.MakeHTTP(c)
+	if err != nil {
+		return fmt.Errorf("获取 HTTP 服务失败: %w", err)
+	}
+
+	// 注册到 Host
+	httpHostable := host.NewHTTPService("http", httpSvc)
+	if err := hostSvc.RegisterService("http", httpHostable); err != nil {
+		return fmt.Errorf("注册 HTTP 服务到 Host 失败: %w", err)
+	}
+
+	logger.Info("starting http server")
+
+	// 设置信号处理
+	sigs := []os.Signal{os.Interrupt}
+	if runtime.GOOS != "windows" {
+		sigs = append(sigs, syscall.SIGTERM)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), sigs...)
+	defer stop()
+
+	// 启动 HTTP 服务
+	errCh := make(chan error, 1)
+	go func() {
+		if err := httpSvc.Run(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				errCh <- nil
+				return
+			}
+			errCh <- err
+		}
+	}()
+
+	// 等待信号或错误
+	select {
+	case <-ctx.Done():
+		logger.Info("shutdown signal received")
+	case err := <-errCh:
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// 优雅关闭
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := hostSvc.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("优雅关闭失败: %w", err)
+	}
+
+	logger.Info("http server stopped gracefully")
+	return nil
+}
+
+// runHTTPDirectly 直接启动 HTTP 服务（不依赖 Host）
+func runHTTPDirectly(c contract.Container, logger contract.Logger) error {
+	httpSvc, err := container.MakeHTTP(c)
+	if err != nil {
+		return fmt.Errorf("获取 HTTP 服务失败: %w", err)
+	}
+
+	logger.Info("starting http server (direct mode)")
+
+	// 设置信号处理
+	sigs := []os.Signal{os.Interrupt}
+	if runtime.GOOS != "windows" {
+		sigs = append(sigs, syscall.SIGTERM)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), sigs...)
+	defer stop()
+
+	// 启动 HTTP 服务
+	errCh := make(chan error, 1)
+	go func() {
+		if err := httpSvc.Run(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				errCh <- nil
+				return
+			}
+			errCh <- err
+		}
+	}()
+
+	// 等待信号或错误
+	select {
+	case <-ctx.Done():
+		logger.Info("shutdown signal received")
+	case err := <-errCh:
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// 优雅关闭
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpSvc.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("优雅关闭失败: %w", err)
+	}
+	logger.Info("http server stopped gracefully")
+	return nil
+}

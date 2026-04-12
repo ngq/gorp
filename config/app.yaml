@@ -1,0 +1,61 @@
+app:
+  address: ":8080"
+  # paths:
+  #   base: ""      # 默认使用当前工作目录
+  #   storage: ""   # 默认 <base>/storage
+  #   runtime: ""   # 默认 <storage>/runtime
+  #   log: ""       # 默认 <storage>/log
+  http:
+    read_timeout_sec: 15
+    write_timeout_sec: 15
+    idle_timeout_sec: 60
+
+# database:
+#   driver: "sqlite"     # sqlite|mysql|postgres
+#   backend: "gorm"      # gorm|sqlx|ent（当前默认 gorm；ent 预留）
+#   dsn: "file:demo.db?cache=shared&mode=rwc"
+#   max_open_conns: 10
+#   max_idle_conns: 5
+
+log:
+  level: "info"
+  format: "console"
+  driver: "stdout" # stdout|single|rotate
+  # file: "" # 默认由 app.paths.log 推导为 <storage>/log/gorp.log
+  # rotate_pattern: "" # 默认在 log.file 后追加 .%Y%m%d（driver=rotate）
+  # rotate_max_age: "168h" # for driver=rotate
+  # rotate_time: "24h" # for driver=rotate
+  # max_size_mb: 100 # for driver=single
+  # max_backups: 7   # for driver=single
+  # max_age_days: 7  # for driver=single
+  # compress: false  # for driver=single
+  # local_time: true # for driver=single
+
+swagger:
+  # 是否暴露 Swagger UI（生产环境建议关闭）
+  enable: false
+  # 可选：Basic Auth 保护 Swagger UI
+  basic_auth:
+    enable: false
+    username: "admin"
+    password: "admin"
+
+auth:
+  # 当前根项目默认仍走 cookie + server-session。
+  # 若配置 jwt.secret，则登录接口会额外返回 access_token，受保护接口也接受 Authorization: Bearer <token>。
+  jwt:
+    secret: ""
+
+dev:
+  # dev proxy 监听端口（对齐教程 Ch19-20）
+  port: "8070"
+  backend:
+    # 后端文件监听刷新延迟（秒），避免频繁保存导致连续重启
+    refresh_time: 1
+    # 后端 dev 模式监听端口
+    port: "8072"
+    # 监听目录：为空则默认监听 ./app
+    monitor_folder: ""
+  frontend:
+    # 前端 dev server 端口（npm run dev）
+    port: "8071"

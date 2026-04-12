@@ -1,0 +1,23 @@
+# 应用配置
+app:
+  name: {{.Name}}
+  env: development
+  debug: true
+  address: :8080
+
+# 数据库配置
+database:
+  driver: sqlite
+  dsn: {{.Name}}.db
+
+# Redis 配置
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+# 日志配置
+log:
+  level: debug
+  format: console
+  output: stdout

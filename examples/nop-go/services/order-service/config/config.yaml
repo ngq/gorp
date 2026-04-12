@@ -1,0 +1,37 @@
+app:
+  name: order-service
+  env: development
+  address: ":8005"
+
+database:
+  driver: mysql
+  dsn: "root:nop123456@tcp(mysql:3306)/nop_order?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: false
+  type: consul
+  consul:
+    addr: "consul:8500"
+    service_name: "order-service"
+
+# DTM 分布式事务配置
+dtm:
+  enabled: false
+  addr: "dtm:36790"
+
+services:
+  customer: "http://customer:8002"
+  inventory: "grpc://inventory:8008"
+  payment: "http://payment:8010"
+  shipping: "http://shipping:8012"
+  notification: "http://notification:8009"

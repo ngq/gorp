@@ -1,0 +1,12 @@
+{
+  "group": "Payment",
+  "friendly_name": "支付宝支付",
+  "system_name": "Payment.Alipay",
+  "version": "1.0.0",
+  "supported_versions": ["1.0"],
+  "author": "nop-go Team",
+  "display_order": 1,
+  "description": "支付宝网页支付、APP支付、扫码支付。支持即时到账和担保交易两种模式。",
+  "depends_on": [],
+  "file_name": ""
+}

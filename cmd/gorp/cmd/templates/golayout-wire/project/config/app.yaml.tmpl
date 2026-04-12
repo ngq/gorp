@@ -1,0 +1,30 @@
+# 应用配置
+# 中文说明：
+# - 使用 gorp 框架统一配置格式；
+# - 支持 noop 模式，单体阶段零依赖。
+
+app:
+  name: {{.Name}}
+  env: development
+  debug: true
+  address: :8080
+
+# 服务器配置
+server:
+  http:
+    addr: :8080
+    mode: debug  # debug, release, test
+
+# 数据库配置（单体阶段使用 sqlite）
+database:
+  driver: sqlite
+  dsn: {{.Name}}.db
+
+# 日志配置
+log:
+  level: debug
+  format: console  # console, json
+
+# tracing 配置（默认关闭）
+tracing:
+  enabled: false

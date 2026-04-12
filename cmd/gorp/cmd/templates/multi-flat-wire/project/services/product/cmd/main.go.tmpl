@@ -1,0 +1,36 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	productdata "{{.ModuleName}}/services/product/internal/data"
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+)
+
+// main 是 product 服务的主入口（Wire 装配版）。
+func main() {
+	if err := frameworkbootstrap.BootHTTPService("product-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&productdata.ProductPO{})
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return fmt.Errorf("product-service requires gorm database")
+	}
+	services, err := wireProductServices(rt.DB)
+	if err != nil {
+		return err
+	}
+	services.Product.RegisterRoutes(rt.Engine)
+	return nil
+}

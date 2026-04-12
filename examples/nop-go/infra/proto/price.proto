@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package nopgo.price;
+
+option go_package = "nop-go/infra/pb/price";
+
+// PriceService 价格服务
+//
+// 中文说明:
+// - 计算订单价格、税费、折扣;
+// - 支持 VIP 价格、阶梯价格;
+// - 用于订单创建前获取准确价格。
+service PriceService {
+  // CalculateOrderPrice 计算订单总价
+  //
+  // 中文说明:
+  // - 计算商品小计、折扣、税费、运费、总价;
+  // - 支持优惠券、积分抵扣;
+  // - 返回价格明细。
+  rpc CalculateOrderPrice(CalculateOrderPriceRequest) returns (CalculateOrderPriceResponse);
+
+  // GetProductPrice 获取商品价格
+  //
+  // 中文说明:
+  // - 获取商品当前售价;
+  // - 支持会员价格、阶梯价格;
+  // - 支持限时促销价。
+  rpc GetProductPrice(GetProductPriceRequest) returns (GetProductPriceResponse);
+
+  // ValidateCoupon 验证优惠券
+  rpc ValidateCoupon(ValidateCouponRequest) returns (ValidateCouponResponse);
+}
+
+message CalculateOrderPriceRequest {
+  uint64 customer_id = 1;
+  uint64 customer_role_id = 2;
+  repeated OrderItem items = 3;
+  string coupon_code = 4;
+  int32 reward_points = 5; // 使用积分
+  Address shipping_address = 6;
+}
+
+message OrderItem {
+  uint64 product_id = 1;
+  string sku = 2;
+  int32 quantity = 3;
+  map<string, string> attributes = 4; // 商品属性
+}
+
+message Address {
+  string country = 1;
+  string state = 2;
+  string city = 3;
+  string zip_code = 4;
+}
+
+message CalculateOrderPriceResponse {
+  double subtotal = 1;           // 商品小计
+  double discount_amount = 2;     // 折扣金额
+  double tax_amount = 3;          // 税费
+  double shipping_amount = 4;     // 运费
+  double reward_points_discount = 5; // 积分抵扣
+  double total = 6;               // 总价
+  string currency = 7;
+  repeated PriceBreakdown breakdown = 8;
+}
+
+message PriceBreakdown {
+  uint64 product_id = 1;
+  string product_name = 2;
+  int32 quantity = 3;
+  double unit_price = 4;
+  double subtotal = 5;
+  double discount = 6;
+  double tax = 7;
+  double total = 8;
+}
+
+message GetProductPriceRequest {
+  uint64 product_id = 1;
+  uint64 customer_role_id = 2;
+  int32 quantity = 3;
+}
+
+message GetProductPriceResponse {
+  uint64 product_id = 1;
+  double unit_price = 2;
+  double final_price = 3; // 优惠后价格
+  double tax_rate = 4;
+  bool on_sale = 5;
+}
+
+message ValidateCouponRequest {
+  string coupon_code = 1;
+  uint64 customer_id = 2;
+  double order_amount = 3;
+  repeated uint64 product_ids = 4;
+}
+
+message ValidateCouponResponse {
+  bool valid = 1;
+  string error_message = 2;
+  double discount_amount = 3;
+  string discount_type = 4; // percentage, fixed
+}

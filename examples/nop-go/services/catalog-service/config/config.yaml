@@ -1,0 +1,32 @@
+app:
+  name: catalog-service
+  env: development
+  address: ":8003"
+
+database:
+  driver: mysql
+  dsn: "root:nop123456@tcp(mysql:3306)/nop_catalog?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+# 服务发现配置
+discovery:
+  enabled: false
+  type: consul
+  consul:
+    addr: "consul:8500"
+    service_name: "catalog-service"
+    health_check_interval: "10s"
+
+# 服务间通信地址
+services:
+  inventory: "grpc://inventory:8008"
+  price: "grpc://price:8011"

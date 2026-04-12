@@ -1,0 +1,19 @@
+# 中文说明: 本地化服务配置
+# 多语言支持、资源字符串管理
+
+app:
+  name: localization-service
+  mode: debug
+
+http:
+  addr: :8015
+
+database:
+  driver: mysql
+  dsn: root:password@tcp(localhost:3306)/nop_localization?charset=utf8mb4&parseTime=True&loc=Local
+
+auth:
+  jwt:
+    secret: your-secret-key
+    issuer: nop-go
+    audience: nop-go-users

@@ -1,0 +1,30 @@
+# 中文说明: SEO服务配置
+# URL优化、元信息管理、sitemap生成
+
+app:
+  name: seo-service
+  mode: debug
+
+http:
+  addr: :8017
+
+database:
+  driver: mysql
+  dsn: root:password@tcp(localhost:3306)/nop_seo?charset=utf8mb4&parseTime=True&loc=Local
+
+auth:
+  jwt:
+    secret: your-secret-key
+    issuer: nop-go
+    audience: nop-go-users
+
+# SEO配置
+seo:
+  # 是否启用SEO优化
+  enabled: true
+  # 是否启用sitemap生成
+  sitemap_enabled: true
+  # 是否启用规范化URL
+  canonical_urls_enabled: true
+  # 是否启用自定义元信息
+  custom_meta_enabled: true

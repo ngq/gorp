@@ -1,0 +1,38 @@
+app:
+  name: payment-service
+  env: development
+  address: ":8085"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_payment?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "payment-service"
+
+# 支付配置
+payment:
+  alipay:
+    app_id: ""
+    private_key: ""
+    public_key: ""
+    notify_url: ""
+  wechat:
+    app_id: ""
+    mch_id: ""
+    api_key: ""
+    notify_url: ""

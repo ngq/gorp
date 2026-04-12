@@ -1,0 +1,36 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	userdata "{{.ModuleName}}/services/user/internal/data"
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+)
+
+// main 是 user 服务的主入口（Wire 装配版）。
+func main() {
+	if err := frameworkbootstrap.BootHTTPService("user-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&userdata.UserPO{})
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return fmt.Errorf("user-service requires gorm database")
+	}
+	services, err := wireUserServices(rt.DB)
+	if err != nil {
+		return err
+	}
+	services.User.RegisterRoutes(rt.Engine)
+	return nil
+}

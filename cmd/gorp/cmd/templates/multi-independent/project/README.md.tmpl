@@ -1,0 +1,137 @@
+# {{.ProjectName}}
+
+多微服务项目演进参考 - 完全独立服务目录方案（framework 原生装配）
+
+## 说明
+
+> 该结构用于大型项目演进参考，不作为当前对外 starter 模板直接提供。
+> 推荐先使用 `multi-flat` 起步，当团队规模、发布自治和仓库拆分需求提升后，再参考本结构逐步演进。
+
+## 技术栈
+
+| 类别 | 组件 |
+|-----|-----|
+| **Web 框架** | Gin |
+| **ORM** | GORM + SQLite |
+| **启动装配** | framework provider/container/bootstrap |
+| **缓存** | Redis |
+| **服务发现** | Consul |
+| **链路追踪** | Jaeger + OpenTelemetry |
+| **监控** | Prometheus + Grafana |
+| **限流熔断** | 自研组件 |
+
+## 项目结构
+
+```text
+├── services/                 # 各服务完全独立
+│   ├── user/                # 用户服务
+│   │   ├── cmd/             # 服务入口
+│   │   │   └── main.go      # 入口
+│   │   ├── internal/        # 服务内部代码
+│   │   ├── config/          # 服务配置
+│   │   ├── deployments/     # 服务部署配置
+│   │   └── go.mod           # 独立 go.mod
+│   ├── order/
+│   ├── product/
+│   └── gateway/
+├── shared/                   # 共享代码
+│   ├── config/              # 配置结构
+│   ├── db/                  # 数据库
+│   ├── infrastructure/      # 基础设施（Redis, Consul, Tracing...）
+│   └── logger/              # 日志
+├── deployments/              # 统一部署编排
+└── go.work                   # Go workspace
+```
+
+## 特点
+
+- **服务完全独立**：每个服务可单独拆分出仓库
+- **独立 go.mod**：每个服务有自己的依赖版本
+- **独立部署**：每个服务有自己的 Dockerfile
+- **framework 原生装配**：默认通过 framework 的 provider/container/bootstrap 完成启动装配
+- **共享基础设施**：通过 shared 模块复用微服务组件
+- **保留扩展空间**：项目后续如偏好 Wire，可自行替换默认装配方案
+
+## 快速开始
+
+### 1. 初始化 workspace
+
+```bash
+go work sync
+```
+
+### 2. 启动服务
+
+```bash
+# 本地运行（分别启动）
+make run-user    # 终端 1
+make run-order   # 终端 2
+make run-product # 终端 3
+
+# 或直接运行各服务 main 入口
+go run ./services/user/cmd
+go run ./services/order/cmd
+go run ./services/product/cmd
+
+# Docker 部署
+make deploy-local
+```
+
+### 3. 访问服务
+
+| 服务 | 地址 | 说明 |
+|-----|-----|-----|
+| 用户服务 | http://localhost:8081 | RESTful API |
+| 订单服务 | http://localhost:8082 | RESTful API |
+| 商品服务 | http://localhost:8083 | RESTful API |
+| Consul UI | http://localhost:8500 | 服务发现 |
+| Jaeger UI | http://localhost:16686 | 链路追踪 |
+
+## 日志使用建议
+
+- 默认优先使用 framework 提供的 logger 能力；
+- 服务启动阶段优先在 main / bootstrap 边界记录日志；
+- 业务逻辑里只有在需要附加 trace_id / request_id 等动态字段时，才在边界层基于 framework logger 补充字段；
+- 不把从 context 重新获取 logger 作为默认业务写法。
+
+## 日志使用建议
+
+- 默认优先使用 framework 提供的 logger 能力；
+- 服务启动阶段优先在 main / bootstrap 边界记录日志；
+- 业务逻辑里只有在需要附加 trace_id / request_id 等动态字段时，才在边界层基于 framework logger 补充字段；
+- 不把从 context 重新获取 logger 作为默认业务写法。
+
+## 组件清单
+
+
+| 组件 | 用途 | 使用方式 |
+|-----|-----|---------|
+| **Redis** | 缓存/分布式锁 | framework provider |
+| **Consul** | 服务发现/注册 | framework discovery provider |
+| **Jaeger** | 链路追踪 | framework tracing provider |
+| **Prometheus** | 监控指标 | `/metrics` 端点 |
+| **RateLimiter** | 限流 | framework middleware/provider |
+| **CircuitBreaker** | 熔断 | framework provider |
+
+## Makefile 命令
+
+| 命令 | 说明 |
+|-----|-----|
+| `make build` | 构建所有服务 |
+| `make deploy-local` | Docker Compose 部署 |
+| `make deploy-local-down` | 停止服务 |
+| `make test` | 运行测试 |
+
+## 服务拆分
+
+当需要将服务拆分为独立仓库时：
+
+```bash
+# 1. 复制服务目录
+cp -r services/user ../user-service-repo
+
+# 2. 复制 shared 模块（或发布为独立模块）
+cp -r shared ../user-service-repo/shared
+
+# 3. 更新 go.mod 中的 replace 指向
+```

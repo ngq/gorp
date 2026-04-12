@@ -1,0 +1,673 @@
+# nop-go 微服务 Docker Compose 配置
+# 包含所有微服务、基础设施和 Swagger 文档服务
+#
+# 使用方法:
+#   docker-compose up -d              # 启动所有服务
+#   docker-compose up -d mysql redis  # 仅启动基础设施
+#   docker-compose logs -f gateway    # 查看网关日志
+#   docker-compose down               # 停止所有服务
+
+services:
+  # ========== 基础设施 ==========
+
+  # MySQL 数据库 (使用 13306 端口避免与本地 MySQL 冲突)
+  mysql:
+    image: docker.m.daocloud.io/library/mysql:8.0
+    container_name: nop-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-nop123456}
+      MYSQL_DATABASE: nop_db
+      TZ: Asia/Shanghai
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infra/sql/init:/docker-entrypoint-initdb.d:ro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nop-network
+
+  # Redis 缓存 (使用 16379 端口避免与本地 Redis 冲突)
+  redis:
+    image: docker.m.daocloud.io/library/redis:7-alpine
+    container_name: nop-redis
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nop-network
+
+  # ========== 微服务 ==========
+
+  # API 网关 (端口 8000)
+  gateway:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: gateway-service
+    container_name: nop-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - ENABLE_SWAGGER=true
+    volumes:
+      - ./services/gateway-service/config:/app/config:ro
+    depends_on:
+      - customer
+      - catalog
+      - cart
+      - order
+    networks:
+      - nop-network
+
+  # 后台管理服务 (端口 8001)
+  admin:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: admin-service
+    container_name: nop-admin
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 客户服务 (端口 8002)
+  customer:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: customer-service
+    container_name: nop-customer
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_customer
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 商品目录服务 (端口 8003)
+  catalog:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: catalog-service
+    container_name: nop-catalog
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_catalog
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 购物车服务 (端口 8004)
+  cart:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: cart-service
+    container_name: nop-cart
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_cart
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 订单服务 (端口 8005)
+  order:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: order-service
+    container_name: nop-order
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    environment:
+      - PORT=8005
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_order
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # CMS 服务 (端口 8007)
+  cms:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: cms-service
+    container_name: nop-cms
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    environment:
+      - PORT=8007
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_cms
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 库存服务 (端口 8008)
+  inventory:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: inventory-service
+    container_name: nop-inventory
+    restart: unless-stopped
+    ports:
+      - "8008:8008"
+    environment:
+      - PORT=8008
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_inventory
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 通知服务 (端口 8009)
+  notification:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: notification-service
+    container_name: nop-notification
+    restart: unless-stopped
+    ports:
+      - "8009:8009"
+    environment:
+      - PORT=8009
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_notification
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 支付服务 (端口 8010)
+  payment:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: payment-service
+    container_name: nop-payment
+    restart: unless-stopped
+    ports:
+      - "8010:8010"
+    environment:
+      - PORT=8010
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_payment
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 价格服务 (端口 8011)
+  price:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: price-service
+    container_name: nop-price
+    restart: unless-stopped
+    ports:
+      - "8011:8011"
+    environment:
+      - PORT=8011
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_price
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 物流服务 (端口 8012)
+  shipping:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: shipping-service
+    container_name: nop-shipping
+    restart: unless-stopped
+    ports:
+      - "8012:8012"
+    environment:
+      - PORT=8012
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_shipping
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 多店铺服务 (端口 8013)
+  store:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: store-service
+    container_name: nop-store
+    restart: unless-stopped
+    ports:
+      - "8013:8013"
+    environment:
+      - PORT=8013
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_store
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 媒体服务 (端口 8014)
+  media:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: media-service
+    container_name: nop-media
+    restart: unless-stopped
+    ports:
+      - "8014:8014"
+    environment:
+      - PORT=8014
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_media
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    volumes:
+      - media_uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 多语言服务 (端口 8015)
+  localization:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: localization-service
+    container_name: nop-localization
+    restart: unless-stopped
+    ports:
+      - "8015:8015"
+    environment:
+      - PORT=8015
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_localization
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 联盟营销服务 (端口 8016)
+  affiliate:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: affiliate-service
+    container_name: nop-affiliate
+    restart: unless-stopped
+    ports:
+      - "8016:8016"
+    environment:
+      - PORT=8016
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_affiliate
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # SEO服务 (端口 8017)
+  seo:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: seo-service
+    container_name: nop-seo
+    restart: unless-stopped
+    ports:
+      - "8017:8017"
+    environment:
+      - PORT=8017
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_seo
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 导入导出服务 (端口 8018)
+  import:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: import-service
+    container_name: nop-import
+    restart: unless-stopped
+    ports:
+      - "8018:8018"
+    environment:
+      - PORT=8018
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_import
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    volumes:
+      - import_temp:/app/temp
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # 主题服务 (端口 8019)
+  theme:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: theme-service
+    container_name: nop-theme
+    restart: unless-stopped
+    ports:
+      - "8019:8019"
+    environment:
+      - PORT=8019
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_theme
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_SWAGGER=true
+    volumes:
+      - theme_themes:/app/themes
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # AI服务 (端口 8020)
+  ai:
+    build:
+      context: ../..
+      dockerfile: examples/nop-go/Dockerfile
+      args:
+        SERVICE_NAME: ai-service
+    container_name: nop-ai
+    restart: unless-stopped
+    ports:
+      - "8020:8020"
+    environment:
+      - PORT=8020
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-nop123456}
+      - DB_NAME=nop_ai
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - ENABLE_SWAGGER=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nop-network
+
+  # ========== Swagger 文档服务 ==========
+
+  # Swagger UI 聚合服务
+  swagger-ui:
+    image: docker.m.daocloud.io/swaggerapi/swagger-ui:v5.10.5
+    container_name: nop-swagger
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - URLS_PRIMARY_NAME=客户服务
+      - URLS=[
+          {"name":"后台管理","url":"http://localhost:8001/swagger/doc.json"},
+          {"name":"客户服务","url":"http://localhost:8002/swagger/doc.json"},
+          {"name":"商品目录","url":"http://localhost:8003/swagger/doc.json"},
+          {"name":"购物车","url":"http://localhost:8004/swagger/doc.json"},
+          {"name":"订单服务","url":"http://localhost:8005/swagger/doc.json"},
+          {"name":"CMS服务","url":"http://localhost:8007/swagger/doc.json"},
+          {"name":"库存服务","url":"http://localhost:8008/swagger/doc.json"},
+          {"name":"通知服务","url":"http://localhost:8009/swagger/doc.json"},
+          {"name":"支付服务","url":"http://localhost:8010/swagger/doc.json"},
+          {"name":"价格服务","url":"http://localhost:8011/swagger/doc.json"},
+          {"name":"物流服务","url":"http://localhost:8012/swagger/doc.json"},
+          {"name":"多店铺","url":"http://localhost:8013/swagger/doc.json"},
+          {"name":"媒体服务","url":"http://localhost:8014/swagger/doc.json"},
+          {"name":"多语言","url":"http://localhost:8015/swagger/doc.json"},
+          {"name":"联盟营销","url":"http://localhost:8016/swagger/doc.json"},
+          {"name":"SEO服务","url":"http://localhost:8017/swagger/doc.json"},
+          {"name":"导入导出","url":"http://localhost:8018/swagger/doc.json"},
+          {"name":"主题服务","url":"http://localhost:8019/swagger/doc.json"},
+          {"name":"AI服务","url":"http://localhost:8020/swagger/doc.json"}
+        ]
+    networks:
+      - nop-network
+
+networks:
+  nop-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  media_uploads:
+  import_temp:
+  theme_themes:

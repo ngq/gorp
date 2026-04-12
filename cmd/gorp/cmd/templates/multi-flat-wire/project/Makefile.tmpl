@@ -1,0 +1,42 @@
+# {{.ProjectName}}
+
+.PHONY: build clean run-user run-order run-product run-gateway test tidy gen-wire
+
+build:
+	go build -o bin/user ./services/user/cmd
+	go build -o bin/order ./services/order/cmd
+	go build -o bin/product ./services/product/cmd
+	go build -o bin/gateway ./cmd/gateway
+
+gen-wire:
+	wire ./services/user/cmd
+	wire ./services/order/cmd
+	wire ./services/product/cmd
+
+tidy:
+	go mod tidy
+
+run-user:
+	go run ./services/user/cmd
+
+run-order:
+	go run ./services/order/cmd
+
+run-product:
+	go run ./services/product/cmd
+
+run-gateway:
+	go run ./cmd/gateway
+
+test:
+	go test ./... -v
+
+clean:
+	rm -rf bin/
+	rm -f *.db
+
+deploy-local:
+	docker-compose -f deployments/compose/docker-compose.yaml up -d
+
+deploy-local-down:
+	docker-compose -f deployments/compose/docker-compose.yaml down

@@ -1,0 +1,66 @@
+package infrastructure
+
+import (
+	"context"
+	"time"
+
+	"{{.ModuleName}}/internal/config"
+)
+
+// Cache 缓存接口
+type Cache interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value string, ttl time.Duration) error
+	Del(ctx context.Context, key string) error
+}
+
+// RedisCache Redis 缓存实现
+type RedisCache struct {
+	redis *RedisClient
+	ttl   time.Duration
+}
+
+// NewRedisCache 创建 Redis 缓存
+func NewRedisCache(redis *RedisClient, cfg *config.Config) *RedisCache {
+	if !cfg.Cache.Enabled || redis == nil {
+		return nil
+	}
+	return &RedisCache{
+		redis: redis,
+		ttl:   cfg.Cache.TTL,
+	}
+}
+
+// Get 获取缓存
+func (c *RedisCache) Get(ctx context.Context, key string) (string, error) {
+	return c.redis.Get(ctx, key)
+}
+
+// Set 设置缓存
+func (c *RedisCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	if ttl == 0 {
+		ttl = c.ttl
+	}
+	return c.redis.Set(ctx, key, value, ttl)
+}
+
+// Del 删除缓存
+func (c *RedisCache) Del(ctx context.Context, key string) error {
+	return c.redis.Del(ctx, key)
+}
+
+// Remember 缓存穿透模式
+func (c *RedisCache) Remember(ctx context.Context, key string, ttl time.Duration, fn func() (string, error)) (string, error) {
+	val, err := c.Get(ctx, key)
+	if err == nil {
+		return val, nil
+	}
+
+	val, err = fn()
+	if err != nil {
+		return "", err
+	}
+
+	_ = c.Set(ctx, key, val, ttl)
+	return val, nil
+}

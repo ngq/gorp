@@ -1,0 +1,64 @@
+# {{.Name}}
+
+由 `gorp new offline` 生成的业务项目骨架。
+
+## 当前 backend
+
+- `{{.Backend}}`
+- 设计原则：统一能力，不统一查询语法
+{{- if .IsEntBackend }}
+- 当前 starter 的 `ent` 路径仍是骨架占位，后续需要你在项目内补 ent provider / repository 实现。
+{{- else }}
+- 当前 starter 默认按 `gorm` 路径生成，可直接继续扩展业务代码。
+{{- end }}
+
+## 当前模板包含什么
+
+这是一套更适合本地联调的 starter，默认包含：
+
+- `cmd/app/main.go`：项目入口
+- `app/http/routes.go`：最小 HTTP 路由
+- `app/service/ping.go`：最小业务 service 示例
+- `config/app.yaml`：基础配置
+- `app/service/`、`app/model/`、`app/provider/`：业务扩展目录
+- `storage/log/`、`storage/runtime/`：运行期目录占位
+- `docs/structure.md`：starter 目录说明
+- `.gitignore`：常见忽略规则
+
+## Quick start
+
+```bash
+go mod tidy
+go run ./cmd/app app start
+```
+
+## 启动后先验证什么
+
+推荐先访问：
+
+- `GET /healthz`
+- `GET /api/ping`
+- `/swagger/index.html`（取决于配置）
+
+## 推荐先看哪几个文件
+
+1. `cmd/app/main.go`
+2. `app/http/routes.go`
+3. `app/service/ping.go`
+4. `config/app.yaml`
+5. `docs/structure.md`
+
+## 为什么 offline 模板里会有 replace
+
+`offline` 主要面向当前框架仓库内的本地联调，因此 `go.mod` 默认会把框架模块 replace 到你的本地源码目录。
+
+适合场景：
+- 正在开发框架本身
+- 需要生成一个 demo/starter 工程快速联调
+
+如果你希望生成一个“更像外部用户拿到的 starter 项目”，请使用：
+
+```bash
+gorp template pack
+gorp new from-release --repo <owner>/<repo> --tag latest
+```

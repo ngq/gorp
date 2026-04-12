@@ -1,0 +1,12 @@
+{
+  "group": "Payment",
+  "friendly_name": "微信支付",
+  "system_name": "Payment.Wechat",
+  "version": "1.0.0",
+  "supported_versions": ["1.0"],
+  "author": "nop-go Team",
+  "display_order": 2,
+  "description": "微信支付:JSAPI支付、APP支付、H5支付、Native支付(扫码支付)、小程序支付。",
+  "depends_on": [],
+  "file_name": ""
+}

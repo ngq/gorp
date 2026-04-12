@@ -1,0 +1,143 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "nop-go 微服务 API 文档",
+    "description": "nopCommerce Go 版本微服务聚合 API 文档",
+    "version": "1.0.0"
+  },
+  "apis": [
+    {
+      "name": "admin-service",
+      "title": "后台管理服务",
+      "description": "后台管理、用户权限、系统配置",
+      "version": "1.0",
+      "port": 8001
+    },
+    {
+      "name": "affiliate-service",
+      "title": "联盟营销服务",
+      "description": "联盟营销、佣金管理、推广追踪",
+      "version": "1.0",
+      "port": 8016
+    },
+    {
+      "name": "ai-service",
+      "title": "AI智能服务",
+      "description": "AI聊天、商品推荐、内容生成",
+      "version": "1.0",
+      "port": 8020
+    },
+    {
+      "name": "cart-service",
+      "title": "购物车服务",
+      "description": "购物车、优惠券、促销",
+      "version": "1.0",
+      "port": 8004
+    },
+    {
+      "name": "catalog-service",
+      "title": "商品目录服务",
+      "description": "商品管理、分类、品牌、规格",
+      "version": "1.0",
+      "port": 8003
+    },
+    {
+      "name": "cms-service",
+      "title": "内容管理服务",
+      "description": "页面、博客、菜单、投票",
+      "version": "1.0",
+      "port": 8007
+    },
+    {
+      "name": "customer-service",
+      "title": "客户服务",
+      "description": "用户注册登录、地址管理、GDPR合规",
+      "version": "1.0",
+      "port": 8002
+    },
+    {
+      "name": "import-service",
+      "title": "导入导出服务",
+      "description": "数据导入导出、Excel处理",
+      "version": "1.0",
+      "port": 8018
+    },
+    {
+      "name": "inventory-service",
+      "title": "库存服务",
+      "description": "库存管理、仓储、库存预警",
+      "version": "1.0",
+      "port": 8008
+    },
+    {
+      "name": "localization-service",
+      "title": "多语言服务",
+      "description": "多语言、货币、时区管理",
+      "version": "1.0",
+      "port": 8015
+    },
+    {
+      "name": "media-service",
+      "title": "媒体服务",
+      "description": "图片、文件上传与管理",
+      "version": "1.0",
+      "port": 8014
+    },
+    {
+      "name": "notification-service",
+      "title": "通知服务",
+      "description": "邮件、短信、站内通知",
+      "version": "1.0",
+      "port": 8009
+    },
+    {
+      "name": "order-service",
+      "title": "订单服务",
+      "description": "订单流程、退款、状态管理",
+      "version": "1.0",
+      "port": 8005
+    },
+    {
+      "name": "payment-service",
+      "title": "支付服务",
+      "description": "支付方式、交易、退款",
+      "version": "1.0",
+      "port": 8010
+    },
+    {
+      "name": "price-service",
+      "title": "价格服务",
+      "description": "价格规则、折扣、会员价",
+      "version": "1.0",
+      "port": 8011
+    },
+    {
+      "name": "seo-service",
+      "title": "SEO服务",
+      "description": "URL优化、元数据、站点地图",
+      "version": "1.0",
+      "port": 8017
+    },
+    {
+      "name": "shipping-service",
+      "title": "物流服务",
+      "description": "配送方式、运费计算、物流追踪",
+      "version": "1.0",
+      "port": 8012
+    },
+    {
+      "name": "store-service",
+      "title": "多店铺服务",
+      "description": "多店铺、多供应商管理",
+      "version": "1.0",
+      "port": 8013
+    },
+    {
+      "name": "theme-service",
+      "title": "主题服务",
+      "description": "主题管理、样式变量、模板",
+      "version": "1.0",
+      "port": 8019
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	orderservice "{{.ModuleName}}/services/order"
+)
+
+// main 是 order 服务的主入口。
+func main() {
+	if err := orderservice.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

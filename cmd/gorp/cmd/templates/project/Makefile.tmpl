@@ -1,0 +1,15 @@
+APP_NAME ?= gorp-app
+
+.PHONY: tidy test build run
+
+tidy:
+	go mod tidy
+
+test:
+	go test ./...
+
+build:
+	go build -o ./.tmp/$(APP_NAME) ./cmd/app
+
+run:
+	go run ./cmd/app app start

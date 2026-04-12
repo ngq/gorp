@@ -1,0 +1,21 @@
+basePath: /api/v1
+host: localhost:8002
+info:
+  contact:
+    email: support@nop-go.local
+    name: API Support
+  description: 客户服务 - 用户注册、登录、地址管理、GDPR合规
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: 客户服务 API
+  version: "1.0"
+paths: {}
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT认证令牌，格式: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

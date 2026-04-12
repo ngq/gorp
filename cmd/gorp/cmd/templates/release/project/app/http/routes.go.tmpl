@@ -1,0 +1,12 @@
+package http
+
+import (
+	"github.com/gin-gonic/gin"
+	"{{.FrameworkModule}}/app/http/handler"
+)
+
+// RegisterRoutes 挂载 starter 默认路由。
+func RegisterRoutes(engine *gin.Engine) {
+	engine.GET("/healthz", handler.Health)
+	engine.GET("/api/ping", handler.Ping)
+}

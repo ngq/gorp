@@ -1,0 +1,16 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	productservice "{{.ModuleName}}/services/product"
+)
+
+// main 是 product 服务的主入口。
+func main() {
+	if err := productservice.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

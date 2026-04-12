@@ -1,0 +1,87 @@
+# nop-go Alertmanager 配置
+# 告警路由、分组、静默和通知配置
+
+global:
+  # SMTP 配置（邮件通知）
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alertmanager@example.com'
+  smtp_auth_username: 'alertmanager@example.com'
+  smtp_auth_password: 'your-password'
+
+  # Slack Webhook（可选）
+  # slack_api_url: 'https://hooks.slack.com/services/xxx'
+
+# 告警模板
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# 路由配置
+route:
+  group_by: ['alertname', 'severity']  # 分组依据
+  group_wait: 30s       # 等待同组告警聚合
+  group_interval: 5m    # 同组告警发送间隔
+  repeat_interval: 4h   # 重复告警发送间隔
+  receiver: 'default'   # 默认接收者
+
+  # 子路由
+  routes:
+    # 关严重告警 -> 立即发送邮件
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # 警告级别告警 -> 普通邮件
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 5m
+      repeat_interval: 4h
+
+    # 服务宕机告警 -> 特殊处理
+    - match:
+        alertname: ServiceDown
+      receiver: 'service-down-alerts'
+      group_wait: 30s
+
+# 接收者配置
+receivers:
+  # 默认接收者
+  - name: 'default'
+    email_configs:
+      - to: 'team@example.com'
+        send_resolved: true
+
+  # 严重告警接收者
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@example.com'
+        send_resolved: true
+    # Slack 通知（可选）
+    # slack_configs:
+    #   - channel: '#alerts-critical'
+    #     send_resolved: true
+
+  # 警告告警接收者
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'team@example.com'
+        send_resolved: true
+
+  # 服务宕机告警接收者
+  - name: 'service-down-alerts'
+    email_configs:
+      - to: 'oncall@example.com'
+        send_resolved: true
+    # PagerDuty（可选）
+    # pagerduty_configs:
+    #   - service_key: 'your-service-key'
+
+# 静默规则（可选）
+# inhibit_rules:
+#   - source_match:
+#       severity: 'critical'
+#     target_match:
+#       severity: 'warning'
+#     equal: ['alertname', 'instance']

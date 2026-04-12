@@ -1,0 +1,111 @@
+package runtime_provider
+
+import (
+	"fmt"
+
+	apphttp "{{.ModuleName}}/app/http"
+	"{{.ModuleName}}/internal/data"
+	"{{.ModuleName}}/internal/service"
+	ginprovider "{{.FrameworkModule}}/framework/provider/gin"
+	"{{.FrameworkModule}}/framework/contract"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"gorm.io/gorm"
+)
+
+// HTTPRuntimeConfigurator 收口项目 HTTP 运行时装配。
+type HTTPRuntimeConfigurator struct{}
+
+// CronRuntimeConfigurator 收口项目 cron 运行时装配。
+type CronRuntimeConfigurator struct{}
+
+// GRPCRuntimeBuilder 收口项目 gRPC 运行时装配。
+type GRPCRuntimeBuilder struct {
+	c contract.Container
+}
+
+// Provider 注册项目自己的 runtime provider。
+//
+// 中文说明：
+// - 这是模板项目侧的 runtime provider；
+// - 生成项目会通过 cmd.RegisterBootstrapProviders 显式把它注入 CLI bootstrap；
+// - 这样 `gorp app/grpc/cron` 跑的是项目自己的装配，而不是母仓默认 runtime。
+type Provider struct{}
+
+// NewProvider 创建 runtime provider。
+func NewProvider() *Provider { return &Provider{} }
+
+// Name 返回 provider 名称。
+func (p *Provider) Name() string { return "app.runtime" }
+
+// IsDefer 表示立即注册。
+func (p *Provider) IsDefer() bool { return false }
+
+// Provides 返回 runtime 相关 key。
+func (p *Provider) Provides() []string {
+	return []string{
+		contract.HTTPRuntimeConfiguratorKey,
+		contract.CronRuntimeConfiguratorKey,
+		contract.GRPCRuntimeBuilderKey,
+	}
+}
+
+// Register 注册 runtime 相关能力。
+func (p *Provider) Register(c contract.Container) error {
+	c.Bind(contract.HTTPRuntimeConfiguratorKey, func(contract.Container) (any, error) {
+		return HTTPRuntimeConfigurator{}, nil
+	}, true)
+	c.Bind(contract.CronRuntimeConfiguratorKey, func(contract.Container) (any, error) {
+		return CronRuntimeConfigurator{}, nil
+	}, true)
+	c.Bind(contract.GRPCRuntimeBuilderKey, func(contract.Container) (any, error) {
+		return GRPCRuntimeBuilder{c: c}, nil
+	}, true)
+	return nil
+}
+
+// Boot 启动 runtime provider。
+func (p *Provider) Boot(contract.Container) error { return nil }
+
+// ConfigureHTTPRuntime 装配 HTTP 运行时。
+func (HTTPRuntimeConfigurator) ConfigureHTTPRuntime(c contract.Container) error {
+	if gormAny, err := c.Make(contract.GormKey); err == nil {
+		db, ok := gormAny.(*gorm.DB)
+		if !ok {
+			return fmt.Errorf("gorm service is not *gorm.DB: %T", gormAny)
+		}
+		if err := db.AutoMigrate(&data.DemoPO{}); err != nil {
+			return err
+		}
+	}
+
+	engine, err := ginprovider.EngineFromContainer(c)
+	if err != nil {
+		return err
+	}
+
+	servicesAny, err := c.Make("app.services")
+	if err != nil {
+		return err
+	}
+	services, ok := servicesAny.(*service.Services)
+	if !ok {
+		return fmt.Errorf("app.services is not *service.Services: %T", servicesAny)
+	}
+
+	apphttp.RegisterRoutes(engine, services)
+	return nil
+}
+
+// ConfigureCronRuntime 装配 cron 运行时。
+func (CronRuntimeConfigurator) ConfigureCronRuntime(c contract.Container) (int, error) {
+	return 0, nil
+}
+
+// BuildGRPCServer 构造项目侧 gRPC Server。
+func (b GRPCRuntimeBuilder) BuildGRPCServer() *grpc.Server {
+	srv := grpc.NewServer()
+	reflection.Register(srv)
+	return srv
+}

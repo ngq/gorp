@@ -1,0 +1,42 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	apphttp "{{.ModuleName}}/app/http"
+	"{{.ModuleName}}/internal/data"
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+)
+
+// main 是 golayout-wire 项目的主入口。
+//
+// 中文说明：
+// - 默认通过 framework/bootstrap 启动 HTTP 服务；
+// - 业务依赖图通过 Wire 在编译期生成；
+// - 用户日常开发时直接 `go run ./cmd/app` 即可。
+func main() {
+	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&data.DemoPO{})
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return fmt.Errorf("{{.Name}} requires gorm database")
+	}
+	svc, err := wireServices(rt.DB)
+	if err != nil {
+		return err
+	}
+	apphttp.RegisterRoutes(rt.Engine, svc)
+	return nil
+}

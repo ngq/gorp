@@ -1,0 +1,115 @@
+# nop-go 告警规则配置
+# 包含服务可用性、性能、错误率等告警规则
+
+groups:
+  # ========== 服务可用性告警 ==========
+  - name: service_availability
+    rules:
+      # 服务宕机告警
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务 {{ $labels.job }} 宕机"
+          description: "服务 {{ $labels.instance }} 已经宕机超过1分钟，请立即检查"
+
+      # 健康检查失败
+      - alert: HealthCheckFailed
+        expr: http_requests_total{status="500"} > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "服务 {{ $labels.service }} 健康检查失败"
+          description: "服务 {{ $labels.service }} 在过去2分钟内500错误超过10次"
+
+  # ========== 性能告警 ==========
+  - name: service_performance
+    rules:
+      # 高延迟告警
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "服务 {{ $labels.service }} 高延迟"
+          description: "服务 {{ $labels.service }} 的P95延迟超过1秒，当前值: {{ $value }}s"
+
+      # P99 延迟告警
+      - alert: VeryHighLatency
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 3
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务 {{ $labels.service }} 极高延迟"
+          description: "服务 {{ $labels.service }} 的P99延迟超过3秒，当前值: {{ $value }}s"
+
+      # 请求堆积告警
+      - alert: RequestBacklog
+        expr: http_requests_in_flight > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "服务 {{ $labels.service }} 请求堆积"
+          description: "服务 {{ $labels.service }} 当前正在处理 {{ $value }} 个请求，可能存在瓶颈"
+
+  # ========== 错误率告警 ==========
+  - name: error_rate
+    rules:
+      # 高错误率告警
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "服务 {{ $labels.service }} 错误率过高"
+          description: "服务 {{ $labels.service }} 的5xx错误率超过5%，当前值: {{ $value | humanizePercentage }}"
+
+      # 极高错误率告警
+      - alert: VeryHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务 {{ $labels.service }} 错误率极高"
+          description: "服务 {{ $labels.service }} 的5xx错误率超过10%，当前值: {{ $value | humanizePercentage }}"
+
+  # ========== 基础设施告警 ==========
+  - name: infrastructure
+    rules:
+      # MySQL 连接数过高
+      - alert: MySQLHighConnections
+        expr: mysql_global_status_threads_connected > 150
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL 连接数过高"
+          description: "MySQL 当前连接数 {{ $value }}，接近最大限制"
+
+      # Redis 内存使用过高
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 内存使用过高"
+          description: "Redis 内存使用率 {{ $value | humanizePercentage }}，超过80%"
+
+      # 容器内存使用过高
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "容器 {{ $labels.name }} 内存使用过高"
+          description: "容器 {{ $labels.name }} 内存使用率超过90%"

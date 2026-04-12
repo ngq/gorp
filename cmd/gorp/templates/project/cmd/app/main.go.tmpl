@@ -1,0 +1,11 @@
+package main
+
+import (
+	"{{.FrameworkModule}}/cmd/gorp/cmd"
+)
+
+func main() {
+	// 说明：这里复用框架自带 CLI 的 app start 流程。
+	// 后续你也可以把业务自己的命令组挂到 rootCmd 下。
+	_ = cmd.Execute()
+}

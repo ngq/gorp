@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package nopgo.shipping;
+
+option go_package = "nop-go/infra/pb/shipping";
+
+// ShippingService 配送服务
+//
+// 中文说明:
+// - 计算运费;
+// - 创建运单;
+// - 获取物流追踪信息。
+service ShippingService {
+  // CalculateShipping 计算运费
+  //
+  // 中文说明:
+  // - 根据收货地址和包裹信息计算运费;
+  // - 返回可选的配送方式。
+  rpc CalculateShipping(CalculateShippingRequest) returns (CalculateShippingResponse);
+
+  // CreateShipment 创建运单
+  rpc CreateShipment(CreateShipmentRequest) returns (CreateShipmentResponse);
+
+  // GetTrackingInfo 获取物流追踪
+  rpc GetTrackingInfo(GetTrackingInfoRequest) returns (GetTrackingInfoResponse);
+
+  // CancelShipment 取消运单
+  rpc CancelShipment(CancelShipmentRequest) returns (CancelShipmentResponse);
+}
+
+message CalculateShippingRequest {
+  uint64 order_id = 1;
+  Address from_address = 2;
+  Address to_address = 3;
+  repeated Package packages = 4;
+  string currency = 5;
+}
+
+message Address {
+  string country = 1;
+  string state = 2;
+  string city = 3;
+  string address1 = 4;
+  string address2 = 5;
+  string zip_code = 6;
+  string phone = 7;
+  string name = 8;
+}
+
+message Package {
+  double weight = 1; // kg
+  double length = 2; // cm
+  double width = 3;
+  double height = 4;
+  double value = 5;
+  int32 quantity = 6;
+}
+
+message CalculateShippingResponse {
+  repeated ShippingOption options = 1;
+  string error_message = 2;
+}
+
+message ShippingOption {
+  string code = 1;
+  string name = 2;
+  double amount = 3;
+  string currency = 4;
+  int32 estimated_days = 5;
+  string description = 6;
+}
+
+message CreateShipmentRequest {
+  uint64 order_id = 1;
+  string shipping_method_code = 2;
+  Address from_address = 3;
+  Address to_address = 4;
+  repeated Package packages = 5;
+}
+
+message CreateShipmentResponse {
+  bool success = 1;
+  uint64 shipment_id = 2;
+  string tracking_number = 3;
+  string label_url = 4;
+  string error_message = 5;
+}
+
+message GetTrackingInfoRequest {
+  string tracking_number = 1;
+}
+
+message GetTrackingInfoResponse {
+  string tracking_number = 1;
+  string status = 2;
+  repeated TrackingEvent events = 3;
+  string estimated_delivery = 4;
+}
+
+message TrackingEvent {
+  string time = 1;
+  string location = 2;
+  string description = 3;
+  string status = 4;
+}
+
+message CancelShipmentRequest {
+  uint64 shipment_id = 1;
+}
+
+message CancelShipmentResponse {
+  bool success = 1;
+  string error_message = 2;
+}

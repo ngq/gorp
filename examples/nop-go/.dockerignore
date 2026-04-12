@@ -1,0 +1,67 @@
+# Git 相关
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# 文档
+*.md
+docs/
+
+# 日志和临时文件
+*.log
+*.tmp
+*.temp
+
+# 编译产物
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 测试文件
+*_test.go
+testdata/
+coverage/
+
+# 开发文件
+.env
+.env.*
+*.local
+
+# Claude 相关
+.claude/
+
+# 临时目录
+.tmp/
+
+# 依赖目录（会在构建时重新下载）
+vendor/
+
+# 前端相关（如果有）
+node_modules/
+dist/
+*.js.map
+
+# Go 缓存
+go.sum
+
+# Docker 相关
+docker-compose*.yml
+Dockerfile*
+.docker/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# 其他
+Makefile
+*.bak
+*.orig

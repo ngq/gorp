@@ -1,0 +1,43 @@
+app:
+  name: media-service
+  env: development
+  address: ":8093"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_media?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "media-service"
+
+# 媒体存储配置
+storage:
+  type: local  # local / s3 / oss
+  local:
+    path: ./uploads
+    url_prefix: /media
+  # s3:
+  #   bucket: my-bucket
+  #   region: us-east-1
+  #   access_key: ""
+  #   secret_key: ""
+
+auth:
+  jwt:
+    secret: "your-secret-key"
+    issuer: "media-service"
+    audience: "admin"

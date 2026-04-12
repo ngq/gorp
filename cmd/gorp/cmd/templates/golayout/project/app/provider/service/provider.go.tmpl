@@ -1,0 +1,65 @@
+package provider
+
+import (
+	"{{.ModuleName}}/internal/biz"
+	"{{.ModuleName}}/internal/data"
+	"{{.ModuleName}}/internal/service"
+
+	"{{.FrameworkModule}}/framework/contract"
+)
+
+// ServiceProvider 注册应用所需的所有服务。
+//
+// 中文说明：
+// - 遵循 gorp 框架的 Provider 模式；
+// - 按依赖顺序注册：data -> biz -> service；
+// - 支持 noop 模式，单体阶段零依赖。
+type ServiceProvider struct{}
+
+// NewProvider 创建服务 provider。
+func NewProvider() *ServiceProvider {
+	return &ServiceProvider{}
+}
+
+// Name 返回 Provider 名称。
+func (p *ServiceProvider) Name() string {
+	return "app-service"
+}
+
+// IsDefer 返回是否延迟加载。
+func (p *ServiceProvider) IsDefer() bool {
+	return false
+}
+
+// Provides 返回提供的服务键。
+func (p *ServiceProvider) Provides() []string {
+	return []string{"app.biz", "app.services"}
+}
+
+// Register 注册服务到容器。
+func (p *ServiceProvider) Register(c contract.Container) error {
+	// 注册 Data 层（数据访问）
+	c.Bind("app.data", func(c contract.Container) (interface{}, error) {
+		return data.NewData(c), nil
+	}, true)
+
+	// 注册 Biz 层（业务逻辑）
+	c.Bind("app.biz", func(c contract.Container) (interface{}, error) {
+		dataAny, _ := c.Make("app.data")
+		d := dataAny.(*data.Data)
+		return biz.NewBiz(data.NewDemoRepo(d)), nil
+	}, true)
+
+	// 注册 Service 层（HTTP 接口）
+	c.Bind("app.services", func(c contract.Container) (interface{}, error) {
+		bizAny, _ := c.Make("app.biz")
+		return service.NewServices(bizAny.(*biz.Biz)), nil
+	}, true)
+
+	return nil
+}
+
+// Boot 启动服务。
+func (p *ServiceProvider) Boot(c contract.Container) error {
+	return nil
+}

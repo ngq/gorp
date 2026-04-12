@@ -1,0 +1,45 @@
+# {{.Name}}
+
+由 `gorp new from-release` 生成的 starter 项目。
+
+## 当前模板包含什么
+
+这是一套面向发布场景的 starter，默认包含：
+
+- `cmd/app/main.go`：项目入口
+- `app/http/routes.go`：最小 HTTP 路由
+- `app/service/ping.go`：最小业务 service 示例
+- `config/app.yaml`：基础配置
+- `app/service/`、`app/model/`、`app/provider/`：业务扩展目录
+- `storage/log/`、`storage/runtime/`：运行期目录占位
+- `docs/structure.md`：starter 目录说明
+- `.gitignore`：常见忽略规则
+
+## Quick start
+
+```bash
+go mod tidy
+go run ./cmd/app app start
+```
+
+## 启动后先验证什么
+
+推荐先访问：
+
+- `GET /healthz`
+- `GET /api/ping`
+- `/swagger/index.html`（取决于配置）
+
+## 推荐先看哪几个文件
+
+1. `cmd/app/main.go`
+2. `app/http/routes.go`
+3. `app/service/ping.go`
+4. `config/app.yaml`
+5. `docs/structure.md`
+
+## release starter 的特点
+
+- 不依赖本地框架源码路径
+- 适合通过 GitHub Release 模板资产直接创建项目
+- 默认模板资产文件名为：`gorp-template.zip`

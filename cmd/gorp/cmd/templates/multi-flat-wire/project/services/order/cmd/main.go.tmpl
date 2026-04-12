@@ -1,0 +1,36 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	orderdata "{{.ModuleName}}/services/order/internal/data"
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+)
+
+// main 是 order 服务的主入口（Wire 装配版）。
+func main() {
+	if err := frameworkbootstrap.BootHTTPService("order-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&orderdata.OrderPO{})
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return fmt.Errorf("order-service requires gorm database")
+	}
+	services, err := wireOrderServices(rt.DB)
+	if err != nil {
+		return err
+	}
+	services.Order.RegisterRoutes(rt.Engine)
+	return nil
+}

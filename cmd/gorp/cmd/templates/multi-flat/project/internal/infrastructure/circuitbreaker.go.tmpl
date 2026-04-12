@@ -1,0 +1,164 @@
+package infrastructure
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"{{.ModuleName}}/internal/config"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
+)
+
+// RateLimiter 限流器
+type RateLimiter struct {
+	limiter *rate.Limiter
+}
+
+// NewRateLimiter 创建限流器
+func NewRateLimiter(cfg *config.Config) *RateLimiter {
+	if !cfg.RateLimit.Enabled {
+		return nil
+	}
+	return &RateLimiter{
+		limiter: rate.NewLimiter(rate.Limit(cfg.RateLimit.RequestsPerSecond), cfg.RateLimit.Burst),
+	}
+}
+
+// Allow 检查是否允许请求
+func (r *RateLimiter) Allow() bool {
+	if r == nil {
+		return true
+	}
+	return r.limiter.Allow()
+}
+
+// Wait 等待直到允许
+func (r *RateLimiter) Wait(ctx context.Context) error {
+	if r == nil {
+		return nil
+	}
+	return r.limiter.Wait(ctx)
+}
+
+// Middleware Gin 限流中间件
+func (r *RateLimiter) Middleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if r != nil && !r.Allow() {
+			c.JSON(429, gin.H{"error": "too many requests"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// =====================================
+// 熔断器
+// =====================================
+
+// CircuitBreakerState 熔断器状态
+type CircuitBreakerState int
+
+const (
+	StateClosed CircuitBreakerState = iota
+	StateOpen
+	StateHalfOpen
+)
+
+// CircuitBreaker 熔断器
+type CircuitBreaker struct {
+	mu        sync.Mutex
+	state     CircuitBreakerState
+	failures  int
+	threshold int
+	timeout   time.Duration
+	lastFail  time.Time
+}
+
+// NewCircuitBreaker 创建熔断器
+func NewCircuitBreaker(cfg *config.Config) *CircuitBreaker {
+	if !cfg.CircuitBreaker.Enabled {
+		return nil
+	}
+	return &CircuitBreaker{
+		state:     StateClosed,
+		threshold: cfg.CircuitBreaker.Threshold,
+		timeout:   cfg.CircuitBreaker.Timeout,
+	}
+}
+
+// Allow 检查是否允许请求
+func (cb *CircuitBreaker) Allow() bool {
+	if cb == nil {
+		return true
+	}
+
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	switch cb.state {
+	case StateClosed:
+		return true
+	case StateOpen:
+		if time.Since(cb.lastFail) > cb.timeout {
+			cb.state = StateHalfOpen
+			return true
+		}
+		return false
+	case StateHalfOpen:
+		return true
+	}
+	return false
+}
+
+// RecordSuccess 记录成功
+func (cb *CircuitBreaker) RecordSuccess() {
+	if cb == nil {
+		return
+	}
+
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	cb.failures = 0
+	cb.state = StateClosed
+}
+
+// RecordFailure 记录失败
+func (cb *CircuitBreaker) RecordFailure() {
+	if cb == nil {
+		return
+	}
+
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	cb.failures++
+	cb.lastFail = time.Now()
+
+	if cb.failures >= cb.threshold {
+		cb.state = StateOpen
+	}
+}
+
+// Execute 执行函数（带熔断保护）
+func (cb *CircuitBreaker) Execute(fn func() error) error {
+	if cb != nil && !cb.Allow() {
+		return fmt.Errorf("circuit breaker is open")
+	}
+
+	err := fn()
+	if err != nil {
+		if cb != nil {
+			cb.RecordFailure()
+		}
+		return err
+	}
+
+	if cb != nil {
+		cb.RecordSuccess()
+	}
+	return nil
+}

@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package address;
+
+import "google/api/annotations.proto";
+
+option go_package = "nop-go/services/customer-service/proto;address";
+
+// Messages generated from Go types
+
+message Address {
+  uint64 id = 1; // 地址ID
+  uint64 customer_id = 2; // 客户ID
+  string first_name = 3; // 名
+  string last_name = 4; // 姓
+  string email = 5; // 邮箱
+  string company = 6; // 公司
+  uint64 country_id = 7; // 国家ID
+  uint64 state_province_id = 8; // 省/州ID
+  string city = 9; // 城市
+  string address1 = 10; // 地址行1
+  string address2 = 11; // 地址行2
+  string zip_postal_code = 12; // 邮编
+  string phone_number = 13; // 电话
+  string fax_number = 14; // 传真
+}
+
+message GetAddressRequest {
+  uint64 id = 1;
+}
+
+message ListAddressesRequest {
+  uint64 customer_id = 1;
+}
+
+message ListAddressesResponse {
+  repeated Address addresses = 1;
+}
+
+message DeleteAddressRequest {
+  uint64 id = 1;
+}
+
+message Empty {
+}
+
+message SetDefaultAddressRequest {
+  uint64 customer_id = 1;
+  uint64 address_id = 2;
+}
+
+// AddressServiceRPC 地址服务 RPC 接口
+// 中文说明：
+// - 定义地址相关的 RPC 方法；
+// - 用于生成 gRPC Proto 定义；
+// - 与 HTTP Handler 分离。
+service AddressServiceRPC {
+  // CreateAddress 创建地址
+  rpc CreateAddress(Address) returns (Address) {
+    option (google.api.http) = {
+      post: "/v1/addresses"
+      body: "*"
+    };
+  }
+  // GetAddress 获取地址
+  rpc GetAddress(GetAddressRequest) returns (Address) {
+    option (google.api.http) = {
+      get: "/v1/addresses/{id}"
+    };
+  }
+  // ListAddresses 获取客户地址列表
+  rpc ListAddresses(ListAddressesRequest) returns (ListAddressesResponse) {
+    option (google.api.http) = {
+      get: "/v1/customers/{customer_id}/addresses"
+    };
+  }
+  // UpdateAddress 更新地址
+  rpc UpdateAddress(Address) returns (Address) {
+    option (google.api.http) = {
+      put: "/v1/addresses/{id}"
+      body: "*"
+    };
+  }
+  // DeleteAddress 删除地址
+  rpc DeleteAddress(DeleteAddressRequest) returns (Empty) {
+    option (google.api.http) = {
+      delete: "/v1/addresses/{id}"
+    };
+  }
+  // SetDefaultBilling 设置默认账单地址
+  rpc SetDefaultBilling(SetDefaultAddressRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/v1/addresses/{address_id}/default-billing"
+      body: "*"
+    };
+  }
+  // SetDefaultShipping 设置默认配送地址
+  rpc SetDefaultShipping(SetDefaultAddressRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/v1/addresses/{address_id}/default-shipping"
+      body: "*"
+    };
+  }
+}

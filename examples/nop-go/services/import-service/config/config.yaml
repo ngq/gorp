@@ -1,0 +1,32 @@
+# 中文说明: 导入导出服务配置
+# 数据批量导入导出
+
+app:
+  name: import-service
+  mode: debug
+
+http:
+  addr: :8018
+
+database:
+  driver: mysql
+  dsn: root:password@tcp(localhost:3306)/nop_import?charset=utf8mb4&parseTime=True&loc=Local
+
+auth:
+  jwt:
+    secret: your-secret-key
+    issuer: nop-go
+    audience: nop-go-users
+
+# 导入导出配置
+import:
+  # 临时文件目录
+  temp_dir: ./temp/import
+  # 最大文件大小(MB)
+  max_file_size: 50
+  # 支持的格式
+  supported_formats: csv,xlsx,xml
+  # 默认分隔符
+  default_separator: ","
+  # 是否跳过属性验证
+  skip_attribute_validation: false

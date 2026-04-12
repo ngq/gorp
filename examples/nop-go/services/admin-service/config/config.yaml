@@ -1,0 +1,32 @@
+app:
+  name: admin-service
+  env: development
+  address: ":8001"
+
+database:
+  driver: mysql
+  dsn: "root:nop123456@tcp(mysql:3306)/nop_admin?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: false
+  type: consul
+  consul:
+    addr: "consul:8500"
+    service_name: "admin-service"
+
+# 管理员认证（使用 framework 级 auth.jwt 配置）
+auth:
+  jwt:
+    secret: "admin-secret-key-change-in-production"
+    issuer: "admin-service"
+    audience: "admin"

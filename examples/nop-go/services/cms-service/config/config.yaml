@@ -1,0 +1,25 @@
+app:
+  name: cms-service
+  env: development
+  address: ":8089"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_cms?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "cms-service"

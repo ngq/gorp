@@ -1,0 +1,75 @@
+# {{.ProjectName}}
+
+多微服务项目 - 默认多服务 starter（扁平化服务目录方案，Wire 装配版）
+
+## 技术栈
+
+| 类别 | 组件 |
+|-----|-----|
+| **Web 框架** | Gin |
+| **ORM** | GORM + SQLite |
+| **启动装配** | Wire + framework bootstrap |
+| **缓存** | Redis |
+| **服务发现** | Consul |
+| **链路追踪** | Jaeger + OpenTelemetry |
+| **监控** | Prometheus + Grafana |
+| **限流熔断** | 自研组件 |
+
+## 项目结构
+
+```text
+├── cmd/                    # 非业务型入口（如 gateway）
+├── internal/              # 公共内部代码
+├── services/              # 各服务代码（就近聚合）
+│   ├── user/
+│   │   ├── cmd/
+│   │   │   ├── main.go    # user 服务主入口
+│   │   │   ├── wire.go    # Wire 依赖定义
+│   │   │   └── wire_gen.go
+│   │   ├── internal/
+│   │   └── config/
+│   ├── order/
+│   └── product/
+├── deployments/
+└── Makefile
+```
+
+## 启动装配策略
+
+- framework 负责提供 config / log / gin / orm / bootstrap 等通用能力；
+- 各服务依赖图通过 Wire 在服务自己的 `cmd` 层编译期装配；
+- 默认模板不把 provider/container 暴露给业务层作为主要工作流。
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+go mod tidy
+```
+
+### 2. 安装并生成 Wire 代码
+
+```bash
+go install github.com/google/wire/cmd/wire@latest
+make gen-wire
+```
+
+说明：
+- `wire.go` 是依赖装配声明；
+- `wire_gen.go` 是生成后的装配结果；
+- 默认情况下，服务入口只通过 `wire*Services(...)` 收口装配链，不再在 `cmd/main.go` 中手写 repo/usecase/service wiring。
+
+### 3. 启动服务
+
+```bash
+make run-user
+make run-order
+make run-product
+```
+
+## 日志使用建议
+
+- 默认直接使用 framework 提供的 logger 能力；
+- 如果需要 trace_id / request_id 等动态字段，优先通过 logger 的上下文增强能力处理；
+- 不把从 context 重新获取 logger 作为默认业务写法。

@@ -1,0 +1,37 @@
+package http
+
+import (
+	"{{.ModuleName}}/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"{{.FrameworkModule}}/framework/contract"
+	ginprovider "{{.FrameworkModule}}/framework/provider/gin"
+)
+
+// RegisterRoutes 注册 HTTP 路由。
+//
+// 中文说明：
+// - 使用框架提供的 Gin Engine；
+// - 调用 internal/service 层注册业务路由；
+// - `/healthz` 与 `/metrics` 等基础端点由 framework/bootstrap 统一注册，这里只关注业务 API。
+func RegisterRoutes(r *gin.Engine, svc *service.Services) {
+	// 业务 API
+	api := r.Group("/api/v1")
+	{
+		// Demo CRUD
+		demos := api.Group("/demos")
+		{
+			demos.POST("", svc.Demo.Create)
+			demos.GET("/:id", svc.Demo.GetByID)
+			demos.GET("", svc.Demo.List)
+			demos.PUT("/:id", svc.Demo.Update)
+			demos.DELETE("/:id", svc.Demo.Delete)
+		}
+	}
+}
+
+// EngineFromContainer 从容器获取 Gin Engine。
+func EngineFromContainer(c contract.Container) *gin.Engine {
+	engine, _ := ginprovider.EngineFromContainer(c)
+	return engine
+}

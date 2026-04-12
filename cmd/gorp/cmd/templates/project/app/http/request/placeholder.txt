@@ -1,0 +1,1 @@
+当前目录用于放置请求 DTO（如 CreateUserRequest、LoginRequest）。

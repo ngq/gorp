@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package nopgo.notification;
+
+option go_package = "nop-go/infra/pb/notification";
+
+// NotificationService 通知服务
+//
+// 中文说明:
+// - 发送邮件、短信、站内信;
+// - 支持模板消息;
+// - 异步处理。
+service NotificationService {
+  // SendEmail 发送邮件
+  rpc SendEmail(SendEmailRequest) returns (SendEmailResponse);
+
+  // SendSMS 发送短信
+  rpc SendSMS(SendSMSRequest) returns (SendSMSResponse);
+
+  // SendOrderNotification 发送订单通知
+  //
+  // 中文说明:
+  // - 订单状态变更通知;
+  // - 包含订单详情。
+  rpc SendOrderNotification(SendOrderNotificationRequest) returns (SendOrderNotificationResponse);
+
+  // SendPaymentNotification 发送支付通知
+  rpc SendPaymentNotification(SendPaymentNotificationRequest) returns (SendPaymentNotificationResponse);
+}
+
+message SendEmailRequest {
+  string to = 1;
+  string subject = 2;
+  string content = 3;
+  bool is_html = 4;
+}
+
+message SendEmailResponse {
+  bool success = 1;
+  string message_id = 2;
+  string error_message = 3;
+}
+
+message SendSMSRequest {
+  string phone = 1;
+  string content = 2;
+  string template_code = 3;
+  map<string, string> template_params = 4;
+}
+
+message SendSMSResponse {
+  bool success = 1;
+  string message_id = 2;
+  string error_message = 3;
+}
+
+message SendOrderNotificationRequest {
+  uint64 customer_id = 1;
+  uint64 order_id = 2;
+  string notification_type = 3; // created, paid, shipped, delivered, cancelled
+  map<string, string> extra_data = 4;
+}
+
+message SendOrderNotificationResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message SendPaymentNotificationRequest {
+  uint64 customer_id = 1;
+  uint64 payment_id = 2;
+  string notification_type = 3; // created, success, failed, refunded
+  map<string, string> extra_data = 4;
+}
+
+message SendPaymentNotificationResponse {
+  bool success = 1;
+  string error_message = 2;
+}

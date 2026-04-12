@@ -1,0 +1,28 @@
+# 部署说明
+
+当前 base starter 提供最小工程化交付骨架，适合先完成：
+
+1. 本地开发
+2. 基础 CI
+3. Docker 镜像构建
+4. 单机或简单环境部署
+
+## 本地命令
+
+```bash
+go mod tidy
+go test ./...
+go run ./cmd/app app start
+```
+
+## Docker 构建
+
+```bash
+docker build -t {{.Name}}:latest .
+```
+
+## 生产建议
+
+- 使用 `config/app.production.yaml`（后续可自行新增）
+- 把敏感配置通过环境变量注入
+- 日志与运行时目录建议挂载到持久化存储

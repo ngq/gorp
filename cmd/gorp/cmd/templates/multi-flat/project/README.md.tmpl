@@ -1,0 +1,110 @@
+# {{.ProjectName}}
+
+多微服务项目 - 默认多服务 starter（扁平化服务目录方案，framework 原生装配）
+
+## 技术栈
+
+| 类别 | 组件 |
+|-----|-----|
+| **Web 框架** | Gin |
+| **ORM** | GORM + SQLite |
+| **启动装配** | framework provider/container/bootstrap |
+| **缓存** | Redis |
+| **服务发现** | Consul |
+| **链路追踪** | Jaeger + OpenTelemetry |
+| **监控** | Prometheus + Grafana |
+| **限流熔断** | 自研组件 |
+
+## 项目结构
+
+```text
+├── cmd/                    # 非业务型入口（如 gateway）
+├── internal/              # 公共内部代码
+├── services/              # 各服务代码（就近聚合）
+│   ├── user/
+│   │   ├── cmd/           # user 服务主入口
+│   │   ├── internal/      # 服务内部代码
+│   │   └── config/        # 服务配置
+│   ├── order/
+│   └── product/
+├── deployments/           # 部署配置
+└── Makefile
+```
+
+## 特点
+
+- **就近聚合**：配置与服务代码在同一目录下
+- **internal 符合 Go 惯例**：`services/user/internal/` 实现服务内部隔离
+- **语义清晰**：`services/` 目录一目了然
+- **framework 原生装配**：默认通过 framework 的 provider/container/bootstrap 完成启动装配
+- **保留扩展空间**：项目后续如偏好 Wire，可自行替换默认装配方案
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+go mod tidy
+```
+
+### 2. 启动服务
+
+```bash
+# 本地运行（分别启动）
+make run-user    # 终端 1
+make run-order   # 终端 2
+make run-product # 终端 3
+
+# 或直接运行各服务 main 入口
+go run ./services/user/cmd
+go run ./services/order/cmd
+go run ./services/product/cmd
+
+# Docker 部署
+make deploy-local
+```
+
+### 3. 访问服务
+
+| 服务 | 地址 | 说明 |
+|-----|-----|-----|
+| 用户服务 | http://localhost:8081 | RESTful API |
+| 订单服务 | http://localhost:8082 | RESTful API |
+| 商品服务 | http://localhost:8083 | RESTful API |
+| Consul UI | http://localhost:8500 | 服务发现 |
+| Jaeger UI | http://localhost:16686 | 链路追踪 |
+
+## 日志使用建议
+
+- 默认优先使用 framework 提供的 logger 能力；
+- 服务启动阶段优先在 main / bootstrap 边界记录日志；
+- 业务逻辑里只有在需要附加 trace_id / request_id 等动态字段时，才在边界层基于 framework logger 补充字段；
+- 不把从 context 重新获取 logger 作为默认业务写法。
+
+## 日志使用建议
+
+- 默认优先使用 framework 提供的 logger 能力；
+- 服务启动阶段优先在 main / bootstrap 边界记录日志；
+- 业务逻辑里只有在需要附加 trace_id / request_id 等动态字段时，才在边界层基于 framework logger 补充字段；
+- 不把从 context 重新获取 logger 作为默认业务写法。
+
+## 组件清单
+
+
+| 组件 | 用途 | 使用方式 |
+|-----|-----|---------|
+| **Redis** | 缓存/分布式锁 | framework provider |
+| **Consul** | 服务发现/注册 | framework discovery provider |
+| **Jaeger** | 链路追踪 | framework tracing provider |
+| **Prometheus** | 监控指标 | `/metrics` 端点 |
+| **RateLimiter** | 限流 | framework middleware/provider |
+| **CircuitBreaker** | 熔断 | framework provider |
+
+## Makefile 命令
+
+| 命令 | 说明 |
+|-----|-----|
+| `make build` | 构建所有服务 |
+| `make deploy-local` | Docker Compose 部署 |
+| `make deploy-local-down` | 停止服务 |
+| `make test` | 运行测试 |

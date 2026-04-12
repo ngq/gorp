@@ -1,0 +1,117 @@
+// nop-go gRPC 服务定义
+//
+// 中文说明:
+// - 定义各微服务间的 RPC 接口;
+// - 用于服务间同步调用;
+// - 配合 DTM 实现分布式事务。
+
+syntax = "proto3";
+
+package nopgo.inventory;
+
+option go_package = "nop-go/infra/pb/inventory";
+
+// InventoryService 库存服务
+//
+// 中文说明:
+// - 提供库存查询、预留、确认、释放能力;
+// - 是订单创建流程的关键服务;
+// - 预留库存用于 SAGA 事务。
+service InventoryService {
+  // GetStock 获取商品库存
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+
+  // ReserveStock 预留库存
+  //
+  // 中文说明:
+  // - SAGA 事务第一步: 预留库存;
+  // - 返回预留 ID,用于后续确认或释放;
+  // - Compensate: ReleaseStock。
+  rpc ReserveStock(ReserveStockRequest) returns (ReserveStockResponse);
+
+  // ConfirmStock 确认库存扣减
+  //
+  // 中文说明:
+  // - 支付成功后确认扣减;
+  // - SAGA 事务最后一步。
+  rpc ConfirmStock(ConfirmStockRequest) returns (ConfirmStockResponse);
+
+  // ReleaseStock 释放预留库存
+  //
+  // 中文说明:
+  // - SAGA 补偿操作;
+  // - 支付失败或订单取消时调用。
+  rpc ReleaseStock(ReleaseStockRequest) returns (ReleaseStockResponse);
+
+  // CheckAvailability 检查库存是否充足
+  rpc CheckAvailability(CheckAvailabilityRequest) returns (CheckAvailabilityResponse);
+}
+
+message GetStockRequest {
+  uint64 product_id = 1;
+  uint64 warehouse_id = 2; // 0 表示查询所有仓库总量
+}
+
+message GetStockResponse {
+  uint64 product_id = 1;
+  uint64 warehouse_id = 2;
+  int32 quantity = 3;
+  int32 reserved_quantity = 4;
+  int32 available_quantity = 5;
+}
+
+message ReserveStockRequest {
+  uint64 order_id = 1;
+  uint64 product_id = 2;
+  uint64 warehouse_id = 3;
+  int32 quantity = 4;
+  string reservation_id = 5; // DTM 事务 ID
+}
+
+message ReserveStockResponse {
+  bool success = 1;
+  string reservation_id = 2;
+  string error_message = 3;
+}
+
+message ConfirmStockRequest {
+  uint64 order_id = 1;
+  string reservation_id = 2;
+}
+
+message ConfirmStockResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message ReleaseStockRequest {
+  uint64 order_id = 1;
+  string reservation_id = 2;
+}
+
+message ReleaseStockResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message CheckAvailabilityRequest {
+  repeated StockItem items = 1;
+}
+
+message StockItem {
+  uint64 product_id = 1;
+  uint64 warehouse_id = 2;
+  int32 quantity = 3;
+}
+
+message CheckAvailabilityResponse {
+  bool all_available = 1;
+  repeated StockCheckResult results = 2;
+}
+
+message StockCheckResult {
+  uint64 product_id = 1;
+  bool available = 2;
+  int32 available_quantity = 3;
+  int32 requested_quantity = 4;
+}

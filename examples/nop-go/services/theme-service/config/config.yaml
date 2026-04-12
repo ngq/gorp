@@ -1,0 +1,28 @@
+# 中文说明: 主题服务配置
+# 前端主题切换管理
+
+app:
+  name: theme-service
+  mode: debug
+
+http:
+  addr: :8019
+
+database:
+  driver: mysql
+  dsn: root:password@tcp(localhost:3306)/nop_theme?charset=utf8mb4&parseTime=True&loc=Local
+
+auth:
+  jwt:
+    secret: your-secret-key
+    issuer: nop-go
+    audience: nop-go-users
+
+# 主题配置
+theme:
+  # 主题目录
+  themes_dir: ./themes
+  # 默认主题
+  default_theme: default
+  # 是否允许用户切换主题
+  allow_user_selection: true

@@ -1,0 +1,32 @@
+app:
+  name: store-service
+  env: development
+  address: ":8092"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_store?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "store-service"
+
+# 认证配置（使用 framework 级 auth.jwt 配置）
+auth:
+  jwt:
+    secret: "your-secret-key"
+    issuer: "store-service"
+    audience: "admin"

@@ -1,0 +1,59 @@
+# 应用配置
+# 中文说明：
+# - 使用 gorp 框架统一配置格式；
+# - 默认按 framework-native 主线生成，兼顾单体起步与后续渐进演进。
+
+service:
+  name: {{.Name}}
+  namespace: default
+  environment: development
+
+app:
+  name: {{.Name}}
+  env: development
+  debug: true
+  address: :8080
+
+server:
+  http:
+    addr: :8080
+
+configsource:
+  type: local
+
+discovery:
+  type: noop
+  service:
+    name: {{.Name}}
+    addr: 127.0.0.1
+    port: 8080
+
+selector:
+  algorithm: noop
+
+rpc:
+  mode: noop
+  timeout_ms: 30000
+
+# 数据库配置（默认使用本地 sqlite，保证模板开箱即跑）
+database:
+  driver: sqlite
+  dsn: {{.Name}}.db
+
+# 日志配置
+log:
+  level: debug
+  format: console
+
+tracing:
+  enabled: false
+  service:
+    name: {{.Name}}
+
+metadata:
+  propagate_prefix:
+    - x-md-
+  constant_metadata: {}
+
+serviceauth:
+  mode: noop

@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package customer;
+
+import "google/api/annotations.proto";
+
+option go_package = "nop-go/services/customer-service/proto;customer";
+
+// Messages generated from Go types
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string phone = 3;
+  string password = 4;
+}
+
+message Customer {
+  uint64 id = 1;
+  string username = 2;
+  string email = 3;
+  string phone = 4;
+  string first_name = 5;
+  string last_name = 6;
+  string gender = 7;
+  bool is_active = 8;
+  bool email_verified = 9;
+  bool phone_verified = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  Customer customer = 1;
+  string token = 2;
+}
+
+message GetCustomerRequest {
+  uint64 id = 1;
+}
+
+message UpdateProfileRequest {
+  uint64 id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string gender = 4;
+  string birthday = 5;
+}
+
+message ChangePasswordRequest {
+  uint64 id = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message Empty {
+}
+
+message ListCustomersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListCustomersResponse {
+  repeated Customer customers = 1;
+  int64 total = 2;
+}
+
+message ValidateCustomerRequest {
+  uint64 id = 1;
+}
+
+message CustomerPreferences {
+  uint64 customer_id = 1;
+  map<string, string> settings = 2;
+  map<string, int32> tags = 3;
+}
+
+// CustomerServiceRPC 客户服务 RPC 接口
+// 中文说明：
+// - 定义客户相关的 RPC 方法；
+// - 用于生成 gRPC Proto 定义；
+// - 与 HTTP Handler 结构体 CustomerService 分离。
+service CustomerServiceRPC {
+  // Register 注册新客户
+  rpc Register(RegisterRequest) returns (Customer) {
+    option (google.api.http) = {
+      post: "/v1/customers"
+      body: "*"
+    };
+  }
+  // Login 客户登录
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/customers/login"
+      body: "*"
+    };
+  }
+  // GetCustomer 获取客户信息
+  rpc GetCustomer(GetCustomerRequest) returns (Customer) {
+    option (google.api.http) = {
+      get: "/v1/customers/{id}"
+    };
+  }
+  // UpdateProfile 更新客户资料
+  rpc UpdateProfile(UpdateProfileRequest) returns (Customer) {
+    option (google.api.http) = {
+      put: "/v1/customers/{id}"
+      body: "*"
+    };
+  }
+  // ChangePassword 修改密码
+  rpc ChangePassword(ChangePasswordRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/v1/customers/{id}/password"
+      body: "*"
+    };
+  }
+  // ListCustomers 客户列表
+  rpc ListCustomers(ListCustomersRequest) returns (ListCustomersResponse) {
+    option (google.api.http) = {
+      get: "/v1/customers"
+    };
+  }
+  // ValidateCustomer 验证客户（供其他服务调用）
+  rpc ValidateCustomer(ValidateCustomerRequest) returns (Empty) {
+    option (google.api.http) = {
+      post: "/v1/customers/validate"
+      body: "*"
+    };
+  }
+  // GetPreferences 获取客户偏好设置
+  rpc GetPreferences(GetCustomerRequest) returns (CustomerPreferences);
+}

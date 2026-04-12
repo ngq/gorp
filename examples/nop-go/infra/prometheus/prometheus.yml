@@ -1,0 +1,87 @@
+# nop-go Prometheus 配置
+# 包含所有微服务的监控指标采集和告警规则
+
+global:
+  scrape_interval: 15s      # 默认采集间隔
+  evaluation_interval: 15s  # 规则评估间隔
+  external_labels:
+    cluster: 'nop-go'
+    environment: 'development'
+
+# Alertmanager 配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# 告警规则文件
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# 采集配置
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 所有微服务 HTTP 指标
+  - job_name: 'nop-microservices'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - gateway:8000
+          - admin:8001
+          - customer:8002
+          - catalog:8003
+          - cart:8004
+          - order:8005
+          - cms:8007
+          - inventory:8008
+          - notification:8009
+          - payment:8010
+          - price:8011
+          - shipping:8012
+          - store:8013
+          - media:8014
+          - localization:8015
+          - affiliate:8016
+          - seo:8017
+          - import:8018
+          - theme:8019
+          - ai:8020
+        labels:
+          group: 'microservices'
+
+  # Consul 服务发现（动态发现注册的服务）
+  - job_name: 'consul-services'
+    consul_sd_configs:
+      - server: 'consul:8500'
+        services: []  # 空数组表示发现所有服务
+    relabel_configs:
+      - source_labels: [__meta_consul_service]
+        target_label: service
+      - source_labels: [__meta_consul_tags]
+        regex: ',(.+),'
+        target_label: tag
+
+  # MySQL 监控（需要 mysqld_exporter）
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysql-exporter:9104']
+
+  # Redis 监控（需要 redis_exporter）
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Jaeger 监控
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+
+  # Node exporter（主机监控）
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']

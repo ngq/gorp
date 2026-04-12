@@ -1,0 +1,40 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	apphttp "{{.ModuleName}}/app/http"
+	"{{.ModuleName}}/internal/biz"
+	"{{.ModuleName}}/internal/data"
+	"{{.ModuleName}}/internal/service"
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+)
+
+// main 是 golayout 项目的主入口。
+//
+// 中文说明：
+// - 用户日常开发时，直接 `go run ./cmd/app` 或 IDE 调试即可启动 HTTP 服务；
+// - 启动逻辑直接复用 framework/bootstrap 提供的 HTTP 启动能力；
+// - 不再依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
+func main() {
+	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&data.DemoPO{})
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	d := data.NewData(rt.Container)
+	b := biz.NewBiz(data.NewDemoRepo(d))
+	svc := service.NewServices(b)
+	apphttp.RegisterRoutes(rt.Engine, svc)
+	return nil
+}

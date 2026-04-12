@@ -1,0 +1,13 @@
+module {{.ModuleName}}/services/user
+
+go 1.25
+
+require (
+	{{.ModuleName}}/shared v0.0.0
+	{{.FrameworkModule}} v0.0.0
+)
+
+replace (
+	{{.ModuleName}}/shared => ../../shared
+	{{.FrameworkModule}} => {{.FrameworkPath}}
+)

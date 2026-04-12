@@ -1,0 +1,29 @@
+app:
+  name: shipping-service
+  env: development
+  address: ":8086"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_shipping?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "shipping-service"
+
+services:
+  order: "http://localhost:8084"
+  notification: "http://localhost:8090"

@@ -1,0 +1,24 @@
+// Package data 数据访问层
+//
+// 中文说明：
+// - 负责数据库、缓存等数据存储的访问；
+// - 实现 internal/biz 中定义的 Repository 接口；
+// - Wire 模板下由 cmd 层在编译期完成依赖装配。
+package data
+
+import "gorm.io/gorm"
+
+// Data 数据访问层聚合。
+type Data struct {
+	db *gorm.DB
+}
+
+// NewData 创建数据访问层。
+func NewData(db *gorm.DB) *Data {
+	return &Data{db: db}
+}
+
+// DB 获取数据库连接。
+func (d *Data) DB() *gorm.DB {
+	return d.db
+}

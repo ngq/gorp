@@ -1,0 +1,15 @@
+app:
+  env: development
+  address: ":8080"
+
+# swagger 管理接口：生产建议默认关闭
+swagger:
+  enable: true
+  basic_auth:
+    enable: false
+    username: "admin"
+    password: "admin"
+
+log:
+  level: "debug"
+  driver: "stdout"

@@ -1,0 +1,16 @@
+# 用户服务
+
+独立的用户微服务
+
+## 运行
+
+```bash
+go run ./cmd
+```
+
+## Docker
+
+```bash
+docker build -f deployments/Dockerfile -t user-service .
+docker run -p 8081:8081 user-service
+```

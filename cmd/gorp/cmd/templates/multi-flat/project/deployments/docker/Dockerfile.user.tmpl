@@ -1,0 +1,27 @@
+# 用户服务镜像
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY cmd/user/ ./cmd/user/
+COPY internal/ ./internal/
+COPY services/user/ ./services/user/
+COPY pkg/ ./pkg/
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /user ./cmd/user
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/user/config/config.yaml ./config.yaml
+COPY --from=builder /user .
+
+EXPOSE 8081
+
+ENTRYPOINT ["./user"]

@@ -1,0 +1,79 @@
+package infrastructure
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"{{.ModuleName}}/shared/config"
+	"github.com/redis/go-redis/v9"
+)
+
+// RedisClient Redis 客户端
+type RedisClient struct {
+	client *redis.Client
+}
+
+// NewRedisClient 创建 Redis 客户端
+func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("redis ping: %w", err)
+	}
+
+	return &RedisClient{client: client}, nil
+}
+
+// Get 获取值
+func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
+	return r.client.Get(ctx, key).Result()
+}
+
+// Set 设置值
+func (r *RedisClient) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	return r.client.Set(ctx, key, value, ttl).Err()
+}
+
+// Del 删除值
+func (r *RedisClient) Del(ctx context.Context, keys ...string) error {
+	return r.client.Del(ctx, keys...).Err()
+}
+
+// Exists 检查是否存在
+func (r *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
+	n, err := r.client.Exists(ctx, key).Result()
+	return n > 0, err
+}
+
+// Expire 设置过期时间
+func (r *RedisClient) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	return r.client.Expire(ctx, key, ttl).Err()
+}
+
+// Incr 自增
+func (r *RedisClient) Incr(ctx context.Context, key string) (int64, error) {
+	return r.client.Incr(ctx, key).Result()
+}
+
+// TTL 获取剩余过期时间
+func (r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error) {
+	return r.client.TTL(ctx, key).Result()
+}
+
+// Client 获取原始客户端
+func (r *RedisClient) Client() *redis.Client {
+	return r.client
+}
+
+// Close 关闭连接
+func (r *RedisClient) Close() error {
+	return r.client.Close()
+}

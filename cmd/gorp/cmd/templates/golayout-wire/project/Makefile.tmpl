@@ -1,0 +1,29 @@
+# {{.ProjectName}}
+
+.PHONY: build run test tidy clean gen-wire
+
+APP_NAME := {{.ProjectName}}
+
+build:
+	go build -o bin/$(APP_NAME) ./cmd/app
+
+gen-wire:
+	wire ./cmd/app
+
+run:
+	go run ./cmd/app
+
+test:
+	go test -v -race ./...
+
+clean:
+	rm -rf bin/
+
+tidy:
+	go mod tidy
+
+docker:
+	docker build -t $(APP_NAME):latest .
+
+docker-run:
+	docker run -p 8080:8080 $(APP_NAME):latest

@@ -1,0 +1,9 @@
+module {{.Module}}
+
+go 1.22
+
+require (
+	{{.FrameworkModule}} v0.0.0
+)
+
+replace {{.FrameworkModule}} => {{.FrameworkPath}}

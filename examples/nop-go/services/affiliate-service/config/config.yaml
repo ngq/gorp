@@ -1,0 +1,30 @@
+# 中文说明: 联盟推广服务配置
+# 联盟会员管理、推广追踪、佣金计算
+
+app:
+  name: affiliate-service
+  mode: debug
+
+http:
+  addr: :8016
+
+database:
+  driver: mysql
+  dsn: root:password@tcp(localhost:3306)/nop_affiliate?charset=utf8mb4&parseTime=True&loc=Local
+
+auth:
+  jwt:
+    secret: your-secret-key
+    issuer: nop-go
+    audience: nop-go-users
+
+# 联盟推广配置
+affiliate:
+  # 佣金比例（百分比）
+  default_commission_rate: 5.0
+  # 最小佣金金额
+  min_commission_amount: 0.01
+  # 提现最小金额
+  min_payout_amount: 50
+  # Cookie 有效期（天）
+  cookie_expiration_days: 30

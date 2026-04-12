@@ -1,0 +1,98 @@
+package infrastructure
+
+import (
+	"fmt"
+	"net"
+	"time"
+
+	"{{.ModuleName}}/internal/config"
+	"github.com/hashicorp/consul/api"
+)
+
+// ServiceRegistry 服务注册器
+type ServiceRegistry struct {
+	client    *api.Client
+	serviceID string
+}
+
+// NewServiceRegistry 创建服务注册器
+func NewServiceRegistry(cfg *config.Config) (*ServiceRegistry, error) {
+	if !cfg.Discovery.Enabled {
+		return nil, nil
+	}
+
+	consulConfig := api.DefaultConfig()
+	consulConfig.Address = cfg.Discovery.Consul.Addr
+
+	client, err := api.NewClient(consulConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ServiceRegistry{client: client}, nil
+}
+
+// Register 注册服务
+func (r *ServiceRegistry) Register(cfg *config.Config) error {
+	if r == nil || r.client == nil {
+		return nil
+	}
+
+	registration := &api.AgentServiceRegistration{
+		ID:      cfg.Discovery.Consul.ServiceName + "-" + fmt.Sprintf("%d", time.Now().Unix()),
+		Name:    cfg.Discovery.Consul.ServiceName,
+		Port:    cfg.Discovery.Consul.ServicePort,
+		Address: getLocalIP(),
+		Check: &api.AgentServiceCheck{
+			HTTP:     fmt.Sprintf("http://%s:%d/health", getLocalIP(), cfg.Discovery.Consul.ServicePort),
+			Interval: "10s",
+			Timeout:  "5s",
+		},
+	}
+
+	r.serviceID = registration.ID
+	return r.client.Agent().ServiceRegister(registration)
+}
+
+// Deregister 注销服务
+func (r *ServiceRegistry) Deregister() error {
+	if r == nil || r.client == nil || r.serviceID == "" {
+		return nil
+	}
+	return r.client.Agent().ServiceDeregister(r.serviceID)
+}
+
+// DiscoverService 发现服务
+func (r *ServiceRegistry) DiscoverService(serviceName string) (string, error) {
+	if r == nil || r.client == nil {
+		return "", fmt.Errorf("service discovery not enabled")
+	}
+
+	services, _, err := r.client.Health().Service(serviceName, "", true, nil)
+	if err != nil {
+		return "", err
+	}
+
+	if len(services) == 0 {
+		return "", fmt.Errorf("service %s not found", serviceName)
+	}
+
+	service := services[0]
+	return fmt.Sprintf("%s:%d", service.Service.Address, service.Service.Port), nil
+}
+
+// getLocalIP 获取本机 IP
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "127.0.0.1"
+}

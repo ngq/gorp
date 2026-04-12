@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package nopgo.payment;
+
+option go_package = "nop-go/infra/pb/payment";
+
+// PaymentService 支付服务
+//
+// 中文说明:
+// - 处理支付创建、查询、取消;
+// - 支持 DTM SAGA 事务;
+// - 补偿操作: CancelPayment。
+service PaymentService {
+  // CreatePayment 创建支付
+  //
+  // 中文说明:
+  // - SAGA 事务步骤: 创建待支付记录;
+  // - 返回支付 ID;
+  // - Compensate: CancelPayment。
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse);
+
+  // CancelPayment 取消支付
+  //
+  // 中文说明:
+  // - SAGA 补偿操作;
+  // - 订单取消时调用。
+  rpc CancelPayment(CancelPaymentRequest) returns (CancelPaymentResponse);
+
+  // GetPaymentStatus 获取支付状态
+  rpc GetPaymentStatus(GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+
+  // ProcessRefund 处理退款
+  rpc ProcessRefund(ProcessRefundRequest) returns (ProcessRefundResponse);
+}
+
+message CreatePaymentRequest {
+  uint64 order_id = 1;
+  uint64 customer_id = 2;
+  double amount = 3;
+  string currency = 4;
+  string payment_method = 5; // Payment.Alipay, Payment.Wechat
+  string return_url = 6;
+  string notify_url = 7;
+  string transaction_id = 8; // DTM 事务 ID
+}
+
+message CreatePaymentResponse {
+  bool success = 1;
+  uint64 payment_id = 2;
+  string transaction_id = 3;
+  string pay_url = 4;       // 支付链接
+  string qr_code_url = 5;   // 二维码链接
+  string error_message = 6;
+}
+
+message CancelPaymentRequest {
+  uint64 order_id = 1;
+  uint64 payment_id = 2;
+  string reason = 3;
+}
+
+message CancelPaymentResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message GetPaymentStatusRequest {
+  uint64 order_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  uint64 payment_id = 1;
+  string status = 2; // pending, paid, failed, cancelled, refunded
+  double amount = 3;
+  string transaction_id = 4;
+  string paid_at = 5;
+}
+
+message ProcessRefundRequest {
+  uint64 payment_id = 1;
+  uint64 order_id = 2;
+  double amount = 3;
+  string reason = 4;
+}
+
+message ProcessRefundResponse {
+  bool success = 1;
+  string refund_id = 2;
+  string error_message = 3;
+}

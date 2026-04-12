@@ -1,0 +1,59 @@
+# 下一步怎么开始业务开发
+
+当你已经可以访问：
+
+- `GET /healthz`
+- `GET /api/ping`
+
+说明 starter 已经跑通。接下来建议按下面顺序继续。
+
+## 1. 先看 HTTP 入口
+
+优先阅读：
+
+- `app/http/routes.go`
+- `app/http/handler/health.go`
+- `app/http/handler/ping.go`
+
+这样你能快速理解：
+- 路由挂载在哪
+- handler 放在哪
+- service 怎么被调用
+
+## 2. 再新增你自己的第一个接口
+
+建议先模仿 `Ping` 这条链路：
+
+1. 在 `app/service/` 增加一个业务函数
+2. 在 `app/http/handler/` 增加一个 handler
+3. 在 `app/http/routes.go` 里挂路由
+
+## 3. DTO 放在哪
+
+- 请求结构：`app/http/request/`
+- 响应结构：`app/http/response/`
+
+## 4. 中间件放在哪
+
+如果后续需要鉴权、日志、限流等项目级中间件，可以放到：
+
+- `app/http/middleware/`
+
+## 5. 如果你准备接数据库
+
+后续可以结合框架命令继续：
+
+```bash
+gorp model test
+gorp model gen --table <table>
+gorp model api --table <table>
+```
+
+## 6. 如果你准备做成可发布项目
+
+后续可以继续使用：
+
+```bash
+gorp template pack
+gorp new from-release --repo <owner>/<repo> --tag latest
+```

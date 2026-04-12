@@ -1,0 +1,29 @@
+app:
+  name: price-service
+  env: development
+  address: ":8083"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_price?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "price-service"
+
+services:
+  catalog: "http://localhost:8081"
+  customer: "http://localhost:8087"

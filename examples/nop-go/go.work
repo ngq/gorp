@@ -1,0 +1,27 @@
+go 1.26
+
+// 中文说明: nopCommerce Go 版本工作区配置
+// 包含微服务 + 共享模块
+use (
+	./services/admin-service
+	./services/affiliate-service
+	./services/ai-service
+	./services/cart-service
+	./services/catalog-service
+	./services/cms-service
+	./services/customer-service
+	./services/gateway-service
+	./services/import-service
+	./services/inventory-service
+	./services/localization-service
+	./services/media-service
+	./services/notification-service
+	./services/order-service
+	./services/payment-service
+	./services/price-service
+	./services/seo-service
+	./services/shipping-service
+	./services/store-service
+	./services/theme-service
+	./shared
+)

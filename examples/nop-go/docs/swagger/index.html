@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nop-go API 文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+        }
+        .services {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .service-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .service-card:hover {
+            transform: translateY(-4px);
+        }
+        .service-card h3 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .service-card p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .service-card a {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .service-card a:hover {
+            background: #5a6fd6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>nop-go 微服务 API 文档</h1>
+        <div class="services">
+
+        <div class="service-card">
+            <h3>后台管理服务</h3>
+            <p>后台管理、用户权限、系统配置</p>
+            <p><strong>端口:</strong> 8001</p>
+            <a href="http://localhost:8001/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>联盟营销服务</h3>
+            <p>联盟营销、佣金管理、推广追踪</p>
+            <p><strong>端口:</strong> 8016</p>
+            <a href="http://localhost:8016/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>AI智能服务</h3>
+            <p>AI聊天、商品推荐、内容生成</p>
+            <p><strong>端口:</strong> 8020</p>
+            <a href="http://localhost:8020/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>购物车服务</h3>
+            <p>购物车、优惠券、促销</p>
+            <p><strong>端口:</strong> 8004</p>
+            <a href="http://localhost:8004/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>商品目录服务</h3>
+            <p>商品管理、分类、品牌、规格</p>
+            <p><strong>端口:</strong> 8003</p>
+            <a href="http://localhost:8003/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>内容管理服务</h3>
+            <p>页面、博客、菜单、投票</p>
+            <p><strong>端口:</strong> 8007</p>
+            <a href="http://localhost:8007/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>客户服务</h3>
+            <p>用户注册登录、地址管理、GDPR合规</p>
+            <p><strong>端口:</strong> 8002</p>
+            <a href="http://localhost:8002/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>导入导出服务</h3>
+            <p>数据导入导出、Excel处理</p>
+            <p><strong>端口:</strong> 8018</p>
+            <a href="http://localhost:8018/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>库存服务</h3>
+            <p>库存管理、仓储、库存预警</p>
+            <p><strong>端口:</strong> 8008</p>
+            <a href="http://localhost:8008/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>多语言服务</h3>
+            <p>多语言、货币、时区管理</p>
+            <p><strong>端口:</strong> 8015</p>
+            <a href="http://localhost:8015/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>媒体服务</h3>
+            <p>图片、文件上传与管理</p>
+            <p><strong>端口:</strong> 8014</p>
+            <a href="http://localhost:8014/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>通知服务</h3>
+            <p>邮件、短信、站内通知</p>
+            <p><strong>端口:</strong> 8009</p>
+            <a href="http://localhost:8009/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>订单服务</h3>
+            <p>订单流程、退款、状态管理</p>
+            <p><strong>端口:</strong> 8005</p>
+            <a href="http://localhost:8005/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>支付服务</h3>
+            <p>支付方式、交易、退款</p>
+            <p><strong>端口:</strong> 8010</p>
+            <a href="http://localhost:8010/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>价格服务</h3>
+            <p>价格规则、折扣、会员价</p>
+            <p><strong>端口:</strong> 8011</p>
+            <a href="http://localhost:8011/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>SEO服务</h3>
+            <p>URL优化、元数据、站点地图</p>
+            <p><strong>端口:</strong> 8017</p>
+            <a href="http://localhost:8017/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>物流服务</h3>
+            <p>配送方式、运费计算、物流追踪</p>
+            <p><strong>端口:</strong> 8012</p>
+            <a href="http://localhost:8012/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>多店铺服务</h3>
+            <p>多店铺、多供应商管理</p>
+            <p><strong>端口:</strong> 8013</p>
+            <a href="http://localhost:8013/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        <div class="service-card">
+            <h3>主题服务</h3>
+            <p>主题管理、样式变量、模板</p>
+            <p><strong>端口:</strong> 8019</p>
+            <a href="http://localhost:8019/swagger/index.html" target="_blank">打开 API 文档</a>
+        </div>
+
+        </div>
+    </div>
+</body>
+</html>

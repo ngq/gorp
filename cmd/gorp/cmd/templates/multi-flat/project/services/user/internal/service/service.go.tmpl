@@ -1,0 +1,125 @@
+// Package service 服务层。
+package service
+
+import (
+	"net/http"
+	"strconv"
+
+	"{{.ModuleName}}/services/user/internal/biz"
+	"{{.ModuleName}}/services/user/internal/data"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+// Services 服务层聚合。
+type Services struct {
+	User *UserService
+}
+
+// NewServices 创建服务层。
+func NewServices(db *gorm.DB) *Services {
+	userRepo := data.NewUserRepo(db)
+	userUC := biz.NewUserUseCase(userRepo)
+	return &Services{
+		User: &UserService{uc: userUC},
+	}
+}
+
+// UserService 用户服务。
+type UserService struct {
+	uc *biz.UserUseCase
+}
+
+// RegisterRoutes 注册用户服务路由。
+func (s *UserService) RegisterRoutes(r *gin.Engine) {
+	api := r.Group("/api/v1/users")
+	{
+		api.GET("", s.List)
+		api.GET("/:id", s.GetByID)
+		api.POST("", s.Create)
+		api.DELETE("/:id", s.Delete)
+	}
+}
+
+// CreateUserRequest 创建用户请求。
+type CreateUserRequest struct {
+	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+}
+
+// UserResponse 用户响应。
+type UserResponse struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+// List 获取用户列表。
+func (s *UserService) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	users, total, err := s.uc.List(c.Request.Context(), page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	items := make([]UserResponse, len(users))
+	for i, u := range users {
+		items[i] = UserResponse{ID: u.ID, Username: u.Username, Email: u.Email}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+}
+
+// GetByID 获取单个用户。
+func (s *UserService) GetByID(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	user, err := s.uc.GetByID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, UserResponse{ID: user.ID, Username: user.Username, Email: user.Email})
+}
+
+// Create 创建用户。
+func (s *UserService) Create(c *gin.Context) {
+	var req CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := s.uc.Create(c.Request.Context(), req.Username, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, UserResponse{ID: user.ID, Username: user.Username, Email: user.Email})
+}
+
+// Delete 删除用户。
+func (s *UserService) Delete(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	if err := s.uc.Delete(c.Request.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}

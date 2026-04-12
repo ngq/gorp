@@ -1,0 +1,76 @@
+app:
+  name: gateway-service
+  env: dev
+  address: ":8000"
+
+log:
+  level: debug
+
+discovery:
+  enabled: false
+  type: consul
+  consul:
+    addr: "consul:8500"
+    service_name: "gateway-service"
+
+# 路由配置（当前唯一真相源）
+routes:
+  - path: /api/v1/auth
+    target: http://customer:8002
+  - path: /api/v1/customers
+    target: http://customer:8002
+  - path: /api/v1/products
+    target: http://catalog:8003
+  - path: /api/v1/categories
+    target: http://catalog:8003
+  - path: /api/v1/manufacturers
+    target: http://catalog:8003
+  - path: /api/v1/cart
+    target: http://cart:8004
+  - path: /api/v1/wishlist
+    target: http://cart:8004
+  - path: /api/v1/orders
+    target: http://order:8005
+  - path: /api/v1/returns
+    target: http://order:8005
+  - path: /api/v1/giftcards
+    target: http://order:8005
+  - path: /api/v1/payments
+    target: http://payment:8010
+  - path: /api/v1/refunds
+    target: http://payment:8010
+  - path: /api/v1/shipments
+    target: http://shipping:8012
+  - path: /api/v1/shipping-methods
+    target: http://shipping:8012
+  - path: /api/v1/inventory
+    target: http://inventory:8008
+  - path: /api/v1/warehouses
+    target: http://inventory:8008
+  - path: /api/v1/price
+    target: http://price:8011
+  - path: /api/v1/tax
+    target: http://price:8011
+  - path: /api/v1/discounts
+    target: http://price:8011
+  - path: /api/v1/blog
+    target: http://cms:8007
+  - path: /api/v1/news
+    target: http://cms:8007
+  - path: /api/v1/topics
+    target: http://cms:8007
+  - path: /api/v1/forums
+    target: http://cms:8007
+  - path: /api/v1/notifications
+    target: http://notification:8009
+  - path: /api/v1/templates
+    target: http://notification:8009
+  - path: /api/v1/admin
+    target: http://admin:8001
+
+# JWT 认证配置（使用 framework 级 auth.jwt 配置）
+auth:
+  jwt:
+    secret: "your-secret-key-change-in-production"
+    issuer: "gateway-service"
+    audience: "api"

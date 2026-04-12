@@ -1,0 +1,27 @@
+# 部署说明
+
+release/base 模板适合对外分发最小 starter，默认提供：
+
+- Dockerfile
+- Makefile
+- CI
+- 最小部署说明
+
+## 推荐步骤
+
+```bash
+go mod tidy
+go test ./...
+go run ./cmd/app app start
+```
+
+## Docker 构建
+
+```bash
+docker build -t {{.Name}}:latest .
+```
+
+## 说明
+
+- release 模板不会写本地 `replace`
+- 更适合通过 `gorp new from-release` 创建项目后直接开始开发

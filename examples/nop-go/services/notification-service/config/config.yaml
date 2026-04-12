@@ -1,0 +1,39 @@
+app:
+  name: notification-service
+  env: development
+  address: ":8090"
+
+database:
+  driver: mysql
+  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_notification?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+discovery:
+  enabled: true
+  type: consul
+  consul:
+    addr: "localhost:8500"
+    service_name: "notification-service"
+
+# 通知配置
+notification:
+  email:
+    smtp_host: "smtp.example.com"
+    smtp_port: 587
+    username: ""
+    password: ""
+    from: "noreply@example.com"
+  sms:
+    provider: "aliyun"
+    access_key: ""
+    secret_key: ""
+    sign_name: ""

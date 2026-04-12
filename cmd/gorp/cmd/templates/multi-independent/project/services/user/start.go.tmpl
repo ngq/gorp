@@ -1,0 +1,35 @@
+package user
+
+import (
+	"fmt"
+
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+	userdata "{{.ModuleName}}/services/user/internal/data"
+	usersvc "{{.ModuleName}}/services/user/internal/service"
+)
+
+// Start 启动 user 服务。
+//
+// 中文说明：
+// - 这是 user 服务对外暴露的最小启动入口；
+// - 真实业务装配仍然位于 services/user/internal/...；
+// - services/user/cmd/main.go 只负责调用这里，避免直接跨越 internal 边界。
+func Start() error {
+	return frameworkbootstrap.BootHTTPService("user-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup)
+}
+
+func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&userdata.UserPO{})
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	if rt.DB == nil {
+		return fmt.Errorf("user-service requires gorm database")
+	}
+	services := usersvc.NewServices(rt.DB)
+	services.User.RegisterRoutes(rt.Engine)
+	return nil
+}
