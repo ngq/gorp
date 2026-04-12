@@ -28,8 +28,6 @@ type Order struct {
 	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	Items            []OrderItem       `gorm:"foreignKey:OrderID" json:"items,omitempty"`
-	BillingAddress   *OrderAddress     `gorm:"foreignKey:OrderID;foreignKey:AddressType" json:"billing_address,omitempty"`
-	ShippingAddress  *OrderAddress     `gorm:"foreignKey:OrderID;foreignKey:AddressType" json:"shipping_address,omitempty"`
 }
 
 func (Order) TableName() string {

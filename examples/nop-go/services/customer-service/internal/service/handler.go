@@ -50,10 +50,10 @@ func (s *CustomerService) RegisterRoutes(r *gin.Engine) {
 		customers := api.Group("/customers")
 		customers.Use(customerAuth)
 		{
-			customers.GET("/:id", s.GetCustomer)
-			customers.GET("/:id/validate", s.ValidateCustomer)
-			customers.PUT("/:id", s.UpdateProfile)
-			customers.PUT("/:id/password", s.ChangePassword)
+			customers.GET("/:customer_id", s.GetCustomer)
+			customers.GET("/:customer_id/validate", s.ValidateCustomer)
+			customers.PUT("/:customer_id", s.UpdateProfile)
+			customers.PUT("/:customer_id/password", s.ChangePassword)
 			customers.GET("", s.ListCustomers)
 		}
 
