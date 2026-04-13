@@ -1,16 +1,16 @@
 app:
   name: inventory-service
   env: development
-  address: ":8082"
+  address: ":8008"
 
 database:
   driver: mysql
-  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_inventory?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: "root:nop123456@tcp(mysql:3306)/nop_inventory?charset=utf8mb4&parseTime=True&loc=Local"
   max_open_conns: 50
   max_idle_conns: 10
 
 redis:
-  addr: "localhost:6379"
+  addr: "redis:6379"
   password: ""
   db: 0
 
@@ -18,12 +18,12 @@ log:
   level: debug
 
 discovery:
-  enabled: true
+  enabled: false
   type: consul
   consul:
-    addr: "localhost:8500"
+    addr: "consul:8500"
     service_name: "inventory-service"
 
 services:
-  catalog: "http://localhost:8081"
-  order: "http://localhost:8084"
+  catalog: "http://catalog:8003"
+  order: "http://order:8005"

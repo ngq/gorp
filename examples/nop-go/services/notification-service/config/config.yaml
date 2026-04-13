@@ -1,16 +1,16 @@
 app:
   name: notification-service
   env: development
-  address: ":8090"
+  address: ":8009"
 
 database:
   driver: mysql
-  dsn: "root:ngq099731A!~@tcp(localhost:3306)/nop_notification?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: "root:nop123456@tcp(mysql:3306)/nop_notification?charset=utf8mb4&parseTime=True&loc=Local"
   max_open_conns: 50
   max_idle_conns: 10
 
 redis:
-  addr: "localhost:6379"
+  addr: "redis:6379"
   password: ""
   db: 0
 
@@ -18,10 +18,10 @@ log:
   level: debug
 
 discovery:
-  enabled: true
+  enabled: false
   type: consul
   consul:
-    addr: "localhost:8500"
+    addr: "consul:8500"
     service_name: "notification-service"
 
 # 通知配置

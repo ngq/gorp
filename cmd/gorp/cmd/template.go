@@ -14,7 +14,7 @@ import "github.com/spf13/cobra"
 // - 该命令组的定位是“模板治理与模板资产维护”，不是业务运行时命令。
 var templateCmd = &cobra.Command{
 	Use:   "template",
-	Short: "Template asset tools",
+	Short: "Template governance and release asset tools",
 }
 
 func init() {

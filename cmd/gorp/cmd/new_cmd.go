@@ -18,14 +18,14 @@ var newCmd = &cobra.Command{
 	Short: "Create a new project (offline template by default)",
 	Long: `Create a new project from starter templates.
 
-Template recommendation:
-  - golayout      : default choice for single-service / lightweight-DDD-first projects
-  - golayout-wire : recommended choice for single-service production projects using Wire
-  - multi-flat    : default choice for multi-service projects
-  - multi-flat-wire : recommended choice for multi-service production projects using Wire
-  - base          : minimal skeleton for custom structure
+Public starter matrix:
+  - golayout        : default choice for single-service projects
+  - golayout-wire   : advanced public single-service template with Wire assembly
+  - multi-flat      : default choice for multi-service projects
+  - multi-flat-wire : advanced public multi-service template with Wire assembly
+  - base            : minimal skeleton for custom structure
 
-If you are not sure which template to pick, start with golayout or golayout-wire.`,
+If you are not sure which template to pick, start with golayout or multi-flat.`,
 }
 
 func init() {

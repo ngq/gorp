@@ -7,7 +7,7 @@ import "github.com/spf13/cobra"
 // 当前仅提供 `gorp proto gen`：用于调用 protoc 生成 *.pb.go / *_grpc.pb.go。
 var protoCmd = &cobra.Command{
 	Use:   "proto",
-	Short: "Protobuf/gRPC proto tools",
+	Short: "Proto and gRPC code generation tools",
 }
 
 func init() {

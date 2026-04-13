@@ -73,7 +73,7 @@ func (p *Provider) Boot(contract.Container) error { return nil }
 // 中文说明：
 // - 负责把模板项目自己的数据模型迁移、业务服务、路由注册接起来；
 // - 这里不再依赖母仓的 app/http 与 app/service；
-// - 生成项目调用 `gorp app start` 时，会先走这里完成装配。
+// - 生成项目通过自己的 `cmd/app/main.go` 启动时，会先走这里完成装配。
 func (HTTPRuntimeConfigurator) ConfigureHTTPRuntime(c contract.Container) error {
 	if gormAny, err := c.Make(contract.GormKey); err == nil {
 		db, ok := gormAny.(*gorm.DB)

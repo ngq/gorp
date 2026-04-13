@@ -19,7 +19,8 @@ var templatePackName string
 // 中文说明：
 // - 它会把 release 模板目录打成一个标准 zip，默认文件名为 `gorp-template.zip`；
 // - zip 内部会保留 `templates/project/**` 目录结构，以便 `new from-release` 直接消费；
-// - 这是后续 GitHub Release 上传模板资产的推荐入口命令。
+// - 当前 release 路径是较小的公开发布子集，默认只覆盖 base / golayout / golayout-wire；
+// - 这是后续 GitHub Release 上传模板资产的推荐入口命令，而不是 offline 全量 starter 矩阵的镜像。
 var templatePackCmd = &cobra.Command{
 	Use:   "pack",
 	Short: "Pack release starter template into gorp-template.zip",
@@ -43,6 +44,6 @@ var templatePackCmd = &cobra.Command{
 
 func init() {
 	templatePackCmd.Flags().StringVar(&templatePackOut, "out", "", "output zip path (default depends on --template)")
-	templatePackCmd.Flags().StringVar(&templatePackName, "template", starterTemplateBase, "starter template: base, golayout, golayout-wire")
+	templatePackCmd.Flags().StringVar(&templatePackName, "template", starterTemplateBase, "release starter template: base, golayout, golayout-wire")
 	templateCmd.AddCommand(templatePackCmd)
 }

@@ -45,7 +45,7 @@ This command creates:
   - interfaces/http/request/<context>.go - Request DTOs
 
 Usage expectation:
-  - First create a DDD starter project with 'gorp new offline --template ddd'
+  - First prepare an existing project that already follows the DDD four-layer host structure
   - Then run 'gorp ddd context --name <context>' inside that project
 
 After generation, register the routes in your routes.go:

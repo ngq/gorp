@@ -8,9 +8,9 @@ APP_NAME := {{.ProjectName}}
 build:
 	go build -o bin/$(APP_NAME) ./cmd/app
 
-# 运行（使用 gorp CLI）
+# 运行（直接通过项目 main 入口启动）
 run:
-	go run ./cmd/app app start
+	go run ./cmd/app
 
 # 测试
 test:

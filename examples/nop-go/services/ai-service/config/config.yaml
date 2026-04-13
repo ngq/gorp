@@ -10,7 +10,7 @@ http:
 
 database:
   driver: mysql
-  dsn: root:password@tcp(localhost:3306)/nop_ai?charset=utf8mb4&parseTime=True&loc=Local
+  dsn: root:nop123456@tcp(mysql:3306)/nop_ai?charset=utf8mb4&parseTime=True&loc=Local
 
 auth:
   jwt:

@@ -137,10 +137,11 @@ func (p *devProxy) handler() http.Handler {
 	return backend
 }
 
-// startGoBackend starts backend via `go run ./cmd/gorp app start` with APP_ENV=development and custom address.
+// startGoBackend starts backend via a legacy compatibility path (`go run ./cmd/gorp app start`) with APP_ENV=development and custom address.
 //
 // 中文说明：
-// - 我们不直接调用现有 `app start` 的内部函数，而是启动一个子进程，便于 kill+restart。
+// - 当前 dev 辅助命令仍复用旧的 runtime CLI 启动兼容链路，便于 kill+restart；
+// - 这不是 starter 项目的公开推荐启动方式，公开路径应优先使用项目自己的 `cmd/*/main.go`；
 // - 通过环境变量 APP_ADDRESS 覆盖监听地址（需要在 gin provider 支持，后续若没有则改为配置文件）。
 func startGoBackend(root string, port string) (*exec.Cmd, error) {
 	cmd := exec.Command("go", "run", "./cmd/gorp", "app", "start")

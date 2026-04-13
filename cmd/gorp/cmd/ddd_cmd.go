@@ -12,7 +12,8 @@ import (
 // - 本命令组提供 DDD 风格的代码生成能力，当前主入口是：
 //   1. context：在**已有 DDD starter 项目内部**生成完整 bounded context
 // - 当前不建议把它当成“在任意空 Go 模块中独立起一个 DDD 项目”的命令使用；
-// - 推荐先使用 `gorp new offline --template ddd` 创建宿主项目，再用 `gorp ddd context` 追加上下文。
+// - 推荐先在已有符合 DDD 四层目录约定的宿主项目中运行，再用 `gorp ddd context` 追加上下文；
+// - 当前公开 starter 模板中并没有 `--template ddd`，因此这里不再把 DDD 生成器表述成独立 starter 模板入口。
 var dddCmd = &cobra.Command{
 	Use:   "ddd",
 	Short: "DDD-specific code generation tools",

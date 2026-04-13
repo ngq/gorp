@@ -36,10 +36,10 @@ var newFromReleaseCmd = &cobra.Command{
 	Short: "Create a new project from GitHub Release",
 	Long: `Create a new project by downloading starter templates from a GitHub Release asset.
 
-Template options:
+Template options in the current release path:
   - base          : minimal skeleton for custom structure
   - golayout      : standard single-service template
-  - golayout-wire : single-service template with Wire assembly
+  - golayout-wire : advanced single-service template with Wire assembly
 
 Preset recommendation:
   - golayout-basic / golayout-enterprise: user-facing presets for the golayout template
@@ -47,10 +47,11 @@ Preset recommendation:
 Important:
   - When you specify --preset without --template, the template is automatically inferred.
   - For example: --preset golayout-enterprise automatically selects --template golayout.
+  - The release path is currently a curated public subset and does not equal the full offline starter matrix.
 
-If you are not sure which template to pick:
-  - Use --template golayout or --template golayout-wire for from-release generation.
-  - Multi-service Wire starter generation is currently recommended via offline --template multi-flat-wire.`,
+If you need the full public starter matrix today:
+  - Use 'gorp new offline' for multi-flat or multi-flat-wire.
+  - Use from-release when you specifically want published release assets for base/golayout/golayout-wire.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !cmd.Flags().Changed("template") && newReleasePreset != "" {
 			if inferred := templateFromPreset(newReleasePreset); inferred != "" {
@@ -149,7 +150,7 @@ func init() {
 	newFromReleaseCmd.Flags().StringVar(&newReleaseRepo, "repo", "<owner>/<repo>", "GitHub repository (owner/repo)")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseTag, "tag", "latest", "Release tag (or 'latest')")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseAsset, "asset", "", "Release asset file name (default depends on --template)")
-	newFromReleaseCmd.Flags().StringVar(&newReleaseTemplate, "template", starterTemplateBase, "starter template: base, golayout, golayout-wire")
+	newFromReleaseCmd.Flags().StringVar(&newReleaseTemplate, "template", starterTemplateBase, "release starter template: base, golayout, golayout-wire")
 	newFromReleaseCmd.Flags().StringVar(&newReleasePreset, "preset", "", "user preset: golayout-basic or golayout-enterprise")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newFromReleaseCmd.Flags().BoolVar(&newReleaseWithDB, "with-db", true, "include DB sample and CRUD example")

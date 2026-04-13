@@ -48,8 +48,8 @@ service → biz → data
 # 安装依赖
 go mod tidy
 
-# 运行
-go run ./cmd/app app start
+# 运行（直接通过项目 main 入口启动）
+go run ./cmd/app
 
 # 或使用 Makefile
 make run

@@ -16,7 +16,7 @@ import (
 // - 后续 openapi3 转换则由 `openapi gen` 负责。
 var swaggerCmd = &cobra.Command{
 	Use:   "swagger",
-	Short: "Swagger/OpenAPI tools",
+	Short: "Swagger documentation generation tools",
 }
 
 var swaggerGenCmd = &cobra.Command{

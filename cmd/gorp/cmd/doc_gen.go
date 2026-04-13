@@ -139,8 +139,12 @@ func renderIndexDoc() string {
 	return "# 操作手册（Operator Manual）\n\n" +
 		"本手册由 `gorp doc gen` 自动生成（并可在此基础上补充说明）。\n\n" +
 		"## Quick start（快速开始）\n\n" +
-		"### 启动 HTTP 服务\n\n" +
-		"- `go run ./cmd/gorp app start`\n" +
+		"### 常见工具链入口\n\n" +
+		"- 创建项目：`go run ./cmd/gorp new --help`\n" +
+		"- 模板治理：`go run ./cmd/gorp template version`\n" +
+		"- 协议/模型生成：`go run ./cmd/gorp proto --help`、`go run ./cmd/gorp model --help`\n\n" +
+		"### 启动项目\n\n" +
+		"- 建议在生成项目内通过自己的 `cmd/*/main.go` 入口启动，例如：`go run ./cmd/app`\n" +
 		"- 验证：`GET /healthz`\n\n" +
 		"### 生成 API 文档\n\n" +
 		"- Swagger2: `go run ./cmd/gorp swagger gen`\n" +
@@ -175,12 +179,10 @@ func renderCLIDoc(root *cobra.Command) (string, error) {
 	b.WriteString("> - 如果你已经知道自己要用哪个命令，再回到本页查参数最合适。\n")
 	b.WriteString(">\n")
 	b.WriteString("> 约定：\n")
-	b.WriteString("> - `gorp app`：HTTP 服务管理\n")
-	b.WriteString("> - `gorp grpc`：gRPC 服务管理\n")
-	b.WriteString("> - `gorp cron`：定时任务 worker 管理\n")
-	b.WriteString("> - `gorp model`：数据库模型 / CRUD 骨架生成\n")
+	b.WriteString("> - `gorp new` / `template` / `proto` / `model`：项目创建、模板治理与代码生成主入口\n")
 	b.WriteString("> - `gorp doc` / `swagger` / `openapi`：文档生成相关\n")
-	b.WriteString("> - `gorp build` / `dev` / `deploy`：构建、开发联调、部署相关\n\n")
+	b.WriteString("> - `gorp build` / `dev` / `deploy`：母仓/工程层的构建、开发联调、部署辅助命令\n")
+	b.WriteString("> - `gorp app` / `grpc` / `cron`：保留的 runtime/兼容命令组，不再作为 starter 项目的公开主路径\n\n")
 
 	docs := collectCommands(root)
 	for _, d := range docs {
@@ -285,7 +287,7 @@ func formatFlag(f flagDoc) string {
 	if f.Usage != "" {
 		parts = append(parts, f.Usage)
 	}
-	return strings.Join(parts, " ")
+	return "`" + strings.Join(parts, " ") + "`"
 }
 
 func quoteIfNeeded(s string) string {

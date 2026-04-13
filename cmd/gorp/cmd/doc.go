@@ -9,7 +9,7 @@ import "github.com/spf13/cobra"
 // - 当前主要子命令是 `gorp doc gen`，用于把项目当前状态导出为 docs/manual/ 下的 markdown。
 var docCmd = &cobra.Command{
 	Use:   "doc",
-	Short: "Documentation tools",
+	Short: "Documentation generation tools",
 }
 
 func init() {

@@ -18,9 +18,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// grpcCmd 是 legacy gRPC runtime 命令组。
+//
+// 中文说明：
+// - 该命令组当前仍保留，主要用于兼容旧的 gRPC runtime CLI 路径；
+// - starter 项目的公开推荐路径应优先走项目自己的启动入口，而不是这里的 runtime 命令。
 var grpcCmd = &cobra.Command{
 	Use:   "grpc",
-	Short: "gRPC server management",
+	Short: "Legacy runtime commands for gRPC services",
 }
 
 var (

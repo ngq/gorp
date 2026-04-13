@@ -19,7 +19,7 @@ import (
 // - 它依赖 `swagger gen` 先产出 docs/swagger.json。
 var openapiCmd = &cobra.Command{
 	Use:   "openapi",
-	Short: "OpenAPI tools",
+	Short: "OpenAPI conversion tools",
 }
 
 var openapiGenCmd = &cobra.Command{

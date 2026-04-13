@@ -414,7 +414,7 @@ func printScaffoldNext(out io.Writer, folder string) {
 	fmt.Fprintf(out, "created: %s\n", folder)
 	fmt.Fprintln(out, "next: cd", folder)
 	fmt.Fprintln(out, "      go mod tidy")
-	fmt.Fprintln(out, "      go run ./cmd/app app start")
+	fmt.Fprintln(out, "      go run ./cmd/app")
 }
 
 func buildGitHubReleaseAssetURL(repo, tag, asset string) string {
