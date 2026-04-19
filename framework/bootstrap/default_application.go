@@ -52,5 +52,6 @@ func DefaultBootstrapHelpers() []string {
 		"container.MustMakeAppService",
 		"container.MakeDBRuntime",
 		"container.MakeRedis",
+		"container.MakeCache",
 	}
 }

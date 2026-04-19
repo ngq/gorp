@@ -72,8 +72,8 @@ type ServiceAuthenticator interface {
 //
 // 中文说明：
 // - 表示一个服务的身份标识；
-// - 包含服务名、权限、元数据等；
-// - 用于服务间访问控制。
+// - 只保留服务认证与身份识别所需的最小字段；
+// - 不在 framework 合同层内解释服务权限语义。
 type ServiceIdentity struct {
 	// ServiceID 服务唯一标识
 	ServiceID string
@@ -86,9 +86,6 @@ type ServiceIdentity struct {
 
 	// Environment 环境标识
 	Environment string
-
-	// Permissions 服务权限列表
-	Permissions []string
 
 	// Metadata 服务元数据
 	Metadata map[string]string
@@ -132,9 +129,6 @@ type ServiceAuthConfig struct {
 
 	// 允许的服务列表
 	AllowedServices []string
-
-	// 服务权限映射
-	ServicePermissions map[string][]string
 }
 
 // ServiceAuthProvider 服务认证 Provider 接口。

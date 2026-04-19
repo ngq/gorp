@@ -7,13 +7,13 @@
 ```
 {{.ProjectName}}/
 ├── cmd/app/                # 应用入口
-│   └── main.go             # gorp CLI 入口
+│   └── main.go             # 项目自己的默认启动入口
 ├── config/                 # 配置文件
 │   └── app.yaml
 ├── app/                    # 应用层
 │   ├── http/               # HTTP 路由
 │   │   └── routes.go
-│   └── provider/           # Provider 注册
+│   └── provider/           # 高级/兼容运行时扩展位
 │       └── service/provider.go
 ├── internal/               # 内部实现
 │   ├── biz/                # 业务逻辑层
@@ -28,8 +28,8 @@
 
 | 层级 | 目录 | 职责 |
 |------|------|------|
-| 入口 | cmd/app/ | gorp CLI 命令入口 |
-| 应用 | app/ | 路由注册、Provider 配置 |
+| 入口 | cmd/app/ | 项目自己的默认启动入口，直接复用 framework/bootstrap |
+| 应用 | app/ | 路由注册；`app/provider` 仅保留给高级/兼容运行时扩展 |
 | 业务 | internal/biz/ | 领域对象、仓储接口、用例 |
 | 数据 | internal/data/ | 仓储实现、数据库操作 |
 | 服务 | internal/service/ | HTTP handler、请求响应转换 |
@@ -55,11 +55,30 @@ go run ./cmd/app
 make run
 ```
 
-如需继续使用工具链/辅助命令，也可以显式传参：
+如需继续使用工具链/辅助命令，建议直接使用项目内的 `gorp` CLI 入口：
 
 ```bash
-go run ./cmd/app proto gen
+go run ./cmd/gorp proto gen
 ```
+
+## 默认已具备的起步能力
+
+当前默认 starter 已经把下面这些框架能力接入到可开工路径里：
+
+- HTTP 启动骨架（直接 `go run ./cmd/app`）
+- `/healthz` 健康检查
+- `/metrics` 指标端点
+- GORM 数据库起步链路（默认 sqlite）
+- 业务 JWT 服务接入位（`auth.jwt.*`）
+- Redis 接入位（`redis.*`，默认按需使用）
+- Proto-first gRPC bridge 能力位（`GRPCConnFactory` / `GRPCServerRegistrar`）
+
+建议理解：
+
+- JWT / Redis / Cache 默认先提供“低成本接入位”，不强制你一开始就启用完整业务认证、缓存或外部基础设施；
+- 基础端点由 framework/bootstrap 统一注册，业务代码主要关注自己的 API 路由与服务逻辑；
+- `app/provider` 目录默认不是日常业务开发主路径，而是保留给高级/兼容运行时扩展；
+- gRPC 当前正式主线已经收口为 Proto-first：业务应围绕 `pb.RegisterXxxServer(...)` / `pb.NewXxxClient(conn)` 工作，而不是继续围绕字符串式 `RPCClient.Call(...)`。
 
 ## API 端点
 

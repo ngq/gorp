@@ -89,15 +89,15 @@ func getMQConfig(c contract.Container) (*contract.MessageQueueConfig, error) {
 	}
 
 	// Redis 配置
-	if addr := cfg.GetString("message_queue.redis_addr"); addr != "" {
+	if addr := cfg.GetString("message_queue.redis.addr"); addr != "" {
 		mqCfg.RedisAddr = addr
 	} else {
 		mqCfg.RedisAddr = "localhost:6379"
 	}
-	if password := cfg.GetString("message_queue.redis_password"); password != "" {
+	if password := cfg.GetString("message_queue.redis.password"); password != "" {
 		mqCfg.RedisPassword = password
 	}
-	if db := cfg.GetInt("message_queue.redis_db"); db > 0 {
+	if db := cfg.GetInt("message_queue.redis.db"); db > 0 {
 		mqCfg.RedisDB = db
 	}
 

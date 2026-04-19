@@ -76,19 +76,29 @@ func getApolloConfig(c contract.Container) (*ApolloConfig, error) {
 		Namespace: "application",
 	}
 
-	if v := cfg.Get("config.apollo.app_id"); v != nil {
+	if v := cfg.Get("configsource.apollo.app_id"); v != nil {
+		apolloCfg.AppID = cfg.GetString("configsource.apollo.app_id")
+	} else if v := cfg.Get("config.apollo.app_id"); v != nil {
 		apolloCfg.AppID = cfg.GetString("config.apollo.app_id")
 	}
-	if v := cfg.Get("config.apollo.cluster"); v != nil {
+	if v := cfg.Get("configsource.apollo.cluster"); v != nil {
+		apolloCfg.Cluster = cfg.GetString("configsource.apollo.cluster")
+	} else if v := cfg.Get("config.apollo.cluster"); v != nil {
 		apolloCfg.Cluster = cfg.GetString("config.apollo.cluster")
 	}
-	if v := cfg.Get("config.apollo.namespace"); v != nil {
+	if v := cfg.Get("configsource.apollo.namespace"); v != nil {
+		apolloCfg.Namespace = cfg.GetString("configsource.apollo.namespace")
+	} else if v := cfg.Get("config.apollo.namespace"); v != nil {
 		apolloCfg.Namespace = cfg.GetString("config.apollo.namespace")
 	}
-	if v := cfg.Get("config.apollo.meta_server"); v != nil {
+	if v := cfg.Get("configsource.apollo.meta_server"); v != nil {
+		apolloCfg.MetaServer = cfg.GetString("configsource.apollo.meta_server")
+	} else if v := cfg.Get("config.apollo.meta_server"); v != nil {
 		apolloCfg.MetaServer = cfg.GetString("config.apollo.meta_server")
 	}
-	if v := cfg.Get("config.apollo.access_key"); v != nil {
+	if v := cfg.Get("configsource.apollo.access_key"); v != nil {
+		apolloCfg.AccessKey = cfg.GetString("configsource.apollo.access_key")
+	} else if v := cfg.Get("config.apollo.access_key"); v != nil {
 		apolloCfg.AccessKey = cfg.GetString("config.apollo.access_key")
 	}
 

@@ -73,7 +73,14 @@ func (p *Provider) Register(c contract.Container) error {
 			tracer, _ = tracerAny.(contract.Tracer)
 		}
 
-		return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer), nil
+		// 获取 CircuitBreaker（如果可用）
+		var circuitBreaker contract.CircuitBreaker
+		if c.IsBind(contract.CircuitBreakerKey) {
+			cbAny, _ := c.Make(contract.CircuitBreakerKey)
+			circuitBreaker, _ = cbAny.(contract.CircuitBreaker)
+		}
+
+		return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker), nil
 	}, true)
 
 	// 注册 HTTP RPCServer（复用 Gin Engine）
@@ -132,15 +139,17 @@ func getConfig(c contract.Container) (*contract.RPCConfig, error) {
 // 中文说明：
 // - 使用标准 net/http 发起请求；
 // - 支持服务发现：优先从 Registry 获取地址，否则使用 BaseURL；
-// - 请求/响应使用 JSON 序列化。
-	type Client struct {
-		cfg                *contract.RPCConfig
-		registry           contract.ServiceRegistry
-		selector           contract.Selector
-		metadataPropagator contract.MetadataPropagator
-		serviceAuth        contract.ServiceAuthenticator
-		tracer             contract.Tracer
-		httpCli            *http.Client
+// - 请求/响应使用 JSON 序列化；
+// - 当启用 circuit_breaker 时，会在真正发起下游调用前经过统一保护。
+type Client struct {
+	cfg                *contract.RPCConfig
+	registry           contract.ServiceRegistry
+	selector           contract.Selector
+	metadataPropagator contract.MetadataPropagator
+	serviceAuth        contract.ServiceAuthenticator
+	tracer             contract.Tracer
+	circuitBreaker     contract.CircuitBreaker
+	httpCli            *http.Client
 
 	// 服务地址缓存（当前仅用于非 discovery fallback 场景）
 	serviceCache sync.Map // map[string]*cachedAddr
@@ -159,6 +168,7 @@ func NewClient(
 	metadataPropagator contract.MetadataPropagator,
 	serviceAuth contract.ServiceAuthenticator,
 	tracer contract.Tracer,
+	circuitBreaker contract.CircuitBreaker,
 ) *Client {
 	timeout := time.Duration(cfg.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {
@@ -172,6 +182,7 @@ func NewClient(
 		metadataPropagator: metadataPropagator,
 		serviceAuth:        serviceAuth,
 		tracer:             tracer,
+		circuitBreaker:     circuitBreaker,
 		httpCli: &http.Client{
 			Timeout: timeout,
 		},
@@ -184,7 +195,9 @@ func NewClient(
 // - service: 目标服务名称（如 "user-service"）；
 // - method: 方法路径（如 "/api/user/get"）；
 // - 自动拼接完整 URL 并发送 POST 请求；
-// - 支持服务发现优先选择地址。
+// - 支持服务发现优先选择地址；
+// - selector 的 done 回调会在调用结束后统一回传；
+// - 若启用了 circuit_breaker，则同一资源名会被统一纳入熔断保护。
 func (c *Client) Call(ctx context.Context, service, method string, req, resp any) error {
 	// 序列化请求
 	reqBody, err := json.Marshal(req)
@@ -203,61 +216,68 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		}()
 	}
 
-	// 拼接完整 URL
-	fullURL := c.buildURL(addr, method)
+	err = c.doWithCircuitBreaker(ctx, service, method, func() error {
+		// 拼接完整 URL
+		fullURL := c.buildURL(addr, method)
 
-	// 发送请求
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", fullURL, bytes.NewReader(reqBody))
+		// 发送请求
+		httpReq, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(reqBody))
+		if reqErr != nil {
+			return fmt.Errorf("rpc: create request failed: %w", reqErr)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		// 注入 metadata（如果存在）
+		if c.metadataPropagator != nil {
+			carrier := &headerCarrier{header: httpReq.Header}
+			c.metadataPropagator.Inject(ctx, carrier)
+		}
+
+		// 注入 tracing 上下文（如果存在）
+		if c.tracer != nil {
+			carrier := &headerCarrier{header: httpReq.Header}
+			_ = c.tracer.Inject(ctx, carrier)
+		}
+
+		// 注入服务间认证令牌（如果启用）
+		if c.serviceAuth != nil {
+			if token, tokenErr := c.serviceAuth.GenerateToken(ctx, service); tokenErr == nil && strings.TrimSpace(token) != "" {
+				httpReq.Header.Set("X-Service-Token", token)
+			}
+		}
+
+		// 透传 TraceID（如果存在）
+		if traceID := ctx.Value("trace_id"); traceID != nil {
+			httpReq.Header.Set("X-Trace-ID", fmt.Sprintf("%v", traceID))
+		}
+
+		httpResp, callErr := c.httpCli.Do(httpReq)
+		if callErr != nil {
+			return fmt.Errorf("rpc: request failed: %w", callErr)
+		}
+		defer httpResp.Body.Close()
+
+		// 检查响应状态
+		if httpResp.StatusCode >= 400 {
+			body, _ := io.ReadAll(httpResp.Body)
+			return fmt.Errorf("rpc: server error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		// 反序列化响应
+		if resp != nil {
+			respBody, readErr := io.ReadAll(httpResp.Body)
+			if readErr != nil {
+				return fmt.Errorf("rpc: read response failed: %w", readErr)
+			}
+			if unmarshalErr := json.Unmarshal(respBody, resp); unmarshalErr != nil {
+				return fmt.Errorf("rpc: unmarshal response failed: %w", unmarshalErr)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("rpc: create request failed: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// 注入 metadata（如果存在）
-	if c.metadataPropagator != nil {
-		carrier := &headerCarrier{header: httpReq.Header}
-		c.metadataPropagator.Inject(ctx, carrier)
-	}
-
-	// 注入 tracing 上下文（如果存在）
-	if c.tracer != nil {
-		carrier := &headerCarrier{header: httpReq.Header}
-		_ = c.tracer.Inject(ctx, carrier)
-	}
-
-	// 注入服务间认证令牌（如果启用）
-	if c.serviceAuth != nil {
-		if token, tokenErr := c.serviceAuth.GenerateToken(ctx, service); tokenErr == nil && strings.TrimSpace(token) != "" {
-			httpReq.Header.Set("X-Service-Token", token)
-		}
-	}
-
-	// 透传 TraceID（如果存在）
-	if traceID := ctx.Value("trace_id"); traceID != nil {
-		httpReq.Header.Set("X-Trace-ID", fmt.Sprintf("%v", traceID))
-	}
-
-	httpResp, err := c.httpCli.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("rpc: request failed: %w", err)
-	}
-	defer httpResp.Body.Close()
-
-	// 检查响应状态
-	if httpResp.StatusCode >= 400 {
-		body, _ := io.ReadAll(httpResp.Body)
-		return fmt.Errorf("rpc: server error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	// 反序列化响应
-	if resp != nil {
-		respBody, err := io.ReadAll(httpResp.Body)
-		if err != nil {
-			return fmt.Errorf("rpc: read response failed: %w", err)
-		}
-		if err := json.Unmarshal(respBody, resp); err != nil {
-			return fmt.Errorf("rpc: unmarshal response failed: %w", err)
-		}
+		return err
 	}
 
 	return nil
@@ -265,26 +285,40 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 
 // CallRaw 执行原始数据 RPC 调用。
 func (c *Client) CallRaw(ctx context.Context, service, method string, data []byte) ([]byte, error) {
-	addr, _, err := c.resolveTarget(ctx, service)
+	addr, done, err := c.resolveTarget(ctx, service)
+	if err != nil {
+		return nil, err
+	}
+	if done != nil {
+		defer func() {
+			done(ctx, contract.DoneInfo{Err: err, BytesSent: true, BytesReceived: err == nil})
+		}()
+	}
+
+	var respBody []byte
+	err = c.doWithCircuitBreaker(ctx, service, method, func() error {
+		fullURL := c.buildURL(addr, method)
+
+		httpReq, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(data))
+		if reqErr != nil {
+			return reqErr
+		}
+		httpReq.Header.Set("Content-Type", "application/octet-stream")
+
+		httpResp, callErr := c.httpCli.Do(httpReq)
+		if callErr != nil {
+			return callErr
+		}
+		defer httpResp.Body.Close()
+
+		respBody, callErr = io.ReadAll(httpResp.Body)
+		return callErr
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	fullURL := c.buildURL(addr, method)
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", fullURL, bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Content-Type", "application/octet-stream")
-
-	httpResp, err := c.httpCli.Do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	defer httpResp.Body.Close()
-
-	return io.ReadAll(httpResp.Body)
+	return respBody, nil
 }
 
 // Close 关闭客户端。
@@ -356,6 +390,34 @@ func (c *headerCarrier) Values(key string) []string {
 	return c.header.Values(key)
 }
 
+func (c *Client) doWithCircuitBreaker(ctx context.Context, service, method string, fn func() error) error {
+	if c.circuitBreaker == nil {
+		return fn()
+	}
+	return c.circuitBreaker.Do(ctx, c.circuitBreakerResource(service, method), fn)
+}
+
+func (c *Client) circuitBreakerResource(service, method string) string {
+	parts := []string{"rpc", "http"}
+	if service != "" {
+		parts = append(parts, sanitizeCircuitBreakerSegment(service))
+	}
+	if method != "" {
+		parts = append(parts, sanitizeCircuitBreakerSegment(method))
+	}
+	return strings.Join(parts, ".")
+}
+
+func sanitizeCircuitBreakerSegment(segment string) string {
+	segment = strings.TrimSpace(segment)
+	segment = strings.Trim(segment, "/")
+	if segment == "" {
+		return "unknown"
+	}
+	replacer := strings.NewReplacer("/", ".", " ", "_", ":", ".")
+	return replacer.Replace(segment)
+}
+
 // buildURL 拼接完整 URL。
 func (c *Client) buildURL(addr, method string) string {
 	// 确保 method 以 / 开头
@@ -383,9 +445,9 @@ func (c *Client) buildURL(addr, method string) string {
 // - 无需单独监听端口，与 HTTP 服务共享；
 // - Register 将 handler 注册到 Gin 路由。
 type Server struct {
-	cfg   *contract.RPCConfig
-	c     contract.Container
-	addr  string
+	cfg    *contract.RPCConfig
+	c      contract.Container
+	addr   string
 	routes sync.Map // map[string]any
 }
 

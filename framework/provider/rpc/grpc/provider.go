@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
+	appgrpc "github.com/ngq/gorp/app/grpc"
 	"github.com/ngq/gorp/framework/contract"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
@@ -15,7 +17,10 @@ import (
 	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	grpc_health_v1 "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/reflection"
 )
 
 // Provider 提供 gRPC RPC 实现。
@@ -32,56 +37,35 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "rpc.grpc" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.RPCClientKey, contract.RPCServerKey}
+	return []string{
+		contract.RPCClientKey,
+		contract.RPCServerKey,
+		contract.GRPCConnFactoryKey,
+		contract.GRPCServerRegistrarKey,
+	}
 }
 
 func (p *Provider) Register(c contract.Container) error {
-	// 注册 gRPC RPCClient
-	c.Bind(contract.RPCClientKey, func(c contract.Container) (any, error) {
+	// 注册 Proto-first gRPC 连接工厂。
+	c.Bind(contract.GRPCConnFactoryKey, func(c contract.Container) (any, error) {
 		cfg, _ := getConfig(c)
-
-		// 获取 Registry（如果可用）
-		var registry contract.ServiceRegistry
-		if c.IsBind(contract.RPCRegistryKey) {
-			regAny, _ := c.Make(contract.RPCRegistryKey)
-			registry, _ = regAny.(contract.ServiceRegistry)
-		}
-
-		// 获取 Selector（如果可用）
-		var selector contract.Selector
-		if c.IsBind(contract.SelectorKey) {
-			selAny, _ := c.Make(contract.SelectorKey)
-			selector, _ = selAny.(contract.Selector)
-		}
-
-		// 获取 MetadataPropagator（如果可用）
-		var metadataPropagator contract.MetadataPropagator
-		if c.IsBind(contract.MetadataPropagatorKey) {
-			mdAny, _ := c.Make(contract.MetadataPropagatorKey)
-			metadataPropagator, _ = mdAny.(contract.MetadataPropagator)
-		}
-
-		// 获取 ServiceAuthenticator（如果可用）
-		var serviceAuth contract.ServiceAuthenticator
-		if c.IsBind(contract.ServiceAuthKey) {
-			authAny, _ := c.Make(contract.ServiceAuthKey)
-			serviceAuth, _ = authAny.(contract.ServiceAuthenticator)
-		}
-
-		// 获取 Tracer（如果可用）
-		var tracer contract.Tracer
-		if c.IsBind(contract.TracerKey) {
-			tracerAny, _ := c.Make(contract.TracerKey)
-			tracer, _ = tracerAny.(contract.Tracer)
-		}
-
-		return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer), nil
+		return newClientFromContainer(c, cfg), nil
 	}, true)
 
-	// 注册 gRPC RPCServer
-	c.Bind(contract.RPCServerKey, func(c contract.Container) (any, error) {
+	// 注册旧统一 RPCClient 抽象，底层继续复用 Proto-first 连接工厂实现。
+	c.Bind(contract.RPCClientKey, func(c contract.Container) (any, error) {
+		return c.Make(contract.GRPCConnFactoryKey)
+	}, true)
+
+	// 注册 Proto-first gRPC 服务端注册器。
+	c.Bind(contract.GRPCServerRegistrarKey, func(c contract.Container) (any, error) {
 		cfg, _ := getConfig(c)
 		return NewServer(cfg, c), nil
+	}, true)
+
+	// 注册旧统一 RPCServer 抽象，底层继续复用 Proto-first 服务端注册器实现。
+	c.Bind(contract.RPCServerKey, func(c contract.Container) (any, error) {
+		return c.Make(contract.GRPCServerRegistrarKey)
 	}, true)
 
 	return nil
@@ -89,6 +73,46 @@ func (p *Provider) Register(c contract.Container) error {
 
 func (p *Provider) Boot(c contract.Container) error {
 	return nil
+}
+
+func newClientFromContainer(c contract.Container, cfg *contract.RPCConfig) *Client {
+	var registry contract.ServiceRegistry
+	if c.IsBind(contract.RPCRegistryKey) {
+		regAny, _ := c.Make(contract.RPCRegistryKey)
+		registry, _ = regAny.(contract.ServiceRegistry)
+	}
+
+	var selector contract.Selector
+	if c.IsBind(contract.SelectorKey) {
+		selAny, _ := c.Make(contract.SelectorKey)
+		selector, _ = selAny.(contract.Selector)
+	}
+
+	var metadataPropagator contract.MetadataPropagator
+	if c.IsBind(contract.MetadataPropagatorKey) {
+		mdAny, _ := c.Make(contract.MetadataPropagatorKey)
+		metadataPropagator, _ = mdAny.(contract.MetadataPropagator)
+	}
+
+	var serviceAuth contract.ServiceAuthenticator
+	if c.IsBind(contract.ServiceAuthKey) {
+		authAny, _ := c.Make(contract.ServiceAuthKey)
+		serviceAuth, _ = authAny.(contract.ServiceAuthenticator)
+	}
+
+	var tracer contract.Tracer
+	if c.IsBind(contract.TracerKey) {
+		tracerAny, _ := c.Make(contract.TracerKey)
+		tracer, _ = tracerAny.(contract.Tracer)
+	}
+
+	var circuitBreaker contract.CircuitBreaker
+	if c.IsBind(contract.CircuitBreakerKey) {
+		cbAny, _ := c.Make(contract.CircuitBreakerKey)
+		circuitBreaker, _ = cbAny.(contract.CircuitBreaker)
+	}
+
+	return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker)
 }
 
 // getConfig 从容器获取 RPC 配置。
@@ -105,36 +129,23 @@ func getConfig(c contract.Container) (*contract.RPCConfig, error) {
 
 	rpcCfg := &contract.RPCConfig{
 		Mode:      "grpc",
-		Insecure:  true, // 默认不使用 TLS
+		Insecure:  true,
 		TimeoutMS: 30000,
 	}
 
-	if mode := configprovider.GetStringAny(cfg,
-		"rpc.mode",
-	); mode != "" {
+	if mode := configprovider.GetStringAny(cfg, "rpc.mode"); mode != "" {
 		rpcCfg.Mode = mode
 	}
-	if target := configprovider.GetStringAny(cfg,
-		"rpc.grpc.target",
-		"rpc.target",
-	); target != "" {
+	if target := configprovider.GetStringAny(cfg, "rpc.grpc.target", "rpc.target"); target != "" {
 		rpcCfg.Target = target
 	}
-	if insecure, ok := configprovider.GetBoolAny(cfg,
-		"rpc.grpc.insecure",
-	); ok {
+	if insecure, ok := configprovider.GetBoolAny(cfg, "rpc.grpc.insecure"); ok {
 		rpcCfg.Insecure = insecure
 	}
-	if timeout := configprovider.GetIntAny(cfg,
-		"rpc.timeout_ms",
-		"rpc.timeout",
-	); timeout > 0 {
+	if timeout := configprovider.GetIntAny(cfg, "rpc.timeout_ms", "rpc.timeout"); timeout > 0 {
 		rpcCfg.TimeoutMS = timeout
 	}
-	if addr := configprovider.GetStringAny(cfg,
-		"rpc.grpc.address",
-		"rpc.address",
-	); addr != "" {
+	if addr := configprovider.GetStringAny(cfg, "rpc.grpc.address", "rpc.address"); addr != "" {
 		rpcCfg.Address = addr
 	}
 
@@ -154,6 +165,7 @@ type Client struct {
 	metadataPropagator contract.MetadataPropagator
 	serviceAuth        contract.ServiceAuthenticator
 	tracer             contract.Tracer
+	circuitBreaker     contract.CircuitBreaker
 
 	// 连接池：按地址缓存 ClientConn
 	connPool sync.Map // map[string]*grpc.ClientConn
@@ -171,6 +183,7 @@ func NewClient(
 	metadataPropagator contract.MetadataPropagator,
 	serviceAuth contract.ServiceAuthenticator,
 	tracer contract.Tracer,
+	circuitBreaker contract.CircuitBreaker,
 ) *Client {
 	return &Client{
 		cfg:                cfg,
@@ -179,6 +192,7 @@ func NewClient(
 		metadataPropagator: metadataPropagator,
 		serviceAuth:        serviceAuth,
 		tracer:             tracer,
+		circuitBreaker:     circuitBreaker,
 	}
 }
 
@@ -188,7 +202,8 @@ func NewClient(
 // - service: 目标服务名称；
 // - method: gRPC 方法全名（如 "/user.UserService/GetUser"）；
 // - req/resp: protobuf 请求/响应对象；
-// - 使用 Invoke 发起 gRPC 调用。
+// - 使用 Invoke 发起 gRPC 调用；
+// - 这是旧统一 RPC 抽象留下的兼容入口，Proto-first 主线应优先使用 Conn + pb.NewXxxClient。
 func (c *Client) Call(ctx context.Context, service, method string, req, resp any) error {
 	conn, done, err := c.getConn(ctx, service)
 	if err != nil {
@@ -200,7 +215,6 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		}()
 	}
 
-	// 设置超时
 	timeout := time.Duration(c.cfg.TimeoutMS) * time.Millisecond
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -208,38 +222,29 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		defer cancel()
 	}
 
-	// 准备 outgoing metadata
 	md, ok := metadata.FromOutgoingContext(ctx)
 	if !ok {
 		md = metadata.New(nil)
 	}
 
-	// 注入 metadata（如果存在）
 	if c.metadataPropagator != nil {
 		carrier := newGRPCMetadataCarrier(md)
 		c.metadataPropagator.Inject(ctx, carrier)
 	}
-
-	// 注入 tracing 上下文（如果存在）
 	if c.tracer != nil {
 		carrier := newGRPCMetadataCarrier(md)
 		_ = c.tracer.Inject(ctx, carrier)
 	}
-
-	// 注入服务间认证令牌（如果启用）
 	if c.serviceAuth != nil {
 		if token, tokenErr := c.serviceAuth.GenerateToken(ctx, service); tokenErr == nil && token != "" {
 			md.Set("x-service-token", token)
 		}
 	}
-
-	// 透传 TraceID
 	if traceID := ctx.Value("trace_id"); traceID != nil {
 		md.Set("x-trace-id", fmt.Sprintf("%v", traceID))
 	}
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	// 发起调用
 	err = conn.Invoke(ctx, method, req, resp)
 	if err != nil {
 		return fmt.Errorf("rpc: invoke failed: %w", err)
@@ -257,6 +262,20 @@ func (c *Client) CallRaw(ctx context.Context, service, method string, data []byt
 	return nil, errors.New("rpc: gRPC does not support raw bytes, use protobuf")
 }
 
+// Conn 按服务名返回可复用的 gRPC 连接。
+//
+// 中文说明：
+// - 这是 Proto-first 客户端主线使用的正式入口；
+// - 业务侧拿到连接后应继续使用 `pb.NewXxxClient(conn)` 发起调用；
+// - discovery / selector / metadata / tracing / serviceauth / 连接复用仍由 framework 负责。
+func (c *Client) Conn(ctx context.Context, service string) (*grpc.ClientConn, error) {
+	conn, _, err := c.getConn(ctx, service)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
 // Close 关闭所有连接。
 func (c *Client) Close() error {
 	c.mu.Lock()
@@ -267,7 +286,6 @@ func (c *Client) Close() error {
 	}
 	c.closed = true
 
-	// 关闭所有缓存的连接
 	c.connPool.Range(func(key, value any) bool {
 		if conn, ok := value.(*grpc.ClientConn); ok {
 			conn.Close()
@@ -289,7 +307,6 @@ func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn,
 		return nil, nil, err
 	}
 
-	// 尝试从缓存获取（按地址缓存，避免把 selector 绕过去）
 	if cached, ok := c.connPool.Load(addr); ok {
 		conn := cached.(*grpc.ClientConn)
 		if conn.GetState().String() != "SHUTDOWN" {
@@ -301,6 +318,37 @@ func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn,
 	opts := []grpc.DialOption{}
 	if c.cfg.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	serviceName := service
+	if serviceName == "" {
+		serviceName = addr
+	}
+
+	var unaryInterceptors []grpc.UnaryClientInterceptor
+	var streamInterceptors []grpc.StreamClientInterceptor
+	if c.metadataPropagator != nil {
+		unaryInterceptors = append(unaryInterceptors, metadatamw.UnaryClientInterceptor(c.metadataPropagator))
+		streamInterceptors = append(streamInterceptors, metadatamw.StreamClientInterceptor(c.metadataPropagator))
+	}
+	if c.tracer != nil {
+		unaryInterceptors = append(unaryInterceptors, tracingmw.UnaryClientInterceptor(c.tracer, serviceName))
+	}
+	if c.serviceAuth != nil {
+		unaryInterceptors = append(unaryInterceptors, serviceauthtoken.UnaryClientInterceptor(c.serviceAuth, serviceName))
+		streamInterceptors = append(streamInterceptors, serviceauthtoken.StreamClientInterceptor(c.serviceAuth, serviceName))
+	}
+	if c.circuitBreaker != nil {
+		unaryInterceptors = append(unaryInterceptors, c.circuitBreakerUnaryInterceptor(serviceName))
+		streamInterceptors = append(streamInterceptors, c.circuitBreakerStreamInterceptor(serviceName))
+	}
+	unaryInterceptors = append(unaryInterceptors, appgrpc.UnaryClientInterceptor())
+	streamInterceptors = append(streamInterceptors, appgrpc.StreamClientInterceptor())
+	if len(unaryInterceptors) > 0 {
+		opts = append(opts, grpc.WithChainUnaryInterceptor(unaryInterceptors...))
+	}
+	if len(streamInterceptors) > 0 {
+		opts = append(opts, grpc.WithChainStreamInterceptor(streamInterceptors...))
 	}
 
 	conn, err := grpc.NewClient(addr, opts...)
@@ -385,6 +433,47 @@ func (c *grpcMetadataCarrier) Values(key string) []string {
 	return c.md.Get(key)
 }
 
+func (c *Client) circuitBreakerUnaryInterceptor(service string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		return c.circuitBreaker.Do(ctx, c.circuitBreakerResource(service, method), func() error {
+			return invoker(ctx, method, req, reply, cc, opts...)
+		})
+	}
+}
+
+func (c *Client) circuitBreakerStreamInterceptor(service string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		var stream grpc.ClientStream
+		err := c.circuitBreaker.Do(ctx, c.circuitBreakerResource(service, method), func() error {
+			var callErr error
+			stream, callErr = streamer(ctx, desc, cc, method, opts...)
+			return callErr
+		})
+		return stream, err
+	}
+}
+
+func (c *Client) circuitBreakerResource(service, method string) string {
+	parts := []string{"rpc", "grpc"}
+	if service != "" {
+		parts = append(parts, sanitizeCircuitBreakerSegment(service))
+	}
+	if method != "" {
+		parts = append(parts, sanitizeCircuitBreakerSegment(method))
+	}
+	return strings.Join(parts, ".")
+}
+
+func sanitizeCircuitBreakerSegment(segment string) string {
+	segment = strings.TrimSpace(segment)
+	segment = strings.Trim(segment, "/")
+	if segment == "" {
+		return "unknown"
+	}
+	replacer := strings.NewReplacer("/", ".", " ", "_", ":", ".")
+	return replacer.Replace(segment)
+}
+
 // Server 是 gRPC RPC 服务端实现。
 //
 // 中文说明：
@@ -392,8 +481,8 @@ func (c *grpcMetadataCarrier) Values(key string) []string {
 // - 支持独立监听端口（与 HTTP 服务分离）；
 // - Register 注册 protobuf service implementation。
 type Server struct {
-	cfg   *contract.RPCConfig
-	c     contract.Container
+	cfg *contract.RPCConfig
+	c   contract.Container
 
 	server *grpc.Server
 	addr   string
@@ -402,64 +491,26 @@ type Server struct {
 	services sync.Map // map[string]any
 
 	// 运行状态
-	mu     sync.Mutex
-	running bool
+	mu       sync.Mutex
+	running  bool
 	listener net.Listener
 }
 
 // NewServer 创建 gRPC RPC 服务端。
 func NewServer(cfg *contract.RPCConfig, c contract.Container) *Server {
-	return &Server{
-		cfg: cfg,
-		c:   c,
-	}
+	return &Server{cfg: cfg, c: c}
 }
 
-// Register 注册服务处理器。
-//
-// 中文说明：
-// - handler 类型应为 protobuf service implementation；
-// - 使用 grpc.Server.RegisterService 注册。
-func (s *Server) Register(service string, handler any) error {
-	s.services.Store(service, handler)
-	return nil
-}
-
-// Start 启动 gRPC 服务。
-//
-// 中文说明：
-// - 创建 grpc.Server 并注册所有服务；
-// - 开始监听指定端口；
-// - 与 HTTP 服务端口分离。
-func (s *Server) Start(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.running {
-		return errors.New("rpc: server already running")
-	}
-
-	// 确定监听地址
-	addr := s.cfg.Address
-	if addr == "" {
-		addr = ":9090" // 默认 gRPC 端口
-	}
-
-	// 创建监听器
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("rpc: listen failed: %w", err)
-	}
-	s.listener = lis
-	s.addr = lis.Addr().String()
-
-	// 创建 gRPC Server
+func (s *Server) newGRPCServer() *grpc.Server {
 	opts := []grpc.ServerOption{}
 	if !s.cfg.Insecure {
 		// TODO: 支持 TLS
 	}
 
 	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+	unaryInterceptors = append(unaryInterceptors, appgrpc.UnaryServerInterceptor())
+	streamInterceptors = append(streamInterceptors, appgrpc.StreamServerInterceptor())
 	if s.c.IsBind(contract.TracerKey) {
 		if tracerAny, err := s.c.Make(contract.TracerKey); err == nil {
 			if tracer, ok := tracerAny.(contract.Tracer); ok {
@@ -475,6 +526,7 @@ func (s *Server) Start(ctx context.Context) error {
 		if propagatorAny, err := s.c.Make(contract.MetadataPropagatorKey); err == nil {
 			if propagator, ok := propagatorAny.(contract.MetadataPropagator); ok {
 				unaryInterceptors = append(unaryInterceptors, metadatamw.UnaryServerInterceptor(propagator))
+				streamInterceptors = append(streamInterceptors, metadatamw.StreamServerInterceptor(propagator))
 			}
 		}
 	}
@@ -482,25 +534,85 @@ func (s *Server) Start(ctx context.Context) error {
 		if authAny, err := s.c.Make(contract.ServiceAuthKey); err == nil {
 			if authenticator, ok := authAny.(contract.ServiceAuthenticator); ok {
 				unaryInterceptors = append(unaryInterceptors, serviceauthtoken.UnaryServerInterceptor(authenticator))
+				streamInterceptors = append(streamInterceptors, serviceauthtoken.StreamServerInterceptor(authenticator))
 			}
 		}
 	}
 	if len(unaryInterceptors) > 0 {
 		opts = append(opts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 	}
-	s.server = grpc.NewServer(opts...)
+	if len(streamInterceptors) > 0 {
+		opts = append(opts, grpc.ChainStreamInterceptor(streamInterceptors...))
+	}
 
-	// 注册服务（这里简化处理，实际需要 protobuf 生成的 desc）
-	// 用户需要手动调用 gRPC 标准注册方法，这里只做占位
+	srv := grpc.NewServer(opts...)
+	hs := health.NewServer()
+	hs.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	grpc_health_v1.RegisterHealthServer(srv, hs)
+	reflection.Register(srv)
+	return srv
+}
+
+// Register 注册服务处理器。
+//
+// 中文说明：
+// - 这是旧统一 RPC 抽象留下的弱类型注册入口；
+// - Proto-first 正式主线应优先使用下方的 `RegisterProto`；
+// - 当前保留该方法仅用于兼容历史抽象，不再作为公开 gRPC 主路径。
+func (s *Server) Register(service string, handler any) error {
+	s.services.Store(service, handler)
+	return nil
+}
+
+// RegisterProto 注册标准 protobuf service。
+//
+// 中文说明：
+// - 业务侧应通过 `RegisterProto(func(server *grpc.Server) error { ... })` 挂接 `pb.RegisterXxxServer(...)`；
+// - 这样业务主线可以保持标准 gRPC register 心智；
+// - 若底层 server 尚未初始化，会先按当前配置创建一个可注册的 gRPC server。
+func (s *Server) RegisterProto(register func(server *grpc.Server) error) error {
+	if register == nil {
+		return nil
+	}
+	return register(s.Server())
+}
+
+// Start 启动 gRPC 服务。
+//
+// 中文说明：
+// - 创建 grpc.Server 并注册所有服务；
+// - 开始监听指定端口；
+// - 与 HTTP 服务端口分离；
+// - 若业务已通过 Proto-first 注册入口预先创建 server，则直接复用，不再覆盖。
+func (s *Server) Start(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.running {
+		return errors.New("rpc: server already running")
+	}
+
+	addr := s.cfg.Address
+	if addr == "" {
+		addr = ":9090"
+	}
+
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("rpc: listen failed: %w", err)
+	}
+	s.listener = lis
+	s.addr = lis.Addr().String()
+
+	if s.server == nil {
+		s.server = s.newGRPCServer()
+	}
+
 	s.services.Range(func(key, value any) bool {
-		// 实际注册由业务代码处理
 		return true
 	})
 
-	// 标记运行状态
 	s.running = true
-
-	// 启动服务（非阻塞）
 	go func() {
 		s.server.Serve(lis)
 	}()
@@ -517,10 +629,8 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	// 优雅关闭
 	s.server.GracefulStop()
 	s.running = false
-
 	return nil
 }
 
@@ -529,11 +639,24 @@ func (s *Server) Addr() string {
 	return s.addr
 }
 
+// Server 返回底层 grpc.Server。
+//
+// 中文说明：
+// - 这是 Proto-first 注册器接口的一部分；
+// - 常规业务注册优先走 `RegisterProto`；
+// - 暴露该方法主要用于保留最小逃生舱与底层扩展能力。
+func (s *Server) Server() *grpc.Server {
+	if s.server == nil {
+		s.server = s.newGRPCServer()
+	}
+	return s.server
+}
+
 // GRPCServer 返回底层 grpc.Server，供业务代码注册 protobuf service。
 //
 // 中文说明：
-// - 业务代码需要用此方法获取 grpc.Server；
-// - 然后调用 pb.RegisterXXXServer(s.GRPCServer(), handler)。
+// - 这是旧名称保留，方便现有内部代码逐步迁移；
+// - Proto-first 主线应优先使用 `Server()` / `RegisterProto()`。
 func (s *Server) GRPCServer() *grpc.Server {
-	return s.server
+	return s.Server()
 }

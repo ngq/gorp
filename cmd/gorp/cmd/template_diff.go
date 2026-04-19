@@ -371,18 +371,17 @@ func buildTemplateCompareData(projectRoot string) map[string]any {
 	name := filepath.Base(absRoot)
 	module := detectGoModulePath(filepath.Join(projectRoot, "go.mod"))
 	frameworkModule, frameworkPath, frameworkVersion := detectFrameworkReference(filepath.Join(projectRoot, "go.mod"))
-	withDB, withSwagger, withAuth, withRBAC, withAdmin := detectProjectFeatureFlags(projectRoot)
+	withDB, withSwagger := detectProjectFeatureFlags(projectRoot)
 	return map[string]any{
 		"Name":             name,
+		"ProjectName":      name,
 		"Module":           module,
+		"ModuleName":       module,
 		"FrameworkModule":  frameworkModule,
 		"FrameworkPath":    filepath.ToSlash(frameworkPath),
 		"FrameworkVersion": frameworkVersion,
 		"WithDB":           withDB,
 		"WithSwagger":      withSwagger,
-		"WithAuth":         withAuth,
-		"WithRBAC":         withRBAC,
-		"WithAdmin":        withAdmin,
 	}
 }
 
@@ -439,22 +438,20 @@ func detectFrameworkReference(goModPath string) (module, replacePath, version st
 	return module, replacePath, version
 }
 
-func detectProjectFeatureFlags(projectRoot string) (withDB, withSwagger, withAuth, withRBAC, withAdmin bool) {
+func detectProjectFeatureFlags(projectRoot string) (withDB, withSwagger bool) {
 	withSwagger = detectSwaggerEnabled(filepath.Join(projectRoot, "config", "app.yaml"))
 	templateType := detectProjectTemplateType()
 	switch templateType {
 	case starterTemplateGoLayout:
 		withDB = dirExists(filepath.Join(projectRoot, "internal", "data"))
-		withAuth = fileExists(filepath.Join(projectRoot, "internal", "service", "auth.go"))
-		withRBAC = fileExists(filepath.Join(projectRoot, "internal", "biz", "rbac.go"))
-		withAdmin = fileExists(filepath.Join(projectRoot, "internal", "service", "admin.go"))
+	case starterTemplateMultiFlat, starterTemplateMultiFlatWire:
+		withDB = dirExists(filepath.Join(projectRoot, "services", "user", "internal", "data")) ||
+			dirExists(filepath.Join(projectRoot, "services", "order", "internal", "data")) ||
+			dirExists(filepath.Join(projectRoot, "services", "product", "internal", "data"))
 	default:
 		withDB = false
-		withAuth = false
-		withRBAC = false
-		withAdmin = false
 	}
-	return withDB, withSwagger, withAuth, withRBAC, withAdmin
+	return withDB, withSwagger
 }
 
 func detectSwaggerEnabled(configPath string) bool {
@@ -486,7 +483,33 @@ func detectSwaggerEnabled(configPath string) bool {
 }
 
 func detectProjectTemplateType() string {
+	if fileExists(".gorp-template.yml") {
+		if content, err := os.ReadFile(".gorp-template.yml"); err == nil {
+			text := string(content)
+			switch {
+			case strings.Contains(text, "template: multi-flat-wire"):
+				return starterTemplateMultiFlatWire
+			case strings.Contains(text, "template: multi-flat"):
+				return starterTemplateMultiFlat
+			case strings.Contains(text, "template: golayout-wire"):
+				return starterTemplateGoLayoutWire
+			case strings.Contains(text, "template: golayout"):
+				return starterTemplateGoLayout
+			case strings.Contains(text, "template: base"):
+				return starterTemplateBase
+			}
+		}
+	}
+	if dirExists("services/user/cmd") && dirExists("services/order/cmd") && dirExists("services/product/cmd") {
+		if fileExists("services/user/cmd/wire.go") || fileExists("services/order/cmd/wire.go") || fileExists("services/product/cmd/wire.go") {
+			return starterTemplateMultiFlatWire
+		}
+		return starterTemplateMultiFlat
+	}
 	if dirExists("internal/biz") && dirExists("internal/data") && dirExists("internal/service") {
+		if fileExists("cmd/app/wire.go") || fileExists("cmd/app/wire_gen.go") {
+			return starterTemplateGoLayoutWire
+		}
 		return starterTemplateGoLayout
 	}
 	if dirExists("app/http") {

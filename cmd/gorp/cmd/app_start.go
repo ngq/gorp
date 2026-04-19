@@ -31,7 +31,7 @@ func init() {
 
 var appStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start HTTP server",
+	Short: "Start HTTP server (legacy runtime path)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if appStartDaemon {
 			exe, err := os.Executable()

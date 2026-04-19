@@ -31,6 +31,7 @@ func Execute() error {
 func init() {
 	// 中文说明：
 	// - 当前一级命令仍主要在各自文件的 init() 中向 rootCmd 追加注册；
-	// - 这里不再特殊对待 appCmd，避免 root.go 给出“runtime 优先挂载”的误导；
-	// - 若后续进入更大一轮 Cobra 命令树重构，再评估是否统一改为集中注册。
+	// - app / cron / grpc 虽然属于 legacy runtime/兼容命令组，但仍需要挂到根命令上；
+	// - 这里显式补 appCmd，避免它因为未注册而从 CLI 树中消失。
+	rootCmd.AddCommand(appCmd)
 }

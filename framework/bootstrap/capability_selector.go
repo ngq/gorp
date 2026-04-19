@@ -4,14 +4,31 @@ import (
 	"context"
 
 	"github.com/ngq/gorp/framework/contract"
+	circuitbreakernoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
+	circuitbreakersentinel "github.com/ngq/gorp/framework/provider/circuitbreaker/sentinel"
+	configsourceapollo "github.com/ngq/gorp/framework/provider/configsource/apollo"
 	configsourceconsul "github.com/ngq/gorp/framework/provider/configsource/consul"
 	configsourceetcd "github.com/ngq/gorp/framework/provider/configsource/etcd"
+	configsourcekubernetes "github.com/ngq/gorp/framework/provider/configsource/kubernetes"
 	configsourcelocal "github.com/ngq/gorp/framework/provider/configsource/local"
+	configsourcenacos "github.com/ngq/gorp/framework/provider/configsource/nacos"
 	configsourcenoop "github.com/ngq/gorp/framework/provider/configsource/noop"
+	configsourcepolaris "github.com/ngq/gorp/framework/provider/configsource/polaris"
 	discoveryconsul "github.com/ngq/gorp/framework/provider/discovery/consul"
 	discoveryetcd "github.com/ngq/gorp/framework/provider/discovery/etcd"
+	discoveryeureka "github.com/ngq/gorp/framework/provider/discovery/eureka"
+	discoverykubernetes "github.com/ngq/gorp/framework/provider/discovery/kubernetes"
 	discoverynacos "github.com/ngq/gorp/framework/provider/discovery/nacos"
 	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
+	discoverypolaris "github.com/ngq/gorp/framework/provider/discovery/polaris"
+	discoveryservicecomb "github.com/ngq/gorp/framework/provider/discovery/servicecomb"
+	discoveryzookeeper "github.com/ngq/gorp/framework/provider/discovery/zookeeper"
+	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
+	dtmsdk "github.com/ngq/gorp/framework/provider/dtm/dtmsdk"
+	dlocknoop "github.com/ngq/gorp/framework/provider/dlock/noop"
+	dlockredis "github.com/ngq/gorp/framework/provider/dlock/redis"
+	mqnoop "github.com/ngq/gorp/framework/provider/messagequeue/noop"
+	mqredis "github.com/ngq/gorp/framework/provider/messagequeue/redis"
 	metadatadefault "github.com/ngq/gorp/framework/provider/metadata"
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
 	rpcgrpc "github.com/ngq/gorp/framework/provider/rpc/grpc"
@@ -35,13 +52,17 @@ import (
 // - 目标是不再依赖 provider 注册顺序来碰运气，而是显式按配置选择 discovery / selector / rpc / tracing / metadata / serviceauth；
 // - configsource 因为涉及两阶段加载，后续单独接入，此处先只负责其余主链路能力。
 func SelectedMicroserviceProviders(cfg contract.Config) []contract.ServiceProvider {
-	providers := make([]contract.ServiceProvider, 0, 8)
+	providers := make([]contract.ServiceProvider, 0, 10)
 	providers = append(providers, SelectDiscoveryProvider(cfg))
 	providers = append(providers, SelectSelectorProvider(cfg))
 	providers = append(providers, SelectRPCProvider(cfg))
 	providers = append(providers, SelectTracingProvider(cfg))
 	providers = append(providers, SelectMetadataProvider(cfg))
 	providers = append(providers, SelectServiceAuthProvider(cfg))
+	providers = append(providers, SelectCircuitBreakerProvider(cfg))
+	providers = append(providers, SelectDTMProvider(cfg))
+	providers = append(providers, SelectMessageQueueProvider(cfg))
+	providers = append(providers, SelectDistributedLockProvider(cfg))
 	return providers
 }
 
@@ -78,6 +99,10 @@ func RegisterSelectedMicroserviceProviders(c contract.Container) error {
 		SelectTracingProvider(cfg),
 		SelectMetadataProvider(cfg),
 		SelectServiceAuthProvider(cfg),
+		SelectCircuitBreakerProvider(cfg),
+		SelectDTMProvider(cfg),
+		SelectMessageQueueProvider(cfg),
+		SelectDistributedLockProvider(cfg),
 	}
 	for _, p := range providers {
 		if p == nil {
@@ -91,12 +116,26 @@ func RegisterSelectedMicroserviceProviders(c contract.Container) error {
 }
 
 func SelectConfigSourceProvider(cfg contract.Config) contract.ServiceProvider {
-	typ := getConfigString(cfg, "configsource.type", "config_source.type")
+	typ := getConfigString(
+		cfg,
+		"configsource.backend",
+		"configsource.type",
+		"config_source.backend",
+		"config_source.type",
+	)
 	switch typ {
 	case "consul":
 		return configsourceconsul.NewProvider()
 	case "etcd":
 		return configsourceetcd.NewProvider()
+	case "apollo":
+		return configsourceapollo.NewProvider()
+	case "nacos":
+		return configsourcenacos.NewProvider()
+	case "kubernetes":
+		return configsourcekubernetes.NewProvider()
+	case "polaris":
+		return configsourcepolaris.NewProvider()
 	case "noop":
 		return configsourcenoop.NewProvider()
 	case "", "local":
@@ -107,7 +146,7 @@ func SelectConfigSourceProvider(cfg contract.Config) contract.ServiceProvider {
 }
 
 func SelectDiscoveryProvider(cfg contract.Config) contract.ServiceProvider {
-	typ := getConfigString(cfg, "discovery.type")
+	typ := getConfigString(cfg, "discovery.backend", "discovery.type")
 	switch typ {
 	case "consul":
 		return discoveryconsul.NewProvider()
@@ -115,6 +154,16 @@ func SelectDiscoveryProvider(cfg contract.Config) contract.ServiceProvider {
 		return discoveryetcd.NewProvider()
 	case "nacos":
 		return discoverynacos.NewProvider()
+	case "zookeeper":
+		return discoveryzookeeper.NewProvider()
+	case "kubernetes":
+		return discoverykubernetes.NewProvider()
+	case "polaris":
+		return discoverypolaris.NewProvider()
+	case "eureka":
+		return discoveryeureka.NewProvider()
+	case "servicecomb":
+		return discoveryservicecomb.NewProvider()
 	case "", "noop":
 		fallthrough
 	default:
@@ -123,7 +172,7 @@ func SelectDiscoveryProvider(cfg contract.Config) contract.ServiceProvider {
 }
 
 func SelectSelectorProvider(cfg contract.Config) contract.ServiceProvider {
-	alg := getConfigString(cfg, "selector.algorithm")
+	alg := getConfigString(cfg, "selector.backend", "selector.algorithm", "selector.type")
 	switch alg {
 	case "random":
 		return selectorrandom.NewProvider()
@@ -153,15 +202,23 @@ func SelectRPCProvider(cfg contract.Config) contract.ServiceProvider {
 }
 
 func SelectTracingProvider(cfg contract.Config) contract.ServiceProvider {
-	if cfg != nil && cfg.GetBool("tracing.enabled") {
+	enabled := cfg != nil && cfg.GetBool("tracing.enabled")
+	backend := getConfigString(cfg,
+		"tracing.backend",
+		"tracing.type",
+	)
+	if enabled || backend == "otel" || backend == "otlp" || backend == "grpc" || backend == "http" || backend == "stdout" {
 		return tracingotel.NewProvider()
 	}
 	return tracingnoop.NewProvider()
 }
 
 func SelectMetadataProvider(cfg contract.Config) contract.ServiceProvider {
-	mode := getConfigString(cfg, "metadata.mode")
-	enabled := cfg != nil && cfg.Get("metadata.propagate_prefix") != nil
+	mode := getConfigString(cfg,
+		"metadata.mode",
+		"metadata.backend",
+	)
+	enabled := cfg != nil && (cfg.Get("metadata.propagate_prefix") != nil || cfg.GetBool("metadata.enabled"))
 	if mode == "default" || enabled {
 		return metadatadefault.NewProvider()
 	}
@@ -169,16 +226,100 @@ func SelectMetadataProvider(cfg contract.Config) contract.ServiceProvider {
 }
 
 func SelectServiceAuthProvider(cfg contract.Config) contract.ServiceProvider {
-	mode := getConfigString(cfg, "serviceauth.mode", "service_auth.mode")
+	mode := getConfigString(cfg,
+		"service_auth.backend",
+		"service_auth.mode",
+	)
+	enabled := cfg != nil && cfg.GetBool("service_auth.enabled")
 	switch mode {
 	case "token":
 		return serviceauthtoken.NewProvider()
 	case "mtls":
 		return serviceauthmtls.NewProvider()
 	case "", "noop":
+		if enabled {
+			return serviceauthtoken.NewProvider()
+		}
 		fallthrough
 	default:
 		return serviceauthnoop.NewProvider()
+	}
+}
+
+func SelectCircuitBreakerProvider(cfg contract.Config) contract.ServiceProvider {
+	backend := getConfigString(cfg,
+		"circuit_breaker.backend",
+		"circuit_breaker.type",
+	)
+	enabled := cfg != nil && cfg.GetBool("circuit_breaker.enabled")
+	switch backend {
+	case "sentinel":
+		return circuitbreakersentinel.NewProvider()
+	case "", "noop":
+		if enabled {
+			return circuitbreakersentinel.NewProvider()
+		}
+		fallthrough
+	default:
+		return circuitbreakernoop.NewProvider()
+	}
+}
+
+func SelectDTMProvider(cfg contract.Config) contract.ServiceProvider {
+	backend := getConfigString(cfg,
+		"dtm.backend",
+		"dtm.type",
+		"dtm.driver",
+	)
+	enabled := cfg != nil && cfg.GetBool("dtm.enabled")
+	switch backend {
+	case "sdk", "dtmsdk":
+		return dtmsdk.NewProvider()
+	case "", "noop":
+		if enabled {
+			return dtmsdk.NewProvider()
+		}
+		fallthrough
+	default:
+		return dtmnoop.NewProvider()
+	}
+}
+
+func SelectMessageQueueProvider(cfg contract.Config) contract.ServiceProvider {
+	backend := getConfigString(cfg,
+		"message_queue.backend",
+		"message_queue.type",
+	)
+	enabled := cfg != nil && cfg.GetBool("message_queue.enabled")
+	switch backend {
+	case "redis":
+		return mqredis.NewProvider()
+	case "", "noop":
+		if enabled {
+			return mqredis.NewProvider()
+		}
+		fallthrough
+	default:
+		return mqnoop.NewProvider()
+	}
+}
+
+func SelectDistributedLockProvider(cfg contract.Config) contract.ServiceProvider {
+	backend := getConfigString(cfg,
+		"distributed_lock.backend",
+		"distributed_lock.type",
+	)
+	enabled := cfg != nil && cfg.GetBool("distributed_lock.enabled")
+	switch backend {
+	case "redis":
+		return dlockredis.NewProvider()
+	case "", "noop":
+		if enabled {
+			return dlockredis.NewProvider()
+		}
+		fallthrough
+	default:
+		return dlocknoop.NewProvider()
 	}
 }
 

@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	userv1 "{{.ModuleName}}/proto/user/v1"
+	userserver "{{.ModuleName}}/services/user/internal/server"
 	userdata "{{.ModuleName}}/services/user/internal/data"
 	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+	frameworkcontainer "{{.FrameworkModule}}/framework/container"
+	"google.golang.org/grpc"
 )
 
-// main 是 user 服务的主入口（Wire 装配版）。
+// main 是 user 服务的主入口。
 func main() {
 	if err := frameworkbootstrap.BootHTTPService("user-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -17,10 +21,7 @@ func main() {
 }
 
 func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	if rt.DB == nil {
-		return nil
-	}
-	return rt.DB.AutoMigrate(&userdata.UserPO{})
+	return frameworkbootstrap.AutoMigrateModels(rt, &userdata.UserPO{})
 }
 
 func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
@@ -31,6 +32,12 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if err != nil {
 		return err
 	}
-	services.User.RegisterRoutes(rt.Engine)
-	return nil
+	httpServer := userserver.NewHTTPServer(services)
+	httpServer.RegisterRoutes(rt.Engine)
+
+	registrar := frameworkcontainer.MustMakeGRPCServerRegistrar(rt.Container)
+	return registrar.RegisterProto(func(server *grpc.Server) error {
+		userv1.RegisterUserServiceServer(server, services.User)
+		return nil
+	})
 }

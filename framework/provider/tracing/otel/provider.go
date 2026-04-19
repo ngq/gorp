@@ -119,6 +119,7 @@ func getTracingConfig(c contract.Container) (*contract.TracingConfig, error) {
 
 	// 导出器配置
 	if exporter := configprovider.GetStringAny(cfg,
+		"tracing.backend",
 		"tracing.type",
 		"tracing.exporter_type",
 	); exporter != "" {

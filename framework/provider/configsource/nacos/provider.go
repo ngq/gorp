@@ -82,25 +82,39 @@ func getNacosConfig(c contract.Container) (*NacosConfig, error) {
 		Group: "DEFAULT_GROUP",
 	}
 
-	if v := cfg.Get("config.nacos.server_addr"); v != nil {
+	if v := cfg.Get("configsource.nacos.server_addr"); v != nil {
+		nacosCfg.ServerAddr = cfg.GetString("configsource.nacos.server_addr")
+	} else if v := cfg.Get("config.nacos.server_addr"); v != nil {
 		nacosCfg.ServerAddr = cfg.GetString("config.nacos.server_addr")
 	}
-	if v := cfg.Get("config.nacos.port"); v != nil {
+	if v := cfg.Get("configsource.nacos.port"); v != nil {
+		nacosCfg.Port = cfg.GetInt("configsource.nacos.port")
+	} else if v := cfg.Get("config.nacos.port"); v != nil {
 		nacosCfg.Port = cfg.GetInt("config.nacos.port")
 	}
-	if v := cfg.Get("config.nacos.namespace"); v != nil {
+	if v := cfg.Get("configsource.nacos.namespace"); v != nil {
+		nacosCfg.Namespace = cfg.GetString("configsource.nacos.namespace")
+	} else if v := cfg.Get("config.nacos.namespace"); v != nil {
 		nacosCfg.Namespace = cfg.GetString("config.nacos.namespace")
 	}
-	if v := cfg.Get("config.nacos.group"); v != nil {
+	if v := cfg.Get("configsource.nacos.group"); v != nil {
+		nacosCfg.Group = cfg.GetString("configsource.nacos.group")
+	} else if v := cfg.Get("config.nacos.group"); v != nil {
 		nacosCfg.Group = cfg.GetString("config.nacos.group")
 	}
-	if v := cfg.Get("config.nacos.data_id"); v != nil {
+	if v := cfg.Get("configsource.nacos.data_id"); v != nil {
+		nacosCfg.DataID = cfg.GetString("configsource.nacos.data_id")
+	} else if v := cfg.Get("config.nacos.data_id"); v != nil {
 		nacosCfg.DataID = cfg.GetString("config.nacos.data_id")
 	}
-	if v := cfg.Get("config.nacos.username"); v != nil {
+	if v := cfg.Get("configsource.nacos.username"); v != nil {
+		nacosCfg.Username = cfg.GetString("configsource.nacos.username")
+	} else if v := cfg.Get("config.nacos.username"); v != nil {
 		nacosCfg.Username = cfg.GetString("config.nacos.username")
 	}
-	if v := cfg.Get("config.nacos.password"); v != nil {
+	if v := cfg.Get("configsource.nacos.password"); v != nil {
+		nacosCfg.Password = cfg.GetString("configsource.nacos.password")
+	} else if v := cfg.Get("config.nacos.password"); v != nil {
 		nacosCfg.Password = cfg.GetString("config.nacos.password")
 	}
 

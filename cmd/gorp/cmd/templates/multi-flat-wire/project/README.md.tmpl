@@ -2,6 +2,11 @@
 
 多微服务项目 - 默认多服务 starter（扁平化服务目录方案，Wire 装配版）
 
+> 定位说明：
+> - 这是多服务的**高级模板**，适合明确希望各服务通过 Wire 做编译期装配的团队；
+> - 如果你只是确定要多服务结构，但不想先引入 Wire，优先使用 `gorp new multi`；
+> - 如果当前只是快速开始单服务业务开发，优先使用裸 `gorp new`。
+
 ## 技术栈
 
 | 类别 | 组件 |
@@ -9,24 +14,26 @@
 | **Web 框架** | Gin |
 | **ORM** | GORM + SQLite |
 | **启动装配** | Wire + framework bootstrap |
-| **缓存** | Redis |
-| **服务发现** | Consul |
-| **链路追踪** | Jaeger + OpenTelemetry |
-| **监控** | Prometheus + Grafana |
-| **限流熔断** | 自研组件 |
+| **缓存** | framework cache（默认 memory，可按需接 Redis） |
+| **服务发现** | framework discovery provider（按需启用） |
+| **链路追踪** | framework tracing provider（按需启用） |
+| **监控** | framework metrics / `/metrics` |
+| **服务间认证** | framework service_auth provider（按需启用） |
 
 ## 项目结构
 
 ```text
-├── cmd/                    # 非业务型入口（如 gateway）
-├── internal/              # 公共内部代码
 ├── services/              # 各服务代码（就近聚合）
 │   ├── user/
 │   │   ├── cmd/
-│   │   │   ├── main.go    # user 服务主入口
-│   │   │   ├── wire.go    # Wire 依赖定义
+│   │   │   ├── main.go
+│   │   │   ├── wire.go
 │   │   │   └── wire_gen.go
 │   │   ├── internal/
+│   │   │   ├── biz/
+│   │   │   ├── data/
+│   │   │   ├── service/
+│   │   │   └── server/
 │   │   └── config/
 │   ├── order/
 │   └── product/
@@ -36,9 +43,11 @@
 
 ## 启动装配策略
 
-- framework 负责提供 config / log / gin / orm / bootstrap 等通用能力；
-- 各服务依赖图通过 Wire 在服务自己的 `cmd` 层编译期装配；
-- 默认模板不把 provider/container 暴露给业务层作为主要工作流。
+- framework 负责提供 config / log / gin / orm / bootstrap / capability selector 等通用能力；
+- 各服务依赖图通过 Wire 在服务根目录内的 `cmd/` 层编译期装配；
+- `service/` 负责应用服务编排与 capability 调用，`server/` 负责 HTTP / gRPC 传输层注册；
+- 当前模板不再默认保留 project-owned infra runtime；微服务能力应优先走 framework 主线；
+- gRPC 正式主线已经收口为 Proto-first：服务端应围绕 `GRPCServerRegistrar + pb.RegisterXxxServer(...)`，客户端应围绕 `GRPCConnFactory + pb.NewXxxClient(conn)`。
 
 ## 快速开始
 
@@ -48,25 +57,100 @@
 go mod tidy
 ```
 
-### 2. 安装并生成 Wire 代码
+### 2. 安装代码生成工具
 
 ```bash
 go install github.com/google/wire/cmd/wire@latest
-make gen-wire
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+### 3. 统一生成代码
+
+```bash
+make generate
 ```
 
 说明：
-- `wire.go` 是依赖装配声明；
-- `wire_gen.go` 是生成后的装配结果；
-- 默认情况下，服务入口只通过 `wire*Services(...)` 收口装配链，不再在 `cmd/main.go` 中手写 repo/usecase/service wiring。
+- `make generate` 会统一执行 Wire 与 Proto 生成；
+- `wire.go` 是依赖装配声明，`wire_gen.go` 是生成后的装配结果；
+- 默认情况下，服务入口统一由 `services/<service>/cmd/main.go` 承接；Wire 只在该目录内收口业务依赖装配，不再通过 `services/*/start.go` 做过渡。
 
-### 3. 启动服务
+### 4. 启动服务
 
 ```bash
 make run-user
 make run-order
 make run-product
 ```
+
+说明：
+- 各服务默认统一由 `services/<service>/cmd/main.go` 作为启动入口；
+- 入口中直接复用 framework/bootstrap，并在 `cmd` 层收口运行时；
+- HTTP / gRPC 传输层注册统一放在 `internal/server`，业务编排与 capability 调用统一放在 `internal/service`；
+- 不再通过 `services/*/start.go` 这类过渡层转发启动。
+
+### 5. 启动本地依赖与多服务联调
+
+```bash
+make deploy-local
+```
+
+说明：
+- 该命令会通过 `deployments/compose/docker-compose.yaml` 拉起 Redis 与三组服务样板；
+- compose 默认把项目根目录挂载到容器内 `/workspace`，并直接执行 `go run ./services/<service>/cmd`，便于边改边联调；
+- 联调完成后可执行 `make deploy-local-down` 清理本地编排环境。
+
+### 6. 运行测试
+
+```bash
+make test
+```
+
+说明：
+- 模板默认已带上最小测试基线；
+- `internal/biz` 下提供 usecase 级样板测试，方便你按领域逻辑继续扩展；
+- `internal/server` 下提供 HTTP smoke 测试，保证路由注册和基础入参处理不漂移；
+- user / order 服务额外保留了最小 gRPC / metadata / dlock 样板测试，方便持续验证微服务治理主链路。
+
+### 7. 如果你准备验证 Proto-first gRPC 双服务链路
+
+建议优先采用：
+
+- `order-service` 作为 gRPC client / caller
+- `user-service` 作为 gRPC server / callee
+
+并统一使用：
+
+- `service.name`
+- `rpc.mode=grpc`
+- `rpc.grpc.address` / `rpc.grpc.target`
+- `metadata.enabled + metadata.propagate_prefix`
+- `tracing.enabled + tracing.backend`
+- `service_auth.mode=token + service_auth.token.secret`
+
+样板目标不是回到字符串式 `RPCClient.Call(...)`，而是直接围绕：
+
+- `GRPCServerRegistrar + pb.RegisterXxxServer(...)`
+- `GRPCConnFactory + pb.NewXxxClient(conn)`
+
+来做双服务闭环验证。
+
+### 8. 如果你准备生成 proto 代码
+
+当前这个多服务模板默认没有内置 `cmd/gorp` 入口，因此建议直接使用 `protoc` + Go 插件生成：
+
+```bash
+PATH="$(go env GOPATH)/bin:$PATH" protoc -I . \
+  --go_out=. --go_opt=paths=source_relative \
+  --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+  proto/user/v1/user.proto
+```
+
+建议理解：
+
+- 多服务主样板当前优先验证业务服务之间的 Proto-first 接线与治理能力闭环；
+- `gorp proto gen` 这条链路当前主要服务于母仓/单服务场景，不是这个模板的默认生成入口。
 
 ## 日志使用建议
 

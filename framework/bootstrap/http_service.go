@@ -18,6 +18,7 @@ import (
 	"github.com/ngq/gorp/framework/contract"
 	gingin "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/ngq/gorp/framework/provider/host"
+	redisProvider "github.com/ngq/gorp/framework/provider/redis"
 
 	gormpkg "gorm.io/gorm"
 )
@@ -42,6 +43,7 @@ type HTTPServiceOptions struct {
 // 中文说明：
 // - 封装 HTTP 服务启动阶段需要的公共运行时对象；
 // - 包含框架核心能力：Logger、Engine、Config、DB；
+// - 同时暴露 starter 最常用的起步能力：JWT、Redis；
 // - 用于简化业务服务的 main.go 启动代码。
 type HTTPServiceRuntime struct {
 	App         *framework.Application
@@ -49,6 +51,8 @@ type HTTPServiceRuntime struct {
 	Logger      contract.Logger
 	Engine      *gin.Engine
 	DB          *gormpkg.DB
+	Redis       contract.Redis
+	JWT         contract.JWTService
 	Config      contract.Config
 	ServiceName string
 }
@@ -78,11 +82,17 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		Logger:      container.MustMakeLogger(c),
 		Engine:      container.MustMakeEngine(c),
 		Config:      container.MustMakeConfig(c),
+		JWT:         container.MustMakeJWTService(c),
 		ServiceName: serviceName,
 	}
 
 	if !opts.DisableGorm {
 		rt.DB = container.MustMakeGorm(c)
+	}
+	if !opts.DisableRedis {
+		if redisSvc, err := container.MakeRedis(c); err == nil {
+			rt.Redis = redisSvc
+		}
 	}
 
 	return rt, nil
@@ -100,9 +110,10 @@ func buildHTTPProviders(opts HTTPServiceOptions) []contract.ServiceProvider {
 		providers = append(providers, ORMRuntimeProviders()...)
 	}
 
-	// 业务减负
+	// 业务减负（默认包含业务 JWT）
+	providers = append(providers, BusinessSimplificationProviders()...)
 	if !opts.DisableRedis {
-		providers = append(providers, BusinessSimplificationProviders()...)
+		providers = append(providers, redisProvider.NewProvider())
 	}
 
 	// 服务专属
@@ -111,11 +122,12 @@ func buildHTTPProviders(opts HTTPServiceOptions) []contract.ServiceProvider {
 	return providers
 }
 
-// BootHTTPService 启动 HTTP 服务
+// BootHTTPService 启动 HTTP 服务。
 //
 // 中文说明：
+// - 这是 generated project 默认公开的 HTTP 启动骨架；
 // - 统一处理：初始化 -> 可选迁移 -> 服务装配回调 -> 健康检查 -> Prometheus 指标 -> RunHTTP；
-// - 业务项目只需要提供自己的装配逻辑；
+// - 业务项目只需要提供自己的装配逻辑，不需要先理解 runtime provider 或 legacy CLI；
 // - 自动注册 /healthz 和 /metrics 端点。
 //
 // 使用示例：
@@ -152,6 +164,19 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 	}
 
 	return RunHTTP(rt.Container, rt.Logger)
+}
+
+// AutoMigrateModels 在 HTTP 服务运行时上执行最小 GORM 自动迁移。
+//
+// 中文说明：
+// - 这是 starter/main.go 常见迁移样板的统一收口辅助；
+// - rt.DB 为空时直接跳过，便于复用到可选数据库能力路径；
+// - 用于减少模板里重复的 `if rt.DB == nil { return nil }` 胶水代码。
+func AutoMigrateModels(rt *HTTPServiceRuntime, models ...any) error {
+	if rt == nil || rt.DB == nil || len(models) == 0 {
+		return nil
+	}
+	return rt.DB.AutoMigrate(models...)
 }
 
 // RegisterHealthCheck 注册健康检查端点
@@ -210,6 +235,9 @@ func RunHTTP(c contract.Container, logger contract.Logger) error {
 	}
 
 	logger.Info("starting http server")
+	if err := hostSvc.Start(context.Background()); err != nil {
+		return err
+	}
 
 	// 设置信号处理
 	sigs := []os.Signal{os.Interrupt}
@@ -218,29 +246,9 @@ func RunHTTP(c contract.Container, logger contract.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), sigs...)
 	defer stop()
+	<-ctx.Done()
 
-	// 启动 HTTP 服务
-	errCh := make(chan error, 1)
-	go func() {
-		if err := httpSvc.Run(); err != nil {
-			if errors.Is(err, http.ErrServerClosed) {
-				errCh <- nil
-				return
-			}
-			errCh <- err
-		}
-	}()
-
-	// 等待信号或错误
-	select {
-	case <-ctx.Done():
-		logger.Info("shutdown signal received")
-	case err := <-errCh:
-		if err != nil {
-			return err
-		}
-		return nil
-	}
+	logger.Info("shutdown signal received")
 
 	// 优雅关闭
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

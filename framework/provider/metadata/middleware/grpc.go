@@ -112,8 +112,13 @@ func (w *wrappedServerStream) Context() context.Context {
 // - 用于客户端发起请求时。
 func UnaryClientInterceptor(propagator contract.MetadataPropagator) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		// 创建 gRPC Metadata
-		md := make(metadata.MD)
+		// 复用已有 outgoing metadata，避免覆盖前面拦截器已写入的 trace/serviceauth 信息。
+		md, ok := metadata.FromOutgoingContext(ctx)
+		if !ok || md == nil {
+			md = make(metadata.MD)
+		} else {
+			md = md.Copy()
+		}
 		carrier := NewGRPCCarrier(md)
 
 		// 注入 metadata
@@ -131,8 +136,13 @@ func UnaryClientInterceptor(propagator contract.MetadataPropagator) grpc.UnaryCl
 // StreamClientInterceptor gRPC 客户端流拦截器。
 func StreamClientInterceptor(propagator contract.MetadataPropagator) grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-		// 创建 gRPC Metadata
-		md := make(metadata.MD)
+		// 复用已有 outgoing metadata，避免覆盖前面拦截器已写入的 trace/serviceauth 信息。
+		md, ok := metadata.FromOutgoingContext(ctx)
+		if !ok || md == nil {
+			md = make(metadata.MD)
+		} else {
+			md = md.Copy()
+		}
 		carrier := NewGRPCCarrier(md)
 
 		// 注入 metadata

@@ -5,10 +5,12 @@ import (
 	"os"
 
 	productdata "{{.ModuleName}}/services/product/internal/data"
+	productserver "{{.ModuleName}}/services/product/internal/server"
 	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+	frameworkcontainer "{{.FrameworkModule}}/framework/container"
 )
 
-// main 是 product 服务的主入口（Wire 装配版）。
+// main 是 product 服务的主入口。
 func main() {
 	if err := frameworkbootstrap.BootHTTPService("product-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -17,20 +19,20 @@ func main() {
 }
 
 func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	if rt.DB == nil {
-		return nil
-	}
-	return rt.DB.AutoMigrate(&productdata.ProductPO{})
+	return frameworkbootstrap.AutoMigrateModels(rt, &productdata.ProductPO{})
 }
 
 func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("product-service requires gorm database")
 	}
-	services, err := wireProductServices(rt.DB)
+	publisher := frameworkcontainer.MustMakeMessagePublisher(rt.Container)
+	subscriber := frameworkcontainer.MustMakeMessageSubscriber(rt.Container)
+	services, err := wireProductServices(rt.DB, publisher, subscriber)
 	if err != nil {
 		return err
 	}
-	services.Product.RegisterRoutes(rt.Engine)
+	httpServer := productserver.NewHTTPServer(services)
+	httpServer.RegisterRoutes(rt.Engine)
 	return nil
 }

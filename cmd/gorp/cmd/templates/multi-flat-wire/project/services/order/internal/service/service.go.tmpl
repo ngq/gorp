@@ -2,13 +2,15 @@
 package service
 
 import (
-	"net/http"
-	"strconv"
+	"context"
+	"fmt"
+	"time"
 
+	userv1 "{{.ModuleName}}/proto/user/v1"
 	"{{.ModuleName}}/services/order/internal/biz"
 	"{{.ModuleName}}/services/order/internal/data"
 
-	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 	"gorm.io/gorm"
 )
 
@@ -18,28 +20,19 @@ type Services struct {
 }
 
 // NewServices 创建服务层。
-func NewServices(db *gorm.DB) *Services {
+func NewServices(db *gorm.DB, userConnFactory contract.GRPCConnFactory, dlock contract.DistributedLock) *Services {
 	orderRepo := data.NewOrderRepo(db)
 	orderUC := biz.NewOrderUseCase(orderRepo)
 	return &Services{
-		Order: &OrderService{uc: orderUC},
+		Order: &OrderService{uc: orderUC, userConnFactory: userConnFactory, dlock: dlock},
 	}
 }
 
 // OrderService 订单服务。
 type OrderService struct {
-	uc *biz.OrderUseCase
-}
-
-// RegisterRoutes 注册订单服务路由。
-func (s *OrderService) RegisterRoutes(r *gin.Engine) {
-	api := r.Group("/api/v1/orders")
-	{
-		api.GET("", s.List)
-		api.GET("/:id", s.GetByID)
-		api.POST("", s.Create)
-		api.DELETE("/:id", s.Delete)
-	}
+	uc              *biz.OrderUseCase
+	userConnFactory contract.GRPCConnFactory
+	dlock           contract.DistributedLock
 }
 
 // CreateOrderRequest 创建订单请求。
@@ -64,73 +57,100 @@ type OrderResponse struct {
 	UpdatedAt   int64   `json:"updated_at"`
 }
 
-// List 获取订单列表。
-func (s *OrderService) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+// RemoteUserResponse 远程用户验证响应。
+type RemoteUserResponse struct {
+	ID                uint64 `json:"id"`
+	Username          string `json:"username"`
+	Email             string `json:"email"`
+	TraceID           string `json:"trace_id"`
+	RequestID         string `json:"request_id"`
+	MetadataDemo      string `json:"metadata_demo"`
+	CallerServiceName string `json:"caller_service_name"`
+}
 
-	orders, total, err := s.uc.List(c.Request.Context(), page, size)
+// LockDemoResponse 分布式锁样板响应。
+type LockDemoResponse struct {
+	Key     string `json:"key"`
+	Success bool   `json:"success"`
+}
+
+// List 获取订单列表。
+func (s *OrderService) List(ctx context.Context, page, size int) ([]OrderResponse, int64, error) {
+	orders, total, err := s.uc.List(ctx, page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, 0, err
 	}
 
 	items := make([]OrderResponse, len(orders))
 	for i, o := range orders {
 		items[i] = toOrderResponse(o)
 	}
-
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	return items, total, nil
 }
 
 // GetByID 获取单个订单。
-func (s *OrderService) GetByID(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+func (s *OrderService) GetByID(ctx context.Context, id uint) (*OrderResponse, error) {
+	order, err := s.uc.GetByID(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
+		return nil, err
 	}
-
-	order, err := s.uc.GetByID(c.Request.Context(), uint(id))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, toOrderResponse(order))
+	resp := toOrderResponse(order)
+	return &resp, nil
 }
 
 // Create 创建订单。
-func (s *OrderService) Create(c *gin.Context) {
-	var req CreateOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	order, err := s.uc.Create(c.Request.Context(), req.UserID, req.ProductID, req.ProductName, req.Quantity, req.TotalPrice)
+func (s *OrderService) Create(ctx context.Context, req CreateOrderRequest) (*OrderResponse, error) {
+	order, err := s.uc.Create(ctx, req.UserID, req.ProductID, req.ProductName, req.Quantity, req.TotalPrice)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
-
-	c.JSON(http.StatusCreated, toOrderResponse(order))
+	resp := toOrderResponse(order)
+	return &resp, nil
 }
 
 // Delete 删除订单。
-func (s *OrderService) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+func (s *OrderService) Delete(ctx context.Context, id uint) error {
+	return s.uc.Delete(ctx, id)
+}
+
+// GetOrderUser 通过 Proto-first gRPC 访问 user-service，验证 tracing/metadata/service_auth 闭环。
+func (s *OrderService) GetOrderUser(ctx context.Context, id uint) (*RemoteUserResponse, error) {
+	order, err := s.uc.GetByID(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
+		return nil, err
 	}
 
-	if err := s.uc.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	ctx = contract.AppendToClientContext(ctx, "x-md-demo", "hello-metadata")
+	conn, err := s.userConnFactory.Conn(ctx, "user-service")
+	if err != nil {
+		return nil, fmt.Errorf("dial user-service failed: %w", err)
 	}
 
-	c.Status(http.StatusNoContent)
+	resp, err := userv1.NewUserServiceClient(conn).GetUser(ctx, &userv1.GetUserRequest{Id: uint64(order.UserID)})
+	if err != nil {
+		return nil, fmt.Errorf("call user-service failed: %w", err)
+	}
+
+	return &RemoteUserResponse{
+		ID:                resp.GetId(),
+		Username:          resp.GetUsername(),
+		Email:             resp.GetEmail(),
+		TraceID:           resp.GetTraceId(),
+		RequestID:         resp.GetRequestId(),
+		MetadataDemo:      resp.GetMetadataDemo(),
+		CallerServiceName: resp.GetCallerServiceName(),
+	}, nil
+}
+
+// LockOrderDemo 通过最小竞争锁样板验证分布式锁能力。
+func (s *OrderService) LockOrderDemo(ctx context.Context, id uint) (*LockDemoResponse, error) {
+	key := fmt.Sprintf("order:%d", id)
+	if err := s.dlock.WithLock(ctx, key, 3*time.Second, func() error {
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return &LockDemoResponse{Key: key, Success: true}, nil
 }
 
 // toOrderResponse 转换为响应格式。

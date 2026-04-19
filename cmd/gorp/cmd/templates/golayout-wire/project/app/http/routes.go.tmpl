@@ -13,8 +13,9 @@ import (
 // 中文说明：
 // - 使用框架提供的 Gin Engine；
 // - 调用 internal/service 层注册业务路由；
-// - `/healthz` 与 `/metrics` 等基础端点由 framework/bootstrap 统一注册，这里只关注业务 API。
-func RegisterRoutes(r *gin.Engine, svc *service.Services) {
+// - `/healthz` 与 `/metrics` 等基础端点由 framework/bootstrap 统一注册，这里只关注业务 API；
+// - 额外保留 container 参数，方便后续挂接 `gorp model api` 这类依赖 runtime/container 的生成模块。
+func RegisterRoutes(r *gin.Engine, c contract.Container, svc *service.Services) {
 	// 业务 API
 	api := r.Group("/api/v1")
 	{

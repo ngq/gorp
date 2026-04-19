@@ -2,13 +2,14 @@
 package service
 
 import (
-	"net/http"
-	"strconv"
+	"context"
+	"fmt"
+	"time"
 
 	"{{.ModuleName}}/services/product/internal/biz"
 	"{{.ModuleName}}/services/product/internal/data"
 
-	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 	"gorm.io/gorm"
 )
 
@@ -18,28 +19,19 @@ type Services struct {
 }
 
 // NewServices 创建服务层。
-func NewServices(db *gorm.DB) *Services {
+func NewServices(db *gorm.DB, publisher contract.MessagePublisher, subscriber contract.MessageSubscriber) *Services {
 	productRepo := data.NewProductRepo(db)
 	productUC := biz.NewProductUseCase(productRepo)
 	return &Services{
-		Product: &ProductService{uc: productUC},
+		Product: &ProductService{uc: productUC, publisher: publisher, subscriber: subscriber},
 	}
 }
 
 // ProductService 商品服务。
 type ProductService struct {
-	uc *biz.ProductUseCase
-}
-
-// RegisterRoutes 注册商品服务路由。
-func (s *ProductService) RegisterRoutes(r *gin.Engine) {
-	api := r.Group("/api/v1/products")
-	{
-		api.GET("", s.List)
-		api.GET("/:id", s.GetByID)
-		api.POST("", s.Create)
-		api.DELETE("/:id", s.Delete)
-	}
+	uc         *biz.ProductUseCase
+	publisher  contract.MessagePublisher
+	subscriber contract.MessageSubscriber
 }
 
 // CreateProductRequest 创建商品请求。
@@ -61,84 +53,89 @@ type ProductResponse struct {
 	UpdatedAt   int64   `json:"updated_at"`
 }
 
-// List 获取商品列表。
-func (s *ProductService) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+// MQConsumeResponse MQ 消费验证响应。
+type MQConsumeResponse struct {
+	Topic   string `json:"topic"`
+	Body    string `json:"body"`
+	Success bool   `json:"success"`
+}
 
-	products, total, err := s.uc.List(c.Request.Context(), page, size)
+// List 获取商品列表。
+func (s *ProductService) List(ctx context.Context, page, size int) ([]ProductResponse, int64, error) {
+	products, total, err := s.uc.List(ctx, page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, 0, err
 	}
 
 	items := make([]ProductResponse, len(products))
 	for i, p := range products {
 		items[i] = toProductResponse(p)
 	}
-
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	return items, total, nil
 }
 
 // GetByID 获取单个商品。
-func (s *ProductService) GetByID(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+func (s *ProductService) GetByID(ctx context.Context, id uint) (*ProductResponse, error) {
+	product, err := s.uc.GetByID(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
+		return nil, err
 	}
-
-	product, err := s.uc.GetByID(c.Request.Context(), uint(id))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, toProductResponse(product))
+	resp := toProductResponse(product)
+	return &resp, nil
 }
 
 // Create 创建商品。
-func (s *ProductService) Create(c *gin.Context) {
-	var req CreateProductRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	product, err := s.uc.Create(c.Request.Context(), req.Name, req.Description, req.Price, req.Stock)
+func (s *ProductService) Create(ctx context.Context, req CreateProductRequest) (*ProductResponse, error) {
+	product, err := s.uc.Create(ctx, req.Name, req.Description, req.Price, req.Stock)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
-
-	c.JSON(http.StatusCreated, toProductResponse(product))
+	resp := toProductResponse(product)
+	return &resp, nil
 }
 
 // Delete 删除商品。
-func (s *ProductService) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
+func (s *ProductService) Delete(ctx context.Context, id uint) error {
+	return s.uc.Delete(ctx, id)
+}
 
-	if err := s.uc.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+// PublishStockChanged 发布一个最小 MQ 样板事件。
+func (s *ProductService) PublishStockChanged(ctx context.Context, id uint) (map[string]any, error) {
+	body := fmt.Sprintf("product:%d stock-changed", id)
+	if err := s.publisher.Publish(ctx, "product.stock.changed", []byte(body)); err != nil {
+		return nil, err
 	}
+	return map[string]any{"topic": "product.stock.changed", "body": body, "success": true}, nil
+}
 
-	c.Status(http.StatusNoContent)
+// ConsumeStockChangedOnce 以单次消费方式验证 MQ 订阅能力。
+func (s *ProductService) ConsumeStockChangedOnce(ctx context.Context) (*MQConsumeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	resultCh := make(chan *contract.Message, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		err := s.subscriber.Consume(ctx, "product.stock.changed", func(_ context.Context, message *contract.Message) error {
+			resultCh <- message
+			return nil
+		})
+		if err != nil && err != context.DeadlineExceeded && err != context.Canceled {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case msg := <-resultCh:
+		return &MQConsumeResponse{Topic: msg.Topic, Body: string(msg.Body), Success: true}, nil
+	case err := <-errCh:
+		return nil, err
+	case <-ctx.Done():
+		return nil, context.DeadlineExceeded
+	}
 }
 
 // toProductResponse 转换为响应格式。
 func toProductResponse(p *biz.Product) ProductResponse {
-	return ProductResponse{
-		ID:          p.ID,
-		Name:        p.Name,
-		Description: p.Description,
-		Price:       p.Price,
-		Stock:       p.Stock,
-		CreatedAt:   p.CreatedAt.Unix(),
-		UpdatedAt:   p.UpdatedAt.Unix(),
-	}
+	return ProductResponse{ID: p.ID, Name: p.Name, Description: p.Description, Price: p.Price, Stock: p.Stock, CreatedAt: p.CreatedAt.Unix(), UpdatedAt: p.UpdatedAt.Unix()}
 }

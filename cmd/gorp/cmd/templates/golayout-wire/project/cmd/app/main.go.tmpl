@@ -37,6 +37,6 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if err != nil {
 		return err
 	}
-	apphttp.RegisterRoutes(rt.Engine, svc)
+	apphttp.RegisterRoutes(rt.Engine, rt.Container, svc)
 	return nil
 }

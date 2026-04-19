@@ -72,9 +72,8 @@ func getServiceAuthConfig(c contract.Container) (*contract.ServiceAuthConfig, er
 	}
 
 	authCfg := &contract.ServiceAuthConfig{
-		Mode:               "mtls",
-		MTLSEnabled:        true,
-		ServicePermissions: make(map[string][]string),
+		Mode:        "mtls",
+		MTLSEnabled: true,
 	}
 
 	if mode := configprovider.GetStringAny(cfg,
@@ -287,18 +286,14 @@ func (a *MTLSAuthenticator) authenticateByCert(cert *x509.Certificate) (*contrac
 		}
 	}
 
-	// 获取服务权限
-	permissions := a.cfg.ServicePermissions[serviceName]
-
 	// 返回服务身份
 	return &contract.ServiceIdentity{
-		ServiceID:     serviceName,
-		ServiceName:   serviceName,
-		Namespace:     a.cfg.Namespace,
-		Environment:   a.cfg.Environment,
-		Permissions:   permissions,
-		ExpiresAt:     cert.NotAfter.Unix(),
-		IssuedAt:      cert.NotBefore.Unix(),
+		ServiceID:   serviceName,
+		ServiceName: serviceName,
+		Namespace:   a.cfg.Namespace,
+		Environment: a.cfg.Environment,
+		ExpiresAt:   cert.NotAfter.Unix(),
+		IssuedAt:    cert.NotBefore.Unix(),
 	}, nil
 }
 

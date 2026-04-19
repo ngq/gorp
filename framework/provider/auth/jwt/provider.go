@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/ngq/gorp/framework/contract"
-	tokensvc "github.com/ngq/gorp/framework/provider/serviceauth/token"
 )
 
 // Provider 提供 framework 级业务 JWT 服务实现。
@@ -13,7 +12,7 @@ import (
 // 中文说明：
 // - 仅负责业务 JWT（AuthJWTKey）绑定；
 // - 与 ServiceAuthKey（服务间认证）完全解耦；
-// - 统一复用 token.JWTSecretFromConfig 的配置读取策略，避免重复配置解析逻辑。
+// - 统一使用 auth/jwt 边界内的实现与配置读取 helper。
 type Provider struct{}
 
 // NewProvider 创建业务 JWT Provider。
@@ -40,7 +39,7 @@ func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.AuthJWTKey, func(c contract.Container) (any, error) {
 		cfgAny, err := c.Make(contract.ConfigKey)
 		if err != nil {
-			return tokensvc.NewJWTService("default-secret-change-in-production", "gorp", ""), nil
+			return NewJWTService("default-secret-change-in-production", "gorp", ""), nil
 		}
 
 		cfg, ok := cfgAny.(contract.Config)
@@ -48,7 +47,7 @@ func (p *Provider) Register(c contract.Container) error {
 			return nil, errors.New("auth.jwt: invalid config service")
 		}
 
-		secret := tokensvc.JWTSecretFromConfig(cfg)
+		secret := JWTSecretFromConfig(cfg)
 		if secret == "" {
 			secret = "default-secret-change-in-production"
 		}
@@ -59,7 +58,7 @@ func (p *Provider) Register(c contract.Container) error {
 		}
 
 		audience := strings.TrimSpace(cfg.GetString("auth.jwt.audience"))
-		return tokensvc.NewJWTService(secret, issuer, audience), nil
+		return NewJWTService(secret, issuer, audience), nil
 	}, true)
 
 	return nil

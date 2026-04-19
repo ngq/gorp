@@ -18,120 +18,82 @@ import (
 var projectTemplateFS embed.FS
 
 var newOfflineTemplate string
-var newOfflinePreset string
 var newOfflineBackend string
 var newOfflineWithDB bool
 var newOfflineWithSwagger bool
-var newOfflineWithAuth bool
-var newOfflineWithRBAC bool
-var newOfflineWithAdmin bool
 
-var newOfflineCmd = &cobra.Command{
-	Use:   "offline",
-	Short: "Create a new project from embedded template (offline)",
-	Long: `Create a new project from embedded starter templates without network access.
+func runNewEmbedded(cmd *cobra.Command, args []string) error {
+	intent, err := parseNewIntent(args)
+	if err != nil {
+		return err
+	}
+	intentTemplate, intentStarter := resolveOfflineIntentDefaults(intent)
 
-Template options:
-  - base            : minimal skeleton for custom structure
-  - golayout        : standard single-service template
-  - golayout-wire   : single-service template with Wire assembly
-  - multi-flat      : default multi-service template
-  - multi-flat-wire : multi-service template with Wire assembly
+	// 中文说明：
+	// - 裸 `gorp new` 现在默认走单服务 basic 起步路径，而不是继续落到 base；
+	// - 位置参数只表达高频模板结构意图，例如 wire / multi / multi-wire；
+	// - 显式 `--template` 仍然拥有更高优先级，但 starter 不再公开承诺 auth/rbac/admin 业务能力。
+	if !cmd.Flags().Changed("template") {
+		newOfflineTemplate = intentTemplate
+	}
+	if err := validateStarterTemplate(newOfflineTemplate); err != nil {
+		return err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
 
-Preset recommendation:
-  - golayout-basic / golayout-enterprise: user-facing presets for the golayout template
+	in := bufio.NewReader(cmd.InOrStdin())
+	frameworkDefault, err := repoRootFromCWD()
+	if err != nil {
+		frameworkDefault = cwd
+	}
+	project, name, err := promptProjectInput(in, cmd.OutOrStdout(), frameworkDefault, true)
+	if err != nil {
+		return err
+	}
+	if newOfflineBackend == "" {
+		newOfflineBackend = string(contract.RuntimeBackendGorm)
+	}
+	project.Backend = newOfflineBackend
 
-Important:
-  - When you specify --preset without --template, the template is automatically inferred.
-  - For example: --preset golayout-basic automatically selects --template golayout.
+	starterProject := project
+	applyIntentDefaults(intentStarter, &starterProject)
+	if cmd.Flags().Changed("with-db") {
+		project.WithDB = newOfflineWithDB
+	} else {
+		project.WithDB = starterProject.WithDB
+	}
+	if cmd.Flags().Changed("with-swagger") {
+		project.WithSwagger = newOfflineWithSwagger
+	} else {
+		project.WithSwagger = starterProject.WithSwagger
+	}
 
-If you are not sure which template to pick:
-  - Single service: --template golayout or --template golayout-wire
-  - Multi-service: --template multi-flat or --template multi-flat-wire`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if !cmd.Flags().Changed("template") && newOfflinePreset != "" {
-			if inferred := templateFromPreset(newOfflinePreset); inferred != "" {
-				newOfflineTemplate = inferred
-			}
-		}
-		if err := validateStarterTemplate(newOfflineTemplate); err != nil {
-			return err
-		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
+	folder, err := prepareScaffoldTargetDir(cwd, name)
+	if err != nil {
+		return err
+	}
 
-		in := bufio.NewReader(cmd.InOrStdin())
-		frameworkDefault, err := repoRootFromCWD()
-		if err != nil {
-			frameworkDefault = cwd
-		}
-		project, name, err := promptProjectInput(in, cmd.OutOrStdout(), frameworkDefault, true)
-		if err != nil {
-			return err
-		}
-		if newOfflineBackend == "" {
-			newOfflineBackend = string(contract.RuntimeBackendGorm)
-		}
-		project.Backend = newOfflineBackend
+	data := buildScaffoldData(project)
+	templateRoot := resolveOfflineTemplateRoot(newOfflineTemplate)
+	if err := renderTemplateProject(projectTemplateFS, templateRoot, folder, data); err != nil {
+		return err
+	}
 
-		presetProject := project
-		if err := applyStarterPreset(newOfflinePreset, &presetProject); err != nil {
-			return err
-		}
-		if cmd.Flags().Changed("with-db") {
-			project.WithDB = newOfflineWithDB
-		} else {
-			project.WithDB = presetProject.WithDB
-		}
-		if cmd.Flags().Changed("with-swagger") {
-			project.WithSwagger = newOfflineWithSwagger
-		} else {
-			project.WithSwagger = presetProject.WithSwagger
-		}
-		if cmd.Flags().Changed("with-auth") {
-			project.WithAuth = newOfflineWithAuth
-		} else {
-			project.WithAuth = presetProject.WithAuth
-		}
-		if cmd.Flags().Changed("with-rbac") {
-			project.WithRBAC = newOfflineWithRBAC
-		} else {
-			project.WithRBAC = presetProject.WithRBAC
-		}
-		if cmd.Flags().Changed("with-admin") {
-			project.WithAdmin = newOfflineWithAdmin
-		} else {
-			project.WithAdmin = presetProject.WithAdmin
-		}
-
-		folder, err := prepareScaffoldTargetDir(cwd, name)
-		if err != nil {
-			return err
-		}
-
-		data := buildScaffoldData(project)
-		templateRoot := resolveOfflineTemplateRoot(newOfflineTemplate)
-		if err := renderTemplateProject(projectTemplateFS, templateRoot, folder, data); err != nil {
-			return err
-		}
-
-		printScaffoldNext(cmd.OutOrStdout(), folder)
-		return nil
-	},
+	printScaffoldNext(cmd.OutOrStdout(), folder)
+	return nil
 }
 
 func init() {
-	newOfflineCmd.Flags().StringVar(&newOfflineTemplate, "template", starterTemplateBase, "starter template: base, golayout, golayout-wire, multi-flat, multi-flat-wire")
-	newOfflineCmd.Flags().StringVar(&newOfflinePreset, "preset", "", "user preset: golayout-basic or golayout-enterprise")
-	newOfflineCmd.Flags().StringVar(&newOfflineBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
-	newOfflineCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
-	newOfflineCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
-	newOfflineCmd.Flags().BoolVar(&newOfflineWithAuth, "with-auth", true, "include auth/session starter")
-	newOfflineCmd.Flags().BoolVar(&newOfflineWithRBAC, "with-rbac", true, "include Casbin RBAC starter")
-	newOfflineCmd.Flags().BoolVar(&newOfflineWithAdmin, "with-admin", true, "include protected admin routes and RBAC management APIs")
-	newCmd.AddCommand(newOfflineCmd)
+	newCmd.RunE = runNewEmbedded
+	newCmd.Args = cobra.MaximumNArgs(1)
+	newCmd.ValidArgs = []string{newIntentWire, newIntentMulti, newIntentMultiWire}
+	newCmd.Flags().StringVar(&newOfflineTemplate, "template", starterTemplateGoLayout, "starter template: base, golayout, golayout-wire, multi-flat, multi-flat-wire")
+	newCmd.Flags().StringVar(&newOfflineBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
+	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
+	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
 }
 
 func renderTemplateDir(src fs.FS, srcRoot string, dstRoot string, data map[string]any) error {

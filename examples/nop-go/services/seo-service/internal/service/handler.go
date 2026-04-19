@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ngq/gorp/framework/contract"
-	jwtmiddleware "github.com/ngq/gorp/framework/provider/serviceauth/token"
+	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/seo-service/internal/biz"
 	"nop-go/services/seo-service/internal/models"
 )

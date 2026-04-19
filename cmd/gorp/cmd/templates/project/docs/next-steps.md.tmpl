@@ -5,7 +5,11 @@
 - `GET /healthz`
 - `GET /api/ping`
 
-说明 starter 已经跑通。接下来建议按下面顺序继续。
+说明这个最小骨架已经跑通。接下来建议按下面顺序继续。
+
+> 定位提醒：
+> - `base` 模板更适合你自己决定目录结构与开发方式；
+> - 如果你需要默认单服务生产起步体验，优先使用 `gorp new` 生成的默认 starter，而不是继续把 `base` 当成默认业务模板。
 
 ## 1. 先看 HTTP 入口
 
@@ -49,7 +53,22 @@ gorp model gen --table <table>
 gorp model api --table <table>
 ```
 
-## 6. 如果你准备做成可发布项目
+## 6. 如果你准备接 gRPC
+
+当前 gRPC 正式主线已经收口为 Proto-first，建议按下面心智接入：
+
+1. 定义 `.proto`
+2. 生成 `pb.go / *_grpc.pb.go`
+3. 服务端通过 `GRPCServerRegistrar` 挂 `pb.RegisterXxxServer(...)`
+4. 客户端通过 `GRPCConnFactory` 获取连接，再用 `pb.NewXxxClient(conn)` 发起调用
+
+建议理解：
+
+- 不再把字符串式 `RPCClient.Call(...)` 作为 gRPC 主路径；
+- `gorp grpc` 命令组当前仍属于 legacy/runtime 兼容链路，不是 starter 默认公开入口；
+- 正式主线应围绕标准 gRPC stub / register 工作。
+
+## 7. 如果你准备做成可发布项目
 
 后续可以继续使用：
 

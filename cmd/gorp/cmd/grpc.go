@@ -42,7 +42,7 @@ func init() {
 
 var grpcStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start a gRPC server",
+	Short: "Start a gRPC server (legacy runtime path)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if grpcStartDaemon {
 			exe, err := os.Executable()
@@ -90,12 +90,20 @@ var grpcStartCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		builderAny, err := c.Make(contract.GRPCRuntimeBuilderKey)
 		if err != nil {
 			return err
 		}
 		builder := builderAny.(contract.GRPCRuntimeBuilder)
 		srv := builder.BuildGRPCServer()
+		if c.IsBind(contract.GRPCServerRegistrarKey) {
+			if registrarAny, makeErr := c.Make(contract.GRPCServerRegistrarKey); makeErr == nil {
+				if registrar, ok := registrarAny.(contract.GRPCServerRegistrar); ok {
+					srv = registrar.Server()
+				}
+			}
+		}
 
 		appAny, err := c.Make(app.AppKey)
 		if err != nil {
@@ -117,7 +125,7 @@ var grpcStartCmd = &cobra.Command{
 			// 中文说明：
 			// - gRPC 优先纳入 Host 管理，与 HTTP / Cron 共享同一套生命周期抽象；
 			// - 命令层只负责 listener 与 runtime builder，不再重复维护 shutdown 模板；
-			// - 这样后续 framework 级通用服务启动抽象可以继续向单一入口收口。
+			// - 若容器中已有 Proto-first gRPC 注册器，则这里优先复用其底层 server。
 			grpcHostable := host.NewGRPCService("grpc", srv, lis)
 			if err := h.RegisterService("grpc", grpcHostable); err != nil {
 				return err

@@ -5,10 +5,12 @@ import (
 	"os"
 
 	orderdata "{{.ModuleName}}/services/order/internal/data"
+	orderserver "{{.ModuleName}}/services/order/internal/server"
 	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+	frameworkcontainer "{{.FrameworkModule}}/framework/container"
 )
 
-// main 是 order 服务的主入口（Wire 装配版）。
+// main 是 order 服务的主入口。
 func main() {
 	if err := frameworkbootstrap.BootHTTPService("order-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -17,20 +19,20 @@ func main() {
 }
 
 func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	if rt.DB == nil {
-		return nil
-	}
-	return rt.DB.AutoMigrate(&orderdata.OrderPO{})
+	return frameworkbootstrap.AutoMigrateModels(rt, &orderdata.OrderPO{})
 }
 
 func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("order-service requires gorm database")
 	}
-	services, err := wireOrderServices(rt.DB)
+	connFactory := frameworkcontainer.MustMakeGRPCConnFactory(rt.Container)
+	dlock := frameworkcontainer.MustMakeDistributedLock(rt.Container)
+	services, err := wireOrderServices(rt.DB, connFactory, dlock)
 	if err != nil {
 		return err
 	}
-	services.Order.RegisterRoutes(rt.Engine)
+	httpServer := orderserver.NewHTTPServer(services)
+	httpServer.RegisterRoutes(rt.Engine)
 	return nil
 }

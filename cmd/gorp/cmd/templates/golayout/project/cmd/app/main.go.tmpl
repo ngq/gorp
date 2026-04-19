@@ -5,10 +5,12 @@ import (
 	"os"
 
 	apphttp "{{.ModuleName}}/app/http"
-	"{{.ModuleName}}/internal/biz"
+	serviceprovider "{{.ModuleName}}/app/provider/service"
 	"{{.ModuleName}}/internal/data"
 	"{{.ModuleName}}/internal/service"
 	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+	frameworkcontainer "{{.FrameworkModule}}/framework/container"
+	"{{.FrameworkModule}}/framework/contract"
 )
 
 // main 是 golayout 项目的主入口。
@@ -18,7 +20,12 @@ import (
 // - 启动逻辑直接复用 framework/bootstrap 提供的 HTTP 启动能力；
 // - 不再依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+	opts := frameworkbootstrap.HTTPServiceOptions{
+		ExtraProviders: []contract.ServiceProvider{
+			serviceprovider.NewProvider(),
+		},
+	}
+	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", opts, migrate, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -32,9 +39,7 @@ func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 }
 
 func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	d := data.NewData(rt.Container)
-	b := biz.NewBiz(data.NewDemoRepo(d))
-	svc := service.NewServices(b)
-	apphttp.RegisterRoutes(rt.Engine, svc)
+	svc := frameworkcontainer.MustMakeAppService[*service.Services](rt.Container, "app.services")
+	apphttp.RegisterRoutes(rt.Engine, rt.Container, svc)
 	return nil
 }

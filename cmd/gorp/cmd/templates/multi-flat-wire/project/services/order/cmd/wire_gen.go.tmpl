@@ -5,11 +5,12 @@
 package main
 
 import (
+	"{{.FrameworkModule}}/framework/contract"
 	"{{.ModuleName}}/services/order/internal/service"
 	"gorm.io/gorm"
 )
 
-func wireOrderServices(db *gorm.DB) (*service.Services, error) {
-	services := service.NewServices(db)
+func wireOrderServices(db *gorm.DB, userConnFactory contract.GRPCConnFactory, dlock contract.DistributedLock) (*service.Services, error) {
+	services := service.NewServices(db, userConnFactory, dlock)
 	return services, nil
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/ngq/gorp/framework/contract"
 	appProvider "github.com/ngq/gorp/framework/provider/app"
 	authJWTProvider "github.com/ngq/gorp/framework/provider/auth/jwt"
+	cacheProvider "github.com/ngq/gorp/framework/provider/cache"
 	configProvider "github.com/ngq/gorp/framework/provider/config"
 	cronProvider "github.com/ngq/gorp/framework/provider/cron"
 	ginProvider "github.com/ngq/gorp/framework/provider/gin"
@@ -13,7 +14,6 @@ import (
 	inspectProvider "github.com/ngq/gorp/framework/provider/orm/inspect"
 	runtimeORMProvider "github.com/ngq/gorp/framework/provider/orm/runtime"
 	sqlxProvider "github.com/ngq/gorp/framework/provider/orm/sqlx"
-	redisProvider "github.com/ngq/gorp/framework/provider/redis"
 )
 
 // FoundationProviders 返回默认启动骨架里的 Foundation/App 组。
@@ -71,11 +71,11 @@ func ServiceAuthProviders() []contract.ServiceProvider {
 //
 // 中文说明：
 // - 这组面向业务开发默认可复用能力；
-// - 当前只保留 redis + 业务 JWT 这类不会与项目侧 runtime/capability selector 冲突的能力；
-// - serviceauth 改由项目侧或统一主链路选择器负责，避免重复注册。
+// - 当前聚焦不会改变 HTTP/ORM 主路径语义、但能明显降低业务起步成本的能力；
+// - 目前包含：业务 JWT + 统一 cache；Redis 原语仍由项目侧按需接入。
 func BusinessSimplificationProviders() []contract.ServiceProvider {
 	providers := make([]contract.ServiceProvider, 0, 8)
-	providers = append(providers, redisProvider.NewProvider())
 	providers = append(providers, AuthProviders()...)
+	providers = append(providers, cacheProvider.NewProvider())
 	return providers
 }

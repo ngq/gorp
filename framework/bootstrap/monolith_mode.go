@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"github.com/ngq/gorp/framework/contract"
 	cbnoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
+	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
 	cfglocal "github.com/ngq/gorp/framework/provider/configsource/local"
 	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
 	dlocknoop "github.com/ngq/gorp/framework/provider/dlock/noop"
@@ -34,6 +35,7 @@ func MonolithFriendlyProviders() []contract.ServiceProvider {
 		mqnoop.NewProvider(),
 		dlocknoop.NewProvider(),
 		cbnoop.NewProvider(),
+		dtmnoop.NewProvider(),
 		selectornoop.NewProvider(),
 		metadatanoop.NewProvider(),
 		validatenoop.NewProvider(),

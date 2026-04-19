@@ -57,25 +57,25 @@ func readMetadataConfig(c contract.Container) contract.MetadataConfig {
 		}
 	}
 
-	metaCfg := contract.MetadataConfig{
-		PropagatePrefix: []string{"x-md-"},
-	}
-	if prefixes := configprovider.GetStringSliceAny(cfg,
-		"metadata.propagate_prefix",
-	); len(prefixes) > 0 {
-		metaCfg.PropagatePrefix = prefixes
-	}
-	if constant := configprovider.GetStringMapAny(cfg,
-		"metadata.constant_metadata",
-	); len(constant) > 0 {
-		metaCfg.ConstantMetadata = constant
-	}
-	if maxSize := configprovider.GetIntAny(cfg,
-		"metadata.max_size",
-	); maxSize > 0 {
-		metaCfg.MaxSize = maxSize
-	}
-	return metaCfg
+		metaCfg := contract.MetadataConfig{
+			PropagatePrefix: []string{"x-md-"},
+		}
+		if prefixes := configprovider.GetStringSliceAny(cfg,
+			"metadata.propagate_prefix",
+		); len(prefixes) > 0 {
+			metaCfg.PropagatePrefix = prefixes
+		}
+		if constant := configprovider.GetStringMapAny(cfg,
+			"metadata.constant_metadata",
+		); len(constant) > 0 {
+			metaCfg.ConstantMetadata = constant
+		}
+		if maxSize := configprovider.GetIntAny(cfg,
+			"metadata.max_size",
+		); maxSize > 0 {
+			metaCfg.MaxSize = maxSize
+		}
+		return metaCfg
 }
 
 func toString(v any) string {

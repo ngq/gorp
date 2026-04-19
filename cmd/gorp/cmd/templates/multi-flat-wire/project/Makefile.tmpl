@@ -1,17 +1,24 @@
 # {{.ProjectName}}
 
-.PHONY: build clean run-user run-order run-product run-gateway test tidy gen-wire
+.PHONY: generate gen-wire gen-proto build clean run-user run-order run-product test tidy deploy-local deploy-local-down
+
+generate: gen-wire gen-proto
 
 build:
 	go build -o bin/user ./services/user/cmd
 	go build -o bin/order ./services/order/cmd
 	go build -o bin/product ./services/product/cmd
-	go build -o bin/gateway ./cmd/gateway
 
 gen-wire:
 	wire ./services/user/cmd
 	wire ./services/order/cmd
 	wire ./services/product/cmd
+
+gen-proto:
+	PATH="$(go env GOPATH)/bin:$$PATH" protoc -I . \
+	  --go_out=. --go_opt=paths=source_relative \
+	  --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+	  proto/user/v1/user.proto
 
 tidy:
 	go mod tidy
@@ -24,9 +31,6 @@ run-order:
 
 run-product:
 	go run ./services/product/cmd
-
-run-gateway:
-	go run ./cmd/gateway
 
 test:
 	go test ./... -v

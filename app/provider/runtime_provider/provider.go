@@ -10,10 +10,21 @@ import (
 	"google.golang.org/grpc"
 )
 
+// HTTPRuntimeConfigurator 收口母仓 legacy HTTP runtime 命令组的装配动作。
 type HTTPRuntimeConfigurator struct{}
+
+// CronRuntimeConfigurator 收口母仓 legacy cron runtime 命令组的装配动作。
 type CronRuntimeConfigurator struct{}
+
+// GRPCRuntimeBuilder 收口母仓 legacy gRPC runtime 命令组的 server 构造动作。
 type GRPCRuntimeBuilder struct{}
 
+// Provider 注册母仓自己的 runtime provider。
+//
+// 中文说明：
+// - 这是母仓自带的 runtime provider，不代表 generated starter 的默认公开启动方式；
+// - 它主要服务于母仓保留的 legacy/runtime 命令组与兼容验证链路；
+// - 项目模板如需覆盖这套装配，会通过自己的 runtime provider 注入共享 CLI bootstrap。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }

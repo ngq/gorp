@@ -67,20 +67,22 @@ func getLockConfig(c contract.Container) (*contract.DistributedLockConfig, error
 	}
 
 	// Redis 配置
-	if addr := cfg.GetString("dlock.redis_addr"); addr != "" {
+	if addr := cfg.GetString("distributed_lock.redis.addr"); addr != "" {
 		lockCfg.RedisAddr = addr
 	} else {
 		lockCfg.RedisAddr = "localhost:6379"
 	}
-	if password := cfg.GetString("dlock.redis_password"); password != "" {
+	if password := cfg.GetString("distributed_lock.redis.password"); password != "" {
 		lockCfg.RedisPassword = password
 	}
-	if db := cfg.GetInt("dlock.redis_db"); db > 0 {
+	if db := cfg.GetInt("distributed_lock.redis.db"); db > 0 {
 		lockCfg.RedisDB = db
 	}
 
 	// 通用配置
-	if prefix := cfg.GetString("dlock.key_prefix"); prefix != "" {
+	if prefix := cfg.GetString("distributed_lock.key_prefix"); prefix != "" {
+		lockCfg.KeyPrefix = prefix
+	} else if prefix := cfg.GetString("dlock.key_prefix"); prefix != "" {
 		lockCfg.KeyPrefix = prefix
 	}
 

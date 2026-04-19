@@ -17,8 +17,11 @@ import (
 // - 提供给 Repository 使用；
 // - 通过容器获取框架提供的 ORM 实例。
 type Data struct {
-	db  interface{} // GORM DB 或 SQLX DB 或 Ent Client
-	c   contract.Container
+	db    interface{} // GORM DB 或 SQLX DB 或 Ent Client
+	redis contract.Redis
+	cache contract.Cache
+	jwt   contract.JWTService
+	c     contract.Container
 }
 
 // NewData 创建数据访问层。
@@ -45,6 +48,52 @@ func (d *Data) DB() interface{} {
 	if sqlxAny, err := d.c.Make(contract.SQLXKey); err == nil {
 		d.db = sqlxAny
 		return d.db
+	}
+	return nil
+}
+
+// Redis 获取 Redis 服务（如果已配置并注册）。
+func (d *Data) Redis() contract.Redis {
+	if d.redis != nil {
+		return d.redis
+	}
+	if redisAny, err := d.c.Make(contract.RedisKey); err == nil {
+		if redisSvc, ok := redisAny.(contract.Redis); ok {
+			d.redis = redisSvc
+			return d.redis
+		}
+	}
+	return nil
+}
+
+// Cache 获取统一缓存服务。
+func (d *Data) Cache() contract.Cache {
+	if d.cache != nil {
+		return d.cache
+	}
+	if cacheAny, err := d.c.Make(contract.CacheKey); err == nil {
+		if cacheSvc, ok := cacheAny.(contract.Cache); ok {
+			d.cache = cacheSvc
+			return d.cache
+		}
+	}
+	return nil
+}
+
+// JWT 获取业务 JWT 服务。
+//
+// 中文说明：
+// - starter 默认已注册 framework 级业务 JWT provider；
+// - 业务项目可在 repository/service/usecase 边界按需使用，而不必自己重新组装 JWT 服务。
+func (d *Data) JWT() contract.JWTService {
+	if d.jwt != nil {
+		return d.jwt
+	}
+	if jwtAny, err := d.c.Make(contract.AuthJWTKey); err == nil {
+		if jwtSvc, ok := jwtAny.(contract.JWTService); ok {
+			d.jwt = jwtSvc
+			return d.jwt
+		}
 	}
 	return nil
 }

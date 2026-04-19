@@ -10,6 +10,8 @@ import (
 	discoveryetcd "github.com/ngq/gorp/framework/provider/discovery/etcd"
 	discoverynacos "github.com/ngq/gorp/framework/provider/discovery/nacos"
 	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
+	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
+	dtmsdk "github.com/ngq/gorp/framework/provider/dtm/dtmsdk"
 	metadatadefault "github.com/ngq/gorp/framework/provider/metadata"
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
 	rpchttp "github.com/ngq/gorp/framework/provider/rpc/http"
@@ -62,5 +64,8 @@ func MicroserviceMainlineProviders() []contract.ServiceProvider {
 		serviceauthnoop.NewProvider(),
 		serviceauthtoken.NewProvider(),
 		serviceauthmtls.NewProvider(),
+
+		dtmnoop.NewProvider(),
+		dtmsdk.NewProvider(),
 	}
 }

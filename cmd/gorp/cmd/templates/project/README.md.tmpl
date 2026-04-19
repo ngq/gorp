@@ -1,6 +1,11 @@
 # {{.Name}}
 
-由 `gorp new offline` 生成的业务项目骨架。
+由 `gorp new --template base` 生成的**最小业务项目骨架**。
+
+> 定位说明：
+> - 这不是默认推荐的单服务业务 starter；
+> - 它更适合最小 demo、结构自定义、快速验证框架主链路，或作为高级用户的起点；
+> - 如果你只是想按默认路径快速开始业务开发，优先使用裸 `gorp new`。
 
 ## 当前 backend
 
@@ -48,15 +53,17 @@ go run ./cmd/app
 4. `config/app.yaml`
 5. `docs/structure.md`
 
-## 为什么 offline 模板里会有 replace
+## 关于当前 starter 的本地联调语义
 
-`offline` 主要面向当前框架仓库内的本地联调，因此 `go.mod` 默认会把框架模块 replace 到你的本地源码目录。
+当前内置 starter 优先服务于“安装 `gorp` → `gorp new` → 立即开始开发”的默认路径。
+
+同时，在框架研发阶段，为了方便母仓内联调，生成结果里的 `go.mod` 可能会带有本地 `replace` 语义，用来指向当前框架源码目录。
 
 适合场景：
-- 正在开发框架本身
-- 需要生成一个 demo/starter 工程快速联调
+- 直接通过 `gorp new` 快速创建并启动项目
+- 在框架研发过程中生成一个 demo/starter 工程快速联调
 
-如果你希望生成一个“更像外部用户拿到的 starter 项目”，请使用：
+如果你明确需要一个更接近“外部用户拿到的固定版本 starter 项目”的结果，请使用：
 
 ```bash
 gorp template pack

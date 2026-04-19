@@ -56,6 +56,7 @@ func WithExtraProviders(providers ...contract.ServiceProvider) bootstrapOption {
 //
 // 中文说明：
 // - 生成项目可通过此入口覆盖母仓默认 runtime provider；
+// - 它主要服务于共享 CLI 下的 legacy/runtime 命令组装配，不是 starter 默认公开启动入口；
 // - 若未指定，则继续回退到母仓 runtime_provider.NewProvider()；
 // - 这样母仓与模板项目可以共享同一套 CLI，但各自拥有自己的 runtime 装配。
 func WithRuntimeProvider(p contract.ServiceProvider) bootstrapOption {
@@ -69,7 +70,9 @@ func WithRuntimeProvider(p contract.ServiceProvider) bootstrapOption {
 // RegisterBootstrapProviders 注册当前进程的全局 bootstrap hook。
 //
 // 中文说明：
-// - 这是给模板项目 main.go 使用的稳定入口；
+// - 这是给模板项目高级扩展位使用的稳定入口；
+// - 主要用于把项目自己的 runtime/provider 装配注入共享 CLI bootstrap；
+// - 普通 starter 用户默认仍应通过项目自己的 `cmd/*/main.go` 启动；
 // - 在调用 cmd.Execute() 前执行一次即可；
 // - 会覆盖当前进程之前注册的 runtime provider，并替换 extra providers 列表。
 func RegisterBootstrapProviders(runtimeProvider contract.ServiceProvider, extraProviders ...contract.ServiceProvider) {

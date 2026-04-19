@@ -35,6 +35,6 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	d := data.NewData(rt.Container)
 	b := biz.NewBiz(data.NewDemoRepo(d))
 	svc := service.NewServices(b)
-	apphttp.RegisterRoutes(rt.Engine, svc)
+	apphttp.RegisterRoutes(rt.Engine, rt.Container, svc)
 	return nil
 }

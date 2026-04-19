@@ -35,7 +35,7 @@ func init() {
 
 var cronStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start cron worker",
+	Short: "Start cron worker (legacy runtime path)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cronStartDaemon {
 			exe, err := os.Executable()

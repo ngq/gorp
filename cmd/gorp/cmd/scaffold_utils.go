@@ -121,11 +121,11 @@ func validateStarterTemplate(name string) error {
 	}
 }
 
-// normalizeStarterTemplate 规范化模板名，空值默认回落到 base。
+// normalizeStarterTemplate 规范化模板名，空值默认回落到 golayout。
 func normalizeStarterTemplate(name string) string {
 	name = strings.TrimSpace(strings.ToLower(name))
 	if name == "" {
-		return starterTemplateBase
+		return starterTemplateGoLayout
 	}
 	return name
 }
@@ -134,14 +134,14 @@ func normalizeStarterTemplate(name string) string {
 func validateReleaseStarterTemplate(name string) error {
 	name = strings.TrimSpace(strings.ToLower(name))
 	switch name {
-	case "", starterTemplateBase, starterTemplateGoLayout, starterTemplateGoLayoutWire:
+	case "", starterTemplateBase, starterTemplateGoLayout, starterTemplateGoLayoutWire, starterTemplateMultiFlat, starterTemplateMultiFlatWire:
 		return nil
 	default:
-		return fmt.Errorf("unsupported release template: %s (supported: base, golayout, golayout-wire)", name)
+		return fmt.Errorf("unsupported release template: %s (supported: base, golayout, golayout-wire, multi-flat, multi-flat-wire)", name)
 	}
 }
 
-// resolveOfflineTemplateRoot 返回 offline 模板根目录。
+// resolveOfflineTemplateRoot 返回内置模板根目录。
 func resolveOfflineTemplateRoot(name string) string {
 	switch normalizeStarterTemplate(name) {
 	case starterTemplateGoLayout:
@@ -164,6 +164,10 @@ func resolveReleaseTemplateRoot(name string) string {
 		return "templates/release/golayout/project"
 	case starterTemplateGoLayoutWire:
 		return "templates/release/golayout-wire/project"
+	case starterTemplateMultiFlat:
+		return "templates/multi-flat/project"
+	case starterTemplateMultiFlatWire:
+		return "templates/multi-flat-wire/project"
 	default:
 		return "templates/release/project"
 	}
@@ -176,55 +180,77 @@ func defaultReleaseTemplateAsset(name string) string {
 		return "gorp-template-golayout.zip"
 	case starterTemplateGoLayoutWire:
 		return "gorp-template-golayout-wire.zip"
+	case starterTemplateMultiFlat:
+		return "gorp-template-multi-flat.zip"
+	case starterTemplateMultiFlatWire:
+		return "gorp-template-multi-flat-wire.zip"
 	default:
 		return "gorp-template.zip"
 	}
 }
 
-// templateFromPreset 根据 preset 名称推断对应的 template。
+const (
+	starterProfileBasic = "basic"
+
+	newIntentWire      = "wire"
+	newIntentMulti     = "multi"
+	newIntentMultiWire = "multi-wire"
+)
+
+// parseNewIntent 解析 `gorp new` 的位置参数意图。
 //
 // 中文说明：
-// - 当用户只指定 preset 而不显式指定 template 时，自动选择匹配的 template。
-// - golayout-basic / golayout-enterprise -> golayout
-// - 其他情况返回空字符串，表示使用默认 template。
-func templateFromPreset(preset string) string {
-	preset = strings.TrimSpace(strings.ToLower(preset))
-	switch preset {
-	case "golayout-basic", "golayout-enterprise":
-		return starterTemplateGoLayout
+// - 这一轮收敛后，`gorp new` 不再要求新手先理解额外的 starter 参数；
+// - 无参时默认走单服务 basic 路径；
+// - 允许少量高频位置参数表达模板结构意图，而不是把业务能力继续塞进 flag 中。
+func parseNewIntent(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", nil
+	}
+	if len(args) > 1 {
+		return "", fmt.Errorf("too many arguments: expected at most 1 intent (supported: wire, multi, multi-wire)")
+	}
+	intent := strings.TrimSpace(strings.ToLower(args[0]))
+	switch intent {
+	case newIntentWire, newIntentMulti, newIntentMultiWire:
+		return intent, nil
 	default:
-		return ""
+		return "", fmt.Errorf("unsupported new intent: %s (supported: wire, multi, multi-wire)", intent)
 	}
 }
 
-// applyStarterPreset 把用户态 preset 展开为研发态细粒度能力开关。
+// resolveOfflineIntentDefaults 把位置参数意图解析为默认 template 与 starter 档位。
 //
 // 中文说明：
-// - 用户只需要记住少量"结果导向"的预设；
-// - 内部仍保留 `with-*` 细粒度能力，作为模板演进与组合验证的底层能力图谱；
-// - preset 只是把"稳定的一组能力组合"映射到这些底层开关上。
-func applyStarterPreset(preset string, in *scaffoldInput) error {
-	preset = strings.TrimSpace(strings.ToLower(preset))
-	if preset == "" {
-		return nil
-	}
-	switch preset {
-	case "golayout-basic":
-		in.WithDB = true
-		in.WithSwagger = true
-		in.WithAuth = false
-		in.WithRBAC = false
-		in.WithAdmin = false
-		return nil
-	case "golayout-enterprise":
-		in.WithDB = true
-		in.WithSwagger = true
-		in.WithAuth = true
-		in.WithRBAC = true
-		in.WithAdmin = true
-		return nil
+// - 默认无参 `gorp new` 现在应直接落到单服务 basic 路径；
+// - 位置参数表达的是高频模板结构意图，不是项目名；
+// - 这里只保留模板结构默认值，不再为 starter 公开展开 auth/rbac/admin 业务能力。
+func resolveOfflineIntentDefaults(intent string) (template string, starter string) {
+	switch strings.TrimSpace(strings.ToLower(intent)) {
+	case "":
+		return starterTemplateGoLayout, starterProfileBasic
+	case newIntentWire:
+		return starterTemplateGoLayoutWire, starterProfileBasic
+	case newIntentMulti:
+		return starterTemplateMultiFlat, ""
+	case newIntentMultiWire:
+		return starterTemplateMultiFlatWire, ""
 	default:
-		return fmt.Errorf("unsupported preset: %s (supported: golayout-basic, golayout-enterprise)", preset)
+		return starterTemplateGoLayout, starterProfileBasic
+	}
+}
+
+// applyIntentDefaults 把内部意图档位展开为默认能力组合。
+//
+// 中文说明：
+// - 这里的 starter 已经不是公开参数，而是内部默认能力档位；
+// - 当前只保留 basic 这组最小模板默认能力；
+// - multi / multi-wire 这类结构意图不额外附带 starter 能力组合，保持模板默认值。
+func applyIntentDefaults(starter string, in *scaffoldInput) {
+	switch strings.TrimSpace(strings.ToLower(starter)) {
+	case starterProfileBasic:
+		in.WithDB = true
+		in.WithSwagger = true
 	}
 }
 
@@ -291,7 +317,7 @@ func validateAssetName(asset string) error {
 	return nil
 }
 
-// scaffoldInput 是 offline / from-release 共享的脚手架核心输入。
+// scaffoldInput 是内置模板 / from-release 共享的脚手架核心输入。
 type scaffoldInput struct {
 	Name             string
 	Module           string
@@ -301,14 +327,12 @@ type scaffoldInput struct {
 	Backend          string
 	WithDB           bool
 	WithSwagger      bool
-	WithAuth         bool
-	WithRBAC         bool
-	WithAdmin        bool
 }
 
 func buildScaffoldData(in scaffoldInput) map[string]any {
 	return map[string]any{
 		"Name":             in.Name,
+		"ProjectName":      in.Name, // 别名，供 README 等模板使用
 		"Module":           in.Module,
 		"ModuleName":       in.Module, // 别名，供模板使用
 		"FrameworkModule":  in.FrameworkModule,
@@ -319,9 +343,6 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 		"IsEntBackend":     in.Backend == "ent",
 		"WithDB":           in.WithDB,
 		"WithSwagger":      in.WithSwagger,
-		"WithAuth":         in.WithAuth,
-		"WithRBAC":         in.WithRBAC,
-		"WithAdmin":        in.WithAdmin,
 	}
 }
 

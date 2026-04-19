@@ -20,7 +20,7 @@ import (
 // - 基于 JWT 令牌实现服务间认证；
 // - 支持令牌签名和验证；
 // - 支持令牌过期时间配置；
-// - 支持服务权限映射；
+// - 只在 framework 层处理服务身份认证，不解释服务权限语义；
 // - 需要项目引入 github.com/golang-jwt/jwt/v5 依赖。
 type Provider struct{}
 
@@ -74,14 +74,15 @@ func getServiceAuthConfig(c contract.Container) (*contract.ServiceAuthConfig, er
 	}
 
 	authCfg := &contract.ServiceAuthConfig{
-		Mode:               "token",
-		TokenExpiry:        3600, // 默认 1 小时
-		ServicePermissions: make(map[string][]string),
+		Mode:        "token",
+		TokenExpiry: 3600, // 默认 1 小时
 	}
 
 	if mode := configprovider.GetStringAny(cfg,
 		"serviceauth.mode",
+		"serviceauth.backend",
 		"service_auth.mode",
+		"service_auth.backend",
 	); mode != "" {
 		authCfg.Mode = mode
 	}
@@ -144,23 +145,6 @@ func getServiceAuthConfig(c contract.Container) (*contract.ServiceAuthConfig, er
 	); len(allowed) > 0 {
 		authCfg.AllowedServices = allowed
 	}
-	if perms := configprovider.GetStringMapAny(cfg,
-		"serviceauth.service_permissions",
-		"service_auth.service_permissions",
-	); len(perms) > 0 {
-		authCfg.ServicePermissions = make(map[string][]string, len(perms))
-		for serviceName, permList := range perms {
-			parts := strings.Split(permList, ",")
-			arr := make([]string, 0, len(parts))
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				if part != "" {
-					arr = append(arr, part)
-				}
-			}
-			authCfg.ServicePermissions[serviceName] = arr
-		}
-	}
 
 	return authCfg, nil
 }
@@ -171,7 +155,7 @@ func getServiceAuthConfig(c contract.Container) (*contract.ServiceAuthConfig, er
 // - 使用 JWT 令牌实现服务身份验证；
 // - 支持 HS256 签名算法；
 // - 支持令牌过期验证；
-// - 支持服务权限映射。
+// - 只返回服务身份，不在 framework 层解释服务权限。
 type TokenAuthenticator struct {
 	cfg *contract.ServiceAuthConfig
 
@@ -229,13 +213,10 @@ func (a *TokenAuthenticator) AuthenticateWithCert(ctx context.Context, cert *tls
 // 中文说明：
 // - 为当前服务生成访问令牌；
 // - targetService: 目标服务名称，用于设置 audience；
-// - 令牌包含服务名、权限等信息。
+// - 令牌只表达服务身份，不在 framework 层写入服务权限语义。
 func (a *TokenAuthenticator) GenerateToken(ctx context.Context, targetService string) (string, error) {
 	now := time.Now()
 	expiresAt := now.Add(time.Duration(a.cfg.TokenExpiry) * time.Second)
-
-	// 获取服务权限
-	permissions := a.cfg.ServicePermissions[a.cfg.ServiceName]
 
 	// 构建令牌声明
 	claims := &serviceTokenClaims{
@@ -249,7 +230,6 @@ func (a *TokenAuthenticator) GenerateToken(ctx context.Context, targetService st
 		ServiceName: a.cfg.ServiceName,
 		Namespace:   a.cfg.Namespace,
 		Environment: a.cfg.Environment,
-		Permissions: permissions,
 	}
 
 	// 设置受众
@@ -325,7 +305,6 @@ func (a *TokenAuthenticator) VerifyToken(ctx context.Context, tokenString string
 		ServiceName: claims.ServiceName,
 		Namespace:   claims.Namespace,
 		Environment: claims.Environment,
-		Permissions: claims.Permissions,
 		ExpiresAt:   claims.ExpiresAt.Unix(),
 		IssuedAt:    claims.IssuedAt.Unix(),
 		Issuer:      claims.Issuer,
@@ -336,11 +315,10 @@ func (a *TokenAuthenticator) VerifyToken(ctx context.Context, tokenString string
 type serviceTokenClaims struct {
 	jwt.RegisteredClaims
 
-	ServiceID   string   `json:"service_id"`
-	ServiceName string   `json:"service_name"`
-	Namespace   string   `json:"namespace,omitempty"`
-	Environment string   `json:"environment,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	ServiceID   string `json:"service_id"`
+	ServiceName string `json:"service_name"`
+	Namespace   string `json:"namespace,omitempty"`
+	Environment string `json:"environment,omitempty"`
 }
 
 // extractTokenFromContext 从上下文提取令牌。

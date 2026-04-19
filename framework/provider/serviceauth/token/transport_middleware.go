@@ -30,13 +30,16 @@ func ServiceAuthHTTPMiddleware(authenticator contract.ServiceAuthenticator) gin.
 		}
 
 		if authenticator != nil {
-			identity, err := authenticator.Authenticate(ctx)
-			if err != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "service authentication failed"})
-				return
-			}
-			if identity != nil {
-				ctx = context.WithValue(ctx, contract.ServiceIdentityKey, identity)
+			hasServiceToken := strings.TrimSpace(c.GetHeader("X-Service-Token")) != "" || strings.TrimSpace(c.GetHeader("Authorization")) != ""
+			if hasServiceToken {
+				identity, err := authenticator.Authenticate(ctx)
+				if err != nil {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "service authentication failed"})
+					return
+				}
+				if identity != nil {
+					ctx = context.WithValue(ctx, contract.ServiceIdentityKey, identity)
+				}
 			}
 		}
 
@@ -109,6 +112,45 @@ func StreamServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.S
 
 		wrapped := &serviceAuthWrappedServerStream{ServerStream: ss, ctx: ctx}
 		return handler(srv, wrapped)
+	}
+}
+
+// UnaryClientInterceptor 在 gRPC 客户端调用前注入服务认证 token。
+//
+// 中文说明：
+// - 基于目标服务名生成服务间认证 token；
+// - 把 token 写入 outgoing metadata 的 `x-service-token`；
+// - 这样 Proto-first 客户端无需手工拼接认证头。
+func UnaryClientInterceptor(authenticator contract.ServiceAuthenticator, targetService string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if authenticator != nil {
+			if token, err := authenticator.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
+				md, ok := metadata.FromOutgoingContext(ctx)
+				if !ok {
+					md = metadata.New(nil)
+				}
+				md.Set("x-service-token", token)
+				ctx = metadata.NewOutgoingContext(ctx, md)
+			}
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+// StreamClientInterceptor 在 gRPC 流式客户端调用前注入服务认证 token。
+func StreamClientInterceptor(authenticator contract.ServiceAuthenticator, targetService string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		if authenticator != nil {
+			if token, err := authenticator.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
+				md, ok := metadata.FromOutgoingContext(ctx)
+				if !ok {
+					md = metadata.New(nil)
+				}
+				md.Set("x-service-token", token)
+				ctx = metadata.NewOutgoingContext(ctx, md)
+			}
+		}
+		return streamer(ctx, desc, cc, method, opts...)
 	}
 }
 

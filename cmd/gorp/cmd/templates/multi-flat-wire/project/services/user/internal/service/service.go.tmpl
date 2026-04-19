@@ -2,13 +2,14 @@
 package service
 
 import (
-	"net/http"
-	"strconv"
+	"context"
 
+	userv1 "{{.ModuleName}}/proto/user/v1"
 	"{{.ModuleName}}/services/user/internal/biz"
 	"{{.ModuleName}}/services/user/internal/data"
 
-	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
+	appgrpc "{{.FrameworkModule}}/app/grpc"
 	"gorm.io/gorm"
 )
 
@@ -28,18 +29,8 @@ func NewServices(db *gorm.DB) *Services {
 
 // UserService 用户服务。
 type UserService struct {
+	userv1.UnimplementedUserServiceServer
 	uc *biz.UserUseCase
-}
-
-// RegisterRoutes 注册用户服务路由。
-func (s *UserService) RegisterRoutes(r *gin.Engine) {
-	api := r.Group("/api/v1/users")
-	{
-		api.GET("", s.List)
-		api.GET("/:id", s.GetByID)
-		api.POST("", s.Create)
-		api.DELETE("/:id", s.Delete)
-	}
 }
 
 // CreateUserRequest 创建用户请求。
@@ -56,70 +47,66 @@ type UserResponse struct {
 }
 
 // List 获取用户列表。
-func (s *UserService) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-
-	users, total, err := s.uc.List(c.Request.Context(), page, size)
+func (s *UserService) List(ctx context.Context, page, size int) ([]UserResponse, int64, error) {
+	users, total, err := s.uc.List(ctx, page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, 0, err
 	}
 
 	items := make([]UserResponse, len(users))
 	for i, u := range users {
 		items[i] = UserResponse{ID: u.ID, Username: u.Username, Email: u.Email}
 	}
-
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	return items, total, nil
 }
 
 // GetByID 获取单个用户。
-func (s *UserService) GetByID(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+func (s *UserService) GetByID(ctx context.Context, id uint) (*UserResponse, error) {
+	user, err := s.uc.GetByID(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
+		return nil, err
 	}
-
-	user, err := s.uc.GetByID(c.Request.Context(), uint(id))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, UserResponse{ID: user.ID, Username: user.Username, Email: user.Email})
+	return &UserResponse{ID: user.ID, Username: user.Username, Email: user.Email}, nil
 }
 
 // Create 创建用户。
-func (s *UserService) Create(c *gin.Context) {
-	var req CreateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	user, err := s.uc.Create(c.Request.Context(), req.Username, req.Email)
+func (s *UserService) Create(ctx context.Context, req CreateUserRequest) (*UserResponse, error) {
+	user, err := s.uc.Create(ctx, req.Username, req.Email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
-
-	c.JSON(http.StatusCreated, UserResponse{ID: user.ID, Username: user.Username, Email: user.Email})
+	return &UserResponse{ID: user.ID, Username: user.Username, Email: user.Email}, nil
 }
 
 // Delete 删除用户。
-func (s *UserService) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+func (s *UserService) Delete(ctx context.Context, id uint) error {
+	return s.uc.Delete(ctx, id)
+}
+
+// GetUser 提供给其他服务调用的最小 gRPC 方法。
+func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (*userv1.GetUserResponse, error) {
+	user, err := s.uc.GetByID(ctx, uint(req.GetId()))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
+		return nil, err
 	}
 
-	if err := s.uc.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	metadataDemo := ""
+	if md, ok := contract.FromServerContext(ctx); ok && md != nil {
+		metadataDemo = md.Get("x-md-demo")
 	}
 
-	c.Status(http.StatusNoContent)
+	callerServiceName := ""
+	if identity, ok := ctx.Value(contract.ServiceIdentityKey).(*contract.ServiceIdentity); ok && identity != nil {
+		callerServiceName = identity.ServiceName
+	}
+
+	return &userv1.GetUserResponse{
+		Id:                uint64(user.ID),
+		Username:          user.Username,
+		Email:             user.Email,
+		TraceId:           appgrpc.GetTraceID(ctx),
+		RequestId:         appgrpc.GetRequestID(ctx),
+		MetadataDemo:      metadataDemo,
+		CallerServiceName: callerServiceName,
+	}, nil
 }

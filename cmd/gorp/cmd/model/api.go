@@ -19,6 +19,7 @@ var (
 	modelAPIModelOut   string
 	modelAPIBackend    string
 	modelAPIForce      bool
+	modelAPIRegister   bool
 )
 
 // modelAPICmd 基于数据库表生成 model/service/http 三层 CRUD 骨架。
@@ -172,9 +173,22 @@ var modelAPICmd = &cobra.Command{
 			fmt.Fprintf(cmd.OutOrStdout(), "generated: %s\n", fpath)
 		}
 
+		if modelAPIRegister {
+			registered, err := appendGeneratedModuleRoute(filepath.Join("app", "http", "routes.go"), pkg)
+			if err != nil {
+				return err
+			}
+			if registered {
+				fmt.Fprintf(cmd.OutOrStdout(), "updated: %s\n", filepath.Join("app", "http", "routes.go"))
+			} else {
+				fmt.Fprintln(cmd.OutOrStdout(), "skip: route registration already exists in app/http/routes.go")
+			}
+		}
+
 		fmt.Fprintln(cmd.OutOrStdout())
 		fmt.Fprintln(cmd.OutOrStdout(), "Next step: register the generated module routes in app/http/routes.go")
-		fmt.Fprintf(cmd.OutOrStdout(), "Example: generated/%s.RegisterRoutes(engine, c)\n", pkg)
+		fmt.Fprintf(cmd.OutOrStdout(), "Example: generated/%s.RegisterRoutes(engine, container, services)\n", pkg)
+		fmt.Fprintln(cmd.OutOrStdout(), "Hint: default golayout starter now keeps contract.Container in app/http.RegisterRoutes for easier module integration")
 		return nil
 	},
 }
@@ -186,6 +200,7 @@ func init() {
 	modelAPICmd.Flags().StringVar(&modelAPIModelOut, "model-out", "", "output directory for app model code")
 	modelAPICmd.Flags().StringVar(&modelAPIBackend, "backend", string(contract.RuntimeBackendGorm), "generation backend: gorm|ent")
 	modelAPICmd.Flags().BoolVar(&modelAPIForce, "force", false, "overwrite existing files")
+	modelAPICmd.Flags().BoolVar(&modelAPIRegister, "register", false, "append generated module registration to app/http/routes.go when possible")
 }
 
 func goTypeFromCols(cols []contract.Column, name string) string {
@@ -209,6 +224,47 @@ func detectModulePath() string {
 		}
 	}
 	return "github.com/ngq/gorp"
+}
+
+func appendGeneratedModuleRoute(routesFilePath, pkg string) (bool, error) {
+	content, err := os.ReadFile(routesFilePath)
+	if err != nil {
+		return false, fmt.Errorf("read routes file: %w", err)
+	}
+	text := string(content)
+
+	importLine := fmt.Sprintf("\tgenerated%[1]s \"%[2]s/app/http/module/generated/%[1]s\"\n", pkg, detectModulePath())
+	registerLine := fmt.Sprintf("\t\tgenerated%[1]s.RegisterRoutes(r, c)\n", pkg)
+
+	if strings.Contains(text, registerLine) || strings.Contains(text, fmt.Sprintf("generated%s.RegisterRoutes(", pkg)) {
+		return false, nil
+	}
+
+	if !strings.Contains(text, importLine) {
+		anchor := "\tginprovider \"{{.FrameworkModule}}/framework/provider/gin\"\n"
+		if strings.Contains(text, anchor) {
+			text = strings.Replace(text, anchor, anchor+importLine, 1)
+		} else {
+			anchor = "\tginprovider \"github.com/ngq/gorp/framework/provider/gin\"\n"
+			if strings.Contains(text, anchor) {
+				text = strings.Replace(text, anchor, anchor+importLine, 1)
+			} else {
+				return false, fmt.Errorf("routes.go import anchor not found")
+			}
+		}
+	}
+
+	insertAnchor := "\t}\n}"
+	insertBlock := registerLine + insertAnchor
+	if !strings.Contains(text, insertAnchor) {
+		return false, fmt.Errorf("routes.go register anchor not found")
+	}
+	text = strings.Replace(text, insertAnchor, insertBlock, 1)
+
+	if err := os.WriteFile(routesFilePath, []byte(text), 0o644); err != nil {
+		return false, fmt.Errorf("write routes file: %w", err)
+	}
+	return true, nil
 }
 
 func writeTemplateFile(base *template.Template, filePath, src string, data any, force bool) error {
