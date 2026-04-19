@@ -1,0 +1,25 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"{{.ModuleName}}/services/order/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRegisterRoutes_InvalidOrderID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	httpServer := NewHTTPServer(&service.Services{Order: &service.OrderService{}})
+	httpServer.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders/abc", nil)
+	resp := httptest.NewRecorder()
+
+	r.ServeHTTP(resp, req)
+	require.Equal(t, http.StatusBadRequest, resp.Code)
+}

@@ -1,0 +1,35 @@
+package service
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"{{.FrameworkModule}}/framework/contract"
+
+	"github.com/stretchr/testify/require"
+)
+
+type dlockStub struct{}
+
+func (d *dlockStub) Lock(ctx context.Context, key string, ttl time.Duration) error { return nil }
+func (d *dlockStub) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) { return true, nil }
+func (d *dlockStub) Unlock(ctx context.Context, key string) error { return nil }
+func (d *dlockStub) Renew(ctx context.Context, key string, ttl time.Duration) error { return nil }
+func (d *dlockStub) IsLocked(ctx context.Context, key string) (bool, error) { return true, nil }
+func (d *dlockStub) WithLock(ctx context.Context, key string, ttl time.Duration, fn func() error) error { return fn() }
+
+func TestOrderServiceLockOrderDemo(t *testing.T) {
+	svc := &OrderService{dlock: &dlockStub{}}
+	resp, err := svc.LockOrderDemo(context.Background(), 1)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+	require.Equal(t, "order:1", resp.Key)
+}
+
+func TestOrderServiceGetOrderUserPropagatesMetadataContext(t *testing.T) {
+	ctx := contract.AppendToClientContext(context.Background(), "x-md-demo", "hello-metadata")
+	md, ok := contract.FromClientContext(ctx)
+	require.True(t, ok)
+	require.Equal(t, "hello-metadata", md.Get("x-md-demo"))
+}

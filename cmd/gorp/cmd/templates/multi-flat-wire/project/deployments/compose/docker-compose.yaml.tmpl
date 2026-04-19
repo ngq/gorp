@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: {{.Name}}-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+
+  user-service:
+    image: golang:1.22-alpine
+    container_name: {{.Name}}-user
+    working_dir: /workspace
+    command: ["sh", "-lc", "go run ./services/user/cmd"]
+    environment:
+      APP_ENV: development
+      REDIS_ADDR: redis:6379
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      - redis
+    ports:
+      - "8081:8081"
+      - "9081:9081"
+
+  order-service:
+    image: golang:1.22-alpine
+    container_name: {{.Name}}-order
+    working_dir: /workspace
+    command: ["sh", "-lc", "go run ./services/order/cmd"]
+    environment:
+      APP_ENV: development
+      REDIS_ADDR: redis:6379
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      - redis
+      - user-service
+    ports:
+      - "8082:8082"
+      - "9082:9082"
+
+  product-service:
+    image: golang:1.22-alpine
+    container_name: {{.Name}}-product
+    working_dir: /workspace
+    command: ["sh", "-lc", "go run ./services/product/cmd"]
+    environment:
+      APP_ENV: development
+      REDIS_ADDR: redis:6379
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      - redis
+    ports:
+      - "8083:8083"

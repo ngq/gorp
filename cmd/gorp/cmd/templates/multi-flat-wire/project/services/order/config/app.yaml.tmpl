@@ -1,0 +1,87 @@
+app:
+  name: order-service
+  env: development
+  address: ":8082"
+
+service:
+  name: order-service
+
+rpc:
+  mode: grpc
+  grpc:
+    address: ":9082"
+    target: "127.0.0.1:9081"
+
+server:
+  http:
+    addr: ":8082"
+    mode: debug
+
+database:
+  driver: sqlite
+  dsn: order.db
+
+redis:
+  addr: "${REDIS_ADDR:localhost:6379}"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+tracing:
+  enabled: true
+  backend: stdout
+  otel:
+    endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
+  sampling_rate: 1.0
+
+metadata:
+  enabled: true
+  propagate_prefix:
+    - x-md-
+
+service_auth:
+  mode: token
+  token:
+    secret: "change-me-in-production"
+    issuer: "order-service"
+    audience: "internal"
+    expiry: 3600
+  allowed_services:
+    - user-service
+
+cache:
+  driver: memory
+
+distributed_lock:
+  enabled: true
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+  key_prefix: lock:
+
+message_queue:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+
+services:
+  user_service:
+    name: "http://localhost:8081"
+    timeout: 10s
+    retry: 3
+
+# 如需服务发现，可再开启
+# discovery:
+#   enabled: true
+#   type: consul
+#   consul:
+#     addr: "${CONSUL_ADDR:localhost:8500}"
+#     service_name: "order-service"
+#     service_port: 8082

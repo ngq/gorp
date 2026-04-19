@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "{{.ModuleName}}/proto/user/v1;userv1";
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+message GetUserRequest {
+  uint64 id = 1;
+}
+
+message GetUserResponse {
+  uint64 id = 1;
+  string username = 2;
+  string email = 3;
+  string trace_id = 10;
+  string request_id = 11;
+  string metadata_demo = 12;
+  string caller_service_name = 13;
+}

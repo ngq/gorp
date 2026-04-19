@@ -1,0 +1,95 @@
+package server
+
+import (
+	"net/http"
+	"strconv"
+
+	"{{.ModuleName}}/services/user/internal/service"
+
+	"github.com/gin-gonic/gin"
+)
+
+// HTTPServer 用户 HTTP 入口。
+type HTTPServer struct {
+	user *service.UserService
+}
+
+// NewHTTPServer 创建用户 HTTP 入口。
+func NewHTTPServer(services *service.Services) *HTTPServer {
+	return &HTTPServer{user: services.User}
+}
+
+// RegisterRoutes 注册用户服务路由。
+func (s *HTTPServer) RegisterRoutes(r *gin.Engine) {
+	api := r.Group("/api/v1/users")
+	{
+		api.GET("", s.List)
+		api.GET("/:id", s.GetByID)
+		api.POST("", s.Create)
+		api.DELETE("/:id", s.Delete)
+	}
+}
+
+// List 获取用户列表。
+func (s *HTTPServer) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	items, total, err := s.user.List(c.Request.Context(), page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+}
+
+// GetByID 获取单个用户。
+func (s *HTTPServer) GetByID(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	user, err := s.user.GetByID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+// Create 创建用户。
+func (s *HTTPServer) Create(c *gin.Context) {
+	var req service.CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := s.user.Create(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, user)
+}
+
+// Delete 删除用户。
+func (s *HTTPServer) Delete(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	if err := s.user.Delete(c.Request.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}

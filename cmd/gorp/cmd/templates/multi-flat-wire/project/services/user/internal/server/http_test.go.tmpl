@@ -1,0 +1,25 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"{{.ModuleName}}/services/user/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRegisterRoutes_InvalidUserID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	httpServer := NewHTTPServer(&service.Services{User: &service.UserService{}})
+	httpServer.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/abc", nil)
+	resp := httptest.NewRecorder()
+
+	r.ServeHTTP(resp, req)
+	require.Equal(t, http.StatusBadRequest, resp.Code)
+}

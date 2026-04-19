@@ -1,0 +1,42 @@
+package service
+
+import (
+	"context"
+	"testing"
+
+	"{{.ModuleName}}/services/user/internal/biz"
+	userv1 "{{.ModuleName}}/proto/user/v1"
+	"{{.FrameworkModule}}/framework/contract"
+
+	"github.com/stretchr/testify/require"
+)
+
+type userRepoStub struct{}
+
+func (s *userRepoStub) Create(ctx context.Context, user *biz.User) error { return nil }
+func (s *userRepoStub) GetByID(ctx context.Context, id uint) (*biz.User, error) {
+	return &biz.User{ID: id, Username: "alice", Email: "alice@example.com"}, nil
+}
+func (s *userRepoStub) GetByUsername(ctx context.Context, username string) (*biz.User, error) {
+	return &biz.User{ID: 1, Username: username, Email: username + "@example.com"}, nil
+}
+func (s *userRepoStub) List(ctx context.Context, page, size int) ([]*biz.User, int64, error) {
+	return []*biz.User{
+		{ID: 1, Username: "alice", Email: "alice@example.com"},
+	}, 1, nil
+}
+func (s *userRepoStub) Delete(ctx context.Context, id uint) error { return nil }
+
+func TestUserServiceGetUserReturnsMetadataAndIdentity(t *testing.T) {
+	svc := &UserService{uc: biz.NewUserUseCase(&userRepoStub{})}
+	md := contract.NewMetadata()
+	md.Set("x-md-demo", "hello-metadata")
+	ctx := contract.NewServerContext(context.Background(), md)
+	ctx = context.WithValue(ctx, contract.ServiceIdentityKey, &contract.ServiceIdentity{ServiceName: "order-service"})
+
+	resp, err := svc.GetUser(ctx, &userv1.GetUserRequest{Id: 1})
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), resp.GetId())
+	require.Equal(t, "hello-metadata", resp.GetMetadataDemo())
+	require.Equal(t, "order-service", resp.GetCallerServiceName())
+}

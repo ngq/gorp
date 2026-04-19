@@ -1,0 +1,131 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"{{.ModuleName}}/services/product/internal/service"
+
+	"github.com/gin-gonic/gin"
+)
+
+// HTTPServer 商品 HTTP 入口。
+type HTTPServer struct {
+	product *service.ProductService
+}
+
+// NewHTTPServer 创建商品 HTTP 入口。
+func NewHTTPServer(services *service.Services) *HTTPServer {
+	return &HTTPServer{product: services.Product}
+}
+
+// RegisterRoutes 注册商品服务路由。
+func (s *HTTPServer) RegisterRoutes(r *gin.Engine) {
+	api := r.Group("/api/v1/products")
+	{
+		api.GET("", s.List)
+		api.GET("/:id", s.GetByID)
+		api.POST("", s.Create)
+		api.DELETE("/:id", s.Delete)
+		api.POST("/:id/events/publish", s.PublishStockChanged)
+		api.POST("/events/consume-once", s.ConsumeStockChangedOnce)
+	}
+}
+
+// List 获取商品列表。
+func (s *HTTPServer) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	items, total, err := s.product.List(c.Request.Context(), page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+}
+
+// GetByID 获取单个商品。
+func (s *HTTPServer) GetByID(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	product, err := s.product.GetByID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, product)
+}
+
+// Create 创建商品。
+func (s *HTTPServer) Create(c *gin.Context) {
+	var req service.CreateProductRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	product, err := s.product.Create(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, product)
+}
+
+// Delete 删除商品。
+func (s *HTTPServer) Delete(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	if err := s.product.Delete(c.Request.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// PublishStockChanged 发布库存变更事件。
+func (s *HTTPServer) PublishStockChanged(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	resp, err := s.product.PublishStockChanged(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// ConsumeStockChangedOnce 单次消费库存变更事件。
+func (s *HTTPServer) ConsumeStockChangedOnce(c *gin.Context) {
+	resp, err := s.product.ConsumeStockChangedOnce(c.Request.Context())
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			c.JSON(http.StatusGatewayTimeout, gin.H{"error": "consume timeout"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}

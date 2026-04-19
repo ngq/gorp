@@ -1,0 +1,62 @@
+app:
+  name: product-service
+  env: development
+  address: ":8083"
+
+server:
+  http:
+    addr: ":8083"
+    mode: debug
+
+database:
+  driver: sqlite
+  dsn: product.db
+
+redis:
+  addr: "${REDIS_ADDR:localhost:6379}"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+tracing:
+  enabled: true
+  backend: stdout
+  otel:
+    endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
+  sampling_rate: 1.0
+
+metadata:
+  enabled: true
+  propagate_prefix:
+    - x-md-
+
+service_auth:
+  mode: token
+  token:
+    secret: "change-me-in-production"
+    issuer: "product-service"
+    audience: "internal"
+    expiry: 3600
+  allowed_services: []
+
+cache:
+  driver: memory
+
+message_queue:
+  enabled: true
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+
+# 如需服务发现，可再开启
+# discovery:
+#   enabled: true
+#   type: consul
+#   consul:
+#     addr: "${CONSUL_ADDR:localhost:8500}"
+#     service_name: "product-service"
+#     service_port: 8083
