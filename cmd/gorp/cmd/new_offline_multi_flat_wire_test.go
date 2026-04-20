@@ -40,6 +40,9 @@ func TestRenderMultiFlatWireTemplateIncludesTests(t *testing.T) {
 		"deployments/docker/Dockerfile.user",
 		"deployments/docker/Dockerfile.order",
 		"deployments/docker/Dockerfile.product",
+		"docs/structure.md",
+		"docs/component-tree.md",
+		"docs/next-steps.md",
 		"Makefile",
 	}
 

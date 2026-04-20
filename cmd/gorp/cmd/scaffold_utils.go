@@ -438,6 +438,17 @@ func printScaffoldNext(out io.Writer, folder string) {
 	fmt.Fprintln(out, "      go run ./cmd/app")
 }
 
+func releaseTemplateSource(name string) (fs.FS, string) {
+	switch normalizeStarterTemplate(name) {
+	case starterTemplateMultiFlat:
+		return projectTemplateFS, "templates/multi-flat/project"
+	case starterTemplateMultiFlatWire:
+		return projectTemplateFS, "templates/multi-flat-wire/project"
+	default:
+		return releaseTemplateFS, resolveReleaseTemplateRoot(name)
+	}
+}
+
 func buildGitHubReleaseAssetURL(repo, tag, asset string) string {
 	if strings.EqualFold(tag, "latest") {
 		return fmt.Sprintf("https://github.com/%s/releases/latest/download/%s", repo, asset)

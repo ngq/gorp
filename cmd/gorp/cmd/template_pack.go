@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed all:templates/release
+//go:embed all:templates/release all:templates/multi-flat all:templates/multi-flat-wire
 var releaseTemplateFS embed.FS
 
 var templatePackOut string
@@ -32,8 +32,8 @@ var templatePackCmd = &cobra.Command{
 		if out == "" {
 			out = filepath.Join(".tmp", defaultReleaseTemplateAsset(templatePackName))
 		}
-		srcRoot := resolveReleaseTemplateRoot(templatePackName)
-		if err := zipDirectoryFromFS(releaseTemplateFS, srcRoot, out, "templates/project"); err != nil {
+		srcFS, srcRoot := releaseTemplateSource(templatePackName)
+		if err := zipDirectoryFromFS(srcFS, srcRoot, out, "templates/project"); err != nil {
 			return err
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "created template asset[%s]: %s\n", templateDisplayName(templatePackName), out)

@@ -1,0 +1,160 @@
+# 微服务与第三方组件标准目录树参考
+
+本文档用于给 `multi-flat-wire` 使用者一个统一判断：
+
+- 某个组件应该放在哪里
+- 哪些内容属于业务编排
+- 哪些内容属于中间件接入细节
+- 哪些能力当前更适合继续通过 framework 使用
+
+> 重要提醒：
+> - 本文档是**目录规划参考**，不是“当前模板已内置这些代码目录”的声明；
+> - 当前模板仍以 `services/*/internal/{biz,data,service,server}` + Wire 装配为主；
+> - 如果后续真的进入代码落地阶段，再决定是否把部分规划物化为真实目录。
+
+---
+
+## 1. 组件归位总表
+
+| 组件类型 | 典型示例 | 业务动作放哪里 | 推荐目录理解 | 不推荐目录写法 | 当前建议 |
+| --- | --- | --- | --- | --- | --- |
+| 缓存 / 键值 | Redis、framework cache | `services/<service>/internal/service/` | 业务使用放 `internal/service/`，能力入口优先走 framework cache / redis | `third_party/redis/`、把 Redis SDK 初始化散落到多个业务 service | 先文档规划，不建独立代码目录 |
+| 消息 / 事件 | RabbitMQ、Kafka、Redis PubSub | `services/<service>/internal/service/` | 业务动作放 `internal/service/`，消息能力优先走 framework message queue | `third_party/rabbitmq/`、`third_party/kafka/`、`services/<service>/mq/` | 先文档规划，不建根级 `third_party/` |
+| 服务发现 | Consul、Nacos、Kubernetes discovery | 服务调用编排仍在 `internal/service/` | 发现能力属于治理链路，优先保持 framework discovery provider 心智 | 把 discovery client 直接塞进业务 service / biz | 优先保持 framework provider 心智 |
+| 配置源 | 本地配置、远程配置源 | 配置使用点在业务服务 | 配置消费发生在服务中，配置源接入优先走 framework config source | 单独铺开 project-owned config client 目录并扩散到各服务 | 先不物化项目侧代码层 |
+| 链路追踪 | OpenTelemetry、Jaeger exporter | 业务侧只消费 trace 上下文 | tracing 属于横切治理能力，初始化与接入优先走 framework tracing | 在业务层自己维护 tracing 初始化细节 | 继续走 framework tracing |
+| 监控指标 | metrics、Prometheus | 业务可埋点，但注册与暴露不放业务层 | 指标注册与暴露属于治理能力，优先走 framework metrics | 把 metrics server / registry 逻辑直接混进业务 service | 继续走 framework metrics |
+| 服务认证 | service_auth、token 传播 | 调用编排在 `internal/service/` | 服务认证属于跨服务安全治理，优先走 framework service_auth | 在业务 service 中直接维护底层 token / credential 接入细节 | 继续走 framework service_auth |
+| 分布式锁 | dlock | 业务调用点可在 `internal/service/` | 锁使用动作在业务编排层，锁能力入口优先走 framework dlock | 单独做一层随处可见的本地锁接入工具目录 | 继续走 framework dlock |
+| 熔断 / 重试 | circuitbreaker、retry | 业务调用点可在 `internal/service/` | 韧性治理能力与业务编排解耦，优先走 framework provider | 在 `biz/` 中直接写熔断 / 重试客户端控制细节 | 继续走 framework provider |
+| 外部集成 | HTTP client、第三方平台 API | 编排在 `internal/service/` | 业务动作在 `internal/service/`，集成细节后续按“集成职责”整理 | `third_party/` 大杂烩、把所有外部 API client 全塞进 service | 后续按集成职责整理 |
+
+### 1.1 一个统一记忆法
+
+可以先用下面这条规则快速判断：
+
+- **业务什么时候调用** → `services/<service>/internal/service/`
+- **中间件 / 治理能力怎么接入** → 当前优先保持 framework capability 心智
+- **是否现在就要建独立代码目录** → 当前大多数场景先不要，先文档化再决定是否物化
+
+---
+
+## 2. RabbitMQ / Kafka / Redis 这类组件怎么理解
+
+### 2.1 RabbitMQ
+
+推荐理解：
+
+- 业务上“什么时候发消息 / 消费消息”属于应用编排
+- RabbitMQ 连接、Exchange、Queue、Publish、Consume 等属于基础设施接入细节
+
+当前阶段建议：
+
+- 业务编排仍放：`services/<service>/internal/service/`
+- 接入心智优先走：framework message queue 抽象
+- 不建议直接在模板根目录建：
+  - `third_party/rabbitmq/`
+  - `services/<service>/rabbitmq/`
+
+### 2.2 Kafka
+
+推荐理解与 RabbitMQ 相同：
+
+- 业务决定何时发布 / 订阅
+- 中间件接入细节不应直接揉进业务 service
+
+当前阶段建议：
+
+- 先作为“消息 / 事件组件”写入目录规划
+- 如果未来要物化目录，应和消息抽象一起判断，而不是单独按供应商建立目录
+
+### 2.3 Redis
+
+Redis 常见有两类角色：
+
+- 缓存 / 键值访问
+- Redis PubSub 消息后端
+
+当前阶段建议：
+
+- 作为缓存时：归到“缓存 / 键值组件”
+- 作为消息后端时：归到“消息 / 事件组件”
+- 业务使用动作仍由 `internal/service/` 编排
+- 不建议把 Redis SDK 初始化逻辑直接散落在多个业务 service 文件里
+
+---
+
+## 3. tracing / discovery / service_auth 放哪里
+
+这类组件有一个共同特征：
+
+- 它们更像“微服务治理能力”
+- 而不是“业务自己的第三方工具函数”
+
+因此当前推荐理解是：
+
+### tracing
+- 业务可以使用 trace 上下文
+- tracing 初始化与接入，优先走 framework tracing provider
+
+### discovery
+- 服务调用目标的发现与解析属于治理能力
+- 不建议把 discovery 客户端散落进业务逻辑层
+
+### service_auth
+- 服务间认证属于跨服务安全治理能力
+- 业务只在调用链中消费认证结果或触发调用，不负责实现底层认证接入
+
+---
+
+## 4. 一个实用判断标准
+
+判断某段代码 / 某类组件该放哪，可以先问自己一句：
+
+> 这段内容是在表达“业务什么时候调用”，还是在表达“中间件怎么接入”？
+
+如果是：
+
+- **业务什么时候调用** → 更接近 `services/<service>/internal/service/`
+- **中间件怎么接入** → 当前优先保持 framework capability 心智，先写入文档规划，不急着物化项目侧目录
+
+---
+
+## 5. 当前阶段不推荐的目录写法
+
+当前阶段不推荐直接在模板中铺开：
+
+```text
+third_party/
+third_party/rabbitmq/
+third_party/kafka/
+third_party/redis/
+shared/infrastructure/
+internal/infrastructure/
+platform/
+```
+
+原因不是这些目录永远不可能存在，而是：
+
+- 当前阶段还在做目录治理收口
+- 模板还没有进入这一轮真实代码改造
+- 现在直接创建这些目录，容易让使用者误判模板能力已经落地
+
+---
+
+## 6. 当前阶段推荐的最小心智
+
+你现在可以先这样理解 `multi-flat-wire`：
+
+1. 业务逻辑看 `biz/`
+2. 应用编排看 `service/`
+3. 传输注册看 `server/`
+4. 启动与依赖图看 `cmd/`
+5. Proto 契约看 `proto/`
+6. 微服务治理与第三方组件目录规划，看 `docs/` 与私有治理文档
+
+---
+
+## 一句话总结
+
+RabbitMQ、Kafka、Redis、tracing、discovery、service_auth 这些组件，在 `multi-flat-wire` 中都不应粗暴理解成“直接新建一个第三方目录”；应先区分业务编排与治理接入，再按职责域做目录规划。

@@ -16,6 +16,10 @@ func TestReleaseTemplateSupportForMultiFlatWire(t *testing.T) {
 	require.Equal(t, "templates/multi-flat-wire/project", resolveReleaseTemplateRoot(starterTemplateMultiFlatWire))
 	require.Equal(t, "gorp-template-multi-flat.zip", defaultReleaseTemplateAsset(starterTemplateMultiFlat))
 	require.Equal(t, "gorp-template-multi-flat-wire.zip", defaultReleaseTemplateAsset(starterTemplateMultiFlatWire))
+
+	srcFS, srcRoot := releaseTemplateSource(starterTemplateMultiFlatWire)
+	_, err := srcFS.Open(filepath.ToSlash(filepath.Join(srcRoot, "README.md.tmpl")))
+	require.NoError(t, err)
 }
 
 func TestDetectProjectTemplateTypeForMultiFlatWire(t *testing.T) {
