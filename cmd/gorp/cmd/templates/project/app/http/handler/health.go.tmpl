@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Health 返回 starter 默认健康检查响应。
 func Health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	ginprovider.Success(c, gin.H{"status": "ok"})
 }

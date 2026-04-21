@@ -194,7 +194,7 @@ var templateVersionCmd = &cobra.Command{
 		fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat: default multi-service starter")
 		fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat-wire: advanced multi-service starter with Wire assembly")
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), "Reference-only evolution structures such as multi-independent are not listed as public starter templates.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Release-pack / from-release currently supports: base, golayout, golayout-wire, multi-flat, multi-flat-wire.")
 		fmt.Fprintln(cmd.OutOrStdout(), "Templates are embedded at build time.")
 		fmt.Fprintln(cmd.OutOrStdout(), "Upgrade CLI to get latest templates.")
 		return nil

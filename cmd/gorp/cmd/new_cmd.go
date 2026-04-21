@@ -31,12 +31,12 @@ High-frequency intents:
   - gorp new multi      : default multi-service template
   - gorp new multi-wire : multi-service Wire template
 
-Advanced template matrix:
-  - golayout        : default choice for single-service projects
-  - golayout-wire   : advanced public single-service template with Wire assembly
-  - multi-flat      : default choice for multi-service projects
-  - multi-flat-wire : advanced public multi-service template with Wire assembly
+Template matrix:
   - base            : minimal skeleton for custom structure
+  - golayout        : default single-service template
+  - golayout-wire   : advanced single-service template with Wire assembly
+  - multi-flat      : default multi-service template
+  - multi-flat-wire : advanced multi-service template with Wire assembly
 
 Important:
   - Positional intent is the primary public path.

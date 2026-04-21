@@ -148,7 +148,7 @@ func renderIndexDoc() string {
 		"- 创建项目：`go run ./cmd/gorp new --help`\n" +
 		"- 模板治理：`go run ./cmd/gorp template version`\n" +
 		"- 协议/模型生成：`go run ./cmd/gorp proto --help`、`go run ./cmd/gorp model --help`\n" +
-		"- legacy runtime 命令组（兼容/专项）：`gorp app`、`gorp cron`、`gorp grpc`\n\n" +
+		"- 当前 CLI 主线已不再把 `app / grpc / cron / build / dev / deploy` 作为 starter 项目的公开 runtime 路径；服务启动应通过生成项目自己的 `cmd/*/main.go` 入口\n\n" +
 		"### 启动项目\n\n" +
 		"- 建议在生成项目内通过自己的 `cmd/*/main.go` 入口启动，例如：`go run ./cmd/app`\n" +
 		"- 验证：`GET /healthz`\n\n" +
@@ -189,8 +189,7 @@ func renderCLIDoc(root *cobra.Command) (string, error) {
 	b.WriteString(">\n")
 	b.WriteString("> - `gorp new` / `template` / `proto` / `model`：项目创建、模板治理与代码生成主入口\n")
 	b.WriteString("> - `gorp doc` / `swagger` / `openapi`：文档生成相关\n")
-	b.WriteString("> - `gorp build` / `dev` / `deploy`：母仓/工程层的构建、开发联调、部署辅助命令\n")
-	b.WriteString("> - `gorp app` / `grpc` / `cron`：保留的 runtime/兼容命令组，主要服务于母仓验证、兼容脚本与专项场景，不再作为 starter 项目的公开主路径\n\n")
+	b.WriteString("> - 当前 CLI 主线已不再把 `app / grpc / cron / build / dev / deploy` 作为 starter 项目的公开 runtime 路径；服务启动应通过生成项目自己的 `cmd/*/main.go` 入口\n\n")
 
 	docs := collectCommands(root)
 	for _, d := range docs {

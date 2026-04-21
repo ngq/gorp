@@ -39,57 +39,57 @@ func (s *HTTPServer) List(c *gin.Context) {
 
 	items, total, err := s.order.List(c.Request.Context(), page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	ginprovider.Success(c, gin.H{"items": items, "total": total, "page": page, "size": size})
 }
 
 // GetByID 获取单个订单。
 func (s *HTTPServer) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	order, err := s.order.GetByID(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		ginprovider.NotFound(c, "order not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, order)
+	ginprovider.Success(c, order)
 }
 
 // Create 创建订单。
 func (s *HTTPServer) Create(c *gin.Context) {
 	var req service.CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 
 	order, err := s.order.Create(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, order)
+	ginprovider.SuccessWithStatus(c, http.StatusCreated, order)
 }
 
 // Delete 删除订单。
 func (s *HTTPServer) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := s.order.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
@@ -100,32 +100,32 @@ func (s *HTTPServer) Delete(c *gin.Context) {
 func (s *HTTPServer) GetOrderUser(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	resp, err := s.order.GetOrderUser(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		ginprovider.ErrorWithStatus(c, http.StatusBadGateway, ginprovider.ErrInternal(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	ginprovider.Success(c, resp)
 }
 
 // LockOrderDemo 验证分布式锁能力。
 func (s *HTTPServer) LockOrderDemo(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	resp, err := s.order.LockOrderDemo(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		ginprovider.ErrorWithStatus(c, http.StatusConflict, ginprovider.ErrInternal(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	ginprovider.Success(c, resp)
 }

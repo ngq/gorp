@@ -37,57 +37,57 @@ func (s *HTTPServer) List(c *gin.Context) {
 
 	items, total, err := s.user.List(c.Request.Context(), page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	ginprovider.Success(c, gin.H{"items": items, "total": total, "page": page, "size": size})
 }
 
 // GetByID 获取单个用户。
 func (s *HTTPServer) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	user, err := s.user.GetByID(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		ginprovider.NotFound(c, "user not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	ginprovider.Success(c, user)
 }
 
 // Create 创建用户。
 func (s *HTTPServer) Create(c *gin.Context) {
 	var req service.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 
 	user, err := s.user.Create(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	ginprovider.SuccessWithStatus(c, http.StatusCreated, user)
 }
 
 // Delete 删除用户。
 func (s *HTTPServer) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := s.user.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 

@@ -41,57 +41,57 @@ func (s *HTTPServer) List(c *gin.Context) {
 
 	items, total, err := s.product.List(c.Request.Context(), page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	ginprovider.Success(c, gin.H{"items": items, "total": total, "page": page, "size": size})
 }
 
 // GetByID 获取单个商品。
 func (s *HTTPServer) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	product, err := s.product.GetByID(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+		ginprovider.NotFound(c, "product not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	ginprovider.Success(c, product)
 }
 
 // Create 创建商品。
 func (s *HTTPServer) Create(c *gin.Context) {
 	var req service.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 
 	product, err := s.product.Create(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, product)
+	ginprovider.SuccessWithStatus(c, http.StatusCreated, product)
 }
 
 // Delete 删除商品。
 func (s *HTTPServer) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := s.product.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
@@ -102,17 +102,17 @@ func (s *HTTPServer) Delete(c *gin.Context) {
 func (s *HTTPServer) PublishStockChanged(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		ginprovider.BadRequest(c, "invalid id")
 		return
 	}
 
 	resp, err := s.product.PublishStockChanged(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	ginprovider.Success(c, resp)
 }
 
 // ConsumeStockChangedOnce 单次消费库存变更事件。
@@ -120,12 +120,12 @@ func (s *HTTPServer) ConsumeStockChangedOnce(c *gin.Context) {
 	resp, err := s.product.ConsumeStockChangedOnce(c.Request.Context())
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			c.JSON(http.StatusGatewayTimeout, gin.H{"error": "consume timeout"})
+			ginprovider.ErrorWithStatus(c, http.StatusGatewayTimeout, ginprovider.ErrInternal("consume timeout"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	ginprovider.Success(c, resp)
 }

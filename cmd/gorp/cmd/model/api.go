@@ -27,9 +27,10 @@ var (
 // 中文说明：
 // - 这是比 `model gen` 更完整的一条脚手架链路。
 // - 它会同时生成：
-//   1. app/model/... 模型
-//   2. app/service/... CRUD 服务
-//   3. app/http/module/... HTTP 接口骨架
+//  1. app/model/... 模型
+//  2. app/service/... CRUD 服务
+//  3. app/http/module/... HTTP 接口骨架
+//
 // - 生成后通常还需要手动把 routes 注册到 app/http/routes.go。
 // - 当前阶段 `--backend` 已支持 `gorm|ent`：
 //   - `gorm`：生成当前可直接使用的 GORM CRUD 骨架；
@@ -409,6 +410,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -416,20 +418,20 @@ import (
 func (api *API) Create(c *gin.Context) {
 	fields := map[string]any{}
 	if err := c.ShouldBindJSON(&fields); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 	db, err := api.mustRuntimeGorm()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	item, err := svc.Create{{.Name}}(c.Request.Context(), db, fields)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, item)
+	ginprovider.SuccessWithStatus(c, http.StatusCreated, item)
 }
 {{end}}`
 
@@ -439,6 +441,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -451,19 +454,19 @@ type updateParam struct {
 func (api *API) Update(c *gin.Context) {
 	param := &updateParam{}
 	if err := c.ShouldBindJSON(param); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 	db, err := api.mustRuntimeGorm()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	if err := svc.Update{{.Name}}(c.Request.Context(), db, param.ID, param.Fields); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	ginprovider.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`
 
@@ -473,6 +476,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -480,20 +484,20 @@ import (
 func (api *API) Get(c *gin.Context) {
 	id := c.Query("{{.PKName}}")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing {{.PKName}}"})
+		ginprovider.BadRequest(c, "missing {{.PKName}}")
 		return
 	}
 	db, err := api.mustRuntimeGorm()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	item, err := svc.Get{{.Name}}(c.Request.Context(), db, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, item)
+	ginprovider.Success(c, item)
 }
 {{end}}`
 
@@ -504,6 +508,7 @@ import (
 	"strconv"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -513,15 +518,15 @@ func (api *API) List(c *gin.Context) {
 	size, _ := strconv.Atoi(c.Query("size"))
 	db, err := api.mustRuntimeGorm()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	items, err := svc.List{{.Name}}(c.Request.Context(), db, start, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, items)
+	ginprovider.Success(c, items)
 }
 {{end}}`
 
@@ -531,6 +536,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -542,19 +548,19 @@ type deleteParam struct {
 func (api *API) Delete(c *gin.Context) {
 	param := &deleteParam{}
 	if err := c.ShouldBindJSON(param); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 	db, err := api.mustRuntimeGorm()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	if err := svc.Delete{{.Name}}(c.Request.Context(), db, param.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	ginprovider.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`
 
@@ -716,6 +722,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -723,20 +730,20 @@ import (
 func (api *API) Create(c *gin.Context) {
 	fields := map[string]any{}
 	if err := c.ShouldBindJSON(&fields); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 	client, err := api.mustEntClient()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	item, err := svc.Create{{.Name}}(c.Request.Context(), client, fields)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, item)
+	ginprovider.SuccessWithStatus(c, http.StatusCreated, item)
 }
 {{end}}`
 
@@ -746,6 +753,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -758,19 +766,19 @@ type updateParam struct {
 func (api *API) Update(c *gin.Context) {
 	param := &updateParam{}
 	if err := c.ShouldBindJSON(param); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 	client, err := api.mustEntClient()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	if err := svc.Update{{.Name}}(c.Request.Context(), client, param.ID, param.Fields); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	ginprovider.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`
 
@@ -780,6 +788,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -787,20 +796,20 @@ import (
 func (api *API) Get(c *gin.Context) {
 	id := c.Query("{{.PKName}}")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing {{.PKName}}"})
+		ginprovider.BadRequest(c, "missing {{.PKName}}")
 		return
 	}
 	client, err := api.mustEntClient()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	item, err := svc.Get{{.Name}}(c.Request.Context(), client, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, item)
+	ginprovider.Success(c, item)
 }
 {{end}}`
 
@@ -811,6 +820,7 @@ import (
 	"strconv"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -820,15 +830,15 @@ func (api *API) List(c *gin.Context) {
 	size, _ := strconv.Atoi(c.Query("size"))
 	client, err := api.mustEntClient()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	items, err := svc.List{{.Name}}(c.Request.Context(), client, start, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, items)
+	ginprovider.Success(c, items)
 }
 {{end}}`
 
@@ -838,6 +848,7 @@ import (
 	"net/http"
 
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -849,18 +860,18 @@ type deleteParam struct {
 func (api *API) Delete(c *gin.Context) {
 	param := &deleteParam{}
 	if err := c.ShouldBindJSON(param); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ginprovider.BadRequest(c, err.Error())
 		return
 	}
 	client, err := api.mustEntClient()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.InternalError(c, err.Error())
 		return
 	}
 	if err := svc.Delete{{.Name}}(c.Request.Context(), client, param.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ginprovider.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	ginprovider.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`

@@ -4,13 +4,19 @@ import (
 	"fmt"
 	"os"
 
-	"{{.FrameworkModule}}/cmd/gorp/cmd"
+	apphttp "{{.Module}}/app/http"
+	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
 )
 
 // main 是 starter 项目的默认入口。
 func main() {
-	if err := cmd.Execute(); err != nil {
+	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", frameworkbootstrap.HTTPServiceOptions{}, nil, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+	apphttp.RegisterRoutes(rt.Engine)
+	return nil
 }

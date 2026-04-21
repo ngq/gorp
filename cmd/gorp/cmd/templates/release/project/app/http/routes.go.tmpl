@@ -5,8 +5,7 @@ import (
 	"{{.FrameworkModule}}/app/http/handler"
 )
 
-// RegisterRoutes 挂载 starter 默认路由。
+// RegisterRoutes 挂载 starter 默认业务路由。
 func RegisterRoutes(engine *gin.Engine) {
-	engine.GET("/healthz", handler.Health)
 	engine.GET("/api/ping", handler.Ping)
 }

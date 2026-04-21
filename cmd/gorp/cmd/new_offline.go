@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed all:templates/project all:templates/golayout all:templates/golayout-wire all:templates/multi-flat all:templates/multi-flat-wire
+//go:embed all:templates/project all:templates/golayout all:templates/golayout-wire all:templates/multi-flat all:templates/multi-flat-wire all:templates/multi-independent
 var projectTemplateFS embed.FS
 
 var newOfflineTemplate string
