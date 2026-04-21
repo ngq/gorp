@@ -21,6 +21,7 @@ var newOfflineTemplate string
 var newOfflineBackend string
 var newOfflineWithDB bool
 var newOfflineWithSwagger bool
+var newOfflineFrameworkVersion string
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)
@@ -49,9 +50,20 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		frameworkDefault = cwd
 	}
-	project, name, err := promptProjectInput(in, cmd.OutOrStdout(), frameworkDefault, true)
+
+	// 中文说明：
+	// - 如果用户指定了 --framework-version，则使用 GitHub 版本，不需要 replace；
+	// - 否则使用本地 replace 模式，询问框架源码路径。
+	needFrameworkPath := newOfflineFrameworkVersion == ""
+	project, name, err := promptProjectInput(in, cmd.OutOrStdout(), frameworkDefault, needFrameworkPath)
 	if err != nil {
 		return err
+	}
+
+	// 如果指定了版本，覆盖默认的版本和路径
+	if newOfflineFrameworkVersion != "" {
+		project.FrameworkVersion = newOfflineFrameworkVersion
+		project.FrameworkPath = "" // 清空路径，不生成 replace
 	}
 	if newOfflineBackend == "" {
 		newOfflineBackend = string(contract.RuntimeBackendGorm)
@@ -94,6 +106,7 @@ func init() {
 	newCmd.Flags().StringVar(&newOfflineBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
+	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), if set, no replace directive will be generated")
 }
 
 func renderTemplateDir(src fs.FS, srcRoot string, dstRoot string, data map[string]any) error {

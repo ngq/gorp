@@ -8,38 +8,36 @@ import (
 	serviceprovider "{{.ModuleName}}/app/provider/service"
 	"{{.ModuleName}}/internal/data"
 	"{{.ModuleName}}/internal/service"
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
-	frameworkcontainer "{{.FrameworkModule}}/framework/container"
-	"{{.FrameworkModule}}/framework/contract"
+	"{{.FrameworkModule}}"
 )
 
-// main 是 golayout 项目的主入口。
+// main 是项目主入口。
 //
 // 中文说明：
 // - 用户日常开发时，直接 `go run ./cmd/app` 或 IDE 调试即可启动 HTTP 服务；
-// - 启动逻辑直接复用 framework/bootstrap 提供的 HTTP 启动能力；
+// - 使用框架统一入口 gorp，简化导入；
 // - 不再依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
 func main() {
-	opts := frameworkbootstrap.HTTPServiceOptions{
-		ExtraProviders: []contract.ServiceProvider{
+	opts := gorp.HTTPServiceOptions{
+		ExtraProviders: []gorp.ServiceProvider{
 			serviceprovider.NewProvider(),
 		},
 	}
-	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", opts, migrate, setup); err != nil {
+	if err := gorp.BootHTTPService("{{.Name}}", opts, migrate, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func migrate(rt *gorp.HTTPServiceRuntime) error {
 	if rt.DB == nil {
 		return nil
 	}
 	return rt.DB.AutoMigrate(&data.DemoPO{})
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	svc := frameworkcontainer.MustMakeAppService[*service.Services](rt.Container, "app.services")
+func setup(rt *gorp.HTTPServiceRuntime) error {
+	svc := gorp.MustMakeAppService[*service.Services](rt.Container, "app.services")
 	apphttp.RegisterRoutes(rt.Engine, rt.Container, svc)
 	return nil
 }

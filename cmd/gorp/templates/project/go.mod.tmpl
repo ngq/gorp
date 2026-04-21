@@ -3,7 +3,7 @@ module {{.Module}}
 go 1.22
 
 require (
-	{{.FrameworkModule}} v0.0.0
-)
+	{{.FrameworkModule}} {{.FrameworkVersion}}
+){{if .UseReplace}}
 
-replace {{.FrameworkModule}} => {{.FrameworkPath}}
+replace {{.FrameworkModule}} => {{.FrameworkPath}}{{end}}

@@ -1,7 +1,7 @@
 module {{.ModuleName}}
 
-go 1.25
+go 1.23
 
-require {{.FrameworkModule}} v0.0.0
+require {{.FrameworkModule}} {{.FrameworkVersion}}{{if .UseReplace}}
 
-replace {{.FrameworkModule}} => {{.FrameworkPath}}
+replace {{.FrameworkModule}} => {{.FrameworkPath}}{{end}}

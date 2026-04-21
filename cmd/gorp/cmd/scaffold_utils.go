@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	starterTemplateBase         = "base"
-	starterTemplateGoLayout     = "golayout"
-	starterTemplateGoLayoutWire = "golayout-wire"
-	starterTemplateMultiFlat    = "multi-flat"      // 多微服务 - 扁平化
+	starterTemplateBase          = "base"
+	starterTemplateGoLayout      = "golayout"
+	starterTemplateGoLayoutWire  = "golayout-wire"
+	starterTemplateMultiFlat     = "multi-flat"      // 多微服务 - 扁平化
 	starterTemplateMultiFlatWire = "multi-flat-wire" // 多微服务 - 扁平化（Wire）
 )
 
@@ -330,6 +330,10 @@ type scaffoldInput struct {
 }
 
 func buildScaffoldData(in scaffoldInput) map[string]any {
+	// 中文说明：
+	// - 如果 FrameworkPath 为空，UseReplace 为 false，不生成 replace 指令；
+	// - 如果 FrameworkPath 非空，UseReplace 为 true，生成 replace 指令。
+	useReplace := strings.TrimSpace(in.FrameworkPath) != ""
 	return map[string]any{
 		"Name":             in.Name,
 		"ProjectName":      in.Name, // 别名，供 README 等模板使用
@@ -338,6 +342,7 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 		"FrameworkModule":  in.FrameworkModule,
 		"FrameworkPath":    normalizeFrameworkReplacePath(in.FrameworkPath),
 		"FrameworkVersion": in.FrameworkVersion,
+		"UseReplace":       useReplace,
 		"Backend":          in.Backend,
 		"IsGormBackend":    in.Backend == "" || in.Backend == "gorm",
 		"IsEntBackend":     in.Backend == "ent",
@@ -626,9 +631,14 @@ type zipFileInfo struct {
 	dir  bool
 }
 
-func (i zipFileInfo) Name() string       { return i.name }
-func (i zipFileInfo) Size() int64        { return i.size }
-func (i zipFileInfo) Mode() fs.FileMode  { if i.dir { return fs.ModeDir | 0o755 }; return 0o644 }
+func (i zipFileInfo) Name() string { return i.name }
+func (i zipFileInfo) Size() int64  { return i.size }
+func (i zipFileInfo) Mode() fs.FileMode {
+	if i.dir {
+		return fs.ModeDir | 0o755
+	}
+	return 0o644
+}
 func (i zipFileInfo) ModTime() time.Time { return time.Time{} }
 func (i zipFileInfo) IsDir() bool        { return i.dir }
 func (i zipFileInfo) Sys() any           { return nil }
@@ -699,9 +709,9 @@ func zipDirectoryFromFS(src fs.FS, srcRoot string, dstZip string, zipRoot string
 // promptString 从 stdin 读取一行文本（非 survey，兼容 Windows/MSYS 终端环境）。
 //
 // 重要说明（易踩坑）：
-// - 如果一个命令需要连续询问多个问题（多次读取 stdin），不要在每次询问时都 new bufio.Reader。
-//   因为 bufio.Reader 可能会"预读"后续输入并缓存；如果换了新的 Reader，会导致后续输入丢失。
-// - 解决方案：在命令开始时创建一个 reader，然后调用 promptStringR/promptConfirmR。
+//   - 如果一个命令需要连续询问多个问题（多次读取 stdin），不要在每次询问时都 new bufio.Reader。
+//     因为 bufio.Reader 可能会"预读"后续输入并缓存；如果换了新的 Reader，会导致后续输入丢失。
+//   - 解决方案：在命令开始时创建一个 reader，然后调用 promptStringR/promptConfirmR。
 //
 // - 如果用户直接回车且 defaultValue 非空，则返回 defaultValue
 // - 如果 required=true，会一直提示直到输入非空

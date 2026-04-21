@@ -1,0 +1,17 @@
+# Namespace 定义
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gorp-prod
+  labels:
+    name: gorp-prod
+    app.kubernetes.io/part-of: gorp
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gorp-dev
+  labels:
+    name: gorp-dev
+    app.kubernetes.io/part-of: gorp

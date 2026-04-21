@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	appgrpc "github.com/ngq/gorp/app/grpc"
 	"github.com/ngq/gorp/framework/contract"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
+	appgrpc "github.com/ngq/gorp/framework/provider/grpc"
 	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
 	serviceauthtoken "github.com/ngq/gorp/framework/provider/serviceauth/token"
 	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"

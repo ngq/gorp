@@ -1,10 +1,10 @@
 module {{.ModuleName}}
 
-go 1.25
+go 1.23
 
 require (
-	{{.FrameworkModule}} v0.0.0
+	{{.FrameworkModule}} {{.FrameworkVersion}}
 	github.com/google/wire v0.6.0
-)
+){{if .UseReplace}}
 
-replace {{.FrameworkModule}} => {{.FrameworkPath}}
+replace {{.FrameworkModule}} => {{.FrameworkPath}}{{end}}

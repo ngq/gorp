@@ -51,7 +51,7 @@ type ProtoGenOptions struct {
 	// ProtoFiles proto 文件路径列表
 	ProtoFiles []string
 
-	// ProtoDir proto 文件目录（默认 app/grpc/proto）
+	// ProtoDir proto 文件目录（默认 api/proto）
 	ProtoDir string
 
 	// OutputDir 输出目录（默认与 proto 同目录）

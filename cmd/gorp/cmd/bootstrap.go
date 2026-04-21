@@ -4,7 +4,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/ngq/gorp/app/provider/runtime_provider"
 	frameworkbootstrap "github.com/ngq/gorp/framework/bootstrap"
 	"github.com/ngq/gorp/framework/contract"
 	"github.com/ngq/gorp/framework/provider/orm/ent"
@@ -15,13 +14,13 @@ import (
 type bootstrapOption func(*bootstrapConfig)
 
 type bootstrapConfig struct {
-	extraProviders []contract.ServiceProvider
+	extraProviders  []contract.ServiceProvider
 	runtimeProvider contract.ServiceProvider
 }
 
 var bootstrapHooks struct {
-	mu sync.RWMutex
-	extraProviders []contract.ServiceProvider
+	mu              sync.RWMutex
+	extraProviders  []contract.ServiceProvider
 	runtimeProvider contract.ServiceProvider
 }
 
@@ -125,11 +124,10 @@ func bootstrap(opts ...bootstrapOption) (*framework.Application, contract.Contai
 	}
 
 	runtimeProvider := cfg.runtimeProvider
-	if runtimeProvider == nil {
-		runtimeProvider = runtime_provider.NewProvider()
-	}
-	if err := c.RegisterProvider(runtimeProvider); err != nil {
-		return nil, nil, err
+	if runtimeProvider != nil {
+		if err := c.RegisterProvider(runtimeProvider); err != nil {
+			return nil, nil, err
+		}
 	}
 	if len(cfg.extraProviders) > 0 {
 		if err := c.RegisterProviders(cfg.extraProviders...); err != nil {

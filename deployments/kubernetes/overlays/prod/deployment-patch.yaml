@@ -1,0 +1,27 @@
+# 生产环境 Deployment 补丁
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gorp-service
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: gorp-service
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          env:
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory

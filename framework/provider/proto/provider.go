@@ -61,9 +61,9 @@ func getProtoConfig(c contract.Container) (*contract.ProtoGeneratorConfig, error
 	if err != nil {
 		// 配置服务不可用时使用默认配置
 		return &contract.ProtoGeneratorConfig{
-			Enabled:          true,
-			Strategy:         "protoc",
-			DefaultProtoDir:  "app/grpc/proto",
+			Enabled:               true,
+			Strategy:              "protoc",
+			DefaultProtoDir:       "api/proto",
 			IncludeHTTPAnnotation: false,
 		}, nil
 	}
@@ -74,9 +74,9 @@ func getProtoConfig(c contract.Container) (*contract.ProtoGeneratorConfig, error
 	}
 
 	protoCfg := &contract.ProtoGeneratorConfig{
-		Enabled:          true,
-		Strategy:         "protoc",
-		DefaultProtoDir:  "app/grpc/proto",
+		Enabled:               true,
+		Strategy:              "protoc",
+		DefaultProtoDir:       "api/proto",
 		IncludeHTTPAnnotation: false,
 	}
 
