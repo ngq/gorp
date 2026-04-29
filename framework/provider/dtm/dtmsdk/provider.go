@@ -192,9 +192,12 @@ type sagaBuilder struct {
 }
 
 type sagaStep struct {
-	action     string
-	compensate string
-	payload    any
+	action        string
+	compensate    string
+	payload       any
+	retryCount    int
+	retryInterval int
+	timeout       int
 }
 
 func (b *sagaBuilder) Add(action string, compensate string, payload any) contract.SAGABuilder {
@@ -207,7 +210,15 @@ func (b *sagaBuilder) Add(action string, compensate string, payload any) contrac
 }
 
 func (b *sagaBuilder) AddBranch(action string, compensate string, payload any, opts contract.BranchOptions) contract.SAGABuilder {
-	return b.Add(action, compensate, payload)
+	b.steps = append(b.steps, sagaStep{
+		action:        action,
+		compensate:    compensate,
+		payload:       payload,
+		retryCount:    opts.RetryCount,
+		retryInterval: opts.RetryInterval,
+		timeout:       opts.Timeout,
+	})
+	return b
 }
 
 func (b *sagaBuilder) Submit(ctx context.Context) error {
@@ -258,9 +269,12 @@ func (b *sagaBuilder) Build() (*contract.SAGATransaction, error) {
 	steps := make([]contract.SAGAStep, len(b.steps))
 	for i, step := range b.steps {
 		steps[i] = contract.SAGAStep{
-			Action:     step.action,
-			Compensate: step.compensate,
-			Payload:    step.payload,
+			Action:        step.action,
+			Compensate:    step.compensate,
+			Payload:       step.payload,
+			RetryCount:    step.retryCount,
+			RetryInterval: step.retryInterval,
+			Timeout:       step.timeout,
 		}
 	}
 	return &contract.SAGATransaction{GID: b.gid, Steps: steps}, nil

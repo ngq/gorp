@@ -1,0 +1,25 @@
+# 部署说明
+
+## Docker 开发部署
+
+- 构建镜像：`docker build -t {{.Name}}:latest .`
+
+## Kubernetes 测试 / 预发部署
+
+默认附带最小 Kubernetes 骨架：
+
+- `deploy/kubernetes/base/`
+- `deploy/kubernetes/overlays/dev/`
+- `deploy/kubernetes/overlays/staging/`
+
+使用前请先替换：
+
+- `deploy/kubernetes/base/secret.yaml` 中的敏感占位值
+- `deploy/kubernetes/overlays/staging/kustomization.yaml` 中的镜像仓库与 tag
+
+最小验证：
+
+```bash
+kubectl kustomize deploy/kubernetes/overlays/dev
+kubectl kustomize deploy/kubernetes/overlays/staging
+```

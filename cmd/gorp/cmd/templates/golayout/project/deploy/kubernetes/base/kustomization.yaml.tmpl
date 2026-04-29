@@ -1,0 +1,20 @@
+# Kustomization 基础配置
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+  - secret.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: gorp-service
+      app.kubernetes.io/part-of: {{.Name}}
+    includeSelectors: true
+
+images:
+  - name: gorp-service
+    newName: gorp-service
+    newTag: latest

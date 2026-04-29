@@ -1,0 +1,24 @@
+# 开发环境 Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: {{.Name}}-dev
+
+resources:
+  - ../../base
+
+images:
+  - name: gorp-service
+    newName: gorp-service
+    newTag: dev
+
+configMapGenerator:
+  - name: gorp-config
+    behavior: merge
+    literals:
+      - APP_ENV=development
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=console
+
+patches:
+  - path: deployment-patch.yaml

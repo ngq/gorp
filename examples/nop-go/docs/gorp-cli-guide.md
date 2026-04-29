@@ -51,7 +51,7 @@ gorp CLI 命令分为三层：
 ### 第 1 层：核心工具链（主要使用）
 
 | 命令 | 说明 | 使用频率 |
-|------|------|---------|
+| ----- | ----- | -------- |
 | `gorp new` | 创建新项目 | ⭐⭐⭐⭐⭐ 高频 |
 | `gorp proto` | Proto/gRPC 代码生成 | ⭐⭐⭐⭐ 高频 |
 | `gorp model` | 数据库模型生成 | ⭐⭐⭐⭐ 高频 |
@@ -59,7 +59,7 @@ gorp CLI 命令分为三层：
 ### 第 2 层：脚手架辅助（开发效率提升）
 
 | 命令 | 说明 | 使用频率 |
-|------|------|---------|
+| ----- | ----- | -------- |
 | `gorp provider` | Provider 脚手架 | ⭐⭐⭐ 中频 |
 | `gorp middleware` | 中间件脚手架 | ⭐⭐⭐ 中频 |
 | `gorp command` | Console 命令脚手架 | ⭐⭐ 低频 |
@@ -67,7 +67,7 @@ gorp CLI 命令分为三层：
 ### 第 3 层：文档与模板管理
 
 | 命令 | 说明 | 使用频率 |
-|------|------|---------|
+| ----- | ----- | -------- |
 | `gorp doc` | 文档生成 | ⭐⭐ 低频 |
 | `gorp swagger` | Swagger 文档生成 | ⭐⭐⭐ 中频 |
 | `gorp openapi` | OpenAPI 文档生成 | ⭐⭐ 低频 |
@@ -91,11 +91,11 @@ gorp new
 # Wire 单服务项目（依赖注入）
 gorp new wire
 
-# 多服务项目
-gorp new multi
-
-# 多服务 Wire 项目
+# 主推微服务项目
 gorp new multi-wire
+
+# 进阶多服务项目
+gorp new --template=multi-independent
 
 # 从 GitHub Release 创建（需要联网）
 gorp new from-release
@@ -107,7 +107,7 @@ gorp new from-release
 gorp new [intent] [options]
 
 选项:
-  --template string      模板类型: golayout, golayout-wire, multi-flat, multi-flat-wire
+  --template string      模板类型: golayout, golayout-wire, multi-flat-wire, multi-independent
   --backend string       ORM 后端: gorm, ent (默认: gorm)
   --with-db bool         是否包含数据库示例 (默认: true)
   --with-swagger bool    是否启用 Swagger (默认: true)
@@ -117,11 +117,12 @@ gorp new [intent] [options]
 #### 模板矩阵
 
 | 位置参数 | 等价模板 | 适用场景 |
-|---------|---------|---------|
-| 无（默认） | `golayout` | 单服务快速起步 |
-| `wire` | `golayout-wire` | 单服务 + Wire 依赖注入 |
-| `multi` | `multi-flat` | 多服务项目 |
-| `multi-wire` | `multi-flat-wire` | 多服务 + Wire 依赖注入 |
+| -------- | -------- | -------- |
+| 无（默认） | `golayout` | 默认单服务模板 |
+| `wire` | `golayout-wire` | 单服务 Wire 高级模板 |
+| `multi-wire` | `multi-flat-wire` | 主推微服务模板 |
+
+> `multi-independent` 作为公开进阶多服务模板，优先通过 `--template=multi-independent` 使用。
 
 #### 交互式创建
 

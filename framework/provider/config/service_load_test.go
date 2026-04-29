@@ -5,8 +5,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadLocalConfigToViper_RespectsAppBasePath(t *testing.T) {
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "app.yaml"), []byte("service:\n  name: app-base\n"), 0o644))
+
+	t.Setenv("APP_BASE_PATH", root)
+
+	v := viper.New()
+	require.NoError(t, LoadLocalConfigToViper(v, "", ""))
+	require.Equal(t, "app-base", v.GetString("service.name"))
+}
 
 func TestService_Load_MultiFile_EnvDir_AndEnvPlaceholder(t *testing.T) {
 	root := t.TempDir()

@@ -25,7 +25,7 @@ log:
   level: debug
   format: console  # console, json
 
-# tracing 配置（默认关闭；需要时可切到 otel）
+# tracing 配置（关闭；需要时再切到 otel）
 tracing:
   enabled: false
   backend: otel
@@ -34,14 +34,14 @@ tracing:
     endpoint: localhost:4317
   sampling_rate: 1.0
 
-# metadata 传播配置（默认关闭；需要时可启用默认前缀传播）
+# metadata 传播配置（关闭；需要时再启用默认前缀传播）
 metadata:
   enabled: false
   backend: default
   propagate_prefix:
     - x-md-
 
-# service_auth 配置（默认关闭；需要服务间调用时可启用 token 模式）
+# service_auth 配置（关闭；需要服务间调用时再启用 token 模式）
 service_auth:
   enabled: false
   backend: token
@@ -52,20 +52,20 @@ service_auth:
     expiry: 3600
   allowed_services: []
 
-# 业务 JWT 配置（starter 默认已提供接入位）
+# 业务 JWT 配置（已预留接入位）
 auth:
   jwt:
     secret: change-me-in-production
     issuer: {{.Name}}
     audience: ""
 
-# Redis 配置（默认作为可选接入位，不要求本地必须可用）
+# Redis 配置（作为可选接入位，不要求本地必须可用）
 redis:
   addr: 127.0.0.1:6379
   password: ""
   db: 0
 
-# message_queue 配置（默认关闭；需要异步消息时可启用 redis）
+# message_queue 配置（关闭；需要异步消息时再启用 redis）
 message_queue:
   enabled: false
   backend: redis
@@ -75,7 +75,7 @@ message_queue:
     db: 0
   max_retry: 3
 
-# distributed_lock 配置（默认关闭；需要任务防重/互斥时可启用 redis）
+# distributed_lock 配置（关闭；需要任务防重/互斥时再启用 redis）
 distributed_lock:
   enabled: false
   backend: redis
@@ -85,6 +85,6 @@ distributed_lock:
     db: 0
   key_prefix: lock:
 
-# Cache 配置（默认优先使用 memory，避免本地单服务起步强依赖 Redis）
+# Cache 配置（优先使用 memory，避免本地单服务起步强依赖 Redis）
 cache:
   driver: memory

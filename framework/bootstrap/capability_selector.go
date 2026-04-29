@@ -4,45 +4,6 @@ import (
 	"context"
 
 	"github.com/ngq/gorp/framework/contract"
-	circuitbreakernoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
-	circuitbreakersentinel "github.com/ngq/gorp/framework/provider/circuitbreaker/sentinel"
-	configsourceapollo "github.com/ngq/gorp/framework/provider/configsource/apollo"
-	configsourceconsul "github.com/ngq/gorp/framework/provider/configsource/consul"
-	configsourceetcd "github.com/ngq/gorp/framework/provider/configsource/etcd"
-	configsourcekubernetes "github.com/ngq/gorp/framework/provider/configsource/kubernetes"
-	configsourcelocal "github.com/ngq/gorp/framework/provider/configsource/local"
-	configsourcenacos "github.com/ngq/gorp/framework/provider/configsource/nacos"
-	configsourcenoop "github.com/ngq/gorp/framework/provider/configsource/noop"
-	configsourcepolaris "github.com/ngq/gorp/framework/provider/configsource/polaris"
-	discoveryconsul "github.com/ngq/gorp/framework/provider/discovery/consul"
-	discoveryetcd "github.com/ngq/gorp/framework/provider/discovery/etcd"
-	discoveryeureka "github.com/ngq/gorp/framework/provider/discovery/eureka"
-	discoverykubernetes "github.com/ngq/gorp/framework/provider/discovery/kubernetes"
-	discoverynacos "github.com/ngq/gorp/framework/provider/discovery/nacos"
-	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
-	discoverypolaris "github.com/ngq/gorp/framework/provider/discovery/polaris"
-	discoveryservicecomb "github.com/ngq/gorp/framework/provider/discovery/servicecomb"
-	discoveryzookeeper "github.com/ngq/gorp/framework/provider/discovery/zookeeper"
-	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
-	dtmsdk "github.com/ngq/gorp/framework/provider/dtm/dtmsdk"
-	dlocknoop "github.com/ngq/gorp/framework/provider/dlock/noop"
-	dlockredis "github.com/ngq/gorp/framework/provider/dlock/redis"
-	mqnoop "github.com/ngq/gorp/framework/provider/messagequeue/noop"
-	mqredis "github.com/ngq/gorp/framework/provider/messagequeue/redis"
-	metadatadefault "github.com/ngq/gorp/framework/provider/metadata"
-	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
-	rpcgrpc "github.com/ngq/gorp/framework/provider/rpc/grpc"
-	rpchttp "github.com/ngq/gorp/framework/provider/rpc/http"
-	rpcnoop "github.com/ngq/gorp/framework/provider/rpc/noop"
-	selectornoop "github.com/ngq/gorp/framework/provider/selector/noop"
-	selectorp2c "github.com/ngq/gorp/framework/provider/selector/p2c"
-	selectorrandom "github.com/ngq/gorp/framework/provider/selector/random"
-	selectorwrr "github.com/ngq/gorp/framework/provider/selector/wrr"
-	serviceauthmtls "github.com/ngq/gorp/framework/provider/serviceauth/mtls"
-	serviceauthnoop "github.com/ngq/gorp/framework/provider/serviceauth/noop"
-	serviceauthtoken "github.com/ngq/gorp/framework/provider/serviceauth/token"
-	tracingnoop "github.com/ngq/gorp/framework/provider/tracing/noop"
-	tracingotel "github.com/ngq/gorp/framework/provider/tracing/otel"
 )
 
 // SelectedMicroserviceProviders 根据当前配置返回主链路能力对应的单一 provider 集合。
@@ -66,6 +27,12 @@ func SelectedMicroserviceProviders(cfg contract.Config) []contract.ServiceProvid
 	return providers
 }
 
+// RegisterSelectedMicroserviceProviders 根据配置把主链路 provider 注册进容器。
+//
+// 中文说明：
+// - 先确保容器里已经有 ConfigKey，避免在无配置场景下误做主链路装配；
+// - configsource 单独先注册，因为它可能会改变后续要读取的真实配置；
+// - 如果启用了远端配置源，会在注册后先触发一次 Reload，再据此选择 discovery/rpc/tracing 等其余 provider。
 func RegisterSelectedMicroserviceProviders(c contract.Container) error {
 	if c == nil || !c.IsBind(contract.ConfigKey) {
 		return nil
@@ -115,6 +82,7 @@ func RegisterSelectedMicroserviceProviders(c contract.Container) error {
 	return nil
 }
 
+// SelectConfigSourceProvider 根据配置选择配置源 provider。
 func SelectConfigSourceProvider(cfg contract.Config) contract.ServiceProvider {
 	typ := getConfigString(
 		cfg,
@@ -123,148 +91,83 @@ func SelectConfigSourceProvider(cfg contract.Config) contract.ServiceProvider {
 		"config_source.backend",
 		"config_source.type",
 	)
-	switch typ {
-	case "consul":
-		return configsourceconsul.NewProvider()
-	case "etcd":
-		return configsourceetcd.NewProvider()
-	case "apollo":
-		return configsourceapollo.NewProvider()
-	case "nacos":
-		return configsourcenacos.NewProvider()
-	case "kubernetes":
-		return configsourcekubernetes.NewProvider()
-	case "polaris":
-		return configsourcepolaris.NewProvider()
-	case "noop":
-		return configsourcenoop.NewProvider()
-	case "", "local":
-		fallthrough
-	default:
-		return configsourcelocal.NewProvider()
-	}
+	return providerFromMap(configSourceProviderFactories, typ, "local")
 }
 
+// SelectDiscoveryProvider 根据配置选择服务发现 provider。
 func SelectDiscoveryProvider(cfg contract.Config) contract.ServiceProvider {
 	typ := getConfigString(cfg, "discovery.backend", "discovery.type")
-	switch typ {
-	case "consul":
-		return discoveryconsul.NewProvider()
-	case "etcd":
-		return discoveryetcd.NewProvider()
-	case "nacos":
-		return discoverynacos.NewProvider()
-	case "zookeeper":
-		return discoveryzookeeper.NewProvider()
-	case "kubernetes":
-		return discoverykubernetes.NewProvider()
-	case "polaris":
-		return discoverypolaris.NewProvider()
-	case "eureka":
-		return discoveryeureka.NewProvider()
-	case "servicecomb":
-		return discoveryservicecomb.NewProvider()
-	case "", "noop":
-		fallthrough
-	default:
-		return discoverynoop.NewProvider()
-	}
+	return providerFromMap(discoveryProviderFactories, typ, "noop")
 }
 
+// SelectSelectorProvider 根据配置选择负载均衡 selector provider。
 func SelectSelectorProvider(cfg contract.Config) contract.ServiceProvider {
 	alg := getConfigString(cfg, "selector.backend", "selector.algorithm", "selector.type")
-	switch alg {
-	case "random":
-		return selectorrandom.NewProvider()
-	case "wrr":
-		return selectorwrr.NewProvider()
-	case "p2c":
-		return selectorp2c.NewProvider()
-	case "", "noop":
-		fallthrough
-	default:
-		return selectornoop.NewProvider()
-	}
+	return providerFromMap(selectorProviderFactories, alg, "noop")
 }
 
+// SelectRPCProvider 根据配置选择 RPC 传输 provider。
 func SelectRPCProvider(cfg contract.Config) contract.ServiceProvider {
 	mode := getConfigString(cfg, "rpc.mode")
-	switch mode {
-	case "http":
-		return rpchttp.NewProvider()
-	case "grpc":
-		return rpcgrpc.NewProvider()
-	case "", "noop":
-		fallthrough
-	default:
-		return rpcnoop.NewProvider()
-	}
+	return providerFromMap(rpcProviderFactories, mode, "noop")
 }
 
+// SelectTracingProvider 根据配置选择 tracing provider。
 func SelectTracingProvider(cfg contract.Config) contract.ServiceProvider {
 	enabled := cfg != nil && cfg.GetBool("tracing.enabled")
 	backend := getConfigString(cfg,
 		"tracing.backend",
 		"tracing.type",
 	)
-	if enabled || backend == "otel" || backend == "otlp" || backend == "grpc" || backend == "http" || backend == "stdout" {
-		return tracingotel.NewProvider()
+	if backend == "" && enabled {
+		backend = "otel"
 	}
-	return tracingnoop.NewProvider()
+	if backend == "otel" || backend == "otlp" || backend == "grpc" || backend == "http" || backend == "stdout" {
+		return providerFromMap(tracingProviderFactories, backend, "noop")
+	}
+	return providerFromMap(tracingProviderFactories, backend, "noop")
 }
 
+// SelectMetadataProvider 根据配置选择 metadata 传播 provider。
 func SelectMetadataProvider(cfg contract.Config) contract.ServiceProvider {
 	mode := getConfigString(cfg,
 		"metadata.mode",
 		"metadata.backend",
 	)
 	enabled := cfg != nil && (cfg.Get("metadata.propagate_prefix") != nil || cfg.GetBool("metadata.enabled"))
-	if mode == "default" || enabled {
-		return metadatadefault.NewProvider()
+	if mode == "" && enabled {
+		mode = "default"
 	}
-	return metadatanoop.NewProvider()
+	return providerFromMap(metadataProviderFactories, mode, "noop")
 }
 
+// SelectServiceAuthProvider 根据配置选择服务间认证 provider。
 func SelectServiceAuthProvider(cfg contract.Config) contract.ServiceProvider {
 	mode := getConfigString(cfg,
 		"service_auth.backend",
 		"service_auth.mode",
 	)
 	enabled := cfg != nil && cfg.GetBool("service_auth.enabled")
-	switch mode {
-	case "token":
-		return serviceauthtoken.NewProvider()
-	case "mtls":
-		return serviceauthmtls.NewProvider()
-	case "", "noop":
-		if enabled {
-			return serviceauthtoken.NewProvider()
-		}
-		fallthrough
-	default:
-		return serviceauthnoop.NewProvider()
+	if mode == "" && enabled {
+		mode = "token"
 	}
+	return providerFromMap(serviceAuthProviderFactories, mode, "noop")
 }
 
+// SelectCircuitBreakerProvider 根据配置选择熔断 provider。
 func SelectCircuitBreakerProvider(cfg contract.Config) contract.ServiceProvider {
 	backend := getConfigString(cfg,
 		"circuit_breaker.backend",
 		"circuit_breaker.type",
 	)
 	enabled := cfg != nil && cfg.GetBool("circuit_breaker.enabled")
-	switch backend {
-	case "sentinel":
-		return circuitbreakersentinel.NewProvider()
-	case "", "noop":
-		if enabled {
-			return circuitbreakersentinel.NewProvider()
-		}
-		fallthrough
-	default:
-		return circuitbreakernoop.NewProvider()
+	if backend == "" && enabled {
+		backend = "sentinel"
 	}
+	return providerFromMap(circuitBreakerProviderFactories, backend, "noop")
 }
 
+// SelectDTMProvider 根据配置选择分布式事务 provider。
 func SelectDTMProvider(cfg contract.Config) contract.ServiceProvider {
 	backend := getConfigString(cfg,
 		"dtm.backend",
@@ -272,57 +175,43 @@ func SelectDTMProvider(cfg contract.Config) contract.ServiceProvider {
 		"dtm.driver",
 	)
 	enabled := cfg != nil && cfg.GetBool("dtm.enabled")
-	switch backend {
-	case "sdk", "dtmsdk":
-		return dtmsdk.NewProvider()
-	case "", "noop":
-		if enabled {
-			return dtmsdk.NewProvider()
-		}
-		fallthrough
-	default:
-		return dtmnoop.NewProvider()
+	if backend == "" && enabled {
+		backend = "dtmsdk"
 	}
+	return providerFromMap(dtmProviderFactories, backend, "noop")
 }
 
+// SelectMessageQueueProvider 根据配置选择消息队列 provider。
 func SelectMessageQueueProvider(cfg contract.Config) contract.ServiceProvider {
 	backend := getConfigString(cfg,
 		"message_queue.backend",
 		"message_queue.type",
 	)
 	enabled := cfg != nil && cfg.GetBool("message_queue.enabled")
-	switch backend {
-	case "redis":
-		return mqredis.NewProvider()
-	case "", "noop":
-		if enabled {
-			return mqredis.NewProvider()
-		}
-		fallthrough
-	default:
-		return mqnoop.NewProvider()
+	if backend == "" && enabled {
+		backend = "redis"
 	}
+	return providerFromMap(messageQueueProviderFactories, backend, "noop")
 }
 
+// SelectDistributedLockProvider 根据配置选择分布式锁 provider。
 func SelectDistributedLockProvider(cfg contract.Config) contract.ServiceProvider {
 	backend := getConfigString(cfg,
 		"distributed_lock.backend",
 		"distributed_lock.type",
 	)
 	enabled := cfg != nil && cfg.GetBool("distributed_lock.enabled")
-	switch backend {
-	case "redis":
-		return dlockredis.NewProvider()
-	case "", "noop":
-		if enabled {
-			return dlockredis.NewProvider()
-		}
-		fallthrough
-	default:
-		return dlocknoop.NewProvider()
+	if backend == "" && enabled {
+		backend = "redis"
 	}
+	return providerFromMap(distributedLockProviderFactories, backend, "noop")
 }
 
+// getConfigString 按顺序读取第一个非空配置项。
+//
+// 中文说明：
+// - 用于兼容同一能力在不同命名下的配置键；
+// - selector 层只关心“最终有效值”，不在这里做额外规范化。
 func getConfigString(cfg contract.Config, keys ...string) string {
 	if cfg == nil {
 		return ""

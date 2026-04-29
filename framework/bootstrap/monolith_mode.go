@@ -5,7 +5,7 @@ import (
 	cbnoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
 	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
 	cfglocal "github.com/ngq/gorp/framework/provider/configsource/local"
-	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
+	discoverynoop "github.com/ngq/gorp/contrib/registry/noop"
 	dlocknoop "github.com/ngq/gorp/framework/provider/dlock/noop"
 	mqnoop "github.com/ngq/gorp/framework/provider/messagequeue/noop"
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
@@ -13,7 +13,7 @@ import (
 	rpcnoop "github.com/ngq/gorp/framework/provider/rpc/noop"
 	selectornoop "github.com/ngq/gorp/framework/provider/selector/noop"
 	serviceauthnoop "github.com/ngq/gorp/framework/provider/serviceauth/noop"
-	tracingnoop "github.com/ngq/gorp/framework/provider/tracing/noop"
+	tracingnoop "github.com/ngq/gorp/contrib/tracing/noop"
 	validatenoop "github.com/ngq/gorp/framework/provider/validate/noop"
 	retrynoop "github.com/ngq/gorp/framework/provider/retry/noop"
 )
@@ -24,7 +24,8 @@ import (
 // - 这是 framework 级统一入口，用于让业务项目快速进入单体友好模式；
 // - 目标不是关闭框架能力，而是为服务发现、RPC、服务认证、追踪、消息队列等组件提供零依赖/noop 实现；
 // - 这样业务项目不必逐个理解 discovery/rpc/serviceauth/tracing 等组件该选择哪个 noop provider；
-// - 配置源默认使用 local，以便单体项目直接从本地 config 启动。
+// - 配置源默认使用 local，以便单体项目直接从本地 config 启动；
+// - 当项目后续要渐进切到真实微服务能力时，可以按能力域把这里的 noop/local provider 替换成 selector 主线选中的真实 provider。
 func MonolithFriendlyProviders() []contract.ServiceProvider {
 	return []contract.ServiceProvider{
 		cfglocal.NewProvider(),

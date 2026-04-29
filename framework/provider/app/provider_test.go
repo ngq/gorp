@@ -9,6 +9,13 @@ import (
 	"github.com/ngq/gorp/framework/contract"
 )
 
+func TestProvider_ProvidesRootKey(t *testing.T) {
+	p := NewProvider()
+	if got := p.Provides(); len(got) != 1 || got[0] != contract.RootKey {
+		t.Fatalf("unexpected provides keys: %v", got)
+	}
+}
+
 type stubConfig struct {
 	values map[string]string
 }

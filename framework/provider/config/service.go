@@ -266,11 +266,11 @@ func readFileWithEnvSubst(path string) ([]byte, error) {
 
 func projectRoot() string {
 	// 中文说明：
-	// - 当前阶段先把 config root 与 app provider 的 host root 约定对齐：
+	// - 当前 config provider 采用“host root + framework config convention”模型：
 	//   1. 优先取环境变量 `APP_BASE_PATH`
 	//   2. 否则回退到当前工作目录
-	// - 这样在还没有彻底重构 bootstrap 之前，至少 config/provider 与 app/provider
-	//   可以共享同一套“宿主根目录覆盖入口”。
+	// - 这说明它已经不是早期的裸 `Getwd()` 推断，但也还不是完全无宿主假设的极简中立 provider；
+	// - framework 冻仓阶段先把这层语义写清并稳定下来，后续若继续抽仓再判断是否还需要进一步下沉约定。
 	if base := strings.TrimSpace(os.Getenv("APP_BASE_PATH")); base != "" {
 		if filepath.IsAbs(base) {
 			return filepath.Clean(base)

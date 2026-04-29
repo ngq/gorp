@@ -9,7 +9,7 @@ import (
 	"{{.ModuleName}}/services/user/internal/data"
 
 	"github.com/ngq/gorp/framework/contract"
-	appgrpc "{{.FrameworkModule}}/app/grpc"
+	frameworkgrpc "{{.FrameworkModule}}/framework/provider/grpc"
 	"gorm.io/gorm"
 )
 
@@ -104,8 +104,8 @@ func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (
 		Id:                uint64(user.ID),
 		Username:          user.Username,
 		Email:             user.Email,
-		TraceId:           appgrpc.GetTraceID(ctx),
-		RequestId:         appgrpc.GetRequestID(ctx),
+		TraceId:           frameworkgrpc.GetTraceID(ctx),
+		RequestId:         frameworkgrpc.GetRequestID(ctx),
 		MetadataDemo:      metadataDemo,
 		CallerServiceName: callerServiceName,
 	}, nil

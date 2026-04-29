@@ -37,6 +37,16 @@ func MustMakeJWTService(c contract.Container) contract.JWTService {
 	return container.MustMakeJWTService(c)
 }
 
+// MustMakeValidator 从容器获取 Validator
+func MustMakeValidator(c contract.Container) contract.Validator {
+	return container.MustMakeValidator(c)
+}
+
+// MustMakeRetry 从容器获取 Retry
+func MustMakeRetry(c contract.Container) contract.Retry {
+	return container.MustMakeRetry(c)
+}
+
 // MustMakeLogger 从容器获取 Logger
 func MustMakeLogger(c contract.Container) contract.Logger {
 	return container.MustMakeLogger(c)

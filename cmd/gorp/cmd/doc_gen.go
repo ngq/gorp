@@ -93,6 +93,7 @@ func init() {
 type commandDoc struct {
 	Path     string
 	Short    string
+	GroupID  string
 	Flags    []flagDoc
 	InhFlags []flagDoc
 	Children []commandDoc
@@ -137,31 +138,32 @@ func renderIndexDoc() string {
 	// Use a normal quoted string so we can include markdown backticks.
 	return "# 操作手册（Operator Manual）\n\n" +
 		"本手册由 `gorp doc gen` 自动生成（并可在此基础上补充说明）。\n\n" +
-		"> 如果你是第一次接触 gorp，建议先阅读：[用户上手路径：安装 gorp 并创建自己的项目](onboarding.md)。\n\n" +
+		"> 第一次使用时，只先阅读：[用户上手路径：安装 gorp 并创建自己的项目](onboarding.md)。\n\n" +
+		"> 自动生成页范围：`index.md`、`cli.md`、`config.md`。\n" +
+		"> 其余 `docs/manual/*.md` 默认按长期手工手册维护，不应直接并入 `doc gen` 生成输出。\n\n" +
 		"## Quick start（快速开始）\n\n" +
-		"### 默认使用路径\n\n" +
+		"### 默认主路径\n\n" +
 		"- 安装 CLI：`go install github.com/ngq/gorp/cmd/gorp@latest`\n" +
-		"- 生成项目：`gorp new`\n" +
-		"- 进入生成项目后开发与启动：`go run ./cmd/app`\n" +
+		"- 创建项目：`gorp new`\n" +
+		"- 启动项目：进入生成项目后执行 `go run ./cmd/app`\n" +
 		"- 验证：`GET /healthz`\n\n" +
-		"### 常见工具链入口\n\n" +
-		"- 创建项目：`go run ./cmd/gorp new --help`\n" +
-		"- 模板治理：`go run ./cmd/gorp template version`\n" +
-		"- 协议/模型生成：`go run ./cmd/gorp proto --help`、`go run ./cmd/gorp model --help`\n" +
+		"### 多服务与补充交付路径\n\n" +
+		"- 多服务默认路径：`gorp new multi-wire`\n" +
+		"- 补充交付路径：`gorp new from-release`（对应同一套公开 starter）\n\n" +
+		"### 高频开发动作\n\n" +
+		"- 生成业务代码：`go run ./cmd/gorp proto --help`、`go run ./cmd/gorp model --help`\n" +
 		"- 当前 CLI 主线已不再把 `app / grpc / cron / build / dev / deploy` 作为 starter 项目的公开 runtime 路径；服务启动应通过生成项目自己的 `cmd/*/main.go` 入口\n\n" +
-		"### 启动项目\n\n" +
-		"- 建议在生成项目内通过自己的 `cmd/*/main.go` 入口启动，例如：`go run ./cmd/app`\n" +
-		"- 验证：`GET /healthz`\n\n" +
-		"### 生成 API 文档\n\n" +
+		"### 按需进入的工具\n\n" +
+		"- 只有默认主路径、高频开发动作、多服务路径、补充交付路径都不能回答当前问题时，再进入这里\n" +
 		"- Swagger2: `go run ./cmd/gorp swagger gen`\n" +
 		"- OpenAPI3: `go run ./cmd/gorp openapi gen`\n" +
 		"- 打开 Swagger UI：`GET /swagger/index.html`\n\n" +
-		"### 基于数据库生成代码\n\n" +
+		"### 更后置的生成与治理入口\n\n" +
 		"- DB 连通性：`go run ./cmd/gorp model test`\n" +
 		"- 生成模型：`go run ./cmd/gorp model gen --table users`\n" +
-		"- 生成 CRUD 骨架：`go run ./cmd/gorp model api --table users`\n\n" +
-		"### 生成本手册\n\n" +
-		"- `go run ./cmd/gorp doc gen`（输出到 `docs/manual/`）\n\n" +
+		"- 生成 CRUD 骨架：`go run ./cmd/gorp model api --table users`\n" +
+		"- 模板版本查询：`go run ./cmd/gorp template version`\n" +
+		"- 生成本手册：`go run ./cmd/gorp doc gen`（输出到 `docs/manual/`）\n\n" +
 		"## 目录\n\n" +
 		"- [CLI 命令参考](cli.md)\n" +
 		"- [配置参考](config.md)\n" +
@@ -178,23 +180,27 @@ func renderCLIDoc(root *cobra.Command) (string, error) {
 	b.WriteString("# CLI 命令参考\n\n")
 	b.WriteString("> 说明：本页主要由 `gorp doc gen` 自动生成，用于作为命令索引与参数查阅页。\n")
 	b.WriteString(">\n")
+	b.WriteString("> 自动生成边界：本页与 `index.md`、`config.md` 属于自动参考页；教程、作者手册、能力说明页仍按手工手册维护。\n")
+	b.WriteString(">\n")
 	b.WriteString("> 阅读建议：\n")
 	b.WriteString(">\n")
-	b.WriteString("> - 如果你是第一次使用本项目，建议先看：\n")
-	b.WriteString(">   - [用户上手路径：安装 gorp 并创建自己的项目](onboarding.md)\n")
-	b.WriteString(">   - [教程：利用脚手架快速开展业务开发](tutorial-scaffold-quickstart.md)\n")
+	b.WriteString("> - 如果你是第一次使用本项目，只先看“默认起步路径”和“高频开发工具”两组即可。\n")
+	b.WriteString("> - 只有在默认起步路径、高频开发工具、补充交付路径都不能回答当前问题时，再查“按需进入的工具”。\n")
 	b.WriteString("> - 如果你已经知道自己要用哪个命令，再回到本页查参数最合适。\n")
 	b.WriteString(">\n")
 	b.WriteString("> 约定：\n")
 	b.WriteString(">\n")
-	b.WriteString("> - `gorp new` / `template` / `proto` / `model`：项目创建、模板治理与代码生成主入口\n")
-	b.WriteString("> - `gorp doc` / `swagger` / `openapi`：文档生成相关\n")
+	b.WriteString("> - `gorp new`：默认项目创建主入口\n")
+	b.WriteString("> - `gorp new multi-wire`：默认微服务项目创建主入口\n")
+	b.WriteString("> - `gorp proto` / `model`：高频代码生成入口\n")
+	b.WriteString("> - `gorp template` / `doc` / `provider` / `middleware` / `command` / `swagger` / `openapi` / `version`：只有在默认主路径、高频开发工具、补充交付路径都不能回答当前问题时，再进入的按需工具链\n")
 	b.WriteString("> - 当前 CLI 主线已不再把 `app / grpc / cron / build / dev / deploy` 作为 starter 项目的公开 runtime 路径；服务启动应通过生成项目自己的 `cmd/*/main.go` 入口\n\n")
 
 	docs := collectCommands(root)
-	for _, d := range docs {
-		renderCommand(&b, d)
-	}
+	writeCommandGroup(&b, "默认起步路径", docs, commandGroupStarter)
+	writeCommandGroup(&b, "高频开发工具", docs, commandGroupCodegen)
+	writeCommandGroup(&b, "按需进入的工具", docs, commandGroupAdvanced)
+	writeUngroupedCommands(&b, docs)
 	return b.String(), nil
 }
 
@@ -227,6 +233,7 @@ func commandToDoc(cmd *cobra.Command) commandDoc {
 	return commandDoc{
 		Path:     cmd.CommandPath(),
 		Short:    cmd.Short,
+		GroupID:  cmd.GroupID,
 		Flags:    collectFlags(cmd.LocalFlags()),
 		InhFlags: collectFlags(cmd.InheritedFlags()),
 	}
@@ -288,6 +295,44 @@ func renderCommand(b *strings.Builder, d commandDoc) {
 	}
 }
 
+func writeCommandGroup(b *strings.Builder, title string, docs []commandDoc, groupID string) {
+	groupDocs := make([]commandDoc, 0, len(docs))
+	for _, d := range docs {
+		if d.GroupID != groupID {
+			continue
+		}
+		groupDocs = append(groupDocs, d)
+	}
+	if len(groupDocs) == 0 {
+		return
+	}
+
+	b.WriteString("# ")
+	b.WriteString(title)
+	b.WriteString("\n\n")
+	for _, d := range groupDocs {
+		renderCommand(b, d)
+	}
+}
+
+func writeUngroupedCommands(b *strings.Builder, docs []commandDoc) {
+	ungrouped := make([]commandDoc, 0, len(docs))
+	for _, d := range docs {
+		if d.GroupID != "" {
+			continue
+		}
+		ungrouped = append(ungrouped, d)
+	}
+	if len(ungrouped) == 0 {
+		return
+	}
+
+	b.WriteString("# 其他命令\n\n")
+	for _, d := range ungrouped {
+		renderCommand(b, d)
+	}
+}
+
 func renderConfigDoc(projectRoot, env string, redact bool) (string, error) {
 	files, order, err := discoverConfigFiles(projectRoot, env)
 	if err != nil {
@@ -301,7 +346,9 @@ func renderConfigDoc(projectRoot, env string, redact bool) (string, error) {
 
 	var b strings.Builder
 	b.WriteString("# 配置参考\n\n")
-	b.WriteString("> 说明：本页由 `gorp doc gen` 自动生成，用于帮助你快速查看当前工程可见配置结构。\n\n")
+	b.WriteString("> 说明：本页由 `gorp doc gen` 自动生成，用于帮助你快速查看当前工程可见配置结构。\n")
+	b.WriteString(">\n")
+	b.WriteString("> 自动生成边界：这里只承载配置聚合视图，不承载长期的架构说明、教程或运维手册。\n\n")
 
 	if len(order) > 0 {
 		b.WriteString("## 加载到的配置文件\n\n")

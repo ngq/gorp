@@ -7,7 +7,7 @@ import (
 	"github.com/ngq/gorp/framework/contract"
 )
 
-const AppKey = "framework.app"
+const AppKey = contract.RootKey
 
 const (
 	configBasePathKey    = "app.paths.base"
@@ -23,19 +23,28 @@ const (
 //
 // 中文说明：
 // - 继承 contract.Root 接口，提供统一的路径管理；
-// - 这是"dedicated root contract 正式化"的具体实现。
+// - 这是"dedicated root contract 正式化"的具体实现；
+// - 当前它更接近 runtime convention provider：提供 framework 默认业务起步路径需要的宿主目录约定；
+// - framework 冻仓阶段先把它统一收进 `contract.RootKey` 语义，再继续观察是否需要进一步从 core provider 中下沉约定。
 type App interface {
 	contract.Root
 }
 
 type Provider struct{}
 
+// NewProvider 创建 app provider。
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string       { return "app" }
-func (p *Provider) IsDefer() bool      { return false }
-func (p *Provider) Provides() []string { return []string{AppKey} }
+// Name 返回 provider 名称。
+func (p *Provider) Name() string { return "app" }
 
+// IsDefer 表示 app provider 不走延迟加载。
+func (p *Provider) IsDefer() bool { return false }
+
+// Provides 返回 app provider 暴露的能力 key。
+func (p *Provider) Provides() []string { return []string{contract.RootKey} }
+
+// Register 绑定应用路径服务。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(AppKey, func(c contract.Container) (any, error) {
 		wd, err := os.Getwd()
@@ -77,6 +86,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot app provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }
 
 type service struct {

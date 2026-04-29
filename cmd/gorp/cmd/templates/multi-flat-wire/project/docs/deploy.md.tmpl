@@ -1,0 +1,50 @@
+# 部署说明
+
+## Docker 开发部署
+
+- `deploy/docker/`
+- `deploy/compose/docker-compose.yaml`
+
+本地联调：
+
+```bash
+make deploy-local
+```
+
+如果希望先统一构建镜像再联调：
+
+```bash
+make deploy-local-build
+```
+
+## Harbor 推送镜像
+
+```bash
+make harbor-push HARBOR_REGISTRY=harbor.example.com HARBOR_NAMESPACE={{.Name}} IMAGE_TAG=v1.0.0
+```
+
+会先构建三组服务镜像，再统一 tag 与 push。
+
+## Kubernetes 测试 / 预发 / 生产部署
+
+默认附带：
+
+- `deploy/kubernetes/base/`
+- `deploy/kubernetes/overlays/dev/`
+- `deploy/kubernetes/overlays/staging/`
+- `deploy/kubernetes/overlays/prod/`
+
+使用前请先替换：
+
+- `deploy/kubernetes/base/secret.yaml` 中的敏感占位值
+- `deploy/kubernetes/overlays/staging/kustomization.yaml` 中的镜像仓库与 tag
+- `deploy/kubernetes/overlays/prod/kustomization.yaml` 中的镜像仓库与 tag
+- `deploy/kubernetes/overlays/prod/ingress.yaml` 中的域名
+
+最小验证：
+
+```bash
+kubectl kustomize deploy/kubernetes/overlays/dev
+kubectl kustomize deploy/kubernetes/overlays/staging
+kubectl kustomize deploy/kubernetes/overlays/prod
+```

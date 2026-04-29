@@ -14,16 +14,16 @@ func NewProvider(config contract.ErrorReporterConfig) *Provider {
 	return &Provider{config: config}
 }
 
-// Name returns the provider name.
+// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "error_reporter" }
 
-// IsDefer returns false.
+// IsDefer 表示 error_reporter provider 不走延迟加载。
 func (p *Provider) IsDefer() bool { return false }
 
-// Provides returns the keys this provider provides.
+// Provides 返回当前 provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.ErrorReporterKey} }
 
-// Register binds the error reporter to the container.
+// Register 绑定错误上报服务。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.ErrorReporterKey, func(c contract.Container) (interface{}, error) {
 		// 如果配置了 Sentry DSN，使用 Sentry adapter
@@ -41,5 +41,5 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-// Boot does nothing.
+// Boot error_reporter provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }

@@ -28,9 +28,13 @@ func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string)
 	return func(c *gin.Context) {
 		key := keyFunc(c)
 		if !limiter.Allow(key) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "rate limit exceeded",
-			})
+			writeResponseHeaders(c)
+			resp := Response{
+				Code:    CodeTooManyRequests,
+				Message: "rate limit exceeded",
+				Data:    nil,
+			}
+			c.JSON(http.StatusTooManyRequests, resp)
 			c.Abort()
 			return
 		}

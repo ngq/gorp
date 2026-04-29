@@ -1,0 +1,79 @@
+# ConfigMap 基础配置
+# 说明：这里只放非敏感默认配置与可公开的参考配置，敏感信息统一放到 secret.yaml。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gorp-config
+data:
+  # 应用配置
+  APP_ENV: "production"
+  APP_NAME: "gorp-service"
+  APP_ADDRESS: ":8080"
+
+  # 日志配置
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # 数据库配置（敏感信息放 Secret）
+  DB_DRIVER: "mysql"
+
+  # Redis 配置（敏感信息放 Secret）
+  REDIS_DB: "0"
+
+  # HTTP 配置
+  HTTP_READ_TIMEOUT_SEC: "15"
+  HTTP_WRITE_TIMEOUT_SEC: "15"
+  HTTP_IDLE_TIMEOUT_SEC: "60"
+
+  # gRPC 配置
+  GRPC_ADDRESS: ":9090"
+
+  # 服务治理配置
+  RPC_TIMEOUT_MS: "5000"
+  CIRCUIT_BREAKER_ENABLED: "true"
+  RATE_LIMIT_ENABLED: "true"
+
+---
+# 配置文件（可选，复杂配置用）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gorp-config-file
+data:
+  config.yaml: |
+    app:
+      name: gorp-service
+      env: production
+      address: ":8080"
+
+    log:
+      level: info
+      format: json
+
+    server:
+      http:
+        read_timeout_sec: 15
+        write_timeout_sec: 15
+        idle_timeout_sec: 60
+
+    rpc:
+      mode: grpc
+      grpc:
+        address: ":9090"
+      timeout_ms: 5000
+
+    circuit_breaker:
+      enabled: true
+      strategy: sentinel
+      default:
+        threshold: 0.5
+        min_request_count: 10
+        max_concurrent_requests: 100
+        timeout_sec: 10
+
+    rate_limit:
+      enabled: true
+      algorithm: token_bucket
+      global:
+        rate: 1000
+        burst: 2000

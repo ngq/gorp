@@ -1,0 +1,24 @@
+# 预发布环境 Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: {{.Name}}-staging
+
+resources:
+  - ../../base
+
+images:
+  - name: gorp-service
+    newName: your-registry/{{.Name}}
+    newTag: staging
+
+configMapGenerator:
+  - name: gorp-config
+    behavior: merge
+    literals:
+      - APP_ENV=staging
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+
+patches:
+  - path: deployment-patch.yaml

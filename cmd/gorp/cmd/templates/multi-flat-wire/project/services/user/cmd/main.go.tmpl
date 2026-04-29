@@ -35,7 +35,10 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	httpServer := userserver.NewHTTPServer(services)
 	httpServer.RegisterRoutes(rt.Engine)
 
-	registrar := frameworkcontainer.MustMakeGRPCServerRegistrar(rt.Container)
+	registrar, err := frameworkcontainer.MakeGRPCServerRegistrar(rt.Container)
+	if err != nil {
+		return err
+	}
 	return registrar.RegisterProto(func(server *grpc.Server) error {
 		userv1.RegisterUserServiceServer(server, services.User)
 		return nil

@@ -21,6 +21,12 @@ type Manager struct {
 }
 
 // ServiceEntry 表示一个已注册的服务条目。
+//
+// 中文说明：
+// - Name 用于生命周期日志、排障和服务列表展示；
+// - Service 是真正执行 Start/Stop 的运行对象；
+// - Hooks 用于在服务前后挂生命周期钩子；
+// - Priority 决定启动顺序和停止逆序。
 type ServiceEntry struct {
 	Name     string
 	Service  contract.Hostable
@@ -58,6 +64,10 @@ func (s State) String() string {
 }
 
 // NewManager 创建生命周期管理器。
+//
+// 中文说明：
+// - 初始状态为 StateIdle；
+// - 默认不注册任何服务，等待 Host 或业务侧逐步填充。
 func NewManager() *Manager {
 	return &Manager{
 		services: make([]ServiceEntry, 0),
@@ -192,6 +202,10 @@ func (m *Manager) Stop(ctx context.Context) error {
 }
 
 // State 返回当前状态。
+//
+// 中文说明：
+// - 这是 Host 和外层运行时观察生命周期进度的读取入口；
+// - 仅读取当前状态，不改变任何生命周期行为。
 func (m *Manager) State() State {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -199,6 +213,10 @@ func (m *Manager) State() State {
 }
 
 // Services 返回所有已注册的服务名称。
+//
+// 中文说明：
+// - 只返回注册名，不暴露内部 ServiceEntry 细节；
+// - 主要供 Host 查询当前托管了哪些服务。
 func (m *Manager) Services() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -210,6 +228,10 @@ func (m *Manager) Services() []string {
 }
 
 // sortedServices 返回按 priority 排序的服务列表。
+//
+// 中文说明：
+// - 返回的是副本，不会改动原始注册顺序；
+// - 统一保证 Start 用正序、Stop 用逆序时看到的是同一套优先级结果。
 func (m *Manager) sortedServices() []ServiceEntry {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -229,6 +251,11 @@ func (m *Manager) sortedServices() []ServiceEntry {
 }
 
 // stopReverse 逆序停止服务。
+//
+// 中文说明：
+// - 这是启动失败后的回滚辅助；
+// - 只处理已经成功启动过的服务，避免把未启动服务也纳入停止流程；
+// - 即使中途有错误，也继续尽量把后续服务停掉。
 func (m *Manager) stopReverse(ctx context.Context, services []ServiceEntry) error {
 	var lastErr error
 	for i := len(services) - 1; i >= 0; i-- {

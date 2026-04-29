@@ -1,26 +1,18 @@
 # {{.ProjectName}}
 
-多微服务项目 - 默认多服务 starter（扁平化服务目录方案，Wire 装配版）
+多服务起步模板（Wire 装配版）
 
-> 定位说明：
-> - 这是多服务的**高级模板**，适合明确希望各服务通过 Wire 做编译期装配的团队；
-> - 如果你只是确定要多服务结构，但不想先引入 Wire，优先使用 `gorp new multi`；
-> - 如果当前只是快速开始单服务业务开发，优先使用裸 `gorp new`。
+> 起步：
+> - 已明确要走多服务主线时，直接使用 `gorp new multi-wire`；
+> - 只想先做单服务业务时，优先使用 `gorp new`。
 
-## 技术栈
+## 先看这三件事
 
-| 类别 | 组件 |
-|-----|-----|
-| **Web 框架** | Gin |
-| **ORM** | GORM + SQLite |
-| **启动装配** | Wire + framework bootstrap |
-| **缓存** | framework cache（默认 memory，可按需接 Redis） |
-| **服务发现** | framework discovery provider（按需启用） |
-| **链路追踪** | framework tracing provider（按需启用） |
-| **监控** | framework metrics / `/metrics` |
-| **服务间认证** | framework service_auth provider（按需启用） |
+- 创建项目：`gorp new multi-wire`
+- 生成代码：`make generate`
+- 启动服务：`make run-user` / `make run-order` / `make run-product`
 
-## 项目结构
+## 目录速览
 
 ```text
 ├── services/              # 各服务代码（就近聚合）
@@ -37,29 +29,21 @@
 │   │   └── config/
 │   ├── order/
 │   └── product/
-├── deployments/
+├── deploy/
 ├── docs/                 # 模板内结构说明与目录规划
 └── Makefile
 ```
 
-更多目录规划说明见：
+目录：
 
 - `docs/structure.md`
-- `docs/component-tree.md`
-- `docs/next-steps.md`
 
-阅读建议：
-- 想先理解模板目录职责，先看 `docs/structure.md`
-- 想判断 RabbitMQ / Kafka / Redis / tracing / discovery 这类组件该怎么归位，优先看 `docs/component-tree.md`
-- 想判断当前阶段是否应该继续保持 framework 心智，还是已经进入目录物化阶段，继续看 `docs/next-steps.md`
+## 默认开发主线
 
-## 启动装配策略
-
-- framework 负责提供 config / log / gin / orm / bootstrap / capability selector 等通用能力；
-- 各服务依赖图通过 Wire 在服务根目录内的 `cmd/` 层编译期装配；
-- `service/` 负责应用服务编排与 capability 调用，`server/` 负责 HTTP / gRPC 传输层注册；
-- 当前模板不再默认保留 project-owned infra runtime；微服务能力应优先走 framework 主线；
-- gRPC 正式主线已经收口为 Proto-first：服务端应围绕 `GRPCServerRegistrar + pb.RegisterXxxServer(...)`，客户端应围绕 `GRPCConnFactory + pb.NewXxxClient(conn)`。
+- 每个服务默认从 `services/<service>/cmd/main.go` 启动；
+- Wire 只负责在 `cmd/` 层收口依赖装配；
+- `internal/service` 负责业务编排，`internal/server` 负责 HTTP / gRPC 传输层注册；
+- gRPC 默认主线是 Proto-first：服务端围绕 `GRPCServerRegistrar + pb.RegisterXxxServer(...)`，客户端围绕 `GRPCConnFactory + pb.NewXxxClient(conn)`。
 
 ## 快速开始
 
@@ -69,26 +53,18 @@
 go mod tidy
 ```
 
-### 2. 安装代码生成工具
-
-```bash
-go install github.com/google/wire/cmd/wire@latest
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-```
-
-### 3. 统一生成代码
+### 2. 统一生成代码
 
 ```bash
 make generate
 ```
 
-说明：
-- `make generate` 会统一执行 Wire 与 Proto 生成；
-- `wire.go` 是依赖装配声明，`wire_gen.go` 是生成后的装配结果；
-- 默认情况下，服务入口统一由 `services/<service>/cmd/main.go` 承接；Wire 只在该目录内收口业务依赖装配，不再通过 `services/*/start.go` 做过渡。
+生成：
+- 统一执行 Wire 与 Proto 生成；
+- `wire.go` 只收口 `cmd/` 层装配；
+- 服务入口由 `services/<service>/cmd/main.go` 承接。
 
-### 4. 启动服务
+### 3. 启动服务
 
 ```bash
 make run-user
@@ -96,43 +72,60 @@ make run-order
 make run-product
 ```
 
-说明：
-- 各服务默认统一由 `services/<service>/cmd/main.go` 作为启动入口；
-- 入口中直接复用 framework/bootstrap，并在 `cmd` 层收口运行时；
-- HTTP / gRPC 传输层注册统一放在 `internal/server`，业务编排与 capability 调用统一放在 `internal/service`；
-- 不再通过 `services/*/start.go` 这类过渡层转发启动。
+生成：
+- 各服务统一由 `services/<service>/cmd/main.go` 启动；
+- 入口直接复用 framework/bootstrap；
+- 传输层注册在 `internal/server`，业务编排在 `internal/service`。
 
-### 5. 启动本地依赖与多服务联调
-
-```bash
-make deploy-local
-```
-
-说明：
-- 该命令会通过 `deployments/compose/docker-compose.yaml` 拉起 Redis 与三组服务样板；
-- compose 默认把项目根目录挂载到容器内 `/workspace`，并直接执行 `go run ./services/<service>/cmd`，便于边改边联调；
-- 联调完成后可执行 `make deploy-local-down` 清理本地编排环境。
-
-### 6. 运行测试
+### 4. 运行测试
 
 ```bash
 make test
 ```
 
-说明：
+生成：
 - 模板默认已带上最小测试基线；
 - `internal/biz` 下提供 usecase 级样板测试，方便你按领域逻辑继续扩展；
 - `internal/server` 下提供 HTTP smoke 测试，保证路由注册和基础入参处理不漂移；
-- user / order 服务额外保留了最小 gRPC / metadata / dlock 样板测试，方便持续验证微服务治理主链路。
+- user / order 服务额外保留了最小 gRPC / metadata / dlock 样板测试。
 
-### 7. 如果你准备验证 Proto-first gRPC 双服务链路
+## 继续往下时再看
 
-建议优先采用：
+### 5. 本地联调
+
+```bash
+make deploy-local
+```
+
+生成：
+- 通过 `deploy/compose/docker-compose.yaml` 拉起 Redis 与三组服务样板；
+- compose 会把项目根目录挂载到 `/workspace`，并执行 `go run ./services/<service>/cmd`；
+- 先构建镜像时再执行 `make deploy-local-build`；
+- 完成后执行 `make deploy-local-down`。
+
+### 6. Harbor 推送镜像
+
+```bash
+make harbor-push HARBOR_REGISTRY=harbor.example.com HARBOR_NAMESPACE={{.Name}} IMAGE_TAG=v1.0.0
+```
+
+生成：
+- 先构建 `user-service`、`order-service`、`product-service` 三个镜像；
+- 再自动 tag 到 Harbor 路径并 push；
+- 需要时通过 `HARBOR_REGISTRY`、`HARBOR_NAMESPACE`、`IMAGE_TAG` 覆盖默认值。
+
+### 7. 部署资产
+
+看：`docs/deploy.md`
+
+### 8. 验证 Proto-first gRPC 双服务链路
+
+先确认一条服务间调用链路能跑通，再继续扩展更多治理能力。
 
 - `order-service` 作为 gRPC client / caller
 - `user-service` 作为 gRPC server / callee
 
-并统一使用：
+关键配置：
 
 - `service.name`
 - `rpc.mode=grpc`
@@ -141,16 +134,14 @@ make test
 - `tracing.enabled + tracing.backend`
 - `service_auth.mode=token + service_auth.token.secret`
 
-样板目标不是回到字符串式 `RPCClient.Call(...)`，而是直接围绕：
+主线入口：
 
 - `GRPCServerRegistrar + pb.RegisterXxxServer(...)`
 - `GRPCConnFactory + pb.NewXxxClient(conn)`
 
-来做双服务闭环验证。
+### 9. 生成 proto 代码
 
-### 8. 如果你准备生成 proto 代码
-
-当前这个多服务模板默认没有内置 `cmd/gorp` 入口，因此建议直接使用 `protoc` + Go 插件生成：
+修改 `proto/*.proto` 后，直接使用 `protoc` + Go 插件生成：
 
 ```bash
 PATH="$(go env GOPATH)/bin:$PATH" protoc -I . \
@@ -159,13 +150,12 @@ PATH="$(go env GOPATH)/bin:$PATH" protoc -I . \
   proto/user/v1/user.proto
 ```
 
-建议理解：
+生成：
 
-- 多服务主样板当前优先验证业务服务之间的 Proto-first 接线与治理能力闭环；
-- `gorp proto gen` 这条链路当前主要服务于母仓/单服务场景，不是这个模板的默认生成入口。
+- 默认优先按服务间 Proto-first 接线验证；
+- 这一步按需执行。
 
-## 日志使用建议
+## 日志建议
 
-- 默认直接使用 framework 提供的 logger 能力；
-- 如果需要 trace_id / request_id 等动态字段，优先通过 logger 的上下文增强能力处理；
-- 不把从 context 重新获取 logger 作为默认业务写法。
+- 优先使用 `gorp/log` 作为业务日志入口；
+- 请求级字段按实际业务需要再补。

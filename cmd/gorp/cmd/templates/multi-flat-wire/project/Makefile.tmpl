@@ -1,6 +1,10 @@
 # {{.ProjectName}}
 
-.PHONY: generate gen-wire gen-proto build clean run-user run-order run-product test tidy deploy-local deploy-local-down
+HARBOR_REGISTRY ?= harbor.example.com
+HARBOR_NAMESPACE ?= {{.Name}}
+IMAGE_TAG ?= latest
+
+.PHONY: generate gen-wire gen-proto build clean run-user run-order run-product test tidy deploy-local deploy-local-down build-images deploy-local-build harbor-tag harbor-push
 
 generate: gen-wire gen-proto
 
@@ -39,8 +43,25 @@ clean:
 	rm -rf bin/
 	rm -f *.db
 
+build-images:
+	docker build -f deploy/docker/Dockerfile.user -t user-service:$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.order -t order-service:$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.product -t product-service:$(IMAGE_TAG) .
+
 deploy-local:
-	docker-compose -f deployments/compose/docker-compose.yaml up -d
+	docker-compose -f deploy/compose/docker-compose.yaml up -d
 
 deploy-local-down:
-	docker-compose -f deployments/compose/docker-compose.yaml down
+	docker-compose -f deploy/compose/docker-compose.yaml down
+
+deploy-local-build: build-images deploy-local
+
+harbor-tag:
+	docker tag user-service:$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/user-service:$(IMAGE_TAG)
+	docker tag order-service:$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/order-service:$(IMAGE_TAG)
+	docker tag product-service:$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/product-service:$(IMAGE_TAG)
+
+harbor-push: build-images harbor-tag
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/user-service:$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/order-service:$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/product-service:$(IMAGE_TAG)

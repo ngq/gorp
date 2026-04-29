@@ -83,8 +83,8 @@ func (d *Data) Cache() contract.Cache {
 // JWT 获取业务 JWT 服务。
 //
 // 中文说明：
-// - starter 默认已注册 framework 级业务 JWT provider；
-// - 业务项目可在 repository/service/usecase 边界按需使用，而不必自己重新组装 JWT 服务。
+// - 业务项目可在 repository/service/usecase 边界按需使用；
+// - 不要求业务自己重新组装 JWT 服务。
 func (d *Data) JWT() contract.JWTService {
 	if d.jwt != nil {
 		return d.jwt

@@ -8,7 +8,7 @@ import (
 )
 
 // TestUser 用于测试的结构体。
-// 验证规则放在 validate tag 中，字段名从 json tag 获取。
+// 验证规则放在 validate tag 中，当前错误字段名默认使用结构体字段名。
 type TestUser struct {
 	Username string `json:"username" validate:"required,min=3,max=20"`
 	Email    string `json:"email" validate:"required,email"`

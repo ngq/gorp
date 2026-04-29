@@ -14,23 +14,13 @@ import (
 // - 验证失败返回统一 AppError 格式；
 // - 验证成功将解析后的对象存入 context。
 //
-// 参数：
-// - validator: 验证器实例（通过容器获取）
-// - objType: 请求体结构体类型（如 reflect.TypeOf(LoginRequest{})）
-//
-// 使用示例：
-//
-//	type LoginRequest struct {
-//	    UserName string `json:"username" binding:"required"`
-//	    Password string `json:"password" binding:"required,gte=6"`
-//	}
-//
-//	router.POST("/login",
-//	    gin.ValidateBodyMiddleware(validator, reflect.TypeOf(LoginRequest{})),
-//	    loginHandler)
+// 注意：
+// - 当前默认业务主线优先使用 `ValidateBody` / `ValidateQuery` / `ValidateForm` 这类 handler 内 helper；
+// - `ValidateBodyMiddleware` 仅适合明确需要中间件式校验的场景。
 func ValidateBodyMiddleware(validator contract.Validator, objType interface{}) gin.HandlerFunc {
-	// objType 可以是 reflect.Type 或具体结构体实例
-	// 这里简化处理，直接使用 ShouldBindJSON + Validate
+	_ = objType
+	// 当前中间件版本不根据 objType 自动创建实例；
+	// 如需显式控制请求结构体，优先在 handler 中使用 ValidateBody。
 
 	return func(c *gin.Context) {
 		// 创建目标对象

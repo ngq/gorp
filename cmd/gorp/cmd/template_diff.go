@@ -142,6 +142,10 @@ Recommended workflow:
 			fmt.Fprintln(cmd.OutOrStdout())
 			if len(files) > 0 {
 				fmt.Fprintf(cmd.OutOrStdout(), "Scoped by --files: %v\n\n", files)
+					if len(selectedOnlyTemplate) == 0 && len(selectedDifferent) == 0 {
+						fmt.Fprintln(cmd.OutOrStdout(), "No matching upgrade candidates found for the selected --files.")
+						fmt.Fprintln(cmd.OutOrStdout())
+					}
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Files only in template (%d):\n", len(selectedOnlyTemplate))
 			for _, p := range selectedOnlyTemplate {
@@ -187,14 +191,12 @@ var templateVersionCmd = &cobra.Command{
 		fmt.Fprintln(cmd.OutOrStdout(), "Template Version Information")
 		fmt.Fprintln(cmd.OutOrStdout(), "============================")
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), "Current CLI embeds the following public starter templates:")
-		fmt.Fprintln(cmd.OutOrStdout(), "  - base: minimal skeleton for custom structure")
-		fmt.Fprintln(cmd.OutOrStdout(), "  - golayout: default single-service starter")
-		fmt.Fprintln(cmd.OutOrStdout(), "  - golayout-wire: advanced single-service starter with Wire assembly")
-		fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat: default multi-service starter")
-		fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat-wire: advanced multi-service starter with Wire assembly")
-		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), "Release-pack / from-release currently supports: base, golayout, golayout-wire, multi-flat, multi-flat-wire.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Current CLI embeds the following public starter templates:")
+			fmt.Fprintln(cmd.OutOrStdout(), "  - golayout: default single-service starter")
+			fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat-wire: default microservice starter with Wire assembly")
+			fmt.Fprintln(cmd.OutOrStdout(), "  - multi-independent: stronger independently-governed multi-service starter")
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), "Release-pack / from-release currently supports the same public starter set: golayout, multi-flat-wire, multi-independent.")
 		fmt.Fprintln(cmd.OutOrStdout(), "Templates are embedded at build time.")
 		fmt.Fprintln(cmd.OutOrStdout(), "Upgrade CLI to get latest templates.")
 		return nil
@@ -444,7 +446,7 @@ func detectProjectFeatureFlags(projectRoot string) (withDB, withSwagger bool) {
 	switch templateType {
 	case starterTemplateGoLayout:
 		withDB = dirExists(filepath.Join(projectRoot, "internal", "data"))
-	case starterTemplateMultiFlat, starterTemplateMultiFlatWire:
+	case starterTemplateMultiFlatWire:
 		withDB = dirExists(filepath.Join(projectRoot, "services", "user", "internal", "data")) ||
 			dirExists(filepath.Join(projectRoot, "services", "order", "internal", "data")) ||
 			dirExists(filepath.Join(projectRoot, "services", "product", "internal", "data"))
@@ -489,10 +491,6 @@ func detectProjectTemplateType() string {
 			switch {
 			case strings.Contains(text, "template: multi-flat-wire"):
 				return starterTemplateMultiFlatWire
-			case strings.Contains(text, "template: multi-flat"):
-				return starterTemplateMultiFlat
-			case strings.Contains(text, "template: golayout-wire"):
-				return starterTemplateGoLayoutWire
 			case strings.Contains(text, "template: golayout"):
 				return starterTemplateGoLayout
 			case strings.Contains(text, "template: base"):
@@ -501,15 +499,9 @@ func detectProjectTemplateType() string {
 		}
 	}
 	if dirExists("services/user/cmd") && dirExists("services/order/cmd") && dirExists("services/product/cmd") {
-		if fileExists("services/user/cmd/wire.go") || fileExists("services/order/cmd/wire.go") || fileExists("services/product/cmd/wire.go") {
-			return starterTemplateMultiFlatWire
-		}
-		return starterTemplateMultiFlat
+		return starterTemplateMultiFlatWire
 	}
 	if dirExists("internal/biz") && dirExists("internal/data") && dirExists("internal/service") {
-		if fileExists("cmd/app/wire.go") || fileExists("cmd/app/wire_gen.go") {
-			return starterTemplateGoLayoutWire
-		}
 		return starterTemplateGoLayout
 	}
 	if dirExists("app/http") {

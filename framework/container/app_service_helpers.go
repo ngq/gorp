@@ -26,6 +26,10 @@ func MakeAppService[T any](c contract.Container, key string) (T, error) {
 }
 
 // MustMakeAppService 从容器中强制解析轻量应用服务。
+//
+// 中文说明：
+// - 用于启动阶段或明确要求该 app service 必须存在的路径；
+// - 保持与 MustMake 系列 helper 一致的失败即 panic 语义。
 func MustMakeAppService[T any](c contract.Container, key string) T {
 	v := c.MustMake(key)
 	return v.(T)

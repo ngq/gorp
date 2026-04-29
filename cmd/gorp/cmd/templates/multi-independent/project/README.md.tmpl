@@ -1,24 +1,17 @@
 # {{.ProjectName}}
 
-多微服务项目演进参考 - 完全独立服务目录方案（framework 原生装配）
+多服务进阶模板（更强独立治理）
+
+## 先看这三件事
+
+- 创建项目：`gorp new --template multi-independent`
+- 启动服务：`go run ./services/user/cmd`
+- 本地联调：`make deploy-local`
 
 ## 说明
 
-> 该结构用于大型项目演进参考，不作为当前对外 starter 模板直接提供。
-> 推荐先使用 `multi-flat` 起步，当团队规模、发布自治和仓库拆分需求提升后，再参考本结构逐步演进。
-
-## 技术栈
-
-| 类别 | 组件 |
-|-----|-----|
-| **Web 框架** | Gin |
-| **ORM** | GORM + SQLite |
-| **启动装配** | framework provider/container/bootstrap |
-| **缓存** | Redis |
-| **服务发现** | Consul |
-| **链路追踪** | Jaeger + OpenTelemetry |
-| **监控** | Prometheus + Grafana |
-| **限流熔断** | 自研组件 |
+- 适合明确需要更强服务独立治理、独立 go.mod 与后续拆仓演进的团队。
+- 推荐先使用 `golayout` 或 `multi-flat-wire` 起步，再按治理需求升级到本结构。
 
 ## 项目结构
 
@@ -29,7 +22,7 @@
 │   │   │   └── main.go      # 入口
 │   │   ├── internal/        # 服务内部代码
 │   │   ├── config/          # 服务配置
-│   │   ├── deployments/     # 服务部署配置
+│   │   ├── deploy/     # 服务部署配置
 │   │   └── go.mod           # 独立 go.mod
 │   ├── order/
 │   ├── product/
@@ -39,18 +32,24 @@
 │   ├── db/                  # 数据库
 │   ├── infrastructure/      # 基础设施（Redis, Consul, Tracing...）
 │   └── logger/              # 日志
-├── deployments/              # 统一部署编排
+├── deploy/              # 统一部署编排
 └── go.work                   # Go workspace
 ```
 
 ## 特点
 
-- **服务完全独立**：每个服务可单独拆分出仓库
-- **独立 go.mod**：每个服务有自己的依赖版本
-- **独立部署**：每个服务有自己的 Dockerfile
-- **framework 原生装配**：默认通过 framework 的 provider/container/bootstrap 完成启动装配
-- **共享基础设施**：通过 shared 模块复用微服务组件
-- **保留扩展空间**：项目后续如偏好 Wire，可自行替换默认装配方案
+- 服务完全独立
+- 独立 go.mod
+- 独立部署
+- 默认入口直接复用 framework/bootstrap
+- 共享层只保留跨服务稳定复用内容
+
+## 默认开发主线
+
+- 每个服务默认从 `services/<service>/cmd/main.go` 启动；
+- 默认入口直接复用 framework/bootstrap，不要求先理解 provider/container 内部装配；
+- 业务主要写在 `internal/service`、`internal/data`、`internal/server`；
+- 共享层只保留跨服务稳定复用内容，不承载默认业务起步教学。
 
 ## 快速开始
 
@@ -79,39 +78,18 @@ make deploy-local
 
 ### 3. 访问服务
 
-| 服务 | 地址 | 说明 |
-|-----|-----|-----|
-| 用户服务 | http://localhost:8081 | RESTful API |
-| 订单服务 | http://localhost:8082 | RESTful API |
-| 商品服务 | http://localhost:8083 | RESTful API |
-| Consul UI | http://localhost:8500 | 服务发现 |
-| Jaeger UI | http://localhost:16686 | 链路追踪 |
+优先先把一个服务跑通，再逐步扩到多服务联调。
 
 ## 日志使用建议
 
-- 默认优先使用 framework 提供的 logger 能力；
-- 服务启动阶段优先在 main / bootstrap 边界记录日志；
-- 业务逻辑里只有在需要附加 trace_id / request_id 等动态字段时，才在边界层基于 framework logger 补充字段；
-- 不把从 context 重新获取 logger 作为默认业务写法。
+- 默认优先使用 `gorp/log` 作为业务日志入口；
+- 先把服务跑通，再按业务需要补日志字段。
 
-## 日志使用建议
+## 组件与部署提醒
 
-- 默认优先使用 framework 提供的 logger 能力；
-- 服务启动阶段优先在 main / bootstrap 边界记录日志；
-- 业务逻辑里只有在需要附加 trace_id / request_id 等动态字段时，才在边界层基于 framework logger 补充字段；
-- 不把从 context 重新获取 logger 作为默认业务写法。
-
-## 组件清单
-
-
-| 组件 | 用途 | 使用方式 |
-|-----|-----|---------|
-| **Redis** | 缓存/分布式锁 | framework provider |
-| **Consul** | 服务发现/注册 | framework discovery provider |
-| **Jaeger** | 链路追踪 | framework tracing provider |
-| **Prometheus** | 监控指标 | `/metrics` 端点 |
-| **RateLimiter** | 限流 | framework middleware/provider |
-| **CircuitBreaker** | 熔断 | framework provider |
+- 默认继续复用项目自己的 `services/<service>/cmd/main.go` 入口
+- 部署与外部组件接入按需展开，不把 README 首屏写成基础设施手册
+- 共享层只保留跨服务稳定复用内容
 
 ## Makefile 命令
 
@@ -124,7 +102,7 @@ make deploy-local
 
 ## 服务拆分
 
-当需要将服务拆分为独立仓库时：
+当团队需要独立发布、独立治理或独立仓库时，再按这个结构继续演进。
 
 ```bash
 # 1. 复制服务目录

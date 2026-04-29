@@ -18,11 +18,10 @@ import (
 )
 
 const (
-	starterTemplateBase          = "base"
-	starterTemplateGoLayout      = "golayout"
-	starterTemplateGoLayoutWire  = "golayout-wire"
-	starterTemplateMultiFlat     = "multi-flat"      // 多微服务 - 扁平化
-	starterTemplateMultiFlatWire = "multi-flat-wire" // 多微服务 - 扁平化（Wire）
+	starterTemplateBase             = "base"              // 仅保留给内部 diff/测试基线，不再作为公开推荐模板
+	starterTemplateGoLayout         = "golayout"
+	starterTemplateMultiFlatWire    = "multi-flat-wire"   // 默认微服务起步（Wire）
+	starterTemplateMultiIndependent = "multi-independent" // 多服务更强独立治理
 )
 
 var reIdent = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
@@ -114,10 +113,10 @@ func requireIdent(name, field string) error {
 func validateStarterTemplate(name string) error {
 	name = strings.TrimSpace(strings.ToLower(name))
 	switch name {
-	case "", starterTemplateBase, starterTemplateGoLayout, starterTemplateGoLayoutWire, starterTemplateMultiFlat, starterTemplateMultiFlatWire:
+	case "", starterTemplateGoLayout, starterTemplateMultiFlatWire, starterTemplateMultiIndependent:
 		return nil
 	default:
-		return fmt.Errorf("unsupported template: %s (supported: base, golayout, golayout-wire, multi-flat, multi-flat-wire)", name)
+		return fmt.Errorf("unsupported template: %s (supported: golayout, multi-flat-wire, multi-independent)", name)
 	}
 }
 
@@ -134,10 +133,10 @@ func normalizeStarterTemplate(name string) string {
 func validateReleaseStarterTemplate(name string) error {
 	name = strings.TrimSpace(strings.ToLower(name))
 	switch name {
-	case "", starterTemplateBase, starterTemplateGoLayout, starterTemplateGoLayoutWire, starterTemplateMultiFlat, starterTemplateMultiFlatWire:
+	case "", starterTemplateGoLayout, starterTemplateMultiFlatWire, starterTemplateMultiIndependent:
 		return nil
 	default:
-		return fmt.Errorf("unsupported release template: %s (supported: base, golayout, golayout-wire, multi-flat, multi-flat-wire)", name)
+		return fmt.Errorf("unsupported release template: %s (supported: golayout, multi-flat-wire, multi-independent)", name)
 	}
 }
 
@@ -146,14 +145,12 @@ func resolveOfflineTemplateRoot(name string) string {
 	switch normalizeStarterTemplate(name) {
 	case starterTemplateGoLayout:
 		return "templates/golayout/project"
-	case starterTemplateGoLayoutWire:
-		return "templates/golayout-wire/project"
-	case starterTemplateMultiFlat:
-		return "templates/multi-flat/project"
 	case starterTemplateMultiFlatWire:
 		return "templates/multi-flat-wire/project"
+	case starterTemplateMultiIndependent:
+		return "templates/multi-independent/project"
 	default:
-		return "templates/project"
+		return "templates/golayout/project"
 	}
 }
 
@@ -162,14 +159,12 @@ func resolveReleaseTemplateRoot(name string) string {
 	switch normalizeStarterTemplate(name) {
 	case starterTemplateGoLayout:
 		return "templates/release/golayout/project"
-	case starterTemplateGoLayoutWire:
-		return "templates/release/golayout-wire/project"
-	case starterTemplateMultiFlat:
-		return "templates/multi-flat/project"
 	case starterTemplateMultiFlatWire:
 		return "templates/multi-flat-wire/project"
+	case starterTemplateMultiIndependent:
+		return "templates/multi-independent/project"
 	default:
-		return "templates/release/project"
+		return "templates/release/golayout/project"
 	}
 }
 
@@ -178,22 +173,18 @@ func defaultReleaseTemplateAsset(name string) string {
 	switch normalizeStarterTemplate(name) {
 	case starterTemplateGoLayout:
 		return "gorp-template-golayout.zip"
-	case starterTemplateGoLayoutWire:
-		return "gorp-template-golayout-wire.zip"
-	case starterTemplateMultiFlat:
-		return "gorp-template-multi-flat.zip"
 	case starterTemplateMultiFlatWire:
 		return "gorp-template-multi-flat-wire.zip"
+	case starterTemplateMultiIndependent:
+		return "gorp-template-multi-independent.zip"
 	default:
-		return "gorp-template.zip"
+		return "gorp-template-golayout.zip"
 	}
 }
 
 const (
 	starterProfileBasic = "basic"
 
-	newIntentWire      = "wire"
-	newIntentMulti     = "multi"
 	newIntentMultiWire = "multi-wire"
 )
 
@@ -208,14 +199,14 @@ func parseNewIntent(args []string) (string, error) {
 		return "", nil
 	}
 	if len(args) > 1 {
-		return "", fmt.Errorf("too many arguments: expected at most 1 intent (supported: wire, multi, multi-wire)")
+		return "", fmt.Errorf("too many arguments: expected at most 1 intent (supported: multi-wire)")
 	}
 	intent := strings.TrimSpace(strings.ToLower(args[0]))
 	switch intent {
-	case newIntentWire, newIntentMulti, newIntentMultiWire:
+	case newIntentMultiWire:
 		return intent, nil
 	default:
-		return "", fmt.Errorf("unsupported new intent: %s (supported: wire, multi, multi-wire)", intent)
+		return "", fmt.Errorf("unsupported new intent: %s (supported: multi-wire)", intent)
 	}
 }
 
@@ -229,10 +220,6 @@ func resolveOfflineIntentDefaults(intent string) (template string, starter strin
 	switch strings.TrimSpace(strings.ToLower(intent)) {
 	case "":
 		return starterTemplateGoLayout, starterProfileBasic
-	case newIntentWire:
-		return starterTemplateGoLayoutWire, starterProfileBasic
-	case newIntentMulti:
-		return starterTemplateMultiFlat, ""
 	case newIntentMultiWire:
 		return starterTemplateMultiFlatWire, ""
 	default:
@@ -334,20 +321,25 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 	// - 如果 FrameworkPath 为空，UseReplace 为 false，不生成 replace 指令；
 	// - 如果 FrameworkPath 非空，UseReplace 为 true，生成 replace 指令。
 	useReplace := strings.TrimSpace(in.FrameworkPath) != ""
+	protoUserGoPackage := in.Module + "/proto/user/v1;userv1"
+	protoUserGoPackageLen := len([]byte(protoUserGoPackage))
 	return map[string]any{
-		"Name":             in.Name,
-		"ProjectName":      in.Name, // 别名，供 README 等模板使用
-		"Module":           in.Module,
-		"ModuleName":       in.Module, // 别名，供模板使用
-		"FrameworkModule":  in.FrameworkModule,
-		"FrameworkPath":    normalizeFrameworkReplacePath(in.FrameworkPath),
-		"FrameworkVersion": in.FrameworkVersion,
-		"UseReplace":       useReplace,
-		"Backend":          in.Backend,
-		"IsGormBackend":    in.Backend == "" || in.Backend == "gorm",
-		"IsEntBackend":     in.Backend == "ent",
-		"WithDB":           in.WithDB,
-		"WithSwagger":      in.WithSwagger,
+		"Name":                           in.Name,
+		"ProjectName":                    in.Name, // 别名，供 README 等模板使用
+		"Module":                         in.Module,
+		"ModuleName":                     in.Module, // 别名，供模板使用
+		"FrameworkModule":                in.FrameworkModule,
+		"FrameworkPath":                  normalizeFrameworkReplacePath(in.FrameworkPath),
+		"FrameworkVersion":               in.FrameworkVersion,
+		"UseReplace":                     useReplace,
+		"Backend":                        in.Backend,
+		"IsGormBackend":                  in.Backend == "" || in.Backend == "gorm",
+		"IsEntBackend":                   in.Backend == "ent",
+		"WithDB":                         in.WithDB,
+		"WithSwagger":                    in.WithSwagger,
+		"ProtoUserGoPackage":             protoUserGoPackage,
+		"ProtoUserGoPackageLenHex":       fmt.Sprintf("\\x%02x", protoUserGoPackageLen),
+		"ProtoUserGoPackageFieldLenHex":  fmt.Sprintf("\\x%02x", protoUserGoPackageLen+2),
 	}
 }
 
@@ -445,10 +437,10 @@ func printScaffoldNext(out io.Writer, folder string) {
 
 func releaseTemplateSource(name string) (fs.FS, string) {
 	switch normalizeStarterTemplate(name) {
-	case starterTemplateMultiFlat:
-		return projectTemplateFS, "templates/multi-flat/project"
 	case starterTemplateMultiFlatWire:
 		return projectTemplateFS, "templates/multi-flat-wire/project"
+	case starterTemplateMultiIndependent:
+		return projectTemplateFS, "templates/multi-independent/project"
 	default:
 		return releaseTemplateFS, resolveReleaseTemplateRoot(name)
 	}

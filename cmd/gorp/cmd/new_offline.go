@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed all:templates/project all:templates/golayout all:templates/golayout-wire all:templates/multi-flat all:templates/multi-flat-wire all:templates/multi-independent
+//go:embed all:templates/project all:templates/golayout all:templates/multi-flat-wire all:templates/multi-independent
 var projectTemplateFS embed.FS
 
 var newOfflineTemplate string
@@ -101,8 +101,8 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 func init() {
 	newCmd.RunE = runNewEmbedded
 	newCmd.Args = cobra.MaximumNArgs(1)
-	newCmd.ValidArgs = []string{newIntentWire, newIntentMulti, newIntentMultiWire}
-	newCmd.Flags().StringVar(&newOfflineTemplate, "template", starterTemplateGoLayout, "starter template: base, golayout, golayout-wire, multi-flat, multi-flat-wire")
+	newCmd.ValidArgs = []string{newIntentMultiWire}
+	newCmd.Flags().StringVar(&newOfflineTemplate, "template", starterTemplateGoLayout, "starter template: golayout, multi-flat-wire, multi-independent")
 	newCmd.Flags().StringVar(&newOfflineBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")

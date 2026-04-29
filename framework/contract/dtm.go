@@ -183,6 +183,15 @@ type SAGAStep struct {
 
 	// Payload 请求数据
 	Payload any
+
+	// RetryCount 分支级重试次数
+	RetryCount int
+
+	// RetryInterval 分支级重试间隔（秒）
+	RetryInterval int
+
+	// Timeout 分支级超时时间（秒）
+	Timeout int
 }
 
 // BranchOptions 分支选项。

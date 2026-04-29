@@ -35,9 +35,13 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 			// 请求正常完成
 		case <-ctx.Done():
 			// 请求超时
-			c.JSON(http.StatusGatewayTimeout, gin.H{
-				"error": "request timeout",
-			})
+			writeResponseHeaders(c)
+			resp := Response{
+				Code:    CodeServiceUnavailable,
+				Message: "request timeout",
+				Data:    nil,
+			}
+			c.JSON(http.StatusGatewayTimeout, resp)
 			c.Abort()
 		}
 	}
@@ -67,9 +71,13 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 			if onTimeout != nil {
 				onTimeout(c)
 			} else {
-				c.JSON(http.StatusGatewayTimeout, gin.H{
-					"error": "request timeout",
-				})
+				writeResponseHeaders(c)
+				resp := Response{
+					Code:    CodeServiceUnavailable,
+					Message: "request timeout",
+					Data:    nil,
+				}
+				c.JSON(http.StatusGatewayTimeout, resp)
 			}
 			c.Abort()
 		}

@@ -8,8 +8,8 @@
 说明这个最小骨架已经跑通。接下来建议按下面顺序继续。
 
 > 定位提醒：
-> - `base` 模板更适合你自己决定目录结构与开发方式；
-> - 如果你需要默认单服务生产起步体验，优先使用 `gorp new` 生成的默认 starter，而不是继续把 `base` 当成默认业务模板。
+> - `project` 是共享骨架基底，不是公开默认 starter；
+> - 如果你需要默认单服务生产起步体验，优先使用 `gorp new` 生成的默认 starter，而不是继续把 `project` 当成公开模板。
 
 ## 1. 先看 HTTP 入口
 
@@ -45,13 +45,7 @@
 
 ## 5. 如果你准备接数据库
 
-后续可以结合框架命令继续：
-
-```bash
-gorp model test
-gorp model gen --table <table>
-gorp model api --table <table>
-```
+数据库相关能力按需再看工具链命令，不把它放进默认首屏路径。
 
 ## 6. 如果你准备接 gRPC
 
@@ -70,7 +64,7 @@ gorp model api --table <table>
 
 ## 7. 如果你准备做成可发布项目
 
-后续可以继续使用：
+固定版本交付相关动作放到真正需要发布时再做：
 
 ```bash
 gorp template pack

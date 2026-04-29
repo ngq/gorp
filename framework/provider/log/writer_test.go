@@ -8,7 +8,7 @@ import (
 )
 
 func TestBuildWriteSyncer_Single(t *testing.T) {
-	ws, err := buildWriteSyncer(sinkConfig{
+	logger, err := buildWriteSyncer(sinkConfig{
 		Driver:     "single",
 		Filename:   "./storage/log/test.log",
 		MaxSizeMB:  1,
@@ -18,11 +18,11 @@ func TestBuildWriteSyncer_Single(t *testing.T) {
 		LocalTime:  true,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, ws)
+	require.NotNil(t, logger)
 }
 
 func TestBuildWriteSyncer_Rotate(t *testing.T) {
-	ws, err := buildWriteSyncer(sinkConfig{
+	logger, err := buildWriteSyncer(sinkConfig{
 		Driver:        "rotate",
 		Filename:      "./storage/log/test-rotate.log",
 		RotatePattern: "./storage/log/test-rotate.log.%Y%m%d%H%M",
@@ -30,5 +30,5 @@ func TestBuildWriteSyncer_Rotate(t *testing.T) {
 		RotateTime:    time.Minute,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, ws)
+	require.NotNil(t, logger)
 }

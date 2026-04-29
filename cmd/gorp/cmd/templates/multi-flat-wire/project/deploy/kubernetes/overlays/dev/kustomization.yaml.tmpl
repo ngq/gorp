@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: {{.Name}}-dev
+
+resources:
+  - ../../base
+
+images:
+  - name: your-registry/user-service
+    newName: user-service
+    newTag: dev
+  - name: your-registry/order-service
+    newName: order-service
+    newTag: dev
+  - name: your-registry/product-service
+    newName: product-service
+    newTag: dev
+
+patches:
+  - path: deployment-patch.yaml

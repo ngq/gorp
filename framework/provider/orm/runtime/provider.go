@@ -17,10 +17,16 @@ import (
 //  3. SQL 执行能力统一走 sqlx。
 type Provider struct{}
 
+// NewProvider 创建 ORM runtime provider。
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string  { return "orm.runtime" }
+// Name 返回 provider 名称。
+func (p *Provider) Name() string { return "orm.runtime" }
+
+// IsDefer 表示 ORM runtime 在应用启动期直接注册。
 func (p *Provider) IsDefer() bool { return false }
+
+// Provides 返回 ORM runtime 对外暴露的统一能力 key。
 func (p *Provider) Provides() []string {
 	return []string{
 		contract.ORMBackendKey,
@@ -30,6 +36,13 @@ func (p *Provider) Provides() []string {
 	}
 }
 
+// Register 绑定 ORM runtime 统一能力。
+//
+// 中文说明：
+// - ORMBackendKey 负责根据 database.backend 解析当前主后端；
+// - DBRuntimeKey 负责把业务真正拿到的运行时对象收敛成一个入口；
+// - MigratorKey 与 SQLExecutorKey 则把迁移、执行 SQL 的常见入口统一成 capability；
+// - 这样业务和 starter 都不必再自己分支判断 gorm / sqlx / ent。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.ORMBackendKey, func(c contract.Container) (any, error) {
 		cfgAny, err := c.Make(contract.ConfigKey)
@@ -80,4 +93,5 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot ORM runtime provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }

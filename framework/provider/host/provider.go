@@ -9,15 +9,26 @@ import (
 )
 
 // Provider 是 Host 服务的提供者。
+//
+// 中文说明：
+// - Host 是框架里的生命周期宿主内核，不是历史 CLI runtime 壳；
+// - 统一负责承载 HTTP、gRPC、Cron 等可运行服务的启动与停止顺序；
+// - provider 本身只负责把 Host 绑定进容器，具体生命周期编排交给 DefaultHost。
 type Provider struct{}
 
 // NewProvider 创建 Host 服务提供者。
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string       { return "host" }
-func (p *Provider) IsDefer() bool      { return false }
+// Name 返回 provider 名称。
+func (p *Provider) Name() string { return "host" }
+
+// IsDefer 表示 Host 不走延迟注册。
+func (p *Provider) IsDefer() bool { return false }
+
+// Provides 返回 Host 对外暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.HostKey} }
 
+// Register 将默认 Host 实现绑定进容器。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.HostKey, func(c contract.Container) (any, error) {
 		return NewDefaultHost(c), nil
@@ -25,6 +36,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot Host provider 无额外启动动作。
 func (p *Provider) Boot(contract.Container) error { return nil }
 
 // DefaultHost 是 Host 接口的默认实现。

@@ -1,192 +1,30 @@
-# 下一步如何继续扩展 multi-flat-wire
+# 下一步开发动作
 
-如果你已经看过：
+建议按这个顺序继续：
 
-- `docs/structure.md`
-- `docs/component-tree.md`
+1. 先看 `docs/structure.md`，确认目录职责
+2. 先把一个服务的业务流程跑通
+3. 需要生成代码时执行 `make generate`
+4. 需要联调时执行 `make deploy-local`
+5. 需要部署时看 `docs/deploy.md`
 
-那么接下来最重要的问题通常不是“我要不要马上建一个 `third_party/` 或 `infrastructure/` 目录”，而是：
+## 继续扩业务时优先看哪几层
 
-> 当前阶段，到底应该继续保持 framework capability 心智，还是已经进入需要物化项目侧目录的阶段？
+- 业务规则：`internal/biz/`
+- 数据访问：`internal/data/`
+- 应用编排：`internal/service/`
+- 传输注册：`internal/server/`
+- 启动装配：`cmd/`
 
-本文档专门回答这个问题。
+## 什么时候再考虑新增目录
 
----
+先满足下面任一条件再考虑：
 
-## 1. 默认判断：先保持 framework 心智
+- 多个服务已经重复维护同一类接入细节
+- 某类接入已经形成稳定共享抽象
+- 继续留在现有结构里已经明显增加维护成本
 
-对 `multi-flat-wire` 来说，默认推荐仍然是：
+## 部署相关
 
-- framework 负责通用能力与治理能力入口
-- 服务目录负责业务内聚
-- Wire 负责服务依赖图装配
-
-也就是说，大多数情况下你应该优先这样理解：
-
-- `services/<service>/internal/biz`：业务规则
-- `services/<service>/internal/data`：数据访问
-- `services/<service>/internal/service`：应用编排
-- `services/<service>/internal/server`：传输层注册
-- `framework provider / capability`：缓存、消息、发现、追踪、认证、锁、熔断等能力入口
-
-如果当前还能用这套心智清晰表达你的业务，就先不要急着新增项目侧基础设施目录。
-
----
-
-## 2. 哪些情况说明“还不需要物化目录”
-
-如果你现在遇到的是下面这些场景，通常还不需要引入新的代码目录：
-
-### 场景 A：只是开始接一个中间件
-
-例如：
-
-- 想接 Redis 做缓存
-- 想接 RabbitMQ / Kafka 做消息
-- 想打开 tracing / metrics / discovery
-
-这时通常先做的应该是：
-
-- 明确业务使用动作放在哪个 `internal/service`
-- 优先复用 framework 对应 capability / provider
-- 先在文档层把目录归位想清楚
-
-而不是先创建：
-
-- `third_party/`
-- `internal/infrastructure/`
-- `shared/infrastructure/`
-
-### 场景 B：只有 1~2 个服务会使用某项能力
-
-如果某个能力目前只在少数服务使用，且还没有形成清晰的跨服务公共抽象，通常也不需要先抽一层公共基础设施目录。
-
-### 场景 C：你现在主要困惑的是“放哪”，不是“现有结构已经失控”
-
-如果问题还只是：
-
-- RabbitMQ 放哪
-- Redis 放哪
-- tracing / discovery 放哪
-
-通常说明当前阶段更需要的是“目录规划规则”，而不是“马上做目录重构”。
-
----
-
-## 3. 哪些情况说明可以开始考虑物化目录
-
-当你出现下面这些情况时，才可以认真考虑是否进入目录物化阶段。
-
-### 场景 A：多个服务已经重复维护同一类接入细节
-
-例如：
-
-- 多个服务都在重复写同一套 RabbitMQ / Kafka 接入细节
-- 多个服务都在重复写同一套外部平台 HTTP client 初始化逻辑
-- 多个服务都在复制相同的 tracing / metrics / metadata 包装层
-
-这说明“仅靠文档约定”可能已经不够了。
-
-### 场景 B：项目侧确实形成了稳定、共享、可复用的接入抽象
-
-例如：
-
-- 团队已经明确所有服务都统一使用同一套消息发布封装
-- 某些外部平台接入已经形成稳定 adapter
-- 某类公共基础设施已明显不是某个单服务私有逻辑
-
-这时候才值得考虑：
-
-- 是否抽成服务共享目录
-- 是否进入更明确的基础设施代码组织
-
-### 场景 C：framework 能力入口不足以表达你的项目约束
-
-如果出现：
-
-- framework 提供的是通用能力，但你的项目已经形成一套更强的业务侧接入规范
-- 单靠 provider / capability 已无法收口团队的接入习惯
-- 继续散落在 `internal/service` 已经明显增加维护成本
-
-这时才适合进入下一阶段设计。
-
----
-
-## 4. 即使要物化目录，也不要直接退回 `third_party/`
-
-即使将来真的进入目录物化阶段，也依然不推荐直接做：
-
-```text
-third_party/
-third_party/rabbitmq/
-third_party/kafka/
-third_party/redis/
-```
-
-因为这类目录只有“来源分类”，没有“职责分类”。
-
-更合理的做法仍然是先回答：
-
-- 这是缓存能力？
-- 这是消息能力？
-- 这是治理能力？
-- 这是外部集成能力？
-- 这是某个服务私有能力，还是多服务共享能力？
-
-也就是说：
-
-> 即使未来物化目录，也应按职责域设计，而不是按供应商堆目录。
-
----
-
-## 5. 一个简单决策顺序
-
-当你不确定是否该新增目录时，可以按下面顺序判断：
-
-### 第一步：先问它是不是业务编排
-
-如果主要表达的是：
-
-- 什么时候发消息
-- 什么时候读缓存
-- 什么时候发起外部调用
-
-那它通常先属于：
-
-- `services/<service>/internal/service/`
-
-### 第二步：再问它是不是 framework 已有能力入口
-
-如果 framework 已经有统一入口，例如：
-
-- cache
-- message queue
-- discovery
-- tracing
-- metrics
-- service_auth
-- dlock
-- circuitbreaker
-
-那优先继续使用 framework 心智，不要急着造项目侧目录。
-
-### 第三步：最后再问它是否已经形成跨服务、稳定、重复的共享接入层
-
-只有当答案明显是“是”时，才值得进一步评估目录物化。
-
----
-
-## 6. 当前推荐动作
-
-如果你现在正在使用 `multi-flat-wire` 扩业务，推荐动作顺序是：
-
-1. 先看 `docs/structure.md`，理解目录职责
-2. 再看 `docs/component-tree.md`，明确组件归位规则
-3. 新能力先按现有结构开发
-4. 只有当重复接入、共享抽象、跨服务统一约束都足够明显时，再考虑是否需要新增项目侧基础设施目录
-
----
-
-## 一句话总结
-
-对 `multi-flat-wire` 而言，默认策略不是“先建 infrastructure 目录”，而是“先保持 framework capability 心智 + 服务内聚结构”；只有当跨服务重复接入与共享抽象已经明显稳定时，才进入目录物化阶段。
+- 默认附带 Docker 开发部署与 Kubernetes 部署资产
+- 继续看：`docs/deploy.md`

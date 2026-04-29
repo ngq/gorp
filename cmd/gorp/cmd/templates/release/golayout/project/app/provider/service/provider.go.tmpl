@@ -11,9 +11,9 @@ import (
 // ServiceProvider 注册应用所需的所有服务。
 //
 // 中文说明：
-// - 遵循 gorp 框架的 Provider 模式；
-// - 按依赖顺序注册：data -> biz -> service；
-// - 支持 noop 模式，单体阶段零依赖。
+// - 这是保留给高级/兼容 runtime 链路的 provider 写法；
+// - 默认 starter 主线已经优先改为 typed runtime + direct constructor；
+// - 只有在继续复用兼容 runtime/provider 机制时，才需要维护这里。
 type ServiceProvider struct{}
 
 // NewProvider 创建服务 provider。

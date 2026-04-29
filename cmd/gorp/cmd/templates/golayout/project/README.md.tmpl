@@ -11,10 +11,8 @@
 ├── config/                 # 配置文件
 │   └── app.yaml
 ├── app/                    # 应用层
-│   ├── http/               # HTTP 路由
-│   │   └── routes.go
-│   └── provider/           # 高级/兼容运行时扩展位
-│       └── service/provider.go
+│   └── http/               # HTTP 路由
+│       └── routes.go
 ├── internal/               # 内部实现
 │   ├── biz/                # 业务逻辑层
 │   ├── data/               # 数据访问层
@@ -29,7 +27,7 @@
 | 层级 | 目录 | 职责 |
 |------|------|------|
 | 入口 | cmd/app/ | 项目自己的默认启动入口，直接复用 framework/bootstrap |
-| 应用 | app/ | 路由注册；`app/provider` 仅保留给高级/兼容运行时扩展 |
+| 应用 | app/ | 路由注册与传输层接线 |
 | 业务 | internal/biz/ | 领域对象、仓储接口、用例 |
 | 数据 | internal/data/ | 仓储实现、数据库操作 |
 | 服务 | internal/service/ | HTTP handler、请求响应转换 |
@@ -55,47 +53,37 @@ go run ./cmd/app
 make run
 ```
 
-如需继续使用工具链/辅助命令，建议直接使用项目内的 `gorp` CLI 入口：
-
-```bash
-go run ./cmd/gorp proto gen
-```
-
-## 默认已具备的起步能力
-
-当前默认 starter 已经把下面这些框架能力接入到可开工路径里：
+## 默认起步能力
 
 - HTTP 启动骨架（直接 `go run ./cmd/app`）
 - `/healthz` 健康检查
 - `/metrics` 指标端点
-- GORM 数据库起步链路（默认 sqlite）
-- 业务 JWT 服务接入位（`auth.jwt.*`）
-- Redis 接入位（`redis.*`，默认按需使用）
-- Proto-first gRPC bridge 能力位（`GRPCConnFactory` / `GRPCServerRegistrar`）
-
-建议理解：
-
-- JWT / Redis / Cache 默认先提供“低成本接入位”，不强制你一开始就启用完整业务认证、缓存或外部基础设施；
-- 基础端点由 framework/bootstrap 统一注册，业务代码主要关注自己的 API 路由与服务逻辑；
-- `app/provider` 目录默认不是日常业务开发主路径，而是保留给高级/兼容运行时扩展；
-- gRPC 当前正式主线已经收口为 Proto-first：业务应围绕 `pb.RegisterXxxServer(...)` / `pb.NewXxxClient(conn)` 工作，而不是继续围绕字符串式 `RPCClient.Call(...)`。
+- GORM 数据库起步链路（sqlite）
+- Redis / gRPC 等能力接入位
 
 ## API 端点
+
+默认生成结果保留最小 Demo CRUD 样板，方便你直接替换成自己的业务接口。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | /healthz | 健康检查 |
-| POST | /api/v1/demos | 创建 Demo |
-| GET | /api/v1/demos/:id | 获取 Demo |
-| GET | /api/v1/demos | 列表 Demo |
-| PUT | /api/v1/demos/:id | 更新 Demo |
-| DELETE | /api/v1/demos/:id | 删除 Demo |
+| POST | /api/v1/demos | Demo 样板：创建 |
+| GET | /api/v1/demos/:id | Demo 样板：获取 |
+| GET | /api/v1/demos | Demo 样板：列表 |
+| PUT | /api/v1/demos/:id | Demo 样板：更新 |
+| DELETE | /api/v1/demos/:id | Demo 样板：删除 |
 
 ## 日志使用建议
 
-- 默认优先使用 framework 提供的 logger 能力；
-- 启动阶段优先通过 framework/bootstrap 暴露的 `rt.Logger` 记录系统日志；
-- 业务逻辑里如果需要请求级 trace / request 字段，可在边界层基于 framework logger 追加字段，而不是把 `LoggerFromContext(ctx)` 作为默认写法散落到各层。
+- 默认优先使用 `gorp/log` 作为业务日志入口；
+- 启动装配层之外，先按业务需要再逐步补上下文字段。
+
+## 装配建议
+
+- 默认主线直接使用 `cmd/app/main.go` 中的入口骨架；
+- 业务主线直接围绕 `data -> biz -> service -> http routes` 组织代码；
+- 更强编译期装配按需再切到 Wire 模板。
 
 ## 配置
 

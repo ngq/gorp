@@ -26,8 +26,14 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("product-service requires gorm database")
 	}
-	publisher := frameworkcontainer.MustMakeMessagePublisher(rt.Container)
-	subscriber := frameworkcontainer.MustMakeMessageSubscriber(rt.Container)
+	publisher, err := frameworkcontainer.MakeMessagePublisher(rt.Container)
+	if err != nil {
+		return err
+	}
+	subscriber, err := frameworkcontainer.MakeMessageSubscriber(rt.Container)
+	if err != nil {
+		return err
+	}
 	services, err := wireProductServices(rt.DB, publisher, subscriber)
 	if err != nil {
 		return err

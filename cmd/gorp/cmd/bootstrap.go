@@ -6,8 +6,6 @@ import (
 
 	frameworkbootstrap "github.com/ngq/gorp/framework/bootstrap"
 	"github.com/ngq/gorp/framework/contract"
-	"github.com/ngq/gorp/framework/provider/orm/ent"
-
 	"github.com/ngq/gorp/framework"
 )
 
@@ -37,9 +35,11 @@ func WithAppEnv(env string) bootstrapOption {
 // WithExtraProviders 为当前进程追加项目侧 provider。
 //
 // 中文说明：
-// - 用于生成项目在调用 cmd.Execute() 前，把自己的 service/runtime provider 注入 CLI bootstrap；
-// - 不修改母仓默认 provider 组，只做顺序明确的附加注册；
-// - 传入 nil 会被忽略。
+// - 这是工具链内部 bootstrap 的附加 provider 扩展位；
+// - 主要服务于生成项目在共享 CLI / 兼容命令链路下补充自己的 provider；
+// - 不修改 framework 默认 provider 组，只做顺序明确的附加注册；
+// - 传入 nil 会被忽略；
+// - 业务服务默认公开启动入口仍应优先走项目自己的 `cmd/*/main.go`。
 func WithExtraProviders(providers ...contract.ServiceProvider) bootstrapOption {
 	return func(cfg *bootstrapConfig) {
 		for _, p := range providers {
@@ -54,10 +54,10 @@ func WithExtraProviders(providers ...contract.ServiceProvider) bootstrapOption {
 // WithRuntimeProvider 指定当前进程使用的 runtime provider。
 //
 // 中文说明：
-// - 生成项目可通过此入口覆盖母仓默认 runtime provider；
-// - 它主要服务于共享 CLI 下的 legacy/runtime 命令组装配，不是 starter 默认公开启动入口；
-// - 若未指定，则继续回退到母仓 runtime_provider.NewProvider()；
-// - 这样母仓与模板项目可以共享同一套 CLI，但各自拥有自己的 runtime 装配。
+// - 这是工具链内部 bootstrap 的兼容 runtime 扩展位；
+// - 主要服务于共享 CLI / legacy 辅助命令链路，不是 starter 默认公开启动入口；
+// - 若未指定，则继续保持 framework/bootstrap.NewCLIApplication() 当前装配结果；
+// - 这样母仓与模板项目可以共享同一套 CLI，但业务服务默认主线仍落在项目自己的启动入口。
 func WithRuntimeProvider(p contract.ServiceProvider) bootstrapOption {
 	return func(cfg *bootstrapConfig) {
 		if p != nil {
@@ -69,9 +69,10 @@ func WithRuntimeProvider(p contract.ServiceProvider) bootstrapOption {
 // RegisterBootstrapProviders 注册当前进程的全局 bootstrap hook。
 //
 // 中文说明：
-// - 这是给模板项目高级扩展位使用的稳定入口；
-// - 主要用于把项目自己的 runtime/provider 装配注入共享 CLI bootstrap；
+// - 这是给模板项目高级扩展位使用的兼容入口，不是业务服务默认公开启动入口；
+// - 主要用于在共享 CLI / legacy 辅助命令链路下，把项目自己的 runtime/provider 装配注入工具链 bootstrap；
 // - 普通 starter 用户默认仍应通过项目自己的 `cmd/*/main.go` 启动；
+// - examples 如保留，也只应作为参考与可选验证素材，不构成这层 hook 的默认语义来源；
 // - 在调用 cmd.Execute() 前执行一次即可；
 // - 会覆盖当前进程之前注册的 runtime provider，并替换 extra providers 列表。
 func RegisterBootstrapProviders(runtimeProvider contract.ServiceProvider, extraProviders ...contract.ServiceProvider) {
@@ -110,16 +111,8 @@ func bootstrap(opts ...bootstrapOption) (*framework.Application, contract.Contai
 		}
 	}
 
-	appRuntime := framework.NewApplication()
-	c := appRuntime.Container()
-
-	if err := c.RegisterProviders(frameworkbootstrap.DefaultProviders()...); err != nil {
-		return nil, nil, err
-	}
-	if err := frameworkbootstrap.RegisterSelectedMicroserviceProviders(c); err != nil {
-		return nil, nil, err
-	}
-	if err := c.RegisterProvider(ent.NewProvider()); err != nil {
+	appRuntime, c, err := frameworkbootstrap.NewCLIApplication()
+	if err != nil {
 		return nil, nil, err
 	}
 

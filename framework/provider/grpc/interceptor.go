@@ -130,12 +130,17 @@ func StreamServerInterceptor() grpc.StreamServerInterceptor {
 	}
 }
 
-// wrappedServerStream 包装 grpc.ServerStream 以支持自定义 context
+// wrappedServerStream 包装 grpc.ServerStream 以支持自定义 context。
+//
+// 中文说明：
+// - 流式拦截器从 metadata 提取 trace/request id 后，需要把更新后的 context 继续传给业务 handler；
+// - grpc.ServerStream 默认不会替换 Context，因此这里用一个轻量包装器把新 context 带下去。
 type wrappedServerStream struct {
 	grpc.ServerStream
 	ctx context.Context
 }
 
+// Context 返回包装后的上下文。
 func (w *wrappedServerStream) Context() context.Context {
 	return w.ctx
 }
@@ -193,6 +198,10 @@ func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 }
 
 // StreamClientInterceptor 创建一个 gRPC 客户端流拦截器，用于向 metadata 中注入 trace id。
+//
+// 中文说明：
+// - 作用与 UnaryClientInterceptor 一致，但覆盖流式调用；
+// - 这样无论是一元 RPC 还是流 RPC，都能复用同一套 trace/request id 透传约定。
 func StreamClientInterceptor() grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		// 尝试从 context 获取 trace id

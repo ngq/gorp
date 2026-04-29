@@ -190,11 +190,15 @@ func TestSAGABuilder_AddBranch(t *testing.T) {
 	saga.AddBranch("/action", "/compensate", nil, contract.BranchOptions{
 		RetryCount:    3,
 		RetryInterval: 5,
+		Timeout:       9,
 	})
 
 	tx, err := saga.Build()
 	assert.NoError(t, err)
 	assert.Len(t, tx.Steps, 1)
+	assert.EqualValues(t, 3, tx.Steps[0].RetryCount)
+	assert.EqualValues(t, 5, tx.Steps[0].RetryInterval)
+	assert.EqualValues(t, 9, tx.Steps[0].Timeout)
 }
 
 func TestDTMClient_APIBaseURL(t *testing.T) {

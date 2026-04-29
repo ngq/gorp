@@ -12,9 +12,9 @@ import (
 // main 是 order 服务的主入口。
 //
 // 中文说明：
-// - 默认直接通过 framework/bootstrap 启动当前服务；
+// - 直接通过 framework/bootstrap 启动当前服务；
 // - 用户日常开发时可直接 `go run ./services/order/cmd` 或 IDE 调试；
-// - 这里不依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
+// - 不依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
 func main() {
 	if err := frameworkbootstrap.BootHTTPService("order-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)

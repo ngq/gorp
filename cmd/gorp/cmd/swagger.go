@@ -14,9 +14,15 @@ import (
 // 中文说明：
 // - 当前主要提供 `swagger gen`，用于基于 swag 生成 swagger2 文档。
 // - 后续 openapi3 转换则由 `openapi gen` 负责。
+// - 这组命令属于按需使用的文档产物链，不是默认起步入口。
 var swaggerCmd = &cobra.Command{
-	Use:   "swagger",
-	Short: "Swagger documentation generation tools",
+	Use:     "swagger",
+	Short:   "On-demand Swagger tools",
+	GroupID: commandGroupAdvanced,
+	Long: `On-demand Swagger tools.
+
+Use this command group only after you already know you need API documentation artifacts.
+It is not the default starter path.`,
 }
 
 var swaggerGenCmd = &cobra.Command{

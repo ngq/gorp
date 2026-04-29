@@ -43,6 +43,12 @@ func (p *Provider) Register(c contract.Container) error {
 // Boot 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }
 
+// readMetadataConfig 从配置中心读取 metadata 传播配置。
+//
+// 中文说明：
+// - 没有配置服务或配置类型不匹配时，直接回退到默认前缀 x-md-；
+// - 只读取 metadata provider 自己关心的少量配置，避免把传播策略和外部配置实现强耦合；
+// - constant metadata 会在传播器层作为固定键值参与透传。
 func readMetadataConfig(c contract.Container) contract.MetadataConfig {
 	cfgAny, err := c.Make(contract.ConfigKey)
 	if err != nil {
@@ -57,32 +63,23 @@ func readMetadataConfig(c contract.Container) contract.MetadataConfig {
 		}
 	}
 
-		metaCfg := contract.MetadataConfig{
-			PropagatePrefix: []string{"x-md-"},
-		}
-		if prefixes := configprovider.GetStringSliceAny(cfg,
-			"metadata.propagate_prefix",
-		); len(prefixes) > 0 {
-			metaCfg.PropagatePrefix = prefixes
-		}
-		if constant := configprovider.GetStringMapAny(cfg,
-			"metadata.constant_metadata",
-		); len(constant) > 0 {
-			metaCfg.ConstantMetadata = constant
-		}
-		if maxSize := configprovider.GetIntAny(cfg,
-			"metadata.max_size",
-		); maxSize > 0 {
-			metaCfg.MaxSize = maxSize
-		}
-		return metaCfg
-}
-
-func toString(v any) string {
-	switch s := v.(type) {
-	case string:
-		return s
-	default:
-		return ""
+	metaCfg := contract.MetadataConfig{
+		PropagatePrefix: []string{"x-md-"},
 	}
+	if prefixes := configprovider.GetStringSliceAny(cfg,
+		"metadata.propagate_prefix",
+	); len(prefixes) > 0 {
+		metaCfg.PropagatePrefix = prefixes
+	}
+	if constant := configprovider.GetStringMapAny(cfg,
+		"metadata.constant_metadata",
+	); len(constant) > 0 {
+		metaCfg.ConstantMetadata = constant
+	}
+	if maxSize := configprovider.GetIntAny(cfg,
+		"metadata.max_size",
+	); maxSize > 0 {
+		metaCfg.MaxSize = maxSize
+	}
+	return metaCfg
 }

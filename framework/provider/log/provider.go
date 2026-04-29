@@ -5,16 +5,22 @@ import (
 	"strings"
 	"time"
 
+	logzap "github.com/ngq/gorp/contrib/log/zap"
 	"github.com/ngq/gorp/framework/contract"
-	"github.com/ngq/gorp/framework/provider/app"
+	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
 // Provider 把日志服务注册进容器。
 //
 // 中文说明：
-// - 对外统一暴露 contract.LogKey，业务层不需要直接依赖 zap。
-// - 日志配置项较多，因此在 Register 中集中做默认值解析与驱动选择。
-// - provider 本身不延迟加载，保证框架启动后日志能力立即可用。
+// - 对外统一暴露 contract.LogKey，业务层不需要直接依赖 zap；
+// - 当前核心层只保留最小默认日志 provider，具体 zap backend 已下沉到 contrib/log/zap；
+// - 日志配置项较多，因此在 Register 中集中做默认值解析与驱动选择；
+// - 当前阶段正式冻结的口径是：
+//   1. 对外承诺面优先是“统一日志能力”
+//   2. 文件路径推导仍属于 runtime convention 语义的一部分
+//   3. 当 file/rotate 且未显式提供 `log.file` 时：优先走 `contract.Root` 的 `LogPath()`，否则最小回退到 `./gorp.log`
+// - 后续如进入抽仓阶段再评估是否继续保留这条最小回退路径，但在冻仓阶段先把它视为稳定默认语义。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
@@ -23,6 +29,7 @@ func (p *Provider) Name() string { return "log" }
 func (p *Provider) IsDefer() bool { return false }
 func (p *Provider) Provides() []string { return []string{contract.LogKey} }
 
+// Register 绑定统一日志服务。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.LogKey, func(c contract.Container) (any, error) {
 		var cfg contract.Config
@@ -45,10 +52,6 @@ func (p *Provider) Register(c contract.Container) error {
 		ljCompress := false
 		ljLocalTime := true
 
-		// 中文说明：
-		// - 先定义一套框架默认值，确保即使没有 log 配置也能正常输出。
-		// - 后面如果配置中心存在对应键，再逐项覆盖这些默认值。
-		// - 这种写法比直接依赖配置文件完整性更稳健。
 		if cfg != nil {
 			if s := cfg.GetString("log.level"); s != "" {
 				level = s
@@ -80,10 +83,10 @@ func (p *Provider) Register(c contract.Container) error {
 			if v := cfg.GetInt("log.max_age_days"); v > 0 {
 				ljMaxAgeDays = v
 			}
-			if v := cfg.GetBool("log.compress"); v {
+			if v, ok := configprovider.GetBoolAny(cfg, "log.compress"); ok {
 				ljCompress = v
 			}
-			if v := cfg.GetBool("log.local_time"); v {
+			if v, ok := configprovider.GetBoolAny(cfg, "log.local_time"); ok {
 				ljLocalTime = v
 			}
 		}
@@ -92,23 +95,15 @@ func (p *Provider) Register(c contract.Container) error {
 		format = strings.ToLower(format)
 		driver = strings.ToLower(driver)
 
-		// resolve log file path default via app service (app log path)
-		//
-		// 中文说明：
-		// - driver != stdout 时，日志需要落盘；默认路径优先从 app 服务提供的 `LogPath()` 推导。
-		// - 这样 framework 的日志默认位置由宿主路径服务决定，而不是由 log provider 自己硬编码项目目录结构。
 		if driver != "stdout" {
 			if file == "" {
-				if appAny, err := c.Make(app.AppKey); err == nil {
-					if appSvc, ok := appAny.(app.App); ok {
-						file = filepath.Join(appSvc.LogPath(), "gorp.log")
+				if rootAny, err := c.Make(contract.RootKey); err == nil {
+					if rootSvc, ok := rootAny.(contract.Root); ok {
+						file = filepath.Join(rootSvc.LogPath(), "gorp.log")
 					}
 				}
 			}
 			if file == "" {
-				// 中文说明：
-				// - 正常情况下，bootstrap 会始终注册 app provider，因此这里大多数时候都会命中 appSvc.LogPath()。
-				// - 只有在极少数未注册 app provider 的宿主里，才退化到一个最小、与项目结构无关的相对路径默认值。
 				file = filepath.Join(".", "gorp.log")
 			}
 		}
@@ -116,7 +111,7 @@ func (p *Provider) Register(c contract.Container) error {
 			rotatePattern = file + ".%Y%m%d"
 		}
 
-		cfgSink := sinkConfig{Driver: driver, Filename: file, RotatePattern: rotatePattern, MaxSizeMB: ljMaxSize, MaxBackups: ljMaxBackups, MaxAgeDays: ljMaxAgeDays, Compress: ljCompress, LocalTime: ljLocalTime}
+		cfgSink := logzap.SinkConfig{Driver: driver, Filename: file, RotatePattern: rotatePattern, MaxSizeMB: ljMaxSize, MaxBackups: ljMaxBackups, MaxAgeDays: ljMaxAgeDays, Compress: ljCompress, LocalTime: ljLocalTime}
 		if d, err := time.ParseDuration(rotateMaxAge); err == nil {
 			cfgSink.RotateMaxAge = d
 		}
@@ -124,9 +119,10 @@ func (p *Provider) Register(c contract.Container) error {
 			cfgSink.RotateTime = d
 		}
 
-		return NewZapLoggerWithSink(level, format, cfgSink)
+		return logzap.NewWithSink(level, format, cfgSink)
 	}, true)
 	return nil
 }
 
+// Boot log provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }

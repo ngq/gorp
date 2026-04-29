@@ -19,7 +19,8 @@ import (
 // FoundationProviders 返回默认启动骨架里的 Foundation/App 组。
 //
 // 中文说明：
-// - 这组负责应用壳、配置、日志、HTTP 宿主、进程宿主与任务调度基础能力；
+// - 这组是“默认业务起步骨架”，不是最小 core 语义；
+// - 负责应用壳、配置、日志、HTTP 宿主、进程宿主与任务调度基础能力；
 // - 默认业务项目启动时通常都需要这组能力。
 func FoundationProviders() []contract.ServiceProvider {
 	return []contract.ServiceProvider{
@@ -30,6 +31,17 @@ func FoundationProviders() []contract.ServiceProvider {
 		hostProvider.NewProvider(),
 		cronProvider.NewProvider(),
 	}
+}
+
+// CoreProviders 返回 framework 默认主线里的核心 provider 组。
+//
+// 中文说明：
+// - 当前这组仍是“可直接启动默认业务项目的 core runtime 组”，而不是最终抽仓意义上的极简 kernel 组；
+// - framework 冻仓阶段正式冻结的桥接口径是：`CoreProviders()` 暂时继续保留为 `FoundationProviders()` 的别名层，
+//   用来承接历史 helper 与默认业务项目入口；
+// - 后续如果 framework 抽仓继续收薄，应优先从这里继续切分出更中立的 kernel provider 组。
+func CoreProviders() []contract.ServiceProvider {
+	return FoundationProviders()
 }
 
 // ORMRuntimeProviders 返回默认启动骨架里的 ORM/Runtime 组。
@@ -78,4 +90,13 @@ func BusinessSimplificationProviders() []contract.ServiceProvider {
 	providers = append(providers, AuthProviders()...)
 	providers = append(providers, cacheProvider.NewProvider())
 	return providers
+}
+
+// DefaultCapabilityProviders 返回默认业务起步能力组。
+//
+// 中文说明：
+// - 这组不是 framework 运行必需骨架，而是默认项目开箱即用时附带的业务减负能力；
+// - 当前先与 BusinessSimplificationProviders 对齐，后续如 default 能力继续收口，应优先改这里。
+func DefaultCapabilityProviders() []contract.ServiceProvider {
+	return BusinessSimplificationProviders()
 }

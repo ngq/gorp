@@ -36,6 +36,10 @@ func NewJWTService(secret, issuer, audience string) *JWTService {
 }
 
 // Sign 对业务 claims 执行签名。
+//
+// 中文说明：
+// - 当前采用 HMAC-SHA256；
+// - 只依赖 provider 自己持有的 secret，不依赖外部全局状态。
 func (s *JWTService) Sign(claims contract.JWTClaims) (string, error) {
 	if s.secret == "" {
 		return "", fmt.Errorf("jwt secret is required")
@@ -60,6 +64,10 @@ func (s *JWTService) Sign(claims contract.JWTClaims) (string, error) {
 }
 
 // Verify 校验业务 JWT 并返回 claims。
+//
+// 中文说明：
+// - 会校验签名、payload 格式以及过期时间；
+// - SubjectID 为 0 的 token 视为无效业务主体。
 func (s *JWTService) Verify(token string) (*contract.JWTClaims, error) {
 	if s.secret == "" {
 		return nil, fmt.Errorf("jwt secret is required")
@@ -96,6 +104,10 @@ func (s *JWTService) Verify(token string) (*contract.JWTClaims, error) {
 }
 
 // NewClaims 创建带默认 TTL 的业务 claims。
+//
+// 中文说明：
+// - ttlSeconds<=0 时默认回退到 24 小时；
+// - Issuer 与 Audience 继承自当前 JWTService 配置。
 func (s *JWTService) NewClaims(subjectID int64, subjectType, subjectName string, roles []string, ttlSeconds int64) contract.JWTClaims {
 	now := time.Now()
 	if ttlSeconds <= 0 {

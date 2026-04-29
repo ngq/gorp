@@ -51,6 +51,7 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 			ResponseWriter: c.Writer,
 			body:           &bytes.Buffer{},
 		}
+		baseWriter := c.Writer
 		c.Writer = writer
 
 		var lastErr error
@@ -64,7 +65,7 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 
 			// 重置响应写入器
 			writer.body.Reset()
-			writer.ResponseWriter = c.Writer
+			writer.ResponseWriter = baseWriter
 
 			// 执行请求
 			c.Next()
@@ -94,11 +95,16 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 			// 检查 context
 			select {
 			case <-c.Request.Context().Done():
-				c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{
-					"code":   504,
-					"reason": "TIMEOUT",
-					"message": "request timeout during retry",
-				})
+				writeResponseHeaders(c)
+				resp := Response{
+					Code:    CodeServiceUnavailable,
+					Message: "request timeout during retry",
+					Data: map[string]any{
+						"attempts": attempt + 1,
+						"reason":   "TIMEOUT",
+					},
+				}
+				c.AbortWithStatusJSON(http.StatusGatewayTimeout, resp)
 				return
 			default:
 			}
@@ -109,11 +115,16 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 
 			select {
 			case <-c.Request.Context().Done():
-				c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{
-					"code":   504,
-					"reason": "TIMEOUT",
-					"message": "request timeout during retry",
-				})
+				writeResponseHeaders(c)
+				resp := Response{
+					Code:    CodeServiceUnavailable,
+					Message: "request timeout during retry",
+					Data: map[string]any{
+						"attempts": attempt + 1,
+						"reason":   "TIMEOUT",
+					},
+				}
+				c.AbortWithStatusJSON(http.StatusGatewayTimeout, resp)
 				return
 			case <-time.After(delay):
 			}
@@ -121,12 +132,16 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 
 		// 重试耗尽，返回错误
 		if lastErr != nil {
-			c.JSON(lastStatusCode, gin.H{
-				"code":     lastStatusCode,
-				"reason":   "SERVICE_UNAVAILABLE",
-				"message":  lastErr.Error(),
-				"attempts": policy.MaxAttempts,
-			})
+			writeResponseHeaders(c)
+			resp := Response{
+				Code:    CodeServiceUnavailable,
+				Message: lastErr.Error(),
+				Data: map[string]any{
+					"attempts": policy.MaxAttempts,
+					"reason":   "SERVICE_UNAVAILABLE",
+				},
+			}
+			c.JSON(lastStatusCode, resp)
 		}
 	}
 }
@@ -152,6 +167,7 @@ func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy
 			ResponseWriter: c.Writer,
 			body:           &bytes.Buffer{},
 		}
+		baseWriter := c.Writer
 		c.Writer = writer
 
 		var lastErr error
@@ -165,7 +181,7 @@ func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy
 
 			// 重置响应写入器
 			writer.body.Reset()
-			writer.ResponseWriter = c.Writer
+			writer.ResponseWriter = baseWriter
 
 			// 执行请求
 			c.Next()
@@ -195,11 +211,16 @@ func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy
 			// 检查 context
 			select {
 			case <-c.Request.Context().Done():
-				c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{
-					"code":   504,
-					"reason": "TIMEOUT",
-					"message": "request timeout during retry",
-				})
+				writeResponseHeaders(c)
+				resp := Response{
+					Code:    CodeServiceUnavailable,
+					Message: "request timeout during retry",
+					Data: map[string]any{
+						"attempts": attempt + 1,
+						"reason":   "TIMEOUT",
+					},
+				}
+				c.AbortWithStatusJSON(http.StatusGatewayTimeout, resp)
 				return
 			default:
 			}
@@ -210,11 +231,16 @@ func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy
 
 			select {
 			case <-c.Request.Context().Done():
-				c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{
-					"code":   504,
-					"reason": "TIMEOUT",
-					"message": "request timeout during retry",
-				})
+				writeResponseHeaders(c)
+				resp := Response{
+					Code:    CodeServiceUnavailable,
+					Message: "request timeout during retry",
+					Data: map[string]any{
+						"attempts": attempt + 1,
+						"reason":   "TIMEOUT",
+					},
+				}
+				c.AbortWithStatusJSON(http.StatusGatewayTimeout, resp)
 				return
 			case <-time.After(delay):
 			}
@@ -222,12 +248,16 @@ func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy
 
 		// 重试耗尽，返回错误
 		if lastErr != nil {
-			c.JSON(lastStatusCode, gin.H{
-				"code":     lastStatusCode,
-				"reason":   "SERVICE_UNAVAILABLE",
-				"message":  lastErr.Error(),
-				"attempts": policy.MaxAttempts,
-			})
+			writeResponseHeaders(c)
+			resp := Response{
+				Code:    CodeServiceUnavailable,
+				Message: lastErr.Error(),
+				Data: map[string]any{
+					"attempts": policy.MaxAttempts,
+					"reason":   "SERVICE_UNAVAILABLE",
+				},
+			}
+			c.JSON(lastStatusCode, resp)
 		}
 	}
 }
@@ -263,11 +293,13 @@ type retryResponseWriter struct {
 }
 
 func (w *retryResponseWriter) Write(data []byte) (int, error) {
-	return w.body.Write(data)
+	_, _ = w.body.Write(data)
+	return w.ResponseWriter.Write(data)
 }
 
 func (w *retryResponseWriter) WriteString(s string) (int, error) {
-	return w.body.WriteString(s)
+	_, _ = w.body.WriteString(s)
+	return w.ResponseWriter.WriteString(s)
 }
 
 func (w *retryResponseWriter) WriteHeader(code int) {

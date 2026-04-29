@@ -17,6 +17,7 @@ import (
 // - 这是对 `gorp new` 的联网补充方案。
 // - 支持公开 GitHub Release + zip 模板包。
 // - 模板包内部需要遵循和内置模板一致的目录约定：`templates/project/**`。
+// - 这不是默认起步路径，只在明确需要 release 交付物时进入。
 var (
 	newReleaseRepo        string
 	newReleaseTag         string
@@ -32,29 +33,24 @@ var newFromReleaseCmd = &cobra.Command{
 	Short: "Create a project from published release assets",
 	Long: `Create a project from published GitHub Release starter assets.
 
-This is a supported supplemental path.
-Most users should start with 'gorp new', and only use from-release when they specifically need published release assets or fixed-version starter delivery.
+This is a supplemental delivery path, not the default starter path.
+Start with 'gorp new' unless you specifically need published release assets or fixed-version delivery.
 
 Recommended path today:
-  - Use bare 'gorp new' for the default single-service quick start.
-  - Use positional intents on 'gorp new' for wire / multi / multi-wire.
-  - Use from-release only when you specifically need published release assets.
+  - Default starter path: gorp new
+  - Default microservice path: gorp new multi-wire
+  - Supplemental delivery path: gorp new from-release
 
-Template options in the current release path:
-  - base            : minimal skeleton for custom structure
-  - golayout        : standard single-service template
-  - golayout-wire   : advanced single-service template with Wire assembly
-  - multi-flat      : standard multi-service template
-  - multi-flat-wire : advanced multi-service template with Wire assembly
+Release starter selection:
+  - Enter here only after the embedded starter path no longer matches your delivery need.
+  - golayout          : 单服务起步
+  - multi-flat-wire   : 默认微服务起步
+  - multi-independent : 多服务独立治理
 
 Important:
-  - Use --template to choose the release template explicitly.
-  - The release path now supports the public starter templates carried by release assets.
-
-If you want the latest embedded matrix from the current CLI build:
-  - Use 'gorp new' directly.
-If you want fixed-version delivery:
-  - Use 'gorp new from-release' with a pinned release tag.
+  - Use --template only after you already know which release starter you need.
+  - Use a pinned release tag only when you need fixed-version delivery.
+  - If the embedded starter already fits, use 'gorp new' directly.
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := validateReleaseStarterTemplate(newReleaseTemplate); err != nil {
@@ -127,7 +123,7 @@ func init() {
 	newFromReleaseCmd.Flags().StringVar(&newReleaseRepo, "repo", "<owner>/<repo>", "GitHub repository (owner/repo)")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseTag, "tag", "latest", "Release tag (or 'latest')")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseAsset, "asset", "", "Release asset file name (default depends on --template)")
-	newFromReleaseCmd.Flags().StringVar(&newReleaseTemplate, "template", starterTemplateGoLayout, "release starter template: base, golayout, golayout-wire, multi-flat, multi-flat-wire")
+	newFromReleaseCmd.Flags().StringVar(&newReleaseTemplate, "template", starterTemplateGoLayout, "release starter template: golayout, multi-flat-wire, multi-independent")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newFromReleaseCmd.Flags().BoolVar(&newReleaseWithDB, "with-db", true, "include DB sample and CRUD example")
 	newFromReleaseCmd.Flags().BoolVar(&newReleaseWithSwagger, "with-swagger", true, "enable swagger config in generated starter")

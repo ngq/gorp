@@ -1,7 +1,0 @@
-module {{.ModuleName}}
-
-go 1.23
-
-require {{.FrameworkModule}} {{.FrameworkVersion}}{{if .UseReplace}}
-
-replace {{.FrameworkModule}} => {{.FrameworkPath}}{{end}}

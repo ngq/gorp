@@ -22,14 +22,21 @@ import (
 //   provider 只消费已经明确提供的 database 配置。
 type Provider struct{}
 
+// NewProvider 创建 sqlx provider。
 func NewProvider() *Provider { return &Provider{} }
 
+// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "orm.sqlx" }
+
+// IsDefer 表示 sqlx provider 不走延迟加载。
 func (p *Provider) IsDefer() bool {
 	return false
 }
+
+// Provides 返回 sqlx provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.SQLXKey} }
 
+// Register 绑定统一 SQLX 数据库连接。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.SQLXKey, func(c contract.Container) (any, error) {
 		cfgAny, err := c.Make(contract.ConfigKey)
@@ -94,9 +101,14 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot sqlx provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }
 
 // normalizeDriver 把配置中的 driver 名归一化为 sqlx.Open 可识别的 driver 名称。
+//
+// 中文说明：
+// - framework 对外沿用统一 database.driver 语义；
+// - 这里负责把业务更常见的 postgres/postgresql/pgsql 归一到 pgx。
 func normalizeDriver(driver string) (string, error) {
 	switch driver {
 	case "sqlite", "sqlite3":

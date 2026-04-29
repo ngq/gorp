@@ -12,11 +12,9 @@ func TestEmbeddedStarterTemplateMatrixRenders(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	templates := []string{
-		starterTemplateBase,
 		starterTemplateGoLayout,
-		starterTemplateGoLayoutWire,
-		starterTemplateMultiFlat,
 		starterTemplateMultiFlatWire,
+		starterTemplateMultiIndependent,
 	}
 
 	for _, templateName := range templates {
@@ -36,9 +34,7 @@ func TestEmbeddedStarterTemplateMatrixRenders(t *testing.T) {
 			require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(templateName), projectDir, data))
 			assertGeneratedProjectHasNoTemplateArtifacts(t, projectDir)
 			marker := filepath.Join(projectDir, ".gorp-template.yml")
-			if templateName != starterTemplateBase {
-				require.FileExists(t, marker)
-			}
+			require.FileExists(t, marker)
 		})
 	}
 }

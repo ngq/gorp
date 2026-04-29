@@ -20,6 +20,10 @@ func MakeDBRuntime(c contract.Container) (any, error) {
 }
 
 // MakeRedis 获取 Redis 服务，失败返回 error。
+//
+// 中文说明：
+// - 适用于业务确实需要 Redis 原生命令能力的场景；
+// - 如果只需要缓存语义，应优先使用 MakeCache。
 func MakeRedis(c contract.Container) (contract.Redis, error) {
 	v, err := c.Make(contract.RedisKey)
 	if err != nil {
@@ -43,6 +47,10 @@ func MakeCache(c contract.Container) (contract.Cache, error) {
 }
 
 // MakeGormDB 获取 GORM 实例，失败返回 error。
+//
+// 中文说明：
+// - 适用于业务明确依赖 GORM API 的路径；
+// - 如果只需要拿当前主数据库运行时，优先使用 MakeDBRuntime。
 func MakeGormDB(c contract.Container) (*gormdb.DB, error) {
 	v, err := c.Make(contract.GormKey)
 	if err != nil {
@@ -52,6 +60,10 @@ func MakeGormDB(c contract.Container) (*gormdb.DB, error) {
 }
 
 // MakeSQLX 获取 SQLX 实例，失败返回 error。
+//
+// 中文说明：
+// - 适用于业务明确依赖 sqlx API 的路径；
+// - 如果只需要拿当前主数据库运行时，优先使用 MakeDBRuntime。
 func MakeSQLX(c contract.Container) (*sqlx.DB, error) {
 	v, err := c.Make(contract.SQLXKey)
 	if err != nil {
@@ -131,6 +143,10 @@ func MakeGRPCServerRegistrar(c contract.Container) (contract.GRPCServerRegistrar
 }
 
 // MakeCron 获取 Cron 服务，失败返回 error。
+//
+// 中文说明：
+// - 适用于业务需要注册或控制定时任务的路径；
+// - 与 MustMakeCron 的差别在于这里保留 error 返回给外层处理。
 func MakeCron(c contract.Container) (contract.Cron, error) {
 	v, err := c.Make(contract.CronKey)
 	if err != nil {
@@ -140,12 +156,42 @@ func MakeCron(c contract.Container) (contract.Cron, error) {
 }
 
 // MakeLogger 获取日志服务，失败返回 error。
+//
+// 中文说明：
+// - 适用于不希望在当前层直接 panic 的路径；
+// - 这是读取框架统一 logger 的标准 helper 入口。
 func MakeLogger(c contract.Container) (contract.Logger, error) {
 	v, err := c.Make(contract.LogKey)
 	if err != nil {
 		return nil, err
 	}
 	return v.(contract.Logger), nil
+}
+
+// MakeValidator 获取验证器，失败返回 error。
+//
+// 中文说明：
+// - 用于业务层最小接入统一校验能力；
+// - 业务默认仍优先通过 gin.ValidateBody / ValidateQuery / ValidateForm 使用。
+func MakeValidator(c contract.Container) (contract.Validator, error) {
+	v, err := c.Make(contract.ValidatorKey)
+	if err != nil {
+		return nil, err
+	}
+	return v.(contract.Validator), nil
+}
+
+// MakeRetry 获取重试服务，失败返回 error。
+//
+// 中文说明：
+// - 用于业务层最小接入统一重试能力；
+// - 业务默认仍优先通过 gin.DoWithRetry 使用。
+func MakeRetry(c contract.Container) (contract.Retry, error) {
+	v, err := c.Make(contract.RetryKey)
+	if err != nil {
+		return nil, err
+	}
+	return v.(contract.Retry), nil
 }
 
 // MakeHost 获取 Host 服务，失败返回 error。
@@ -265,6 +311,26 @@ func MustMakeGRPCConnFactory(c contract.Container) contract.GRPCConnFactory {
 func MustMakeGRPCServerRegistrar(c contract.Container) contract.GRPCServerRegistrar {
 	v := c.MustMake(contract.GRPCServerRegistrarKey)
 	return v.(contract.GRPCServerRegistrar)
+}
+
+// MustMakeValidator 获取验证器，失败 panic。
+//
+// 中文说明：
+// - 适用于启动阶段或明确要求校验能力已接入的路径；
+// - 业务默认仍优先通过 gin.ValidateBody / ValidateQuery / ValidateForm 使用。
+func MustMakeValidator(c contract.Container) contract.Validator {
+	v := c.MustMake(contract.ValidatorKey)
+	return v.(contract.Validator)
+}
+
+// MustMakeRetry 获取重试服务，失败 panic。
+//
+// 中文说明：
+// - 适用于启动阶段或明确要求重试能力已接入的路径；
+// - 业务默认仍优先通过 gin.DoWithRetry 使用。
+func MustMakeRetry(c contract.Container) contract.Retry {
+	v := c.MustMake(contract.RetryKey)
+	return v.(contract.Retry)
 }
 
 // MustMakeConfig 获取 Config，失败 panic。

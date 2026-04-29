@@ -1,17 +1,17 @@
-# Starter 项目目录说明
+# 共享 starter 基底目录说明
 
-当前 starter 默认包含以下关键目录：
+当前基底层只保留多模板共享的最小目录：
 
-- `cmd/app/`：程序入口
-- `app/http/`：HTTP 路由入口
-- `app/service/`：业务服务层
-- `app/model/`：数据模型层（预留）
-- `app/provider/`：自定义 provider（预留）
+- `cmd/app/`：共享默认入口骨架
+- `app/http/`：最小 HTTP 路由入口
+- `app/service/`：最小业务服务示例
+- `app/model/`：数据模型预留目录
+- `app/provider/`：自定义 provider 预留目录
 - `config/`：基础配置
-- `storage/`：日志与运行时目录
+- `storage/`：日志与运行时目录占位
 
 ## 推荐扩展顺序
 
-1. 先在 `app/http/routes.go` 中增加新的接口
-2. 再把业务逻辑放到 `app/service/`
-3. 后续再补 `app/model/` 与 provider
+1. 先在公开模板里承接业务起步路径
+2. 基底层只保留共享文件与共享规则
+3. 不在这里增加面向最终用户的模板叙事

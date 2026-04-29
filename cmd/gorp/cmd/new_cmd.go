@@ -14,40 +14,30 @@ import "github.com/spf13/cobra"
 //    - 从 GitHub Release 下载模板包并生成项目。
 //    - 面向后续发布给外部用户使用的 starter / template 场景。
 var newCmd = &cobra.Command{
-	Use:   "new [wire|multi|multi-wire]",
-	Short: "Create a new project from embedded starter templates",
+	Use:     "new [multi-wire]",
+	Short:   "Create a new project from embedded starter templates",
+	GroupID: commandGroupStarter,
 	Long: `Create a new project from embedded starter templates.
 
-Default recommendation:
-  - Install gorp first, then use 'gorp new' as the primary starter path.
-  - Bare 'gorp new' is the default single-service quick start.
-  - Use 'gorp new wire' when you specifically want the Wire-based single-service template.
-  - Use 'gorp new multi' / 'gorp new multi-wire' when you already know you want a multi-service structure.
-  - Use 'gorp new from-release' only when you specifically need published release assets or fixed-version starter delivery.
-
-High-frequency intents:
+Default starter path:
   - gorp new            : default single-service quick start
-  - gorp new wire       : single-service Wire template
-  - gorp new multi      : default multi-service template
-  - gorp new multi-wire : multi-service Wire template
+  - gorp new multi-wire : default multi-service quick start
 
-Template matrix:
-  - base            : minimal skeleton for custom structure
-  - golayout        : default single-service template
-  - golayout-wire   : advanced single-service template with Wire assembly
-  - multi-flat      : default multi-service template
-  - multi-flat-wire : advanced multi-service template with Wire assembly
+Supplementary delivery path:
+  - gorp new from-release : published release asset delivery path
 
-Important:
-  - Positional intent is the primary public path.
-  - Explicit --template has higher priority than positional intent.
-  - Use --template when you want custom structure or advanced composition.
-  - Authentication, RBAC, admin, and other business permissions should be implemented in the generated project, not assumed by the starter template.
+On-demand starter selection:
+  - Use --template only after gorp new and gorp new multi-wire no longer match your project shape.
+  - golayout          : 单服务 / 默认起步
+  - multi-flat-wire   : 多服务 / 默认微服务起步
+  - multi-independent : 多服务 / 更强独立治理
 
-If you are not sure which path to pick:
-  - Single service quick start: gorp new
-  - Single service with Wire: gorp new wire
-  - Multi-service: gorp new multi or gorp new multi-wire`,
+Decision rule:
+  - If you are not sure, start with gorp new.
+  - If you already know you need multi-service structure, use gorp new multi-wire.
+  - Reach for --template only after those two default paths no longer fit.
+  - Authentication, RBAC, admin, and other business permissions belong in the generated project, not in the starter template.
+  - After generation, start services from the generated project's own cmd/*/main.go entrypoints.`,
 }
 
 func init() {

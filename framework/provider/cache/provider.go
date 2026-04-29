@@ -18,10 +18,16 @@ import (
 // - 这样后续做本地开发、单测替换、线上切换驱动都更方便。
 type Provider struct{}
 
+// NewProvider 创建 cache provider。
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string       { return "cache" }
-func (p *Provider) IsDefer() bool      { return false }
+// Name 返回 provider 名称。
+func (p *Provider) Name() string { return "cache" }
+
+// IsDefer 表示 cache provider 不走延迟加载。
+func (p *Provider) IsDefer() bool { return false }
+
+// Provides 返回 cache provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.CacheKey} }
 
 // config 描述 cache 顶层配置。
@@ -34,6 +40,7 @@ type config struct {
 	Driver string `mapstructure:"driver"`
 }
 
+// Register 根据配置绑定统一缓存服务。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.CacheKey, func(c contract.Container) (any, error) {
 		cfgAny, err := c.Make(contract.ConfigKey)
@@ -73,6 +80,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot cache provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }
 
 // ---- service impl ----

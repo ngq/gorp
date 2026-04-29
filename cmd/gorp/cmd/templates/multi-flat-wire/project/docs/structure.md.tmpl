@@ -1,11 +1,11 @@
 # multi-flat-wire 模板目录说明
 
-`multi-flat-wire` 是多服务的高级模板，适合明确希望在业务项目中使用 Wire 做编译期装配的团队。
+`multi-flat-wire` 适合明确要走多服务主线且希望把 Wire 收口在 `cmd/` 层的团队。
 
 > 定位提醒：
-> - 它是**高级模板**，不是默认推荐模板；
-> - 如果你只是要默认多服务起步，优先使用 `multi-flat`；
-> - `multi-flat-wire` 更适合已经明确接受 Wire 装配复杂度、希望把服务依赖图收敛在编译期的团队。
+> - 如果你已经明确要走多服务主线，直接使用 `gorp new multi-wire`；
+> - 这里的重点是服务目录、Proto-first 契约与 Wire 编译期装配；
+> - 如果当前只是快速开始单服务业务开发，优先使用裸 `gorp new`。
 
 ## 当前模板目录
 
@@ -25,7 +25,7 @@
 │   ├── order/
 │   └── product/
 ├── proto/                         # Proto-first 契约目录
-├── deployments/                   # 本地联调 / 容器部署资源
+├── deploy/                   # 本地联调 / 容器部署资源
 ├── scripts/                       # 脚本辅助目录
 ├── pkg/                           # 公共包（仅放稳定、跨服务复用的代码）
 └── docs/                          # 模板内结构说明文档
@@ -41,11 +41,10 @@
 - Wire 装配声明
 - 依赖图生成结果收口
 
-这里解决的是：
+这里默认只关心两件事：
 
 - 这个服务如何启动
-- 这个服务依赖哪些业务对象
-- 这些对象如何通过 Wire 在编译期拼起来
+- 依赖如何在 `cmd/` 层收口
 
 不建议把业务逻辑直接写在这里。
 
@@ -109,140 +108,25 @@
 - 不建议把 RabbitMQ / Redis / Kafka 这类中间件 SDK 直接写进 `internal/service/`
 - 应先区分“业务编排”和“基础设施接入细节”
 
-### 推荐理解
+当前模板只固定两条边界：
 
-#### 业务编排层
-放在：
+- 业务动作放 `internal/service/`
+- 传输注册放 `internal/server/`
 
-- `services/<service>/internal/service/`
-
-例如：
-
-- 下单后发布订单创建事件
-- 支付完成后发送库存扣减消息
-- 查询数据前先读缓存
-
-这里表达的是**什么时候用**这些能力。
-
-#### 基础设施接入细节
-当前模板阶段：
-
-- 先通过 framework provider / capability 理解
-- 先在文档中明确目录规划
-- 当前不默认把它们物化成一层模板代码目录
-
-这里表达的是**怎么接中间件**。
+其余基础设施接入细节，优先通过 framework capability / provider 解决，不在模板里继续铺开新的目录层。
 
 ---
 
-## 微服务 / 第三方组件的推荐分组
+## `docs/` 目录的作用
 
-后续如果继续扩展目录说明，建议按职责分组，而不是按供应商分组。
-
-### A. 缓存与键值组件
-
-例如：
-
-- Redis
-- framework cache
-
-推荐心智：
-
-- 业务如何使用缓存：放 `internal/service/`
-- 缓存能力来源：优先走 framework capability
-- 不建议把 Redis SDK 初始化直接分散到业务 service
-
-### B. 消息与事件组件
-
-例如：
-
-- RabbitMQ
-- Kafka
-- Redis PubSub
-- framework message queue
-
-推荐心智：
-
-- 业务何时发消息：放 `internal/service/`
-- 消息中间件如何接入：优先保持 framework message queue 心智
-- 当前不建议直接建根级 `mq/` 或 `third_party/mq/`
-
-### C. 服务发现与配置源组件
-
-例如：
-
-- discovery
-- config source
-
-推荐心智：
-
-- 它们属于运行时治理能力
-- 当前优先通过 framework provider 使用
-- 不建议在模板中提前铺开一层 project-owned 客户端封装目录
-
-### D. 可观测性组件
-
-例如：
-
-- tracing
-- metrics
-- error reporting
-
-推荐心智：
-
-- 属于跨服务治理能力
-- 不属于单个业务模块领域逻辑
-- 当前继续保持 framework capability 入口表达
-
-### E. 韧性治理组件
-
-例如：
-
-- dlock
-- circuitbreaker
-- retry
-
-推荐心智：
-
-- 它们是运行时稳定性能力
-- 应与业务 usecase 分离
-- 当前阶段先作为文档规划，不直接物化目录
-
-### F. 外部集成组件
-
-例如：
-
-- HTTP client
-- 第三方 API client
-- 外部平台接入 adapter
-
-推荐心智：
-
-- 业务调用动作可以出现在 `internal/service/`
-- 但外部调用细节不应全部直接堆在 service 中
-- 后续若要进一步整理，应按“集成职责”归类，而不是按“第三方来源”归类
-
----
-
-## 当前阶段为什么只新增 `docs/`
-
-当前模板里只先新增：
-
-- `docs/`
-
-原因是：
-
-- 先给目录树说明预留承接点
+- 给目录树说明预留承接点
 - 避免把规划中的结构误写成已经落地的代码目录
-- 避免现在过早引入 `internal/infrastructure` / `shared/infrastructure` / `third_party` 等目录，造成模板使用者误解
+- 避免过早引入 `internal/infrastructure` / `shared/infrastructure` / `third_party` 等目录，造成模板使用者误解
 
-所以当前阶段的正确理解是：
-
-- 先把规则说清楚
-- 再决定后续是否要把部分目录真正物化
+因此这里只保留目录规则，不把规划中的结构直接物化成模板代码目录。
 
 ---
 
 ## 一句话总结
 
-`multi-flat-wire` 当前仍应以“服务目录 + Wire 装配 + framework capability”作为主心智；微服务与第三方组件先按职责做目录规划说明，不要急着直接铺开一层新的基础设施代码目录。
+`multi-flat-wire` 只固定三件事：服务目录、`cmd/` 层 Wire 收口、默认通过 framework/bootstrap 启动。

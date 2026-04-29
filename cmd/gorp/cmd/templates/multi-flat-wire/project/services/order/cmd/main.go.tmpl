@@ -26,8 +26,14 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("order-service requires gorm database")
 	}
-	connFactory := frameworkcontainer.MustMakeGRPCConnFactory(rt.Container)
-	dlock := frameworkcontainer.MustMakeDistributedLock(rt.Container)
+	connFactory, err := frameworkcontainer.MakeGRPCConnFactory(rt.Container)
+	if err != nil {
+		return err
+	}
+	dlock, err := frameworkcontainer.MakeDistributedLock(rt.Container)
+	if err != nil {
+		return err
+	}
 	services, err := wireOrderServices(rt.DB, connFactory, dlock)
 	if err != nil {
 		return err

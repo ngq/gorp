@@ -26,8 +26,9 @@ import (
 //
 //	gorp proto gen  # 默认 api/proto
 var protoCmd = &cobra.Command{
-	Use:   "proto",
-	Short: "Proto generator - three workflows",
+	Use:     "proto",
+	Short:   "Proto generator - three workflows",
+	GroupID: commandGroupCodegen,
 	Long: `gorp proto is a Proto generator CLI with three workflows:
 
 1. from-service: Generate Proto from Go Service interface

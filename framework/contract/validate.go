@@ -20,7 +20,7 @@ type Validator interface {
 	// 中文说明：
 	// - 使用 validator/v10 进行结构体验证；
 	// - 验证失败返回 AppError，包含字段级错误详情；
-	// - 验证规则通过 binding tag 定义。
+	// - 验证规则默认通过 `validate` tag 定义。
 	Validate(ctx context.Context, obj any) error
 
 	// ValidateVar 验证单个变量。
@@ -34,7 +34,7 @@ type Validator interface {
 	//
 	// 中文说明：
 	// - name 为规则名称（如 "mobile"、"id_card"）；
-	// - 注册后可在 binding tag 中使用（如 binding:"required,mobile"）。
+	// - 注册后可在 `validate` tag 中使用（如 `validate:"required,mobile"`）。
 	RegisterCustom(name string, fn CustomValidateFunc) error
 
 	// SetLocale 设置错误消息语言。
@@ -66,7 +66,7 @@ type CustomValidateFunc func(ctx context.Context, field any) bool
 // - 描述单个字段的验证错误；
 // - 用于构建详细的错误响应。
 type ValidationError struct {
-	// Field 错误字段名（JSON tag 名）
+	// Field 错误字段名（当前默认使用结构体字段名）
 	Field string
 
 	// Tag 验证规则标签（如 "required"、"email"）

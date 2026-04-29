@@ -11,7 +11,7 @@ import (
 // Start 启动 product 服务。
 //
 // 中文说明：
-// - 这是 product 服务对外暴露的最小启动入口；
+// - 暴露最小启动入口；
 // - 真实业务装配仍然位于 services/product/internal/...；
 // - services/product/cmd/main.go 只负责调用这里，避免直接跨越 internal 边界。
 func Start() error {

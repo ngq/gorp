@@ -17,9 +17,15 @@ import (
 // 中文说明：
 // - 当前主要承担"把 swagger2 转成 openapi3"这一补充步骤。
 // - 它依赖 `swagger gen` 先产出 docs/swagger.json。
+// - 这组命令属于按需使用的文档产物链，不是默认起步入口。
 var openapiCmd = &cobra.Command{
-	Use:   "openapi",
-	Short: "OpenAPI conversion tools",
+	Use:     "openapi",
+	Short:   "On-demand OpenAPI tools",
+	GroupID: commandGroupAdvanced,
+	Long: `On-demand OpenAPI tools.
+
+Use this command group only after you already know you need API spec conversion output.
+It is not the default starter path.`,
 }
 
 var openapiGenCmd = &cobra.Command{

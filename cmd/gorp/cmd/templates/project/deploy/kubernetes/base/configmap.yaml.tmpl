@@ -1,0 +1,12 @@
+# ConfigMap 基础配置
+# 说明：这里只放非敏感默认配置与可公开的参考配置，敏感信息统一放到 secret.yaml。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gorp-config
+data:
+  APP_ENV: "production"
+  APP_NAME: "{{.Name}}"
+  APP_ADDRESS: ":8080"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"

@@ -5,6 +5,10 @@ import (
 )
 
 // Provider 观测服务提供者。
+//
+// 中文说明：
+// - 对外统一暴露 contract.ObservabilityKey；
+// - 把 metrics、tracer、logger、error reporter 聚合成一个总入口。
 type Provider struct {
 	config contract.ObservabilityConfig
 }
@@ -14,16 +18,16 @@ func NewProvider(config contract.ObservabilityConfig) *Provider {
 	return &Provider{config: config}
 }
 
-// Name returns the provider name.
+// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "observability" }
 
-// IsDefer returns false.
+// IsDefer 表示 observability provider 不走延迟加载。
 func (p *Provider) IsDefer() bool { return false }
 
-// Provides returns the keys this provider provides.
+// Provides 返回当前 provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.ObservabilityKey} }
 
-// Register binds the observability service to the container.
+// Register 绑定统一观测服务。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.ObservabilityKey, func(c contract.Container) (interface{}, error) {
 		// 获取依赖服务
@@ -53,5 +57,5 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-// Boot does nothing.
+// Boot observability provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }

@@ -8,7 +8,11 @@ import (
 	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
 )
 
-// main 是 starter 项目的默认入口。
+// main 是共享 starter 基底的默认入口。
+//
+// 中文说明：
+// - 这里服务于 `project` 基底层验证，不承载公开模板定位；
+// - 对外推荐入口应以 golayout / multi-flat-wire / multi-independent 为准。
 func main() {
 	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", frameworkbootstrap.HTTPServiceOptions{}, nil, setup); err != nil {
 		fmt.Fprintln(os.Stderr, err)

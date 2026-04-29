@@ -19,12 +19,17 @@
 
 ## 概述
 
-框架 Runtime 提供以下核心能力：
+框架 Runtime 提供以下运行时骨架：
 
 1. **HTTP Service Runtime** - HTTP 服务启动封装
 2. **ORM Runtime** - 统一的数据库运行时抽象
 3. **Capability Selector** - 根据配置自动选择微服务能力 Provider
-4. **Container Helpers** - 简化容器服务获取的工具函数
+4. **Container Helpers** - 容器 helper 与轻入口
+
+> 说明：
+> - 这份文档面向 runtime / framework 内部能力理解；
+> - 业务默认主线优先使用 typed runtime、direct constructor 和 capability 轻入口；
+> - 不建议把这里的内部运行时能力直接当成 starter 首屏业务写法。
 
 ---
 
@@ -47,6 +52,11 @@ type HTTPServiceRuntime struct {
 ```
 
 ### HTTPServiceOptions 选项
+
+> 说明：
+> - `ExtraProviders` 仍属于高级/扩展入口；
+> - 默认业务主线优先通过 typed runtime、direct constructor 和 capability helper 完成装配；
+> - 不建议把 `ExtraProviders` 当成 starter 首屏默认写法。
 
 ```go
 type HTTPServiceOptions struct {
@@ -103,7 +113,7 @@ func main() {
     }
 
     // 使用 Runtime 对象
-    rt.Logger.Info("服务启动中...")
+    glog.Info("服务启动中...")
     rt.Engine.GET("/users", getUsers)
 }
 ```
@@ -134,6 +144,7 @@ package main
 
 import (
     "github.com/ngq/gorp/framework/bootstrap"
+    glog "github.com/ngq/gorp/log"
     "your-project/internal/data"
     "your-project/internal/handler"
 )
@@ -162,7 +173,8 @@ func migrate(rt *bootstrap.HTTPServiceRuntime) error {
 // setup 服务装配（路由注册）
 func setup(rt *bootstrap.HTTPServiceRuntime) error {
     // 注册路由
-    userHandler := handler.NewUserHandler(rt.DB, rt.Logger)
+    userHandler := handler.NewUserHandler(rt.DB)
+    glog.Info("register user routes")
 
     rt.Engine.GET("/users", userHandler.List)
     rt.Engine.GET("/users/:id", userHandler.Get)
@@ -518,6 +530,11 @@ func SelectDistributedLockProvider(cfg contract.Config) contract.ServiceProvider
 
 ## Container Runtime Helpers
 
+> 说明：
+> - 本节是 framework/runtime 参考能力清单，不是业务默认开发主线；
+> - 业务默认优先使用 typed runtime、direct constructor，以及各 capability 的轻入口；
+> - `Make* / MustMake*` 主要用于启动装配层、framework/internal helper、兼容路径或高级场景。
+
 ### 安全获取函数（返回 error）
 
 ```go
@@ -570,9 +587,6 @@ func MakeGinEngine(c contract.Container) (*gin.Engine, error)
 ### 强制获取函数（panic）
 
 ```go
-// 日志服务
-func MustMakeLogger(c contract.Container) contract.Logger
-
 // GORM 实例
 func MustMakeGorm(c contract.Container) *gorm.DB
 
@@ -621,24 +635,24 @@ package main
 import (
     "github.com/ngq/gorp/framework/bootstrap"
     "github.com/ngq/gorp/framework/container"
+    glog "github.com/ngq/gorp/log"
 )
 
 func setup(rt *bootstrap.HTTPServiceRuntime) error {
     c := rt.Container
 
     // 强制获取（启动阶段必需）
-    logger := container.MustMakeLogger(c)
     db := container.MustMakeGorm(c)
 
     // 安全获取（可选能力）
     redis, err := container.MakeRedis(c)
     if err != nil {
-        logger.Info("Redis not configured")
+        glog.Info("Redis not configured")
     }
 
     cache, err := container.MakeCache(c)
     if err != nil {
-        logger.Info("Cache not configured")
+        glog.Info("Cache not configured")
     }
 
     // 数据库健康检查
@@ -1015,7 +1029,8 @@ func setup(rt *bootstrap.HTTPServiceRuntime) error {
     rt.Engine.Use(authMiddleware(rt.JWT))
 
     // 注册路由
-    h := handler.NewUserHandler(rt.DB, rt.Logger)
+    h := handler.NewUserHandler(rt.DB)
+    glog.Info("register user api routes")
     api := rt.Engine.Group("/api/v1")
     {
         api.GET("/users", h.List)
@@ -1035,16 +1050,16 @@ package main
 import (
     "github.com/ngq/gorp/framework/bootstrap"
     "github.com/ngq/gorp/framework/container"
+    glog "github.com/ngq/gorp/log"
 )
 
 func setup(rt *bootstrap.HTTPServiceRuntime) error {
     c := rt.Container
-    logger := rt.Logger
 
     // 可选：Redis
     redis, err := container.MakeRedis(c)
     if err != nil {
-        logger.Info("Redis not configured, using in-memory cache")
+        glog.Info("Redis not configured, using in-memory cache")
     } else {
         // 使用 Redis
         rt.Engine.Use(rateLimitMiddleware(redis))
@@ -1053,7 +1068,7 @@ func setup(rt *bootstrap.HTTPServiceRuntime) error {
     // 可选：缓存
     cache, err := container.MakeCache(c)
     if err != nil {
-        logger.Info("Cache not configured")
+        glog.Info("Cache not configured")
     } else {
         // 使用缓存
         rt.Engine.Use(cacheMiddleware(cache))
@@ -1062,7 +1077,7 @@ func setup(rt *bootstrap.HTTPServiceRuntime) error {
     // 可选：分布式锁
     lock, err := container.MakeDistributedLock(c)
     if err != nil {
-        logger.Info("Distributed lock not configured")
+        glog.Info("Distributed lock not configured")
     } else {
         // 使用分布式锁
         rt.Engine.Use(idempotencyMiddleware(lock))
@@ -1106,6 +1121,7 @@ package main
 import (
     "github.com/ngq/gorp/framework/bootstrap"
     "github.com/ngq/gorp/framework/container"
+    glog "github.com/ngq/gorp/log"
 )
 
 func setup(rt *bootstrap.HTTPServiceRuntime) error {
@@ -1185,10 +1201,9 @@ func main() {
 
 func cleanupExpiredSessions(c contract.Container) {
     db := container.MustMakeGorm(c)
-    logger := container.MustMakeLogger(c)
 
     result := db.Where("expires_at < ?", time.Now()).Delete(&Session{})
-    logger.Info("清理过期 Session", map[string]any{"count": result.RowsAffected})
+    glog.Info("清理过期 Session", glog.Int64("count", result.RowsAffected))
 }
 ```
 
@@ -1295,13 +1310,11 @@ func debugCapabilities(c contract.Container) {
         contract.MessagePublisherKey,
     }
 
-    logger := container.MustMakeLogger(c)
-
     for _, key := range keys {
         if c.IsBind(key) {
-            logger.Info("能力已启用", map[string]any{"key": key})
+            glog.Info("能力已启用", glog.String("key", key))
         } else {
-            logger.Info("能力未启用", map[string]any{"key": key})
+            glog.Info("能力未启用", glog.String("key", key))
         }
     }
 }
@@ -1319,7 +1332,7 @@ func debugCapabilities(c contract.Container) {
 | HTTP 运行时创建 | `NewHTTPServiceRuntime` | 需要自定义启动流程 |
 | ORM Runtime | `ORMRuntimeProviders` | 数据库服务 |
 | 微服务能力 | `RegisterSelectedMicroserviceProviders` | 微服务架构 |
-| 服务获取 | `Make*/MustMake*` | 业务代码中获取服务 |
+| 服务获取 | `Make*` 轻入口 / typed runtime | 启动装配层与业务边界层 |
 
 ### 启动方式选择
 
@@ -1328,5 +1341,5 @@ func debugCapabilities(c contract.Container) {
 | 单体应用 | `BootHTTPService` + 禁用微服务能力 |
 | 微服务应用 | `BootHTTPService` + 配置微服务能力 |
 | Cron Worker | `NewDefaultApplication` + `MakeCron` |
-| 纯 gRPC 服务 | 自定义启动 + `MakeGRPCServerRegistrar` |
+| 纯 gRPC 服务 | 自定义启动 + `MakeGRPCServerRegistrar` 轻入口 |
 | 最简服务 | `BootHTTPService` + 禁用 DB/Redis |

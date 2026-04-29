@@ -18,12 +18,18 @@ import (
 // - 已集成 Prometheus 指标收集，通过 /metrics 端点暴露 Redis 命令执行统计。
 type Provider struct{}
 
+// NewProvider 创建 redis provider。
 func NewProvider() *Provider { return &Provider{} }
 
+// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "redis" }
+
+// IsDefer 表示 redis provider 不走延迟加载。
 func (p *Provider) IsDefer() bool {
 	return false
 }
+
+// Provides 返回 redis provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.RedisKey} }
 
 // config 对应 redis 配置节点。
@@ -38,6 +44,7 @@ type config struct {
 	DB       int    `mapstructure:"db"`
 }
 
+// Register 绑定统一 Redis 服务。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.RedisKey, func(c contract.Container) (any, error) {
 		cfgAny, err := c.Make(contract.ConfigKey)
@@ -78,6 +85,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot redis provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }
 
 type service struct {

@@ -1,13 +1,14 @@
 # gRPC 开发指南
 
 本文档详细说明：
+
 1. 如何使用 `gorp` 命令创建项目模板
 2. 框架中 gRPC 的两种使用方式及其选择建议
 3. 基于 Proto-first 的最佳实践
 
 ---
 
-# 第一部分：使用 gorp CLI 创建项目
+## 第一部分：使用 gorp CLI 创建项目
 
 ## 安装 gorp 命令
 
@@ -35,7 +36,7 @@ go install ./cmd/gorp
 
 ## gorp 命令概览
 
-```
+```text
 gorp - Framework, starter templates, and developer tooling for gorp
 
 一级命令：
@@ -67,10 +68,7 @@ gorp new
 # 单服务 + Wire 依赖注入
 gorp new wire
 
-# 多微服务结构
-gorp new multi
-
-# 多微服务 + Wire + gRPC 示例
+# 主推微服务模板（多服务 + Wire + Proto）
 gorp new multi-wire
 ```
 
@@ -79,9 +77,9 @@ gorp new multi-wire
 | 模板名 | 说明 | 适用场景 | gRPC 支持 |
 |-------|------|---------|----------|
 | `golayout` | 默认单服务模板 | 快速启动单体项目 | ❌ |
-| `golayout-wire` | 单服务 + Wire | 需要依赖注入的单体项目 | ❌ |
-| `multi-flat` | 多微服务扁平结构 | 微服务项目（共享 go.mod） | ❌ |
-| `multi-flat-wire` | 多微服务 + Wire + Proto | **完整微服务示例** | ✅ |
+| `golayout-wire` | 单服务 Wire 高级模板 | 需要显式编译期装配的单服务项目 | ❌ |
+| `multi-flat-wire` | 主推微服务模板（多服务 + Wire + Proto） | 当前公开微服务主线 | ✅ |
+| `multi-independent` | 公开进阶多服务模板 | 更强服务自治、独立 go.mod、后续拆仓 | 视项目接入而定 |
 | `base` | 最小骨架 | 自定义结构 | ❌ |
 
 ### 命令参数
@@ -91,8 +89,10 @@ gorp new [intent] [flags]
 
 # intent（位置参数）
   wire        -> golayout-wire 模板
-  multi       -> multi-flat 模板
   multi-wire  -> multi-flat-wire 模板（推荐用于 gRPC）
+
+# 进阶多服务模板
+  --template=multi-independent
 
 # flags
   --template   指定模板名（优先级高于 intent）
@@ -277,7 +277,10 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
     httpServer.RegisterRoutes(rt.Engine)
 
     // 【关键】注册 gRPC 服务（Proto-first 方式）
-    registrar := frameworkcontainer.MustMakeGRPCServerRegistrar(rt.Container)
+    registrar, err := frameworkcontainer.MakeGRPCServerRegistrar(rt.Container)
+    if err != nil {
+        return err
+    }
     return registrar.RegisterProto(func(server *grpc.Server) error {
         userv1.RegisterUserServiceServer(server, services.User)
         return nil
@@ -346,7 +349,10 @@ import (
 
 func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
     // 【关键】获取 gRPC 连接工厂
-    connFactory := frameworkcontainer.MustMakeGRPCConnFactory(rt.Container)
+    connFactory, err := frameworkcontainer.MakeGRPCConnFactory(rt.Container)
+    if err != nil {
+        return err
+    }
 
     // Wire 组装服务（传入连接工厂）
     services, err := wireOrderServices(rt.DB, connFactory)
@@ -667,7 +673,6 @@ func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (
     s.logger.Info(ctx, "GetUser called", map[string]any{
         "trace_id":   traceID,
         "request_id": requestID,
-        "user_id":    req.Id,
     })
 
     // 业务逻辑...

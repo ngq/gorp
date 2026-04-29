@@ -19,12 +19,16 @@ func NewProvider() *Provider {
 	return &Provider{cfg: NewService()}
 }
 
+// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "config" }
 
+// IsDefer 表示 config provider 不走延迟加载。
 func (p *Provider) IsDefer() bool { return false }
 
+// Provides 返回 config provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.ConfigKey} }
 
+// Register 绑定稳定的 config service 指针。
 func (p *Provider) Register(c contract.Container) error {
 	// Bind a stable pointer so Boot() can load into it.
 	cfg := p.cfg
@@ -34,6 +38,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot 根据 APP_ENV 装载配置内容。
 func (p *Provider) Boot(contract.Container) error {
 	env := NormalizeEnv(os.Getenv("APP_ENV"))
 	// 中文说明：

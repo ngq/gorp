@@ -2,23 +2,25 @@
 
 本项目使用 **gorp 框架** 提供的微服务能力，遵循"单体→微服务渐进演进"的设计原则。
 
-## 框架已提供的能力
+## 框架当前提供的能力位
 
-| 能力 | noop (单体阶段) | 真实实现 (微服务阶段) | 使用方式 |
+| 能力位 | 单体阶段默认实现 | 微服务阶段可接入后端 | 默认业务入口 |
 |-----|----------------|---------------------|---------|
-| **服务发现** | `discovery/noop` | consul, etcd, nacos, k8s | `container.MustMake[contract.Discovery](c)` |
-| **负载均衡** | `selector/noop` | random, wrr, p2c | `container.MustMake[contract.Selector](c)` |
-| **链路追踪** | `tracing/noop` | otel (OpenTelemetry) | `container.MustMake[contract.Tracer](c)` |
-| **熔断器** | `circuitbreaker/noop` | sentinel | `container.MustMake[contract.CircuitBreaker](c)` |
-| **限流器** | `circuitbreaker/noop` | sentinel | `container.MustMake[contract.RateLimiter](c)` |
-| **RPC** | `rpc/noop` | grpc | `container.MustMake[contract.RPCClient](c)` |
-| **分布式锁** | `dlock/noop` | redis, etcd | `container.MustMake[contract.DLock](c)` |
-| **消息队列** | `messagequeue/noop` | kafka, rabbitmq | `container.MustMake[contract.MessageQueue](c)` |
+| **服务发现** | `discovery/noop` | consul, etcd, nacos, k8s 等 | 启动装配层注入，业务默认不直接从容器取 |
+| **负载均衡** | `selector/noop` | random, wrr, p2c | 启动装配层注入，业务默认不直接从容器取 |
+| **链路追踪** | `tracing/noop` | otel | framework transport / middleware 自动接入 |
+| **熔断器** | `circuitbreaker/noop` | sentinel | 按业务边界注入或封装在 service/usecase |
+| **限流器** | `circuitbreaker/noop` | sentinel | 优先通过 middleware 接入 |
+| **RPC** | `rpc/noop` | grpc / http | Proto-first + `GRPCConnFactory` |
+| **分布式锁** | `dlock/noop` | redis, etcd | typed runtime / `container.MakeDistributedLock` 轻入口 |
+| **消息队列** | `messagequeue/noop` | redis / kafka / rabbitmq 等 | typed runtime / `container.MakeMessagePublisher` 轻入口 |
 | **HTTP Metrics** | 内置 | prometheus | `gin.MetricsMiddleware()` |
 
 ## 单体阶段（默认）
 
-使用 `MonolithFriendlyProviders()`，所有微服务能力都是 noop 实现，零依赖：
+单体阶段的主线目标是：保持默认入口更轻，优先通过 typed runtime 与 capability helper 起步；微服务能力默认走 noop，实现零依赖启动。
+
+下面这段代码用于说明框架内部如何装配 noop 能力，不是推荐业务项目在默认起步阶段直接照抄的首屏写法。
 
 ```go
 package main
@@ -39,43 +41,33 @@ func main() {
 
 ## 微服务阶段
 
-切换到真实实现，只需替换对应的 Provider：
+切换到真实实现时，业务默认不需要自己在主线代码里手工拼一批具体后端 Provider；更推荐通过配置切换能力位，再由 bootstrap + capability selector 选中对应实现。
 
 ```go
 package main
 
 import (
     "github.com/ngq/gorp/framework/bootstrap"
-    "github.com/ngq/gorp/framework/contract"
-    
-    // 真实实现
-    discoveryconsul "github.com/ngq/gorp/framework/provider/discovery/consul"
-    selectorp2c "github.com/ngq/gorp/framework/provider/selector/p2c"
-    tracingotel "github.com/ngq/gorp/framework/provider/tracing/otel"
-    cbsentinel "github.com/ngq/gorp/framework/provider/circuitbreaker/sentinel"
 )
 
 func main() {
-    // 微服务模式：使用真实实现
-    providers := []contract.ServiceProvider{
-        // 基础能力
-        bootstrap.FoundationProviders()...,
-        bootstrap.ORMRuntimeProviders()...,
-        
-        // 微服务能力（替换 noop）
-        discoveryconsul.NewProvider(),     // Consul 服务发现
-        selectorp2c.NewProvider(),         // P2C 负载均衡
-        tracingotel.NewProvider(),         // OpenTelemetry 链路追踪
-        cbsentinel.NewProvider(),          // Sentinel 熔断/限流
-    }
-    
-    app, c, err := bootstrap.Init(bootstrap.Options{
-        ExtraProviders: providers,
-    })
+    // 微服务模式：保持默认启动骨架，由配置驱动 capability selector 选中真实实现
+    app, c, err := bootstrap.NewDefaultApplication()
+    _ = app
+    _ = c
+    _ = err
 }
 ```
 
+对应思路是：
+
+- 基础骨架仍走 `DefaultProviders()`
+- 微服务真实能力由 `RegisterSelectedMicroserviceProviders(...)` 按配置选中
+- 业务默认主线优先看到的是 capability helper / typed runtime，而不是一长串具体后端 import
+
 ## 使用示例
+
+下面这些示例用于说明 capability 在业务边界层如何被使用；它们表达的是 contract / helper 心智，不要求业务项目自己在启动入口里手工拼装具体后端。
 
 ### 1. HTTP Metrics（已自动集成）
 
@@ -88,16 +80,10 @@ func main() {
 ### 2. 熔断器保护下游调用
 
 ```go
-import "github.com/ngq/gorp/framework/container"
-
-func callDownstream(c contract.Container, url string) error {
-    // 获取熔断器
-    cb := container.MustMakeCircuitBreaker(c)
-    
-    // 使用熔断器保护调用
+func callDownstream(cb contract.CircuitBreaker, url string) error {
     return cb.Do(context.Background(), "downstream-service", func() error {
         resp, err := http.Get(url)
-        // ...
+        _ = resp
         return err
     })
 }
@@ -106,19 +92,14 @@ func callDownstream(c contract.Container, url string) error {
 ### 3. 限流保护 API
 
 ```go
-func apiHandler(c contract.Container) gin.HandlerFunc {
-    rl := container.MustMakeRateLimiter(c)
-    
+func apiHandler(rl contract.RateLimiter) gin.HandlerFunc {
     return func(ctx *gin.Context) {
-        // 检查是否允许请求
         if err := rl.Allow(ctx, "api:/v1/users"); err != nil {
             ctx.JSON(429, gin.H{"error": "rate limited"})
             ctx.Abort()
             return
         }
-        
         // 处理请求
-        // ...
     }
 }
 ```
@@ -126,28 +107,19 @@ func apiHandler(c contract.Container) gin.HandlerFunc {
 ### 4. 服务发现 + 负载均衡
 
 ```go
-func callService(c contract.Container, serviceName string) error {
-    // 获取服务发现
-    disc := container.MustMakeDiscovery(c)
-    
-    // 发现服务实例
+func callService(disc contract.Discovery, sel contract.Selector, serviceName string) error {
     instances, err := disc.Discover(context.Background(), serviceName)
     if err != nil {
         return err
     }
-    
-    // 获取负载均衡器
-    sel := container.MustMakeSelector(c)
-    
-    // 选择一个实例
+
     instance, err := sel.Select(instances)
     if err != nil {
         return err
     }
-    
-    // 调用服务
+
     url := fmt.Sprintf("http://%s:%d/api", instance.Address, instance.Port)
-    // ...
+    _ = url
     return nil
 }
 ```
@@ -155,22 +127,13 @@ func callService(c contract.Container, serviceName string) error {
 ### 5. 链路追踪
 
 ```go
-func tracedOperation(c contract.Container) error {
-    tracer := container.MustMakeTracer(c)
-    
-    // 创建 Span
+func tracedOperation(tracer contract.Tracer) error {
     ctx, span := tracer.Start(context.Background(), "operation-name")
     defer span.End()
-    
-    // 设置属性
+
     span.SetAttributes("key", "value")
-    
-    // 记录错误
-    if err != nil {
-        span.RecordError(err)
-    }
-    
-    return err
+    _ = ctx
+    return nil
 }
 ```
 

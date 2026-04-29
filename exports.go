@@ -2,12 +2,14 @@
 //
 // 中文说明：
 // - 通过此包可以直接访问框架的核心功能，无需分别导入子包；
-// - 例如：gorp.BootHTTPService、gorp.MustMakeLogger；
-// - 这是推荐的导入方式，简化业务代码的 import 语句。
+// - 例如：gorp.BootHTTPService；
+// - 业务层日志主线改为使用 `gorp/log`，而不是 `gorp.MustMakeLogger`；
+// - `MustMake*` 仍保留给启动装配层与 framework/internal helper 使用，不作为业务默认主线。
 //
 // 使用示例：
 //
 //	import "github.com/ngq/gorp"
+//	import glog "github.com/ngq/gorp/log"
 //
 //	func main() {
 //	    err := gorp.BootHTTPService("my-service", gorp.HTTPServiceOptions{}, migrate, setup)
@@ -21,10 +23,11 @@
 //	}
 //
 //	func setup(rt *gorp.HTTPServiceRuntime) error {
-//	    c := rt.Container()
-//	    logger := gorp.MustMakeLogger(c)
-//	    db := gorp.MustMakeGorm(c)
-//	    // 注册路由、业务逻辑等
+//	    glog.Info("service setup")
+//	    // 业务默认优先使用 typed runtime 与轻量 helper
+//	    if rt.DB == nil {
+//	        return fmt.Errorf("database required")
+//	    }
 //	    return nil
 //	}
 package gorp
@@ -80,6 +83,10 @@ func AutoMigrateModels(runtime *HTTPServiceRuntime, models ...any) error {
 }
 
 // MustMakeLogger 从容器获取日志服务。
+//
+// 中文说明：
+// - 这是 framework/internal helper；
+// - 业务层统一日志入口直接使用 `gorp/log` 或 `framework/log`。
 func MustMakeLogger(c Container) contract.Logger {
 	return container.MustMakeLogger(c)
 }
@@ -104,37 +111,70 @@ func MustMakeJWTService(c Container) contract.JWTService {
 	return container.MustMakeJWTService(c)
 }
 
+// MustMakeValidator 从容器获取验证器。
+//
+// 中文说明：
+// - 适用于启动阶段或明确要求校验能力已接入的路径；
+// - 业务默认仍优先使用 `framework/provider/gin` 提供的 ValidateBody / ValidateQuery / ValidateForm。
+func MustMakeValidator(c Container) contract.Validator {
+	return container.MustMakeValidator(c)
+}
+
+// MustMakeRetry 从容器获取重试服务。
+//
+// 中文说明：
+// - 适用于启动阶段或明确要求重试能力已接入的路径；
+// - 业务默认仍优先使用 `framework/provider/gin` 提供的 DoWithRetry。
+func MustMakeRetry(c Container) contract.Retry {
+	return container.MustMakeRetry(c)
+}
+
 // MustMakeCache 从容器获取缓存服务。
 func MustMakeCache(c Container) contract.Cache {
 	return container.MustMakeCache(c)
 }
 
 // MustMakeGRPCConnFactory 从容器获取 gRPC 连接工厂。
+//
+// 中文说明：
+// - 适用于启动装配层或 framework/internal helper；
+// - 业务默认优先使用 typed runtime 与 `container.MakeGRPCConnFactory` 轻入口。
 func MustMakeGRPCConnFactory(c Container) contract.GRPCConnFactory {
 	return container.MustMakeGRPCConnFactory(c)
 }
 
 // MustMakeGRPCServerRegistrar 从容器获取 gRPC 服务注册器。
+//
+// 中文说明：
+// - 适用于启动装配层或 framework/internal helper；
+// - 业务默认优先使用 typed runtime 与 `container.MakeGRPCServerRegistrar` 轻入口。
 func MustMakeGRPCServerRegistrar(c Container) contract.GRPCServerRegistrar {
 	return container.MustMakeGRPCServerRegistrar(c)
 }
 
 // MustMakeMessagePublisher 从容器获取消息发布者。
+//
+// 中文说明：
+// - 适用于启动装配层或 framework/internal helper；
+// - 业务默认优先使用 `container.MakeMessagePublisher` 轻入口。
 func MustMakeMessagePublisher(c Container) contract.MessagePublisher {
 	return container.MustMakeMessagePublisher(c)
 }
 
 // MustMakeMessageSubscriber 从容器获取消息订阅者。
+//
+// 中文说明：
+// - 适用于启动装配层或 framework/internal helper；
+// - 业务默认优先使用 `container.MakeMessageSubscriber` 轻入口。
 func MustMakeMessageSubscriber(c Container) contract.MessageSubscriber {
 	return container.MustMakeMessageSubscriber(c)
 }
 
 // MustMakeDistributedLock 从容器获取分布式锁。
+//
+// 中文说明：
+// - 适用于启动装配层或 framework/internal helper；
+// - 业务默认优先使用 `container.MakeDistributedLock` 轻入口。
 func MustMakeDistributedLock(c Container) contract.DistributedLock {
 	return container.MustMakeDistributedLock(c)
-}
-
-// MustMakeAppService 从容器获取应用服务。
-func MustMakeAppService[T any](c Container, key string) T {
-	return container.MustMakeAppService[T](c, key)
 }

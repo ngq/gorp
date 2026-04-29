@@ -23,14 +23,21 @@ import (
 //   provider 只消费已经明确提供的 database 配置。
 type Provider struct{}
 
+// NewProvider 创建 gorm provider。
 func NewProvider() *Provider { return &Provider{} }
 
+// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "orm.gorm" }
+
+// IsDefer 表示 gorm provider 不走延迟加载。
 func (p *Provider) IsDefer() bool {
 	return false
 }
+
+// Provides 返回 gorm provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{contract.GormKey} }
 
+// Register 绑定统一 GORM 数据库连接。
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.GormKey, func(c contract.Container) (any, error) {
 		cfgAny, err := c.Make(contract.ConfigKey)
@@ -111,4 +118,5 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
+// Boot gorm provider 无额外启动逻辑。
 func (p *Provider) Boot(contract.Container) error { return nil }

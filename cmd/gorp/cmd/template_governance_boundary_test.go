@@ -18,19 +18,19 @@ func TestTemplateVersionCommandListsPublicStarterTemplatesOnly(t *testing.T) {
 	require.NoError(t, templateVersionCmd.RunE(templateVersionCmd, nil))
 
 	out := buf.String()
-	require.Contains(t, out, "base: minimal skeleton for custom structure")
+	require.NotContains(t, out, "base: minimal skeleton for custom structure")
 	require.Contains(t, out, "golayout: default single-service starter")
-	require.Contains(t, out, "golayout-wire: advanced single-service starter with Wire assembly")
-	require.Contains(t, out, "multi-flat: default multi-service starter")
-	require.Contains(t, out, "multi-flat-wire: advanced multi-service starter with Wire assembly")
-	require.NotContains(t, out, "multi-independent")
-	require.Contains(t, out, "Release-pack / from-release currently supports: base, golayout, golayout-wire, multi-flat, multi-flat-wire.")
+	require.Contains(t, out, "multi-flat-wire: default microservice starter with Wire assembly")
+	require.Contains(t, out, "multi-independent: stronger independently-governed multi-service starter")
+
+	require.NotContains(t, out, "golayout-wire: advanced single-service starter with Wire assembly")
+	require.NotContains(t, out, "multi-flat: default multi-service starter")
+	require.Contains(t, out, "Release-pack / from-release currently supports the same public starter set: golayout, multi-flat-wire, multi-independent.")
 }
 
-func TestReleaseTemplateValidationRejectsMultiIndependent(t *testing.T) {
+func TestReleaseTemplateValidationAllowsMultiIndependent(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	err := validateReleaseStarterTemplate("multi-independent")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported release template")
+	require.NoError(t, err)
 }

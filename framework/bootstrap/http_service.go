@@ -16,6 +16,7 @@ import (
 	"github.com/ngq/gorp/framework"
 	"github.com/ngq/gorp/framework/container"
 	"github.com/ngq/gorp/framework/contract"
+	frameworklog "github.com/ngq/gorp/framework/log"
 	gingin "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/ngq/gorp/framework/provider/host"
 	redisProvider "github.com/ngq/gorp/framework/provider/redis"
@@ -23,18 +24,23 @@ import (
 	gormpkg "gorm.io/gorm"
 )
 
-// HTTPServiceOptions HTTP 服务启动选项
+// HTTPServiceOptions HTTP 服务启动选项。
+//
+// 中文说明：
+// - 这一层只暴露 starter 默认启动真正需要的少量开关；
+// - 通过 Disable* 控制是否挂载可选基础能力，避免业务 main.go 再去手工拼 provider 列表；
+// - ExtraProviders 用来追加服务私有能力，例如 RPC client、领域仓储或自定义中间件 provider。
 type HTTPServiceOptions struct {
-	// ExtraProviders 服务专属 Provider 列表
+	// ExtraProviders 服务专属 Provider 列表。
 	ExtraProviders []contract.ServiceProvider
 
-	// DisableRedis 禁用 Redis Provider
+	// DisableRedis 禁用 Redis Provider。
 	DisableRedis bool
 
-	// DisableGorm 禁用 Gorm Provider
+	// DisableGorm 禁用 Gorm Provider。
 	DisableGorm bool
 
-	// DisableMetrics 禁用 Prometheus 指标采集
+	// DisableMetrics 禁用 Prometheus 指标采集。
 	DisableMetrics bool
 }
 
@@ -85,6 +91,7 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		JWT:         container.MustMakeJWTService(c),
 		ServiceName: serviceName,
 	}
+	frameworklog.SetDefault(rt.Logger)
 
 	if !opts.DisableGorm {
 		rt.DB = container.MustMakeGorm(c)
@@ -98,11 +105,16 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	return rt, nil
 }
 
-// buildHTTPProviders 构建 HTTP 服务 Provider 列表
+// buildHTTPProviders 构建 HTTP 服务 Provider 列表。
+//
+// 中文说明：
+// - 先装入 framework 默认基础能力，再按开关决定是否接入 ORM runtime 与 Redis；
+// - 业务减负能力保持默认开启，让 starter 生成项目开箱即可拿到 JWT 等常用能力；
+// - ExtraProviders 始终最后追加，便于业务在不覆盖默认骨架的前提下补自己的 provider。
 func buildHTTPProviders(opts HTTPServiceOptions) []contract.ServiceProvider {
 	providers := make([]contract.ServiceProvider, 0)
 
-	// 基础能力
+	// 默认业务起步骨架
 	providers = append(providers, FoundationProviders()...)
 
 	// ORM/Runtime
@@ -110,8 +122,8 @@ func buildHTTPProviders(opts HTTPServiceOptions) []contract.ServiceProvider {
 		providers = append(providers, ORMRuntimeProviders()...)
 	}
 
-	// 业务减负（默认包含业务 JWT）
-	providers = append(providers, BusinessSimplificationProviders()...)
+	// 默认业务减负能力
+	providers = append(providers, DefaultCapabilityProviders()...)
 	if !opts.DisableRedis {
 		providers = append(providers, redisProvider.NewProvider())
 	}
@@ -262,7 +274,12 @@ func RunHTTP(c contract.Container, logger contract.Logger) error {
 	return nil
 }
 
-// runHTTPDirectly 直接启动 HTTP 服务（不依赖 Host）
+// runHTTPDirectly 直接启动 HTTP 服务（不依赖 Host）。
+//
+// 中文说明：
+// - 这是没有注册 Host 时的最小直启路径；
+// - 仍然保留信号监听与优雅关闭，保证 starter 在精简模式下也具备完整退出行为；
+// - 该分支只是不经过生命周期编排，不代表框架默认不推荐 Host。
 func runHTTPDirectly(c contract.Container, logger contract.Logger) error {
 	httpSvc, err := container.MakeHTTP(c)
 	if err != nil {
