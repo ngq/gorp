@@ -3,21 +3,20 @@ package contract
 import (
 	"context"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
-	HTTPKey       = "framework.http"
-	HTTPEngineKey = "framework.http.engine"
+	HTTPKey = "framework.http"
 )
 
 // HTTP is the web server service.
-// Note: Engine() returns *gin.Engine directly. We intentionally don't abstract
-// the HTTP router layer because Gin is the de-facto standard and replacing it
-// is extremely rare in practice.
+//
+// 中文说明：
+// - Router() 是新的 framework 主入口；
+// - 新框架主线只暴露 Router / Server 宿主能力，不再把 Gin engine 作为公开契约的一部分；
+// - 业务与模板默认应优先依赖 Router()，而不是感知具体 Web engine。
 type HTTP interface {
-	Engine() *gin.Engine
+	Router() HTTPRouter
 	Server() *http.Server
 
 	Run() error
