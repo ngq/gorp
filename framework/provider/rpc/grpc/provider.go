@@ -13,7 +13,6 @@ import (
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	appgrpc "github.com/ngq/gorp/framework/provider/grpc"
 	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
-	serviceauthtoken "github.com/ngq/gorp/framework/provider/serviceauth/token"
 	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -240,8 +239,8 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 			md.Set("x-service-token", token)
 		}
 	}
-	if traceID := ctx.Value("trace_id"); traceID != nil {
-		md.Set("x-trace-id", fmt.Sprintf("%v", traceID))
+	if traceID, ok := contract.FromTraceIDContext(ctx); ok {
+		md.Set("x-trace-id", traceID)
 	}
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
@@ -335,8 +334,8 @@ func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn,
 		unaryInterceptors = append(unaryInterceptors, tracingmw.UnaryClientInterceptor(c.tracer, serviceName))
 	}
 	if c.serviceAuth != nil {
-		unaryInterceptors = append(unaryInterceptors, serviceauthtoken.UnaryClientInterceptor(c.serviceAuth, serviceName))
-		streamInterceptors = append(streamInterceptors, serviceauthtoken.StreamClientInterceptor(c.serviceAuth, serviceName))
+		unaryInterceptors = append(unaryInterceptors, serviceAuthUnaryClientInterceptor(c.serviceAuth, serviceName))
+		streamInterceptors = append(streamInterceptors, serviceAuthStreamClientInterceptor(c.serviceAuth, serviceName))
 	}
 	if c.circuitBreaker != nil {
 		unaryInterceptors = append(unaryInterceptors, c.circuitBreakerUnaryInterceptor(serviceName))
@@ -533,8 +532,8 @@ func (s *Server) newGRPCServer() *grpc.Server {
 	if s.c.IsBind(contract.ServiceAuthKey) {
 		if authAny, err := s.c.Make(contract.ServiceAuthKey); err == nil {
 			if authenticator, ok := authAny.(contract.ServiceAuthenticator); ok {
-				unaryInterceptors = append(unaryInterceptors, serviceauthtoken.UnaryServerInterceptor(authenticator))
-				streamInterceptors = append(streamInterceptors, serviceauthtoken.StreamServerInterceptor(authenticator))
+				unaryInterceptors = append(unaryInterceptors, serviceAuthUnaryServerInterceptor(authenticator))
+				streamInterceptors = append(streamInterceptors, serviceAuthStreamServerInterceptor(authenticator))
 			}
 		}
 	}
@@ -659,4 +658,78 @@ func (s *Server) Server() *grpc.Server {
 // - Proto-first 主线应优先使用 `Server()` / `RegisterProto()`。
 func (s *Server) GRPCServer() *grpc.Server {
 	return s.Server()
+}
+
+// ── serviceauth transport interceptors（内联，避免引用 contrib 包）─────────────
+
+type serviceAuthWrappedStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (w *serviceAuthWrappedStream) Context() context.Context { return w.ctx }
+
+func serviceAuthUnaryClientInterceptor(auth contract.ServiceAuthenticator, targetService string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if token, err := auth.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
+			md, ok := metadata.FromOutgoingContext(ctx)
+			if !ok {
+				md = metadata.New(nil)
+			}
+			md.Set("x-service-token", token)
+			ctx = metadata.NewOutgoingContext(ctx, md)
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+func serviceAuthStreamClientInterceptor(auth contract.ServiceAuthenticator, targetService string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		if token, err := auth.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
+			md, ok := metadata.FromOutgoingContext(ctx)
+			if !ok {
+				md = metadata.New(nil)
+			}
+			md.Set("x-service-token", token)
+			ctx = metadata.NewOutgoingContext(ctx, md)
+		}
+		return streamer(ctx, desc, cc, method, opts...)
+	}
+}
+
+func serviceAuthUnaryServerInterceptor(auth contract.ServiceAuthenticator) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+				ctx = context.WithValue(ctx, "x-service-token", values[0])
+			}
+		}
+		identity, err := auth.Authenticate(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("rpc: service authentication failed: %w", err)
+		}
+		if identity != nil {
+			ctx = contract.NewServiceIdentityContext(ctx, identity)
+		}
+		return handler(ctx, req)
+	}
+}
+
+func serviceAuthStreamServerInterceptor(auth contract.ServiceAuthenticator) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		ctx := ss.Context()
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+				ctx = context.WithValue(ctx, "x-service-token", values[0])
+			}
+		}
+		identity, err := auth.Authenticate(ctx)
+		if err != nil {
+			return fmt.Errorf("rpc: service authentication failed: %w", err)
+		}
+		if identity != nil {
+			ctx = contract.NewServiceIdentityContext(ctx, identity)
+		}
+		return handler(srv, &serviceAuthWrappedStream{ServerStream: ss, ctx: ctx})
+	}
 }

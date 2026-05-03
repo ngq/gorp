@@ -72,7 +72,6 @@ func (p *Provider) Register(c contract.Container) error {
 		engine.Use(adaptMiddleware(RequestID()))
 		engine.Use(adaptMiddleware(TraceID()))
 		engine.Use(injectRequestLogger(c))
-		engine.Use(adaptMiddleware(MetricsMiddleware()))
 		attachHTTPTransportMiddleware(engine, c)
 		// 中文说明：
 		// - 默认挂载基础中间件：Recovery + RequestID + TraceID + 请求级 logger 注入 + Metrics；
@@ -476,12 +475,7 @@ func (r *router) Mount(path string, handler http.Handler) {
 	}
 	h := wrapHTTPHandler(handler)
 	r.group.Handle(http.MethodGet, path, h)
-	r.group.Handle(http.MethodPost, path, h)
-	r.group.Handle(http.MethodPut, path, h)
-	r.group.Handle(http.MethodDelete, path, h)
-	r.group.Handle(http.MethodPatch, path, h)
 	r.group.Handle(http.MethodHead, path, h)
-	r.group.Handle(http.MethodOptions, path, h)
 }
 
 func wrapHTTPHandler(handler http.Handler) gin.HandlerFunc {

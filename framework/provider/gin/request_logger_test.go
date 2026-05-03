@@ -48,8 +48,8 @@ func TestInjectRequestLoggerStoresRequestLoggerInContext(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx, _ := ginpkg.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx.Set("trace_id", "trace-1")
-	ctx.Set("request_id", "req-1")
+	ctx.Request = ctx.Request.WithContext(contract.NewTraceIDContext(ctx.Request.Context(), "trace-1"))
+	ctx.Request = ctx.Request.WithContext(contract.NewRequestIDContext(ctx.Request.Context(), "req-1"))
 
 	called := false
 	ctx.Set("__test_next", true)

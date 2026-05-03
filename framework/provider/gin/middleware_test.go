@@ -1,19 +1,29 @@
 package gin
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 )
 
 // TestRequestID 验证 RequestID 中间件是否正常工作。
 func TestRequestID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(RequestID())
+	r.Use(adaptMiddleware(RequestID()))
+
 	r.GET("/test", func(c *gin.Context) {
 		rid := GetRequestID(c)
+		ctxRID, ok := contract.FromRequestIDContext(c.Request.Context())
+		if !ok || ctxRID == "" {
+			t.Fatal("expected request id in request context")
+		}
+		if ctxRID != rid {
+			t.Fatalf("request context id mismatch: expected %s, got %s", rid, ctxRID)
+		}
 		c.String(200, rid)
 	})
 
@@ -41,7 +51,8 @@ func TestRequestID(t *testing.T) {
 func TestRequestIDWithHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(RequestID())
+	r.Use(adaptMiddleware(RequestID()))
+
 	r.GET("/test", func(c *gin.Context) {
 		rid := GetRequestID(c)
 		c.String(200, rid)
@@ -66,10 +77,19 @@ func TestRequestIDWithHeader(t *testing.T) {
 func TestTraceID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(RequestID())
-	r.Use(TraceID())
+	r.Use(adaptMiddleware(RequestID()))
+
+	r.Use(adaptMiddleware(TraceID()))
+
 	r.GET("/test", func(c *gin.Context) {
 		tid := GetTraceID(c)
+		ctxTID, ok := contract.FromTraceIDContext(c.Request.Context())
+		if !ok || ctxTID == "" {
+			t.Fatal("expected trace id in request context")
+		}
+		if ctxTID != tid {
+			t.Fatalf("trace context id mismatch: expected %s, got %s", tid, ctxTID)
+		}
 		c.String(200, tid)
 	})
 
@@ -91,8 +111,10 @@ func TestTraceID(t *testing.T) {
 func TestTraceIDWithHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(RequestID())
-	r.Use(TraceID())
+	r.Use(adaptMiddleware(RequestID()))
+
+	r.Use(adaptMiddleware(TraceID()))
+
 	r.GET("/test", func(c *gin.Context) {
 		tid := GetTraceID(c)
 		c.String(200, tid)
@@ -110,5 +132,44 @@ func TestTraceIDWithHeader(t *testing.T) {
 	tid := w.Body.String()
 	if tid != "test-trace-id-67890" {
 		t.Errorf("expected trace id to be preserved, got %s", tid)
+	}
+}
+
+func TestGetIDsFallbackToRequestContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	req := httptest.NewRequest("GET", "/test", nil)
+	req = req.WithContext(contract.NewRequestIDContext(req.Context(), "req-1"))
+	req = req.WithContext(contract.NewTraceIDContext(req.Context(), "trace-1"))
+	ctx.Request = req
+
+	if got := GetRequestID(ctx); got != "req-1" {
+		t.Fatalf("expected request id req-1, got %s", got)
+	}
+	if got := GetTraceID(ctx); got != "trace-1" {
+		t.Fatalf("expected trace id trace-1, got %s", got)
+	}
+}
+
+func TestMountOnlyExposesReadMethods(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	rt := newRouter(&engine.RouterGroup)
+	rt.Mount("/mounted", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	getReq := httptest.NewRequest(http.MethodGet, "/mounted", nil)
+	getW := httptest.NewRecorder()
+	engine.ServeHTTP(getW, getReq)
+	if getW.Code != http.StatusNoContent {
+		t.Fatalf("expected GET status %d, got %d", http.StatusNoContent, getW.Code)
+	}
+
+	postReq := httptest.NewRequest(http.MethodPost, "/mounted", nil)
+	postW := httptest.NewRecorder()
+	engine.ServeHTTP(postW, postReq)
+	if postW.Code != http.StatusNotFound {
+		t.Fatalf("expected POST status %d, got %d", http.StatusNotFound, postW.Code)
 	}
 }

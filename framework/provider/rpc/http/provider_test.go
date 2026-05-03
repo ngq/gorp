@@ -64,3 +64,32 @@ func TestClientCall_UsesCircuitBreaker(t *testing.T) {
 		t.Fatalf("expected response body to be decoded, got %#v", resp)
 	}
 }
+
+func TestClientCall_PropagatesTraceIDFromContext(t *testing.T) {
+	var gotTraceID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotTraceID = r.Header.Get("X-Trace-ID")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(
+		&contract.RPCConfig{Mode: "http", BaseURL: server.URL, TimeoutMS: 1000},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	ctx := contract.NewTraceIDContext(context.Background(), "trace-123")
+	var resp map[string]bool
+	if err := client.Call(ctx, "user-service", "/api/user/get", map[string]string{"id": "1"}, &resp); err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if gotTraceID != "trace-123" {
+		t.Fatalf("expected trace id trace-123, got %q", gotTraceID)
+	}
+}

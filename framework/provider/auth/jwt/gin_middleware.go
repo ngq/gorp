@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,45 +27,71 @@ func extractBearerToken(header string) string {
 	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(header), prefix))
 }
 
-// AuthMiddleware 基于 framework JWTService 的最小 gin middleware。
+// AuthMiddleware 基于 framework JWTService 的默认 HTTP 鉴权中间件。
 //
 // 中文说明：
 // - 这是面向业务主体的 JWT 鉴权中间件；
 // - 负责读取 Authorization Bearer Token、校验 claims、写入主体上下文；
-// - expectedSubjectType 非空时，会额外限制主体类型（如 admin/customer）。
-func AuthMiddleware(jwtSvc contract.JWTService, expectedSubjectType string) gin.HandlerFunc {
-	return func(c *gin.Context) {
+// - expectedSubjectType 非空时，会额外限制主体类型（如 admin/customer）；
+// - 默认主线返回 framework `contract.HTTPMiddleware`，Gin 只作为 provider 内部承接层。
+func AuthMiddleware(jwtSvc contract.JWTService, expectedSubjectType string) contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
 		if jwtSvc == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "jwt service is not configured"})
+			c.JSON(http.StatusUnauthorized, map[string]any{"error": "jwt service is not configured"})
 			return
 		}
 		token := extractBearerToken(c.GetHeader("Authorization"))
 		if token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing bearer token"})
+			c.JSON(http.StatusUnauthorized, map[string]any{"error": "missing bearer token"})
 			return
 		}
 		claims, err := jwtSvc.Verify(token)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.JSON(http.StatusUnauthorized, map[string]any{"error": err.Error()})
 			return
 		}
 		if expectedSubjectType != "" && claims.SubjectType != expectedSubjectType {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("unexpected subject type: %s", claims.SubjectType)})
+			c.JSON(http.StatusForbidden, map[string]any{"error": fmt.Sprintf("unexpected subject type: %s", claims.SubjectType)})
 			return
 		}
-		c.Set(ContextJWTClaimsKey, claims)
-		c.Set(ContextSubjectIDKey, claims.SubjectID)
-		c.Set(ContextSubjectTypeKey, claims.SubjectType)
-		c.Next()
+		ctx := c.Context()
+		ctx = contract.NewJWTClaimsContext(ctx, claims)
+		ctx = contract.NewSubjectIDContext(ctx, claims.SubjectID)
+		ctx = contract.NewSubjectTypeContext(ctx, claims.SubjectType)
+		c.SetContext(ctx)
+		if next != nil {
+			next()
+		}
 	}
 }
 
 // SubjectIDFromContext 从 gin context 中提取当前业务主体 ID。
 func SubjectIDFromContext(c *gin.Context) (int64, bool) {
-	v, ok := c.Get(ContextSubjectIDKey)
-	if !ok {
+	if c == nil {
 		return 0, false
 	}
-	id, ok := v.(int64)
-	return id, ok
+	v, ok := c.Get(ContextSubjectIDKey)
+	if ok {
+		id, ok := v.(int64)
+		return id, ok
+	}
+	if c.Request == nil {
+		return 0, false
+	}
+	return contract.FromSubjectIDContext(c.Request.Context())
+}
+
+// ClaimsFromRequestContext 从 request context 中提取当前业务 JWT claims。
+func ClaimsFromRequestContext(ctx context.Context) (*contract.JWTClaims, bool) {
+	return contract.FromJWTClaimsContext(ctx)
+}
+
+// SubjectIDFromRequestContext 从 request context 中提取当前业务主体 ID。
+func SubjectIDFromRequestContext(ctx context.Context) (int64, bool) {
+	return contract.FromSubjectIDContext(ctx)
+}
+
+// SubjectTypeFromRequestContext 从 request context 中提取当前业务主体类型。
+func SubjectTypeFromRequestContext(ctx context.Context) (string, bool) {
+	return contract.FromSubjectTypeContext(ctx)
 }

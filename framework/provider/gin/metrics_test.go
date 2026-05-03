@@ -90,7 +90,8 @@ func TestMetricsMiddleware(t *testing.T) {
 func TestPrometheusHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/metrics", PrometheusHandler())
+	r.GET("/metrics", wrapHTTPHandler(PrometheusHandler()))
+
 
 	// 发送测试请求
 	req := httptest.NewRequest("GET", "/metrics", nil)

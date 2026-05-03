@@ -30,7 +30,14 @@ func TestMetadataHTTPMiddlewareExtractsIntoContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	propagator := testMetadataPropagator{}
 	r := gin.New()
-	r.Use(MetadataMiddleware(propagator))
+	r.Use(func(c *gin.Context) {
+		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		MetadataMiddleware(propagator)(httpCtx, func() {
+			c.Request = httpCtx.Request()
+			c.Next()
+		})
+	})
 
 	var got string
 	r.GET("/", func(c *gin.Context) {
