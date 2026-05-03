@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/ngq/gorp/framework"
 	"github.com/ngq/gorp/framework/container"
 	"github.com/ngq/gorp/framework/contract"
@@ -42,6 +42,9 @@ type HTTPServiceOptions struct {
 
 	// DisableMetrics 禁用 Prometheus 指标采集。
 	DisableMetrics bool
+
+	// EnablePprof 启用 pprof 调试端点。
+	EnablePprof bool
 }
 
 // HTTPServiceRuntime HTTP 服务运行时
@@ -55,7 +58,7 @@ type HTTPServiceRuntime struct {
 	App         *framework.Application
 	Container   contract.Container
 	Logger      contract.Logger
-	Engine      *gin.Engine
+	Router      contract.HTTPRouter
 	DB          *gormpkg.DB
 	Redis       contract.Redis
 	JWT         contract.JWTService
@@ -86,7 +89,7 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		App:         app,
 		Container:   c,
 		Logger:      container.MustMakeLogger(c),
-		Engine:      container.MustMakeEngine(c),
+		Router:      container.MustMakeHTTPRouter(c),
 		Config:      container.MustMakeConfig(c),
 		JWT:         container.MustMakeJWTService(c),
 		ServiceName: serviceName,
@@ -140,7 +143,9 @@ func buildHTTPProviders(opts HTTPServiceOptions) []contract.ServiceProvider {
 // - 这是 generated project 默认公开的 HTTP 启动骨架；
 // - 统一处理：初始化 -> 可选迁移 -> 服务装配回调 -> 健康检查 -> Prometheus 指标 -> RunHTTP；
 // - 业务项目只需要提供自己的装配逻辑，不需要先理解 runtime provider 或 legacy CLI；
-// - 自动注册 /healthz 和 /metrics 端点。
+// - 这是给项目 main 调用的启动 helper，不替代业务 main，也不托管业务入口；
+// - 自动注册 /healthz 和 /metrics 端点；
+// - `EnablePprof` 为 true 时，额外注册 `/debug/pprof/*` 调试端点。
 //
 // 使用示例：
 //
@@ -169,10 +174,13 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 	}
 
 	// 注册基础端点
-	RegisterHealthCheck(rt.Engine, serviceName)
+	RegisterHealthCheck(rt.Router, serviceName)
 	if !opts.DisableMetrics {
-		RegisterMetricsEndpoint(rt.Engine)
-		rt.Engine.Use(gingin.MetricsMiddleware())
+		RegisterMetricsEndpoint(rt.Router)
+		rt.Router.Use(gingin.MetricsMiddleware())
+	}
+	if opts.EnablePprof {
+		RegisterPprofEndpoints(rt.Router)
 	}
 
 	return RunHTTP(rt.Container, rt.Logger)
@@ -195,10 +203,14 @@ func AutoMigrateModels(rt *HTTPServiceRuntime, models ...any) error {
 //
 // 中文说明：
 // - 添加标准 /healthz 端点，返回服务状态；
-// - serviceName 用于标识当前服务名称。
-func RegisterHealthCheck(engine *gin.Engine, serviceName string) {
-	engine.GET("/healthz", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{
+// - serviceName 用于标识当前服务名称；
+// - 默认主线直接使用 framework HTTPContext，不再要求业务或 bootstrap 直接写 Gin handler。
+func RegisterHealthCheck(router contract.HTTPRouter, serviceName string) {
+	if router == nil {
+		return
+	}
+	router.GET("/healthz", func(c contract.HTTPContext) {
+		c.JSON(http.StatusOK, map[string]any{
 			"status":  "healthy",
 			"service": serviceName,
 			"version": "1.0.0",
@@ -211,12 +223,31 @@ func RegisterHealthCheck(engine *gin.Engine, serviceName string) {
 // 中文说明：
 // - 暴露 /metrics 端点供 Prometheus 采集；
 // - 自动收集 HTTP 请求指标；
-// - 包含 Go runtime 指标。
-func RegisterMetricsEndpoint(engine *gin.Engine) {
-	// 注册 Go runtime 指标
+// - 包含 Go runtime 指标；
+// - 默认主线通过 `Mount(http.Handler)` 注册，不再要求 Router 继续承接 Gin-only metrics handler。
+func RegisterMetricsEndpoint(router contract.HTTPRouter) {
+	if router == nil {
+		return
+	}
 	gingin.RegisterGoRuntimeMetrics()
-	// 注册 /metrics 端点
-	engine.GET("/metrics", gingin.PrometheusHandler())
+	router.Mount("/metrics", gingin.PrometheusHandler())
+}
+
+// RegisterPprofEndpoints 注册标准 pprof 调试端点。
+//
+// 中文说明：
+// - 通过 Router 的 `Mount(path, http.Handler)` 注册标准库 pprof handler；
+// - 让 `/debug/pprof/*` 进入 framework 的 Router 主线路径，而不是要求业务先拿 `*gin.Engine`；
+// - 默认不自动暴露，只有在 `EnablePprof` 为 true 时才接入启动主线。
+func RegisterPprofEndpoints(router contract.HTTPRouter) {
+	if router == nil {
+		return
+	}
+	router.Mount("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	router.Mount("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	router.Mount("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	router.Mount("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	router.Mount("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 }
 
 // RunHTTP 启动 HTTP 服务，封装信号处理和优雅关闭

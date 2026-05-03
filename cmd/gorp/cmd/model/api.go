@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -188,8 +189,8 @@ var modelAPICmd = &cobra.Command{
 
 		fmt.Fprintln(cmd.OutOrStdout())
 		fmt.Fprintln(cmd.OutOrStdout(), "Next step: register the generated module routes in app/http/routes.go")
-		fmt.Fprintf(cmd.OutOrStdout(), "Example: generated/%s.RegisterRoutes(engine, container, services)\n", pkg)
-		fmt.Fprintln(cmd.OutOrStdout(), "Hint: default golayout starter now keeps contract.Container in app/http.RegisterRoutes for easier module integration")
+		fmt.Fprintf(cmd.OutOrStdout(), "Example: generated/%s.RegisterRoutes(router)\n", pkg)
+		fmt.Fprintln(cmd.OutOrStdout(), "Hint: generated routes resolve runtime backend from request context, so --register can be appended without exposing container in app/http.RegisterRoutes")
 		return nil
 	},
 }
@@ -235,37 +236,52 @@ func appendGeneratedModuleRoute(routesFilePath, pkg string) (bool, error) {
 	text := string(content)
 
 	importLine := fmt.Sprintf("\tgenerated%[1]s \"%[2]s/app/http/module/generated/%[1]s\"\n", pkg, detectModulePath())
-	registerLine := fmt.Sprintf("\t\tgenerated%[1]s.RegisterRoutes(r, c)\n", pkg)
+	routerVar, err := detectRouteRouterVar(text)
+	if err != nil {
+		return false, err
+	}
+	registerLine := fmt.Sprintf("\tgenerated%[1]s.RegisterRoutes(%[2]s)\n", pkg, routerVar)
 
 	if strings.Contains(text, registerLine) || strings.Contains(text, fmt.Sprintf("generated%s.RegisterRoutes(", pkg)) {
 		return false, nil
 	}
 
 	if !strings.Contains(text, importLine) {
-		anchor := "\tginprovider \"{{.FrameworkModule}}/framework/provider/gin\"\n"
-		if strings.Contains(text, anchor) {
-			text = strings.Replace(text, anchor, anchor+importLine, 1)
-		} else {
-			anchor = "\tginprovider \"github.com/ngq/gorp/framework/provider/gin\"\n"
-			if strings.Contains(text, anchor) {
-				text = strings.Replace(text, anchor, anchor+importLine, 1)
-			} else {
-				return false, fmt.Errorf("routes.go import anchor not found")
-			}
+		updated, ok := insertImportIntoBlock(text, importLine)
+		if !ok {
+			return false, fmt.Errorf("routes.go import block not found")
 		}
+		text = updated
 	}
 
-	insertAnchor := "\t}\n}"
-	insertBlock := registerLine + insertAnchor
-	if !strings.Contains(text, insertAnchor) {
+	insertAt := strings.LastIndex(text, "\n}")
+	if insertAt < 0 {
 		return false, fmt.Errorf("routes.go register anchor not found")
 	}
-	text = strings.Replace(text, insertAnchor, insertBlock, 1)
+	text = text[:insertAt+1] + registerLine + text[insertAt+1:]
 
 	if err := os.WriteFile(routesFilePath, []byte(text), 0o644); err != nil {
 		return false, fmt.Errorf("write routes file: %w", err)
 	}
 	return true, nil
+}
+
+func insertImportIntoBlock(text, importLine string) (string, bool) {
+	for _, closeToken := range []string{"\n)", "\r\n)"} {
+		if idx := strings.Index(text, closeToken); idx >= 0 && strings.Contains(text[:idx], "import (") {
+			return text[:idx+1] + importLine + text[idx+1:], true
+		}
+	}
+	return "", false
+}
+
+func detectRouteRouterVar(text string) (string, error) {
+	re := regexp.MustCompile(`func RegisterRoutes\(\s*([A-Za-z_][A-Za-z0-9_]*)\s+[^,\)]+`)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("routes.go RegisterRoutes signature not found")
+	}
+	return matches[1], nil
 }
 
 func writeTemplateFile(base *template.Template, filePath, src string, data any, force bool) error {
@@ -367,20 +383,19 @@ func Delete{{.Name}}(ctx context.Context, db *gorm.DB, id any) error {
 const routesTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/ngq/gorp/framework/contract"
+	gorp "github.com/ngq/gorp"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type API struct {
-	container contract.Container
 }
 
-func RegisterRoutes(r *gin.Engine, container contract.Container) {
-	api := &API{container: container}
+func RegisterRoutes(r gorp.HTTPRouter) {
+	api := &API{}
 	g := r.Group("{{.HTTPGroup}}")
 	{
 		g.POST("/create", api.Create)
@@ -391,8 +406,12 @@ func RegisterRoutes(r *gin.Engine, container contract.Container) {
 	}
 }
 
-func (api *API) mustRuntimeGorm() (*gorm.DB, error) {
-	v, err := api.container.Make(contract.DBRuntimeKey)
+func (api *API) mustRuntimeGorm(ctx context.Context) (*gorm.DB, error) {
+	container, ok := gorp.FromContainerContext(ctx)
+	if !ok || container == nil {
+		return nil, fmt.Errorf("runtime container not available in request context")
+	}
+	v, err := container.Make(gorp.DBRuntimeKey)
 	if err != nil {
 		return nil, err
 	}
@@ -409,41 +428,35 @@ const createTpl = `{{define "tpl"}}package {{.Pkg}}
 import (
 	"net/http"
 
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
-func (api *API) Create(c *gin.Context) {
+func (api *API) Create(c gorp.HTTPContext) {
 	fields := map[string]any{}
-	if err := c.ShouldBindJSON(&fields); err != nil {
-		ginprovider.BadRequest(c, err.Error())
+	if err := c.BindJSON(&fields); err != nil {
+		gorp.BadRequest(c, err.Error())
 		return
 	}
-	db, err := api.mustRuntimeGorm()
+	db, err := api.mustRuntimeGorm(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Create{{.Name}}(c.Request.Context(), db, fields)
+	item, err := svc.Create{{.Name}}(c.Context(), db, fields)
 	if err != nil {
-		ginprovider.Error(c, err)
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.SuccessWithStatus(c, http.StatusCreated, item)
+	gorp.SuccessWithStatus(c, http.StatusCreated, item)
 }
 {{end}}`
 
 const updateTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
-
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
 type updateParam struct {
@@ -451,116 +464,105 @@ type updateParam struct {
 	Fields map[string]any ` + "`json:\"fields\" binding:\"required\"`" + `
 }
 
-func (api *API) Update(c *gin.Context) {
+func (api *API) Update(c gorp.HTTPContext) {
 	param := &updateParam{}
-	if err := c.ShouldBindJSON(param); err != nil {
-		ginprovider.BadRequest(c, err.Error())
+	if err := c.BindJSON(param); err != nil {
+		gorp.BadRequest(c, err.Error())
 		return
 	}
-	db, err := api.mustRuntimeGorm()
+	db, err := api.mustRuntimeGorm(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Update{{.Name}}(c.Request.Context(), db, param.ID, param.Fields); err != nil {
-		ginprovider.Error(c, err)
+	if err := svc.Update{{.Name}}(c.Context(), db, param.ID, param.Fields); err != nil {
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.SuccessWithMessage(c, "ok", nil)
+	gorp.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`
 
 const getTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
-
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
-func (api *API) Get(c *gin.Context) {
+func (api *API) Get(c gorp.HTTPContext) {
 	id := c.Query("{{.PKName}}")
 	if id == "" {
-		ginprovider.BadRequest(c, "missing {{.PKName}}")
+		gorp.BadRequest(c, "missing {{.PKName}}")
 		return
 	}
-	db, err := api.mustRuntimeGorm()
+	db, err := api.mustRuntimeGorm(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Get{{.Name}}(c.Request.Context(), db, id)
+	item, err := svc.Get{{.Name}}(c.Context(), db, id)
 	if err != nil {
-		ginprovider.Error(c, err)
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.Success(c, item)
+	gorp.Success(c, item)
 }
 {{end}}`
 
 const listTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
 	"strconv"
 
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
-func (api *API) List(c *gin.Context) {
+func (api *API) List(c gorp.HTTPContext) {
 	start, _ := strconv.Atoi(c.Query("start"))
 	size, _ := strconv.Atoi(c.Query("size"))
-	db, err := api.mustRuntimeGorm()
+	db, err := api.mustRuntimeGorm(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	items, err := svc.List{{.Name}}(c.Request.Context(), db, start, size)
+	items, err := svc.List{{.Name}}(c.Context(), db, start, size)
 	if err != nil {
-		ginprovider.Error(c, err)
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.Success(c, items)
+	gorp.Success(c, items)
 }
 {{end}}`
 
 const deleteTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
-
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
 type deleteParam struct {
 	ID any ` + "`json:\"{{.PKName}}\" binding:\"required\"`" + `
 }
 
-func (api *API) Delete(c *gin.Context) {
+func (api *API) Delete(c gorp.HTTPContext) {
 	param := &deleteParam{}
-	if err := c.ShouldBindJSON(param); err != nil {
-		ginprovider.BadRequest(c, err.Error())
+	if err := c.BindJSON(param); err != nil {
+		gorp.BadRequest(c, err.Error())
 		return
 	}
-	db, err := api.mustRuntimeGorm()
+	db, err := api.mustRuntimeGorm(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Delete{{.Name}}(c.Request.Context(), db, param.ID); err != nil {
-		ginprovider.Error(c, err)
+	if err := svc.Delete{{.Name}}(c.Context(), db, param.ID); err != nil {
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.SuccessWithMessage(c, "ok", nil)
+	gorp.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`
 
@@ -673,20 +675,19 @@ func ent{{.Name}}ToModel(e *ent.{{.Name}}) *model.{{.Name}} {
 const entRoutesTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/ngq/gorp/framework/contract"
+	gorp "github.com/ngq/gorp"
 
-	"github.com/gin-gonic/gin"
 	"{{.Module}}/ent"
 )
 
 type API struct {
-	container contract.Container
 }
 
-func RegisterRoutes(r *gin.Engine, container contract.Container) {
-	api := &API{container: container}
+func RegisterRoutes(r gorp.HTTPRouter) {
+	api := &API{}
 	g := r.Group("{{.HTTPGroup}}")
 	{
 		g.POST("/create", api.Create)
@@ -702,9 +703,13 @@ func RegisterRoutes(r *gin.Engine, container contract.Container) {
 // 中文说明：
 // - 从 container 或项目 runtime 获取 *ent.Client；
 // - 假设项目已配置 ent backend 并执行 go generate ./ent。
-func (api *API) mustEntClient() (*ent.Client, error) {
+func (api *API) mustEntClient(ctx context.Context) (*ent.Client, error) {
+	container, ok := gorp.FromContainerContext(ctx)
+	if !ok || container == nil {
+		return nil, fmt.Errorf("runtime container not available in request context")
+	}
 	// 方式1: 从 container 获取
-	v, err := api.container.Make(contract.DBRuntimeKey)
+	v, err := container.Make(gorp.DBRuntimeKey)
 	if err == nil {
 		if client, ok := v.(*ent.Client); ok {
 			return client, nil
@@ -721,41 +726,35 @@ const entCreateTpl = `{{define "tpl"}}package {{.Pkg}}
 import (
 	"net/http"
 
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
-func (api *API) Create(c *gin.Context) {
+func (api *API) Create(c gorp.HTTPContext) {
 	fields := map[string]any{}
-	if err := c.ShouldBindJSON(&fields); err != nil {
-		ginprovider.BadRequest(c, err.Error())
+	if err := c.BindJSON(&fields); err != nil {
+		gorp.BadRequest(c, err.Error())
 		return
 	}
-	client, err := api.mustEntClient()
+	client, err := api.mustEntClient(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Create{{.Name}}(c.Request.Context(), client, fields)
+	item, err := svc.Create{{.Name}}(c.Context(), client, fields)
 	if err != nil {
-		ginprovider.Error(c, err)
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.SuccessWithStatus(c, http.StatusCreated, item)
+	gorp.SuccessWithStatus(c, http.StatusCreated, item)
 }
 {{end}}`
 
 const entUpdateTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
-
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
 type updateParam struct {
@@ -763,115 +762,104 @@ type updateParam struct {
 	Fields map[string]any ` + "`json:\"fields\" binding:\"required\"`" + `
 }
 
-func (api *API) Update(c *gin.Context) {
+func (api *API) Update(c gorp.HTTPContext) {
 	param := &updateParam{}
-	if err := c.ShouldBindJSON(param); err != nil {
-		ginprovider.BadRequest(c, err.Error())
+	if err := c.BindJSON(param); err != nil {
+		gorp.BadRequest(c, err.Error())
 		return
 	}
-	client, err := api.mustEntClient()
+	client, err := api.mustEntClient(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Update{{.Name}}(c.Request.Context(), client, param.ID, param.Fields); err != nil {
-		ginprovider.Error(c, err)
+	if err := svc.Update{{.Name}}(c.Context(), client, param.ID, param.Fields); err != nil {
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.SuccessWithMessage(c, "ok", nil)
+	gorp.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`
 
 const entGetTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
-
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
-func (api *API) Get(c *gin.Context) {
+func (api *API) Get(c gorp.HTTPContext) {
 	id := c.Query("{{.PKName}}")
 	if id == "" {
-		ginprovider.BadRequest(c, "missing {{.PKName}}")
+		gorp.BadRequest(c, "missing {{.PKName}}")
 		return
 	}
-	client, err := api.mustEntClient()
+	client, err := api.mustEntClient(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Get{{.Name}}(c.Request.Context(), client, id)
+	item, err := svc.Get{{.Name}}(c.Context(), client, id)
 	if err != nil {
-		ginprovider.Error(c, err)
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.Success(c, item)
+	gorp.Success(c, item)
 }
 {{end}}`
 
 const entListTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
 	"strconv"
 
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
-func (api *API) List(c *gin.Context) {
+func (api *API) List(c gorp.HTTPContext) {
 	start, _ := strconv.Atoi(c.Query("start"))
 	size, _ := strconv.Atoi(c.Query("size"))
-	client, err := api.mustEntClient()
+	client, err := api.mustEntClient(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	items, err := svc.List{{.Name}}(c.Request.Context(), client, start, size)
+	items, err := svc.List{{.Name}}(c.Context(), client, start, size)
 	if err != nil {
-		ginprovider.Error(c, err)
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.Success(c, items)
+	gorp.Success(c, items)
 }
 {{end}}`
 
 const entDeleteTpl = `{{define "tpl"}}package {{.Pkg}}
 
 import (
-	"net/http"
-
+	gorp "github.com/ngq/gorp"
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
 )
 
 type deleteParam struct {
 	ID any ` + "`json:\"{{.PKName}}\" binding:\"required\"`" + `
 }
 
-func (api *API) Delete(c *gin.Context) {
+func (api *API) Delete(c gorp.HTTPContext) {
 	param := &deleteParam{}
-	if err := c.ShouldBindJSON(param); err != nil {
-		ginprovider.BadRequest(c, err.Error())
+	if err := c.BindJSON(param); err != nil {
+		gorp.BadRequest(c, err.Error())
 		return
 	}
-	client, err := api.mustEntClient()
+	client, err := api.mustEntClient(c.Context())
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
+		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Delete{{.Name}}(c.Request.Context(), client, param.ID); err != nil {
-		ginprovider.Error(c, err)
+	if err := svc.Delete{{.Name}}(c.Context(), client, param.ID); err != nil {
+		gorp.Error(c, err)
 		return
 	}
-	ginprovider.SuccessWithMessage(c, "ok", nil)
+	gorp.SuccessWithMessage(c, "ok", nil)
 }
 {{end}}`

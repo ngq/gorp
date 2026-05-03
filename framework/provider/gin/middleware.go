@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 )
 
 const (
@@ -21,18 +22,21 @@ const (
 // 中文说明：
 // - 优先从请求头读取 X-Request-Id；
 // - 如果不存在则生成一个 32 字符的随机 ID；
-// - 设置到响应头和 gin.Context，供后续中间件和业务代码使用。
-func RequestID() gin.HandlerFunc {
-	return func(c *gin.Context) {
+// - 设置到响应头和 request context，供后续中间件和业务代码使用。
+func RequestID() contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
 		rid := c.GetHeader(requestIDHeader)
 		if rid == "" {
 			buf := make([]byte, 16)
 			_, _ = rand.Read(buf)
 			rid = hex.EncodeToString(buf)
 		}
-		c.Writer.Header().Set(requestIDHeader, rid)
-		c.Set("request_id", rid)
-		c.Next()
+		c.Header(requestIDHeader, rid)
+		ctx := contract.NewRequestIDContext(c.Context(), rid)
+		c.SetContext(ctx)
+		if next != nil {
+			next()
+		}
 	}
 }
 
@@ -40,44 +44,43 @@ func RequestID() gin.HandlerFunc {
 //
 // 中文说明：
 // - 优先从请求头读取 X-Trace-Id（支持分布式链路追踪场景）；
-// - 如果不存在则生成一个 32 字符的随机 ID；
-// - 设置到响应头和 gin.Context；
+// - 如果不存在则优先复用 request id；
+// - 设置到响应头和 request context；
 // - 与 Request ID 区分：Trace ID 用于跨服务追踪，Request ID 用于单次请求标识。
-// - 如果没有单独设置 Trace ID，默认使用 Request ID 作为 Trace ID。
-func TraceID() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// 尝试从多个可能的请求头读取 trace id
+func TraceID() contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
 		tid := c.GetHeader(traceIDHeader)
 		if tid == "" {
 			tid = c.GetHeader(traceIDHeaderAlt)
 		}
-
-		// 如果没有 trace id，使用 request id 或生成新的
 		if tid == "" {
-			rid, exists := c.Get("request_id")
-			if exists {
-				tid = rid.(string)
+			if rid, ok := contract.FromRequestIDContext(c.Context()); ok && rid != "" {
+				tid = rid
 			} else {
 				buf := make([]byte, 16)
 				_, _ = rand.Read(buf)
 				tid = hex.EncodeToString(buf)
 			}
 		}
-
-		c.Writer.Header().Set(traceIDHeader, tid)
-		c.Set("trace_id", tid)
-		c.Next()
+		c.Header(traceIDHeader, tid)
+		ctx := contract.NewTraceIDContext(c.Context(), tid)
+		c.SetContext(ctx)
+		if next != nil {
+			next()
+		}
 	}
 }
 
 // GetTraceID 从 gin.Context 获取 Trace ID。
 //
 // 中文说明：
-// - 供业务代码和日志中间件使用；
-// - 如果不存在则返回空字符串。
+// - 这是 provider 内部兼容读取入口；
+// - 默认业务主线应优先通过 contract.FromTraceIDContext 读取。
 func GetTraceID(c *gin.Context) string {
-	if tid, exists := c.Get("trace_id"); exists {
-		return tid.(string)
+	if c != nil && c.Request != nil {
+		if tid, ok := contract.FromTraceIDContext(c.Request.Context()); ok {
+			return tid
+		}
 	}
 	return ""
 }
@@ -85,11 +88,13 @@ func GetTraceID(c *gin.Context) string {
 // GetRequestID 从 gin.Context 获取 Request ID。
 //
 // 中文说明：
-// - 供业务代码和日志中间件使用；
-// - 如果不存在则返回空字符串。
+// - 这是 provider 内部兼容读取入口；
+// - 默认业务主线应优先通过 contract.FromRequestIDContext 读取。
 func GetRequestID(c *gin.Context) string {
-	if rid, exists := c.Get("request_id"); exists {
-		return rid.(string)
+	if c != nil && c.Request != nil {
+		if rid, ok := contract.FromRequestIDContext(c.Request.Context()); ok {
+			return rid
+		}
 	}
 	return ""
 }

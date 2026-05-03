@@ -247,8 +247,8 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		}
 
 		// 透传 TraceID（如果存在）
-		if traceID := ctx.Value("trace_id"); traceID != nil {
-			httpReq.Header.Set("X-Trace-ID", fmt.Sprintf("%v", traceID))
+		if traceID, ok := contract.FromTraceIDContext(ctx); ok {
+			httpReq.Header.Set("X-Trace-ID", traceID)
 		}
 
 		httpResp, callErr := c.httpCli.Do(httpReq)
@@ -462,8 +462,9 @@ func NewServer(cfg *contract.RPCConfig, c contract.Container) *Server {
 // Register 注册服务处理器。
 //
 // 中文说明：
-// - handler 类型应为 gin.HandlerFunc；
-// - 实际注册在 Gin Engine 上，路径为 /rpc/{service}/{method}。
+// - 默认 HTTP RPC 主线下，handler 类型应为 `contract.HTTPHandler`；
+// - 实际注册路径为 `/rpc/{service}`，由默认 HTTP Router 承接；
+// - 如果底层 provider 仍基于 Gin，应在 provider 内部完成适配，而不是把 Gin handler 暴露回 RPCServer 契约。
 func (s *Server) Register(service string, handler any) error {
 	s.routes.Store(service, handler)
 	return nil
@@ -475,21 +476,27 @@ func (s *Server) Register(service string, handler any) error {
 // - HTTP RPC 不需要单独启动，复用 HTTP 服务；
 // - 返回 nil 表示成功。
 func (s *Server) Start(ctx context.Context) error {
-	// HTTP RPC 复用 Gin Engine，无需单独启动
-	// 注册路由到 Gin
-	if s.c.IsBind(contract.HTTPEngineKey) {
-		engineAny, _ := s.c.Make(contract.HTTPEngineKey)
-		// 使用类型断言处理 gin.Engine
-		if engine, ok := engineAny.(interface{ POST(string, any) }); ok {
-			s.routes.Range(func(key, value any) bool {
-				service := key.(string)
-				handler := value
-				// 注册到 /rpc/{service}/ 路径
-				engine.POST("/rpc/"+service, handler)
-				return true
-			})
-		}
+	httpSvc, err := s.c.Make(contract.HTTPKey)
+	if err != nil {
+		return nil
 	}
+	httpServer, ok := httpSvc.(contract.HTTP)
+	if !ok || httpServer == nil {
+		return nil
+	}
+	router := httpServer.Router()
+	if router == nil {
+		return nil
+	}
+	s.routes.Range(func(key, value any) bool {
+		service := key.(string)
+		handler, ok := value.(contract.HTTPHandler)
+		if !ok || handler == nil {
+			return true
+		}
+		router.POST("/rpc/"+service, handler)
+		return true
+	})
 	return nil
 }
 

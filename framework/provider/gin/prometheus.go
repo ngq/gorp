@@ -2,24 +2,22 @@ package gin
 
 import (
 	"errors"
+	"net/http"
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// PrometheusHandler 返回一个 Gin HandlerFunc，用于暴露 /metrics 端点。
+// PrometheusHandler 返回标准 http.Handler，用于暴露 /metrics 端点。
 //
 // 中文说明：
-// - 内部直接包装 promhttp.Handler()，适配 Gin 的 HandlerFunc 接口；
-// - 用于在 app/http/routes.go 中注册 GET /metrics 路由；
-// - 会暴露所有已注册的 Prometheus 指标（包括 HTTP 指标 + Go runtime 指标）。
-func PrometheusHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		promhttp.Handler().ServeHTTP(c.Writer, c.Request)
-	}
+// - 默认主线不再直接暴露 Gin HandlerFunc；
+// - 通过标准 `http.Handler`，framework 可以统一走 `Mount(path, http.Handler)` 主线；
+// - provider 若仍基于 Gin，可在 provider 内部完成适配。
+func PrometheusHandler() http.Handler {
+	return promhttp.Handler()
 }
 
 var registerGoRuntimeMetricsOnce sync.Once

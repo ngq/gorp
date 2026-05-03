@@ -52,16 +52,14 @@ func (c *HeaderCarrier) Values(key string) []string {
 // - 从 HTTP Header 提取 metadata 存入 context；
 // - 支持前缀过滤（默认 x-md- 前缀）；
 // - 自己实现，不抄袭 Kratos。
-func MetadataMiddleware(propagator contract.MetadataPropagator) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// 从 HTTP Header 提取 metadata
-		carrier := NewHeaderCarrier(c.Request.Header)
-		ctx := propagator.Extract(c.Request.Context(), carrier)
-
-		// 更新 request context
-		c.Request = c.Request.WithContext(ctx)
-
-		c.Next()
+func MetadataMiddleware(propagator contract.MetadataPropagator) contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
+		carrier := NewHeaderCarrier(c.Request().Header)
+		ctx := propagator.Extract(c.Context(), carrier)
+		c.SetContext(ctx)
+		if next != nil {
+			next()
+		}
 	}
 }
 

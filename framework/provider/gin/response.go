@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 )
 
 // Response 是统一的 API 响应结构。
@@ -26,9 +27,9 @@ type Response struct {
 }
 
 // writeResponseHeaders 将链路追踪 ID 写入响应头。
-func writeResponseHeaders(c *gin.Context) {
-	requestID := getRequestID(c)
-	traceID := getTraceID(c)
+func writeResponseHeaders(c contract.HTTPContext) {
+	requestID, _ := contract.FromRequestIDContext(c.Context())
+	traceID, _ := contract.FromTraceIDContext(c.Context())
 
 	if requestID != "" {
 		c.Header("X-Request-Id", requestID)
@@ -43,18 +44,7 @@ func writeResponseHeaders(c *gin.Context) {
 // 中文说明：
 // - 用于 Handler 返回成功数据；
 // - request_id 和 trace_id 通过响应头返回。
-//
-// 使用示例：
-//
-//	func (h *Handler) GetUser(c *gin.Context) {
-//	    user, err := h.service.GetUser(c, id)
-//	    if err != nil {
-//	        Error(c, err)
-//	        return
-//	    }
-//	    Success(c, user)
-//	}
-func Success(c *gin.Context, data any) {
+func Success(c contract.HTTPContext, data any) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    0,
@@ -65,7 +55,7 @@ func Success(c *gin.Context, data any) {
 }
 
 // SuccessWithMessage 返回成功响应并自定义消息。
-func SuccessWithMessage(c *gin.Context, message string, data any) {
+func SuccessWithMessage(c contract.HTTPContext, message string, data any) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    0,
@@ -76,7 +66,7 @@ func SuccessWithMessage(c *gin.Context, message string, data any) {
 }
 
 // SuccessWithStatus 返回成功响应并自定义 HTTP 状态码。
-func SuccessWithStatus(c *gin.Context, status int, data any) {
+func SuccessWithStatus(c contract.HTTPContext, status int, data any) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    0,
@@ -92,14 +82,7 @@ func SuccessWithStatus(c *gin.Context, status int, data any) {
 // - 用于 Handler 返回业务错误；
 // - 根据 Error 的 Code 自动选择 HTTP 状态码；
 // - request_id 和 trace_id 通过响应头返回。
-//
-// 使用示例：
-//
-//	if user == nil {
-//	    Error(c, errors.NotFound("用户不存在"))
-//	    return
-//	}
-func Error(c *gin.Context, err error) {
+func Error(c contract.HTTPContext, err error) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	httpStatus := codeToHTTPStatus(code)
@@ -113,7 +96,7 @@ func Error(c *gin.Context, err error) {
 }
 
 // ErrorWithData 返回业务错误响应并附带数据。
-func ErrorWithData(c *gin.Context, err error, data any) {
+func ErrorWithData(c contract.HTTPContext, err error, data any) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	httpStatus := codeToHTTPStatus(code)
@@ -127,7 +110,7 @@ func ErrorWithData(c *gin.Context, err error, data any) {
 }
 
 // ErrorWithStatus 返回业务错误响应并自定义 HTTP 状态码。
-func ErrorWithStatus(c *gin.Context, status int, err error) {
+func ErrorWithStatus(c contract.HTTPContext, status int, err error) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 
@@ -140,7 +123,7 @@ func ErrorWithStatus(c *gin.Context, status int, err error) {
 }
 
 // BadRequest 返回 400 参数错误响应。
-func BadRequest(c *gin.Context, message string) {
+func BadRequest(c contract.HTTPContext, message string) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    CodeBadRequest,
@@ -151,7 +134,7 @@ func BadRequest(c *gin.Context, message string) {
 }
 
 // Unauthorized 返回 401 未认证响应。
-func Unauthorized(c *gin.Context, message string) {
+func Unauthorized(c contract.HTTPContext, message string) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    CodeUnauthorized,
@@ -162,7 +145,7 @@ func Unauthorized(c *gin.Context, message string) {
 }
 
 // Forbidden 返回 403 禁止访问响应。
-func Forbidden(c *gin.Context, message string) {
+func Forbidden(c contract.HTTPContext, message string) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    CodeForbidden,
@@ -173,7 +156,7 @@ func Forbidden(c *gin.Context, message string) {
 }
 
 // NotFound 返回 404 未找到响应。
-func NotFound(c *gin.Context, message string) {
+func NotFound(c contract.HTTPContext, message string) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    CodeNotFound,
@@ -184,7 +167,7 @@ func NotFound(c *gin.Context, message string) {
 }
 
 // InternalError 返回 500 内部错误响应。
-func InternalError(c *gin.Context, message string) {
+func InternalError(c contract.HTTPContext, message string) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    CodeInternalError,
@@ -210,7 +193,7 @@ type PaginatedData struct {
 }
 
 // SuccessPaginated 返回分页成功响应。
-func SuccessPaginated(c *gin.Context, items any, total int64, page, pageSize int) {
+func SuccessPaginated(c contract.HTTPContext, items any, total int64, page, pageSize int) {
 	data := PaginatedData{
 		Items:    items,
 		Total:    total,
@@ -272,17 +255,19 @@ const (
 	CodePaymentCanceled = 40003 // 支付已取消
 )
 
+// writeGinResponseHeaders 仅供 provider/gin 内部兼容路径使用。
+//
+// 中文说明：
+// - 某些仍未迁移到 framework HTTPContext 的 Gin-only 中间件/辅助函数会继续复用它；
+// - 它不是默认业务主线能力，只是 provider 内部收口过程中的实现细节。
+func writeGinResponseHeaders(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	writeResponseHeaders(newHTTPContext(c))
+}
+
 // --- 内部辅助函数 ---
-
-func getRequestID(c *gin.Context) string {
-	return c.GetString("request_id")
-}
-
-func getTraceID(c *gin.Context) string {
-	return c.GetString("trace_id")
-}
-
-// parseError 解析错误获取错误码和消息
 func parseError(err error) (int, string) {
 	if err == nil {
 		return CodeSuccess, "success"

@@ -1,79 +1,104 @@
 package gin
 
 import (
+	"reflect"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ngq/gorp/framework/contract"
 )
 
+const (
+	validatedBodyGinKey = "validated_body"
+	validatorGinKey     = "validator"
+)
+
+func storeValidatedBody(c *gin.Context, obj interface{}) {
+	if c == nil {
+		return
+	}
+	c.Set(validatedBodyGinKey, obj)
+	if c.Request != nil {
+		c.Request = c.Request.WithContext(contract.NewValidatedBodyContext(c.Request.Context(), obj))
+	}
+}
+
+func storeValidator(c *gin.Context, validator contract.Validator) {
+	if c == nil {
+		return
+	}
+	c.Set(validatorGinKey, validator)
+}
+
+func clonePointerValue(objType interface{}) (interface{}, bool) {
+	if objType == nil {
+		return nil, false
+	}
+	t := reflect.TypeOf(objType)
+	if t.Kind() != reflect.Ptr {
+		return nil, false
+	}
+	return reflect.New(t.Elem()).Interface(), true
+}
+
 // ValidateBodyMiddleware 创建请求体验证中间件。
 //
 // 中文说明：
-// - 验证 JSON 请求体；
-// - 使用 Validator 接口进行验证；
-// - 验证失败返回统一 AppError 格式；
-// - 验证成功将解析后的对象存入 context。
-//
-// 注意：
-// - 当前默认业务主线优先使用 `ValidateBody` / `ValidateQuery` / `ValidateForm` 这类 handler 内 helper；
-// - `ValidateBodyMiddleware` 仅适合明确需要中间件式校验的场景。
-func ValidateBodyMiddleware(validator contract.Validator, objType interface{}) gin.HandlerFunc {
-	_ = objType
-	// 当前中间件版本不根据 objType 自动创建实例；
-	// 如需显式控制请求结构体，优先在 handler 中使用 ValidateBody。
-
-	return func(c *gin.Context) {
-		// 创建目标对象
-		// objType 应该是一个结构体指针类型
-		var obj interface{}
-
-		// 尝试绑定 JSON
-		if err := c.ShouldBindJSON(obj); err != nil {
-			// 绑定失败（JSON 格式错误或 Content-Type 不支持）
-			appErr := contract.BadRequest(contract.ErrorReasonBadRequest, "invalid request body: "+err.Error())
-			respondWithError(c, appErr)
-			c.Abort()
+// - 这是 provider 侧的验证入口，负责承接当前 HTTP provider 下的请求绑定与验证；
+// - 默认业务主线如果只需要在 handler 内部完成绑定与验证，优先直接使用 `HTTPContext.BindJSON(...) + Validator.Validate(...)`；
+// - 当项目确实希望把“绑定 + 验证 + 统一错误响应”前移到中间件层时，再显式接入这里的 middleware；
+// - 验证成功后的对象应继续通过 request context / helper 暴露给后续链路，而不是要求业务直接依赖 Gin-only 存储。
+func ValidateBodyMiddleware(validator contract.Validator, objType interface{}) contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
+		if validator == nil || objType == nil {
+			if next != nil {
+				next()
+			}
 			return
 		}
 
-		// 执行验证
-		if err := validator.Validate(c.Request.Context(), obj); err != nil {
-			// 验证失败
+		binder, ok := clonePointerValue(objType)
+		if !ok {
+			appErr := contract.BadRequest(contract.ErrorReasonBadRequest, "validate middleware requires pointer objType")
+			respondWithError(c, appErr)
+			return
+		}
+		if err := c.BindJSON(binder); err != nil {
+			appErr := contract.BadRequest(contract.ErrorReasonBadRequest, "invalid request body: "+err.Error())
+			respondWithError(c, appErr)
+			return
+		}
+		if err := validator.Validate(c.Context(), binder); err != nil {
 			appErr, ok := err.(contract.AppError)
 			if !ok {
 				appErr = contract.BadRequest(contract.ErrorReasonBadRequest, err.Error())
 			}
 			respondWithError(c, appErr)
-			c.Abort()
 			return
 		}
-
-		// 验证成功，存入 context
-		c.Set("validated_body", obj)
-		c.Next()
+		if gc, ok := unwrapGinContext(c); ok {
+			storeValidatedBody(gc, binder)
+		}
+		if next != nil {
+			next()
+		}
 	}
 }
 
 // ValidateMiddleware 创建通用验证中间件。
 //
 // 中文说明：
-// - 提供验证器实例供 handler 使用；
-// - 不自动验证，需要 handler 调用 ValidateBody 辅助函数。
-//
-// 使用示例：
-//
-//	router.Use(gin.ValidateMiddleware(validator))
-//	router.POST("/login", func(c *gin.Context) {
-//	    var req LoginRequest
-//	    if err := gin.ValidateBody(c, validator, &req); err != nil {
-//	        return // 错误已处理
-//	    }
-//	    // 使用 req ...
-//	})
-func ValidateMiddleware(validator contract.Validator) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Set("validator", validator)
-		c.Next()
+// - 它只负责把 Validator 暴露给后续 Gin helper / 兼容路径；
+// - 默认 framework 主线不要求业务必须依赖它；
+// - 如果项目仍保留 provider-specific 验证辅助写法，可显式接入该 middleware。
+func ValidateMiddleware(validator contract.Validator) contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
+		if gc, ok := unwrapGinContext(c); ok {
+			storeValidator(gc, validator)
+		}
+		if next != nil {
+			next()
+		}
 	}
 }
 
@@ -101,7 +126,7 @@ func ValidateBody(c *gin.Context, validator contract.Validator, obj interface{})
 	// 绑定 JSON
 	if err := c.ShouldBindJSON(obj); err != nil {
 		appErr := contract.BadRequest(contract.ErrorReasonBadRequest, "invalid request body: "+err.Error())
-		respondWithError(c, appErr)
+		respondWithError(newHTTPContext(c), appErr)
 		return appErr
 	}
 
@@ -111,10 +136,11 @@ func ValidateBody(c *gin.Context, validator contract.Validator, obj interface{})
 		if !ok {
 			appErr = contract.BadRequest(contract.ErrorReasonBadRequest, err.Error())
 		}
-		respondWithError(c, appErr)
+		respondWithError(newHTTPContext(c), appErr)
 		return appErr
 	}
 
+	storeValidatedBody(c, obj)
 	return nil
 }
 
@@ -127,7 +153,7 @@ func ValidateQuery(c *gin.Context, validator contract.Validator, obj interface{}
 	// 绑定 Query
 	if err := c.ShouldBindQuery(obj); err != nil {
 		appErr := contract.BadRequest(contract.ErrorReasonBadRequest, "invalid query parameters: "+err.Error())
-		respondWithError(c, appErr)
+		respondWithError(newHTTPContext(c), appErr)
 		return appErr
 	}
 
@@ -137,7 +163,7 @@ func ValidateQuery(c *gin.Context, validator contract.Validator, obj interface{}
 		if !ok {
 			appErr = contract.BadRequest(contract.ErrorReasonBadRequest, err.Error())
 		}
-		respondWithError(c, appErr)
+		respondWithError(newHTTPContext(c), appErr)
 		return appErr
 	}
 
@@ -153,7 +179,7 @@ func ValidateForm(c *gin.Context, validator contract.Validator, obj interface{})
 	// 绑定 Form
 	if err := c.ShouldBind(obj); err != nil {
 		appErr := contract.BadRequest(contract.ErrorReasonBadRequest, "invalid form data: "+err.Error())
-		respondWithError(c, appErr)
+		respondWithError(newHTTPContext(c), appErr)
 		return appErr
 	}
 
@@ -163,7 +189,7 @@ func ValidateForm(c *gin.Context, validator contract.Validator, obj interface{})
 		if !ok {
 			appErr = contract.BadRequest(contract.ErrorReasonBadRequest, err.Error())
 		}
-		respondWithError(c, appErr)
+		respondWithError(newHTTPContext(c), appErr)
 		return appErr
 	}
 
@@ -175,7 +201,7 @@ func ValidateForm(c *gin.Context, validator contract.Validator, obj interface{})
 // 中文说明：
 // - 使用统一的响应格式；
 // - 包含 code、reason、message 字段。
-func respondWithError(c *gin.Context, err contract.AppError) {
+func respondWithError(c contract.HTTPContext, err contract.AppError) {
 	status := err.GetStatus()
 
 	response := ValidateErrorResponse{
@@ -184,7 +210,6 @@ func respondWithError(c *gin.Context, err contract.AppError) {
 		Message: status.Message,
 	}
 
-	// 添加验证错误详情
 	if status.Metadata != nil {
 		if errorsJSON, ok := status.Metadata["validation_errors"]; ok {
 			response.Details = errorsJSON
@@ -219,7 +244,7 @@ type ValidateErrorResponse struct {
 // - 配合 ValidateMiddleware 使用；
 // - 在 handler 中获取验证器实例。
 func GetValidator(c *gin.Context) contract.Validator {
-	if v, exists := c.Get("validator"); exists {
+	if v, exists := c.Get(validatorGinKey); exists {
 		if validator, ok := v.(contract.Validator); ok {
 			return validator
 		}
@@ -233,8 +258,13 @@ func GetValidator(c *gin.Context) contract.Validator {
 // - 配合 ValidateBodyMiddleware 使用；
 // - 在 handler 中获取已验证的对象。
 func GetValidatedBody(c *gin.Context) interface{} {
-	if v, exists := c.Get("validated_body"); exists {
+	if v, exists := c.Get(validatedBodyGinKey); exists {
 		return v
+	}
+	if c != nil && c.Request != nil {
+		if v, ok := contract.FromValidatedBodyContext(c.Request.Context()); ok {
+			return v
+		}
 	}
 	return nil
 }

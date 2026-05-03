@@ -1,0 +1,127 @@
+package handler
+
+import (
+	"net/http"
+	"strconv"
+
+	gorp "{{.FrameworkModule}}"
+	"{{.ModuleName}}/app/http/request"
+	"{{.ModuleName}}/app/http/response"
+	"{{.ModuleName}}/internal/biz"
+	"{{.ModuleName}}/internal/service"
+)
+
+type DemoHandler struct {
+	svc *service.DemoService
+}
+
+func NewDemoHandler(svc *service.DemoService) *DemoHandler {
+	return &DemoHandler{svc: svc}
+}
+
+func (h *DemoHandler) Create(c gorp.HTTPContext) {
+	var req request.CreateDemo
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+
+	demo, err := h.svc.Create(c.Context(), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, toDemoResponse(demo))
+}
+
+func (h *DemoHandler) GetByID(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		return
+	}
+
+	demo, err := h.svc.GetByID(c.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, map[string]any{"error": "not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, toDemoResponse(demo))
+}
+
+func (h *DemoHandler) List(c gorp.HTTPContext) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	demos, total, err := h.svc.List(c.Context(), page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	items := make([]*response.Demo, len(demos))
+	for i, demo := range demos {
+		items[i] = toDemoResponse(demo)
+	}
+
+	c.JSON(http.StatusOK, &response.DemoList{
+		Items: items,
+		Total: total,
+		Page:  page,
+		Size:  pageSize,
+	})
+}
+
+func (h *DemoHandler) Update(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		return
+	}
+
+	var req request.UpdateDemo
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+
+	demo, err := h.svc.Update(c.Context(), uint(id), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, toDemoResponse(demo))
+}
+
+func (h *DemoHandler) Delete(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		return
+	}
+
+	if err := h.svc.Delete(c.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func toDemoResponse(demo *biz.Demo) *response.Demo {
+	return &response.Demo{
+		ID:        demo.ID,
+		Name:      demo.Name,
+		CreatedAt: demo.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt: demo.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}
+}

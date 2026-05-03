@@ -1,9 +1,9 @@
 package jwt
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	frameworkjwt "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"github.com/ngq/gorp/framework/contract"
 	"github.com/stretchr/testify/require"
@@ -41,11 +41,26 @@ func TestExportedJWTHelpers(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), verified.SubjectID)
 
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(ContextSubjectIDKey, int64(9))
-	subjectID, ok := SubjectIDFromContext(ctx)
+	requestCtx := contract.NewJWTClaimsContext(context.Background(), verified)
+	requestCtx = contract.NewSubjectIDContext(requestCtx, int64(9))
+	subjectID, ok := SubjectIDFromContext(requestCtx)
 	require.True(t, ok)
 	require.Equal(t, int64(9), subjectID)
+
+	requestCtx = contract.NewSubjectIDContext(requestCtx, verified.SubjectID)
+	requestCtx = contract.NewSubjectTypeContext(requestCtx, verified.SubjectType)
+
+	gotClaims, ok := ClaimsFromRequestContext(requestCtx)
+	require.True(t, ok)
+	require.Equal(t, verified.SubjectID, gotClaims.SubjectID)
+
+	gotSubjectID, ok := SubjectIDFromRequestContext(requestCtx)
+	require.True(t, ok)
+	require.Equal(t, verified.SubjectID, gotSubjectID)
+
+	gotSubjectType, ok := SubjectTypeFromRequestContext(requestCtx)
+	require.True(t, ok)
+	require.Equal(t, verified.SubjectType, gotSubjectType)
 
 	require.Equal(t, frameworkjwt.ContextJWTClaimsKey, ContextJWTClaimsKey)
 	require.Equal(t, frameworkjwt.ContextSubjectIDKey, ContextSubjectIDKey)

@@ -1,8 +1,13 @@
 package bootstrap
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,4 +18,196 @@ func TestAutoMigrateModelsNilRuntime(t *testing.T) {
 func TestAutoMigrateModelsNilDB(t *testing.T) {
 	rt := &HTTPServiceRuntime{}
 	require.NoError(t, AutoMigrateModels(rt, struct{}{}))
+}
+
+func TestRegisterPprofEndpointsUsesMount(t *testing.T) {
+	router := &recordingRouter{}
+
+	RegisterPprofEndpoints(router)
+
+	require.Contains(t, router.mounted, "/debug/pprof/")
+	require.Contains(t, router.mounted, "/debug/pprof/cmdline")
+	require.Contains(t, router.mounted, "/debug/pprof/profile")
+	require.Contains(t, router.mounted, "/debug/pprof/symbol")
+	require.Contains(t, router.mounted, "/debug/pprof/trace")
+}
+
+func TestRegisterPprofEndpointsServesIndex(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+
+	RegisterPprofEndpoints(router)
+
+	req := httptest.NewRequest(http.MethodGet, "/debug/pprof/", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.True(t, strings.Contains(w.Body.String(), "profile") || strings.Contains(w.Body.String(), "pprof"))
+}
+
+type recordingRouter struct {
+	mounted []string
+}
+
+func (r *recordingRouter) Use(middleware ...contract.HTTPMiddleware) {}
+func (r *recordingRouter) Group(prefix string, middleware ...contract.HTTPMiddleware) contract.HTTPRouter {
+	return r
+}
+func (r *recordingRouter) Handle(method, path string, handler contract.HTTPHandler)        {}
+func (r *recordingRouter) HandleFunc(method, path string, handlerFunc contract.HTTPHandler) {}
+func (r *recordingRouter) GET(path string, handler contract.HTTPHandler)                   {}
+func (r *recordingRouter) POST(path string, handler contract.HTTPHandler)                  {}
+func (r *recordingRouter) PUT(path string, handler contract.HTTPHandler)                   {}
+func (r *recordingRouter) DELETE(path string, handler contract.HTTPHandler)                {}
+func (r *recordingRouter) Mount(path string, handler http.Handler) {
+	r.mounted = append(r.mounted, path)
+}
+
+type ginTestRouter struct {
+	engine *gin.Engine
+}
+
+func (r *ginTestRouter) Use(middleware ...contract.HTTPMiddleware) {
+	adapted := make([]gin.HandlerFunc, 0, len(middleware))
+	for _, mw := range middleware {
+		mw := mw
+		adapted = append(adapted, func(c *gin.Context) {
+			httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+			httpCtx.SetParamFunc(c.Param)
+			httpCtx.SetQueryFunc(c.Query)
+			httpCtx.SetDefaultQueryFunc(c.DefaultQuery)
+			httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+			httpCtx.SetBindFuncs(c.ShouldBindJSON, c.ShouldBindQuery, c.ShouldBind)
+			httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
+			httpCtx.SetRoutePathFunc(c.FullPath)
+			mw(httpCtx, func() { c.Next() })
+		})
+	}
+	r.engine.Use(adapted...)
+}
+func (r *ginTestRouter) Group(prefix string, middleware ...contract.HTTPMiddleware) contract.HTTPRouter {
+	group := r.engine.Group(prefix)
+	wrapped := &ginGroupTestRouter{group: group}
+	wrapped.Use(middleware...)
+	return wrapped
+}
+func (r *ginTestRouter) Handle(method, path string, handler contract.HTTPHandler) {
+	r.engine.Handle(method, path, func(c *gin.Context) {
+		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetParamFunc(c.Param)
+		httpCtx.SetQueryFunc(c.Query)
+		httpCtx.SetDefaultQueryFunc(c.DefaultQuery)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetBindFuncs(c.ShouldBindJSON, c.ShouldBindQuery, c.ShouldBind)
+		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
+		httpCtx.SetRoutePathFunc(c.FullPath)
+		handler(httpCtx)
+	})
+}
+func (r *ginTestRouter) HandleFunc(method, path string, handlerFunc contract.HTTPHandler) {
+	r.Handle(method, path, handlerFunc)
+}
+func (r *ginTestRouter) GET(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodGet, path, handler)
+}
+func (r *ginTestRouter) POST(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodPost, path, handler)
+}
+func (r *ginTestRouter) PUT(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodPut, path, handler)
+}
+func (r *ginTestRouter) DELETE(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodDelete, path, handler)
+}
+func (r *ginTestRouter) Mount(path string, handler http.Handler) {
+	h := func(c *gin.Context) {
+		handler.ServeHTTP(c.Writer, c.Request)
+	}
+	r.engine.Handle(http.MethodGet, path, h)
+	r.engine.Handle(http.MethodPost, path, h)
+	r.engine.Handle(http.MethodPut, path, h)
+	r.engine.Handle(http.MethodDelete, path, h)
+	r.engine.Handle(http.MethodPatch, path, h)
+	r.engine.Handle(http.MethodHead, path, h)
+	r.engine.Handle(http.MethodOptions, path, h)
+}
+
+type ginGroupTestRouter struct {
+	group *gin.RouterGroup
+}
+
+func (r *ginGroupTestRouter) Use(middleware ...contract.HTTPMiddleware) {
+	adapted := make([]gin.HandlerFunc, 0, len(middleware))
+	for _, mw := range middleware {
+		mw := mw
+		adapted = append(adapted, func(c *gin.Context) {
+			httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+			httpCtx.SetParamFunc(c.Param)
+			httpCtx.SetQueryFunc(c.Query)
+			httpCtx.SetDefaultQueryFunc(c.DefaultQuery)
+			httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+			httpCtx.SetBindFuncs(c.ShouldBindJSON, c.ShouldBindQuery, c.ShouldBind)
+			httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
+			httpCtx.SetRoutePathFunc(c.FullPath)
+			mw(httpCtx, func() { c.Next() })
+		})
+	}
+	r.group.Use(adapted...)
+}
+func (r *ginGroupTestRouter) Group(prefix string, middleware ...contract.HTTPMiddleware) contract.HTTPRouter {
+	group := &ginGroupTestRouter{group: r.group.Group(prefix)}
+	group.Use(middleware...)
+	return group
+}
+func (r *ginGroupTestRouter) Handle(method, path string, handler contract.HTTPHandler) {
+	r.group.Handle(method, path, func(c *gin.Context) {
+		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetParamFunc(c.Param)
+		httpCtx.SetQueryFunc(c.Query)
+		httpCtx.SetDefaultQueryFunc(c.DefaultQuery)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetBindFuncs(c.ShouldBindJSON, c.ShouldBindQuery, c.ShouldBind)
+		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
+		httpCtx.SetRoutePathFunc(c.FullPath)
+		handler(httpCtx)
+	})
+}
+func (r *ginGroupTestRouter) HandleFunc(method, path string, handlerFunc contract.HTTPHandler) {
+	r.Handle(method, path, handlerFunc)
+}
+func (r *ginGroupTestRouter) GET(path string, handler contract.HTTPHandler) {
+	r.group.Handle(http.MethodGet, path, func(c *gin.Context) {
+		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetParamFunc(c.Param)
+		httpCtx.SetQueryFunc(c.Query)
+		httpCtx.SetDefaultQueryFunc(c.DefaultQuery)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetBindFuncs(c.ShouldBindJSON, c.ShouldBindQuery, c.ShouldBind)
+		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
+		httpCtx.SetRoutePathFunc(c.FullPath)
+		handler(httpCtx)
+	})
+}
+func (r *ginGroupTestRouter) POST(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodPost, path, handler)
+}
+func (r *ginGroupTestRouter) PUT(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodPut, path, handler)
+}
+func (r *ginGroupTestRouter) DELETE(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodDelete, path, handler)
+}
+func (r *ginGroupTestRouter) Mount(path string, handler http.Handler) {
+	h := func(c *gin.Context) {
+		handler.ServeHTTP(c.Writer, c.Request)
+	}
+	r.group.Handle(http.MethodGet, path, h)
+	r.group.Handle(http.MethodPost, path, h)
+	r.group.Handle(http.MethodPut, path, h)
+	r.group.Handle(http.MethodDelete, path, h)
+	r.group.Handle(http.MethodPatch, path, h)
+	r.group.Handle(http.MethodHead, path, h)
+	r.group.Handle(http.MethodOptions, path, h)
 }

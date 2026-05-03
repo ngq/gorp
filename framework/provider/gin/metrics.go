@@ -6,7 +6,7 @@ import (
 
 	prometheus "github.com/prometheus/client_golang/prometheus"
 	promauto "github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract"
 )
 
 var (
@@ -26,19 +26,27 @@ var (
 //
 // 中文说明：
 // - 第一阶段先聚焦最稳的通用指标：请求总量 + 请求耗时；
-// - 路由标签优先使用 `FullPath()`，避免把具体 ID 参数打散成高基数；
+// - 路由标签优先使用 `RoutePath()`，避免把具体 ID 参数打散成高基数；
 // - 若当前请求没有命中已注册路由，则退回 URL.Path。
-func MetricsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func MetricsMiddleware() contract.HTTPMiddleware {
+	return func(c contract.HTTPContext, next contract.HTTPNext) {
 		start := time.Now()
-		c.Next()
-
-		path := c.FullPath()
-		if path == "" {
-			path = c.Request.URL.Path
+		if next != nil {
+			next()
 		}
-		status := strconv.Itoa(c.Writer.Status())
-		method := c.Request.Method
+
+		path := c.RoutePath()
+		if path == "" && c.Request() != nil && c.Request().URL != nil {
+			path = c.Request().URL.Path
+		}
+		status := strconv.Itoa(c.ResponseStatus())
+		if status == "0" {
+			status = strconv.Itoa(200)
+		}
+		method := ""
+		if c.Request() != nil {
+			method = c.Request().Method
+		}
 		duration := time.Since(start).Seconds()
 
 		httpRequestsTotal.WithLabelValues(method, path, status).Inc()

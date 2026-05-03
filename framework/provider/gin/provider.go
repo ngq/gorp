@@ -2,47 +2,54 @@ package gin
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
-	logzap "github.com/ngq/gorp/contrib/log/zap"
 	"github.com/ngq/gorp/framework/contract"
 	frameworkbizlog "github.com/ngq/gorp/framework/log"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
+	providerlog "github.com/ngq/gorp/framework/provider/log"
 	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
-	serviceauthtoken "github.com/ngq/gorp/framework/provider/serviceauth/token"
 	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
+const httpEngineKey = "framework.http.engine"
+
 // Provider 把 Gin Engine 与 HTTP Server 一起注册进容器。
 //
 // 中文说明：
 // - 这里同时提供两个 key：
-//   1. contract.HTTPEngineKey：底层 *gin.Engine
-//   2. contract.HTTPKey：对外统一的 HTTP 服务抽象
+//  1. provider 内部 engine key：底层 *gin.Engine
+//  2. contract.HTTPKey：对外统一的 HTTP 服务抽象
+//
 // - 这样路由注册与服务启动可以解耦。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-// EngineFromContainer 从容器解析 *gin.Engine。
-func EngineFromContainer(c contract.Container) (*gin.Engine, error) {
-	// 中文说明：
-	// - 统一把 HTTPEngineKey -> *gin.Engine 的解析收进 provider/gin 边界；
-	// - 上层 app / template 不再重复书写 c.Make + type assert；
-	// - 后续如果 HTTP 宿主继续抽象，这里就是最自然的单点收口位置。
-	engineAny, err := c.Make(contract.HTTPEngineKey)
-	if err != nil {
-		return nil, err
+type router struct {
+	group *gin.RouterGroup
+}
+
+// ginHTTPContext 是 provider/gin 对 framework HTTPContext 的默认适配实现。
+//
+// 中文说明：
+// - 它把底层 `*gin.Context` 适配成 framework 默认 HTTPContext；
+// - Gin 仍可继续作为当前默认 provider，但 Gin 细节只停留在 provider 边界内部；
+// - framework 其余层只应依赖 `contract.HTTPContext`，不再直接感知 `*gin.Context`。
+type ginHTTPContext struct {
+	*contract.DefaultHTTPContext
+	gin *gin.Context
+}
+
+func (c *ginHTTPContext) GinContext() *gin.Context {
+	if c == nil {
+		return nil
 	}
-	engine, ok := engineAny.(*gin.Engine)
-	if !ok {
-		return nil, fmt.Errorf("http engine is not *gin.Engine: %T", engineAny)
-	}
-	return engine, nil
+	return c.gin
 }
 
 // Name 返回 provider 名称。
@@ -54,17 +61,18 @@ func (p *Provider) IsDefer() bool {
 }
 
 // Provides 返回 gin provider 暴露的能力 key。
-func (p *Provider) Provides() []string { return []string{contract.HTTPKey, contract.HTTPEngineKey} }
+func (p *Provider) Provides() []string { return []string{contract.HTTPKey, httpEngineKey} }
 
 // Register 绑定 Gin Engine 与统一 HTTP 服务。
 func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.HTTPEngineKey, func(c contract.Container) (any, error) {
+	c.Bind(httpEngineKey, func(c contract.Container) (any, error) {
 		engine := gin.New()
 		engine.Use(gin.Recovery())
-		engine.Use(RequestID())
-		engine.Use(TraceID())
+		engine.Use(injectRequestContainer(c))
+		engine.Use(adaptMiddleware(RequestID()))
+		engine.Use(adaptMiddleware(TraceID()))
 		engine.Use(injectRequestLogger(c))
-		engine.Use(MetricsMiddleware())
+		engine.Use(adaptMiddleware(MetricsMiddleware()))
 		attachHTTPTransportMiddleware(engine, c)
 		// 中文说明：
 		// - 默认挂载基础中间件：Recovery + RequestID + TraceID + 请求级 logger 注入 + Metrics；
@@ -100,7 +108,7 @@ func (p *Provider) Register(c contract.Container) error {
 			}
 		}
 
-		engineAny, err := c.Make(contract.HTTPEngineKey)
+		engineAny, err := c.Make(httpEngineKey)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +124,12 @@ func (p *Provider) Register(c contract.Container) error {
 		}
 
 		log.Info("http server initialized", contract.Field{Key: "addr", Value: addr})
-		return &service{srv: srv, engine: engine, log: log}, nil
+		return &service{
+			srv:    srv,
+			engine: engine,
+			router: newRouter(&engine.RouterGroup),
+			log:    log,
+		}, nil
 	}, true)
 
 	return nil
@@ -155,6 +168,15 @@ func injectRequestLogger(c contract.Container) gin.HandlerFunc {
 	}
 }
 
+func injectRequestContainer(c contract.Container) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if c != nil && ctx != nil && ctx.Request != nil {
+			ctx.Request = ctx.Request.WithContext(contract.NewContainerContext(ctx.Request.Context(), c))
+		}
+		ctx.Next()
+	}
+}
+
 // attachHTTPTransportMiddleware 按已注册能力为 Gin 装配传输层中间件。
 func attachHTTPTransportMiddleware(engine *gin.Engine, c contract.Container) {
 	if engine == nil {
@@ -168,7 +190,7 @@ func attachHTTPTransportMiddleware(engine *gin.Engine, c contract.Container) {
 				if serviceName == "" {
 					serviceName = "http-service"
 				}
-				engine.Use(tracingmw.TracingMiddleware(tracer, serviceName))
+				engine.Use(adaptMiddleware(tracingmw.TracingMiddleware(tracer, serviceName)))
 			}
 		}
 	}
@@ -176,7 +198,7 @@ func attachHTTPTransportMiddleware(engine *gin.Engine, c contract.Container) {
 	if c.IsBind(contract.MetadataPropagatorKey) {
 		if propagatorAny, err := c.Make(contract.MetadataPropagatorKey); err == nil {
 			if propagator, ok := propagatorAny.(contract.MetadataPropagator); ok {
-				engine.Use(metadatamw.MetadataMiddleware(propagator))
+				engine.Use(adaptMiddleware(metadatamw.MetadataMiddleware(propagator)))
 			}
 		}
 	}
@@ -184,7 +206,33 @@ func attachHTTPTransportMiddleware(engine *gin.Engine, c contract.Container) {
 	if c.IsBind(contract.ServiceAuthKey) {
 		if authAny, err := c.Make(contract.ServiceAuthKey); err == nil {
 			authenticator, _ := authAny.(contract.ServiceAuthenticator)
-			engine.Use(serviceauthtoken.ServiceAuthHTTPMiddleware(authenticator))
+			engine.Use(func(authenticator contract.ServiceAuthenticator) gin.HandlerFunc {
+				return func(c *gin.Context) {
+					ctx := c.Request.Context()
+					if auth := strings.TrimSpace(c.GetHeader("Authorization")); auth != "" {
+						ctx = context.WithValue(ctx, "authorization", auth)
+					}
+					if token := strings.TrimSpace(c.GetHeader("X-Service-Token")); token != "" {
+						ctx = context.WithValue(ctx, "x-service-token", token)
+					}
+					if authenticator != nil {
+						hasToken := strings.TrimSpace(c.GetHeader("X-Service-Token")) != "" ||
+							strings.TrimSpace(c.GetHeader("Authorization")) != ""
+						if hasToken {
+							identity, err := authenticator.Authenticate(ctx)
+							if err != nil {
+								c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "service authentication failed"})
+								return
+							}
+							if identity != nil {
+								ctx = contract.NewServiceIdentityContext(ctx, identity)
+							}
+						}
+					}
+					c.Request = c.Request.WithContext(ctx)
+					c.Next()
+				}
+			}(authenticator))
 		}
 	}
 }
@@ -211,11 +259,12 @@ func getConfig(c contract.Container) contract.Config {
 type service struct {
 	srv    *http.Server
 	engine *gin.Engine
+	router contract.HTTPRouter
 	log    contract.Logger
 }
 
-func (s *service) Engine() *gin.Engine  { return s.engine }
-func (s *service) Server() *http.Server { return s.srv }
+func (s *service) Router() contract.HTTPRouter { return s.router }
+func (s *service) Server() *http.Server        { return s.srv }
 
 // Run 启动 HTTP 监听。
 func (s *service) Run() error { return s.srv.ListenAndServe() }
@@ -231,12 +280,212 @@ func (s *service) Shutdown(ctx context.Context) error { return s.srv.Shutdown(ct
 func getLogger(c contract.Container) contract.Logger {
 	v, err := c.Make(contract.LogKey)
 	if err != nil {
-		l, _ := logzap.New("info", "console")
+		l, _ := providerlog.NewDefaultLogger()
 		return l
 	}
 	if logger, ok := v.(contract.Logger); ok {
 		return logger
 	}
-	l, _ := logzap.New("info", "console")
+	l, _ := providerlog.NewDefaultLogger()
 	return l
+}
+
+func newRouter(group *gin.RouterGroup) contract.HTTPRouter {
+	return &router{group: group}
+}
+
+func newHTTPContext(ctx *gin.Context) contract.HTTPContext {
+	base := contract.NewDefaultHTTPContext(nil, nil)
+	if ctx != nil {
+		base.SetRequest(ctx.Request)
+	}
+	base.SetParamFunc(func(key string) string {
+		if ctx == nil {
+			return ""
+		}
+		return ctx.Param(key)
+	})
+	base.SetQueryFunc(func(key string) string {
+		if ctx == nil {
+			return ""
+		}
+		return ctx.Query(key)
+	})
+	base.SetDefaultQueryFunc(func(key, defaultValue string) string {
+		if ctx == nil {
+			return defaultValue
+		}
+		return ctx.DefaultQuery(key, defaultValue)
+	})
+	base.SetHeaderFuncs(func(key string) string {
+		if ctx == nil {
+			return ""
+		}
+		return ctx.GetHeader(key)
+	}, func(key, value string) {
+		if ctx == nil {
+			return
+		}
+		ctx.Header(key, value)
+	})
+	base.SetBindFuncs(func(obj any) error {
+		if ctx == nil {
+			return nil
+		}
+		return ctx.ShouldBindJSON(obj)
+	}, func(obj any) error {
+		if ctx == nil {
+			return nil
+		}
+		return ctx.ShouldBindQuery(obj)
+	}, func(obj any) error {
+		if ctx == nil {
+			return nil
+		}
+		return ctx.ShouldBind(obj)
+	})
+	base.SetResponseFuncs(func(status int, body any) {
+		if ctx == nil {
+			return
+		}
+		ctx.JSON(status, body)
+	}, func(code int) {
+		if ctx == nil {
+			return
+		}
+		ctx.Status(code)
+	}, func() int {
+		if ctx == nil {
+			return 0
+		}
+		return ctx.Writer.Status()
+	})
+	base.SetRoutePathFunc(func() string {
+		if ctx == nil {
+			return ""
+		}
+		return ctx.FullPath()
+	})
+	return &ginHTTPContext{DefaultHTTPContext: base, gin: ctx}
+}
+
+func unwrapGinContext(c contract.HTTPContext) (*gin.Context, bool) {
+	type ginContextProvider interface {
+		GinContext() *gin.Context
+	}
+	provider, ok := c.(ginContextProvider)
+	if !ok {
+		return nil, false
+	}
+	gc := provider.GinContext()
+	if gc == nil {
+		return nil, false
+	}
+	return gc, true
+}
+
+func adaptMiddleware(middleware contract.HTTPMiddleware) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if middleware == nil {
+			ctx.Next()
+			return
+		}
+		httpCtx := newHTTPContext(ctx)
+		middleware(httpCtx, func() {
+			ctx.Request = httpCtx.Request()
+			ctx.Next()
+			httpCtx.SetRequest(ctx.Request)
+		})
+		ctx.Request = httpCtx.Request()
+	}
+}
+
+func adaptHandler(handler contract.HTTPHandler) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if handler == nil {
+			return
+		}
+		handler(newHTTPContext(ctx))
+	}
+}
+
+func (r *router) Use(middleware ...contract.HTTPMiddleware) {
+	if r == nil || r.group == nil || len(middleware) == 0 {
+		return
+	}
+	adapted := make([]gin.HandlerFunc, 0, len(middleware))
+	for _, mw := range middleware {
+		if mw == nil {
+			continue
+		}
+		adapted = append(adapted, adaptMiddleware(mw))
+	}
+	if len(adapted) == 0 {
+		return
+	}
+	r.group.Use(adapted...)
+}
+
+func (r *router) Group(prefix string, middleware ...contract.HTTPMiddleware) contract.HTTPRouter {
+	if r == nil || r.group == nil {
+		return &router{}
+	}
+	adapted := make([]gin.HandlerFunc, 0, len(middleware))
+	for _, mw := range middleware {
+		if mw == nil {
+			continue
+		}
+		adapted = append(adapted, adaptMiddleware(mw))
+	}
+	return newRouter(r.group.Group(prefix, adapted...))
+}
+
+func (r *router) Handle(method, path string, handler contract.HTTPHandler) {
+	if r == nil || r.group == nil || handler == nil {
+		return
+	}
+	r.group.Handle(method, path, adaptHandler(handler))
+}
+
+func (r *router) HandleFunc(method, path string, handlerFunc contract.HTTPHandler) {
+	if handlerFunc == nil {
+		return
+	}
+	r.Handle(method, path, handlerFunc)
+}
+
+func (r *router) GET(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodGet, path, handler)
+}
+
+func (r *router) POST(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodPost, path, handler)
+}
+
+func (r *router) PUT(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodPut, path, handler)
+}
+
+func (r *router) DELETE(path string, handler contract.HTTPHandler) {
+	r.Handle(http.MethodDelete, path, handler)
+}
+
+func (r *router) Mount(path string, handler http.Handler) {
+	if handler == nil {
+		return
+	}
+	h := wrapHTTPHandler(handler)
+	r.group.Handle(http.MethodGet, path, h)
+	r.group.Handle(http.MethodPost, path, h)
+	r.group.Handle(http.MethodPut, path, h)
+	r.group.Handle(http.MethodDelete, path, h)
+	r.group.Handle(http.MethodPatch, path, h)
+	r.group.Handle(http.MethodHead, path, h)
+	r.group.Handle(http.MethodOptions, path, h)
+}
+
+func wrapHTTPHandler(handler http.Handler) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		handler.ServeHTTP(ctx.Writer, ctx.Request)
+	}
 }

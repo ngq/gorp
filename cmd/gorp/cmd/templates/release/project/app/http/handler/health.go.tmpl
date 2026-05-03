@@ -1,12 +1,10 @@
 package handler
 
 import (
-	ginprovider "{{.FrameworkModule}}/framework/provider/gin"
-
-	"github.com/gin-gonic/gin"
+	gorp "{{.FrameworkModule}}"
 )
 
 // Health 返回 starter 默认健康检查响应。
-func Health(c *gin.Context) {
-	ginprovider.Success(c, gin.H{"status": "ok"})
+func Health(c gorp.HTTPContext) {
+	gorp.Success(c, map[string]any{"status": "ok"})
 }
