@@ -5,32 +5,34 @@ import (
 	"os"
 
 	orderdata "{{.ModuleName}}/services/order/internal/data"
-	orderserver "{{.ModuleName}}/services/order/internal/server"
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
-	frameworkcontainer "{{.FrameworkModule}}/framework/container"
+	orderhttp "{{.ModuleName}}/services/order/internal/server/http"
+	"{{.FrameworkModule}}"
 )
 
 // main 是 order 服务的主入口。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("order-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+	if err := gorp.Run("order-service", gorp.HTTP(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	return frameworkbootstrap.AutoMigrateModels(rt, &orderdata.OrderPO{})
+func migrate(rt *gorp.HTTPRuntime) error {
+	if rt == nil || rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&orderdata.OrderPO{})
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("order-service requires gorm database")
 	}
-	connFactory, err := frameworkcontainer.MakeGRPCConnFactory(rt.Container)
+	connFactory, err := gorp.MakeGRPCConnFactory(rt.Container)
 	if err != nil {
 		return err
 	}
-	dlock, err := frameworkcontainer.MakeDistributedLock(rt.Container)
+	dlock, err := gorp.MakeDistributedLock(rt.Container)
 	if err != nil {
 		return err
 	}
@@ -38,7 +40,6 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if err != nil {
 		return err
 	}
-	httpServer := orderserver.NewHTTPServer(services)
-	httpServer.RegisterRoutes(rt.Engine)
+	orderhttp.RegisterRoutes(rt.Router, services)
 	return nil
 }

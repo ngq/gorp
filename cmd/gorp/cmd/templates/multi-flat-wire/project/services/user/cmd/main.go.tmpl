@@ -4,27 +4,29 @@ import (
 	"fmt"
 	"os"
 
-	userv1 "{{.ModuleName}}/proto/user/v1"
-	userserver "{{.ModuleName}}/services/user/internal/server"
 	userdata "{{.ModuleName}}/services/user/internal/data"
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
-	frameworkcontainer "{{.FrameworkModule}}/framework/container"
+	usergrpc "{{.ModuleName}}/services/user/internal/server/grpc"
+	userhttp "{{.ModuleName}}/services/user/internal/server/http"
+	"{{.FrameworkModule}}"
 	"google.golang.org/grpc"
 )
 
 // main 是 user 服务的主入口。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("user-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+	if err := gorp.Run("user-service", gorp.HTTP(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	return frameworkbootstrap.AutoMigrateModels(rt, &userdata.UserPO{})
+func migrate(rt *gorp.HTTPRuntime) error {
+	if rt == nil || rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&userdata.UserPO{})
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("user-service requires gorm database")
 	}
@@ -32,15 +34,14 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if err != nil {
 		return err
 	}
-	httpServer := userserver.NewHTTPServer(services)
-	httpServer.RegisterRoutes(rt.Engine)
+	userhttp.RegisterRoutes(rt.Router, services)
 
-	registrar, err := frameworkcontainer.MakeGRPCServerRegistrar(rt.Container)
+	registrar, err := gorp.MakeGRPCServerRegistrar(rt.Container)
 	if err != nil {
 		return err
 	}
 	return registrar.RegisterProto(func(server *grpc.Server) error {
-		userv1.RegisterUserServiceServer(server, services.User)
+		usergrpc.RegisterUserService(server, services)
 		return nil
 	})
 }

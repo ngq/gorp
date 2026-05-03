@@ -9,7 +9,7 @@ import (
 	"{{.ModuleName}}/services/product/internal/biz"
 	"{{.ModuleName}}/services/product/internal/data"
 
-	"github.com/ngq/gorp/framework/contract"
+	"{{.FrameworkModule}}"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type Services struct {
 }
 
 // NewServices 创建服务层。
-func NewServices(db *gorm.DB, publisher contract.MessagePublisher, subscriber contract.MessageSubscriber) *Services {
+func NewServices(db *gorm.DB, publisher gorp.MessagePublisher, subscriber gorp.MessageSubscriber) *Services {
 	productRepo := data.NewProductRepo(db)
 	productUC := biz.NewProductUseCase(productRepo)
 	return &Services{
@@ -30,8 +30,8 @@ func NewServices(db *gorm.DB, publisher contract.MessagePublisher, subscriber co
 // ProductService 商品服务。
 type ProductService struct {
 	uc         *biz.ProductUseCase
-	publisher  contract.MessagePublisher
-	subscriber contract.MessageSubscriber
+	publisher  gorp.MessagePublisher
+	subscriber gorp.MessageSubscriber
 }
 
 // CreateProductRequest 创建商品请求。
@@ -113,10 +113,10 @@ func (s *ProductService) ConsumeStockChangedOnce(ctx context.Context) (*MQConsum
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	resultCh := make(chan *contract.Message, 1)
+	resultCh := make(chan *gorp.Message, 1)
 	errCh := make(chan error, 1)
 	go func() {
-		err := s.subscriber.Consume(ctx, "product.stock.changed", func(_ context.Context, message *contract.Message) error {
+		err := s.subscriber.Consume(ctx, "product.stock.changed", func(_ context.Context, message *gorp.Message) error {
 			resultCh <- message
 			return nil
 		})

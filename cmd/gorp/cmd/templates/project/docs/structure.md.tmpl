@@ -1,17 +1,33 @@
-# 共享 starter 基底目录说明
+# 共享基底结构
 
-当前基底层只保留多模板共享的最小目录：
+`project` 只提供三类公开模板都会复用的共享片段。
 
-- `cmd/app/`：共享默认入口骨架
-- `app/http/`：最小 HTTP 路由入口
-- `app/service/`：最小业务服务示例
-- `app/model/`：数据模型预留目录
-- `app/provider/`：自定义 provider 预留目录
-- `config/`：基础配置
-- `storage/`：日志与运行时目录占位
+## 当前保留
 
-## 推荐扩展顺序
+- `.gorp-template.yml`
+- `.gitignore`
+- `README.md`
+- `docs/`
+- `deploy/kubernetes/`
 
-1. 先在公开模板里承接业务起步路径
-2. 基底层只保留共享文件与共享规则
-3. 不在这里增加面向最终用户的模板叙事
+## 当前不保留
+
+- `cmd/app`
+- `app/http`
+- `internal/server`
+- `internal/biz`
+- `internal/data`
+- `internal/service`
+- `config/app.yaml`
+- `go.mod`
+- Dockerfile
+- Makefile
+- CI workflow
+
+## 边界规则
+
+单服务入口属于 `golayout`。
+
+微服务入口、Wire 收口、`internal/server/http`、`internal/server/grpc` 属于 `multi-flat-wire` 或 `multi-independent`。
+
+`project` 不解释业务开发方式，只提供可复用的根层文档与交付片段。

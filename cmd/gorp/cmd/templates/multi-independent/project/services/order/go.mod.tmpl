@@ -3,11 +3,12 @@ module {{.ModuleName}}/services/order
 go 1.25
 
 require (
-	{{.ModuleName}}/shared v0.0.0
-	{{.FrameworkModule}} v0.0.0
+	{{.FrameworkModule}} {{.FrameworkVersion}}
+	github.com/gin-gonic/gin v1.9.1
+	github.com/google/wire v0.6.0
+	github.com/stretchr/testify v1.9.0
+	gorm.io/gorm v1.25.5
 )
-
-replace (
-	{{.ModuleName}}/shared => ../../shared
-	{{.FrameworkModule}} => {{.FrameworkPath}}
-)
+{{if .UseReplace}}
+replace {{.FrameworkModule}} => {{.FrameworkPath}}
+{{end}}

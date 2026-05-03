@@ -1,68 +1,29 @@
-# {{.Name}}
+# {{.Name}} template base
 
-最小业务 starter。
+这是 gorp starter 的共享模板基底。
 
-> 定位：
-> - 这是最小业务骨架，不是默认推荐的完整单服务业务 starter；
-> - 默认业务起步优先使用裸 `gorp new`；
-> - 需要固定版本交付物时，再考虑 `gorp new from-release`。
+它不是公开推荐的业务 starter，也不承载单服务或多服务的入口叙事。公开模板应从下面三类选择：
 
-## 当前 backend
+- `golayout`：默认单服务 Gin Web API starter
+- `multi-flat-wire`：默认微服务 starter
+- `multi-independent`：进阶独立治理多服务 starter
 
-- `{{.Backend}}`
-- 设计原则：统一能力，不统一查询语法
-{{- if .IsEntBackend }}
-- 当前 starter 的 `ent` 路径仍是骨架占位，后续需要你在项目内补 ent provider / repository 实现。
-{{- else }}
-- 当前 starter 默认按 `gorm` 路径生成，可直接继续扩展业务代码。
-{{- end }}
+## 这个基底包含什么
 
-## 当前模板包含什么
+- `.gorp-template.yml`：模板元信息
+- `.gitignore`：共享忽略规则
+- `README.md`：基底定位说明
+- `docs/structure.md`：共享结构边界
+- `docs/deploy.md`：共享交付片段说明
+- `docs/next-steps.md`：后续公开模板重写顺序
+- `deploy/kubernetes/base/*`：最小 Kubernetes 共享片段
+- `deploy/kubernetes/overlays/*`：环境 overlay 示例片段
 
-这是共享骨架基底，默认包含：
+## 使用边界
 
-- `cmd/app/main.go`：项目入口
-- `app/http/routes.go`：最小 HTTP 路由
-- `app/service/ping.go`：最小业务 service 示例
-- `config/app.yaml`：基础配置
-- `app/service/`、`app/model/`、`app/provider/`：业务扩展目录
-- `storage/log/`、`storage/runtime/`：运行期目录占位
-- `docs/structure.md`：starter 目录说明
-- `.gitignore`：常见忽略规则
+- 不在这里放 `cmd/app`、`app/http`、`internal/server/*`
+- 不在这里放业务 handler、service、repository
+- 不在这里放 `go.mod`、Dockerfile、Makefile、CI 主线
+- 不在这里解释 framework 内部 provider / container / bootstrap
 
-## Quick start
-
-```bash
-go mod tidy
-go run ./cmd/app
-```
-
-## 启动后先验证什么
-
-推荐先访问：
-
-- `GET /healthz`
-- `GET /api/ping`
-- `/swagger/index.html`（取决于配置）
-
-## 推荐先看哪几个文件
-
-1. `cmd/app/main.go`
-2. `app/http/routes.go`
-3. `app/service/ping.go`
-4. `config/app.yaml`
-5. `docs/structure.md`
-
-## 关于当前 starter 的使用边界
-
-当前共享骨架基底优先服务于默认起步路径：
-
-- 直接通过 `gorp new` 快速创建并启动项目
-- 在母仓内生成一个最小骨架验证入口与目录规则
-
-如果你明确需要一个更接近“固定版本交付物”的结果，请使用：
-
-```bash
-gorp template pack
-gorp new from-release --repo <owner>/<repo> --tag latest
-```
+这些内容由公开模板按场景重写并拥有。

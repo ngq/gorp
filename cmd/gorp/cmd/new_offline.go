@@ -94,7 +94,7 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printScaffoldNext(cmd.OutOrStdout(), folder)
+	printScaffoldNext(cmd.OutOrStdout(), folder, newOfflineTemplate)
 	return nil
 }
 

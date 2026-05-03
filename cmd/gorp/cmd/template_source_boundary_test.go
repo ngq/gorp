@@ -13,24 +13,26 @@ func TestTemplateSourcesRenderProjectArtifactsWithoutTemplateResidue(t *testing.
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	tests := []struct {
-		name     string
-		template string
-		mustExist []string
+		name         string
+		template     string
+		mustExist    []string
+		mustNotExist []string
 	}{
 		{
-			name:     "golayout",
-			template: starterTemplateGoLayout,
-			mustExist: []string{".gorp-template.yml", "cmd/app/main.go", "app/http/routes.go", "deploy/kubernetes/base/kustomization.yaml"},
+			name:         "golayout",
+			template:     starterTemplateGoLayout,
+			mustExist:    []string{".gorp-template.yml", "cmd/app/main.go", "app/http/routes.go", "deploy/kubernetes/base/kustomization.yaml"},
+			mustNotExist: []string{"api", "pkg", "third_party"},
 		},
 		{
-			name:     "multi-flat-wire",
-			template: starterTemplateMultiFlatWire,
+			name:      "multi-flat-wire",
+			template:  starterTemplateMultiFlatWire,
 			mustExist: []string{".gorp-template.yml", "services/user/cmd/main.go", "docs/deploy.md", "deploy/kubernetes/overlays/prod/kustomization.yaml"},
 		},
 		{
-			name:     "multi-independent",
-			template: starterTemplateMultiIndependent,
-			mustExist: []string{".gorp-template.yml", "services/user/cmd/main.go", "services/user/deploy/Dockerfile", "go.work"},
+			name:      "multi-independent",
+			template:  starterTemplateMultiIndependent,
+			mustExist: []string{".gorp-template.yml", "services/user/cmd/main.go", "deploy/docker/Dockerfile.user", "go.work"},
 		},
 	}
 
@@ -55,6 +57,10 @@ func TestTemplateSourcesRenderProjectArtifactsWithoutTemplateResidue(t *testing.
 				_, err := os.Stat(filepath.Join(projectDir, filepath.FromSlash(rel)))
 				require.NoError(t, err, rel)
 			}
+			for _, rel := range tt.mustNotExist {
+				_, err := os.Stat(filepath.Join(projectDir, filepath.FromSlash(rel)))
+				require.True(t, os.IsNotExist(err), rel)
+			}
 		})
 	}
 }
@@ -63,14 +69,16 @@ func TestReleaseTemplateSourcesRenderProjectArtifactsWithoutTemplateResidue(t *t
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	tests := []struct {
-		name      string
-		template  string
-		mustExist []string
+		name         string
+		template     string
+		mustExist    []string
+		mustNotExist []string
 	}{
 		{
-			name:      "release-golayout",
-			template:  starterTemplateGoLayout,
-			mustExist: []string{"cmd/app/main.go", "app/http/routes.go", "README.md"},
+			name:         "release-golayout",
+			template:     starterTemplateGoLayout,
+			mustExist:    []string{"cmd/app/main.go", "app/http/routes.go", "README.md", ".gorp-template.yml", "docs/deploy.md", "deploy/kubernetes/base/kustomization.yaml"},
+			mustNotExist: []string{"api", "pkg", "third_party"},
 		},
 		{
 			name:      "release-multi-flat-wire",
@@ -80,7 +88,7 @@ func TestReleaseTemplateSourcesRenderProjectArtifactsWithoutTemplateResidue(t *t
 		{
 			name:      "release-multi-independent",
 			template:  starterTemplateMultiIndependent,
-			mustExist: []string{"README.md", "services/user/cmd/main.go", "services/user/deploy/Dockerfile"},
+			mustExist: []string{"README.md", "services/user/cmd/main.go", "deploy/docker/Dockerfile.user"},
 		},
 	}
 
@@ -105,6 +113,10 @@ func TestReleaseTemplateSourcesRenderProjectArtifactsWithoutTemplateResidue(t *t
 			for _, rel := range tt.mustExist {
 				_, err := os.Stat(filepath.Join(projectDir, filepath.FromSlash(rel)))
 				require.NoError(t, err, rel)
+			}
+			for _, rel := range tt.mustNotExist {
+				_, err := os.Stat(filepath.Join(projectDir, filepath.FromSlash(rel)))
+				require.True(t, os.IsNotExist(err), rel)
 			}
 		})
 	}

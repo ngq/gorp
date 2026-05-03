@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"{{.ModuleName}}/internal/biz"
-
-	"gorm.io/gorm"
 )
 
 // DemoPO Demo 持久化对象。
@@ -55,13 +53,13 @@ func NewDemoRepo(data *Data) biz.DemoRepository {
 // Create 创建。
 func (r *demoRepo) Create(ctx context.Context, demo *biz.Demo) error {
 	po := ToPO(demo)
-	return r.data.DB().(*gorm.DB).WithContext(ctx).Create(po).Error
+	return r.data.DB().WithContext(ctx).Create(po).Error
 }
 
 // GetByID 根据 ID 获取。
 func (r *demoRepo) GetByID(ctx context.Context, id uint) (*biz.Demo, error) {
 	var po DemoPO
-	if err := r.data.DB().(*gorm.DB).WithContext(ctx).First(&po, id).Error; err != nil {
+	if err := r.data.DB().WithContext(ctx).First(&po, id).Error; err != nil {
 		return nil, err
 	}
 	return po.ToEntity(), nil
@@ -72,7 +70,7 @@ func (r *demoRepo) List(ctx context.Context, page, pageSize int) ([]*biz.Demo, i
 	var pos []DemoPO
 	var total int64
 
-	db := r.data.DB().(*gorm.DB).WithContext(ctx).Model(&DemoPO{})
+	db := r.data.DB().WithContext(ctx).Model(&DemoPO{})
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -93,10 +91,10 @@ func (r *demoRepo) List(ctx context.Context, page, pageSize int) ([]*biz.Demo, i
 // Update 更新。
 func (r *demoRepo) Update(ctx context.Context, demo *biz.Demo) error {
 	po := ToPO(demo)
-	return r.data.DB().(*gorm.DB).WithContext(ctx).Save(po).Error
+	return r.data.DB().WithContext(ctx).Save(po).Error
 }
 
 // Delete 删除。
 func (r *demoRepo) Delete(ctx context.Context, id uint) error {
-	return r.data.DB().(*gorm.DB).WithContext(ctx).Delete(&DemoPO{}, id).Error
+	return r.data.DB().WithContext(ctx).Delete(&DemoPO{}, id).Error
 }

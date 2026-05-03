@@ -18,20 +18,28 @@ import (
 // - 使用框架统一入口 gorp，简化导入；
 // - 默认主线直接走 typed runtime + direct constructor，不要求先理解 ServiceProvider / ExtraProviders。
 func main() {
-	if err := gorp.BootHTTPService("{{.Name}}", gorp.HTTPServiceOptions{}, migrate, setup); err != nil {
+	if err := gorp.Run(
+		"{{.Name}}",
+		gorp.HTTP(),
+		gorp.WithMigrate(migrate),
+		gorp.WithSetup(setup),
+	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *gorp.HTTPServiceRuntime) error {
-	return gorp.AutoMigrateModels(rt, &data.DemoPO{})
+func migrate(rt *gorp.HTTPRuntime) error {
+	if rt == nil || rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&data.DemoPO{})
 }
 
-func setup(rt *gorp.HTTPServiceRuntime) error {
-	d := data.NewData(rt.Container)
+func setup(rt *gorp.HTTPRuntime) error {
+	d := data.NewData(rt.DB)
 	b := biz.NewBiz(data.NewDemoRepo(d))
 	svc := service.NewServices(b)
-	apphttp.RegisterRoutes(rt.Engine, rt.Container, svc)
+	apphttp.RegisterRoutes(rt.Router, svc)
 	return nil
 }

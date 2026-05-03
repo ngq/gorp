@@ -5,32 +5,34 @@ import (
 	"os"
 
 	productdata "{{.ModuleName}}/services/product/internal/data"
-	productserver "{{.ModuleName}}/services/product/internal/server"
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
-	frameworkcontainer "{{.FrameworkModule}}/framework/container"
+	producthttp "{{.ModuleName}}/services/product/internal/server/http"
+	"{{.FrameworkModule}}"
 )
 
 // main 是 product 服务的主入口。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("product-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+	if err := gorp.Run("product-service", gorp.HTTP(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	return frameworkbootstrap.AutoMigrateModels(rt, &productdata.ProductPO{})
+func migrate(rt *gorp.HTTPRuntime) error {
+	if rt == nil || rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&productdata.ProductPO{})
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("product-service requires gorm database")
 	}
-	publisher, err := frameworkcontainer.MakeMessagePublisher(rt.Container)
+	publisher, err := gorp.MakeMessagePublisher(rt.Container)
 	if err != nil {
 		return err
 	}
-	subscriber, err := frameworkcontainer.MakeMessageSubscriber(rt.Container)
+	subscriber, err := gorp.MakeMessageSubscriber(rt.Container)
 	if err != nil {
 		return err
 	}
@@ -38,7 +40,6 @@ func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
 	if err != nil {
 		return err
 	}
-	httpServer := productserver.NewHTTPServer(services)
-	httpServer.RegisterRoutes(rt.Engine)
+	producthttp.RegisterRoutes(rt.Router, services)
 	return nil
 }

@@ -8,8 +8,7 @@ import (
 	"{{.ModuleName}}/services/user/internal/biz"
 	"{{.ModuleName}}/services/user/internal/data"
 
-	"github.com/ngq/gorp/framework/contract"
-	frameworkgrpc "{{.FrameworkModule}}/framework/provider/grpc"
+	"{{.FrameworkModule}}"
 	"gorm.io/gorm"
 )
 
@@ -91,12 +90,12 @@ func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (
 	}
 
 	metadataDemo := ""
-	if md, ok := contract.FromServerContext(ctx); ok && md != nil {
+	if md, ok := gorp.FromServerContext(ctx); ok && md != nil {
 		metadataDemo = md.Get("x-md-demo")
 	}
 
 	callerServiceName := ""
-	if identity, ok := ctx.Value(contract.ServiceIdentityKey).(*contract.ServiceIdentity); ok && identity != nil {
+	if identity, ok := gorp.FromServiceIdentity(ctx); ok && identity != nil {
 		callerServiceName = identity.ServiceName
 	}
 
@@ -104,8 +103,8 @@ func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (
 		Id:                uint64(user.ID),
 		Username:          user.Username,
 		Email:             user.Email,
-		TraceId:           frameworkgrpc.GetTraceID(ctx),
-		RequestId:         frameworkgrpc.GetRequestID(ctx),
+		TraceId:           gorp.GetGRPCTraceID(ctx),
+		RequestId:         gorp.GetGRPCRequestID(ctx),
 		MetadataDemo:      metadataDemo,
 		CallerServiceName: callerServiceName,
 	}, nil

@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	frameworktesting "github.com/ngq/gorp/framework/testing"
@@ -29,12 +28,28 @@ func TestRenderMultiFlatWireTemplateIncludesTests(t *testing.T) {
 	require.NoError(t, err)
 
 	mustExist := []string{
+		".gorp-template.yml",
+		"go.mod",
+		"Makefile",
+		"pkg/README.md",
 		"services/user/internal/biz/user_test.go",
 		"services/order/internal/biz/order_test.go",
 		"services/product/internal/biz/product_test.go",
-		"services/user/internal/server/http_test.go",
-		"services/order/internal/server/http_test.go",
-		"services/product/internal/server/http_test.go",
+		"services/user/internal/server/http/routes_test.go",
+		"services/order/internal/server/http/routes_test.go",
+		"services/product/internal/server/http/routes_test.go",
+		"services/user/internal/server/http/routes.go",
+		"services/order/internal/server/http/routes.go",
+		"services/product/internal/server/http/routes.go",
+		"services/user/internal/server/http/handler/user.go",
+		"services/order/internal/server/http/handler/order.go",
+		"services/product/internal/server/http/handler/product.go",
+		"services/user/internal/server/grpc/register.go",
+		"services/order/internal/server/grpc/README.md",
+		"services/product/internal/server/grpc/README.md",
+		"services/user/internal/server/http/middleware/README.md",
+		"services/order/internal/server/http/middleware/README.md",
+		"services/product/internal/server/http/middleware/README.md",
 		"services/user/internal/service/grpc_smoke_test.go",
 		"services/order/internal/service/grpc_smoke_test.go",
 		"deploy/compose/docker-compose.yaml",
@@ -54,69 +69,126 @@ func TestRenderMultiFlatWireTemplateIncludesTests(t *testing.T) {
 		}
 	}
 
+	mustNotExist := []string{
+		"cmd",
+		"scripts",
+		"deploy/k8s",
+		"services/gateway",
+		"shared/infrastructure",
+		"third_party",
+	}
+	for _, rel := range mustNotExist {
+		_, err := os.Stat(filepath.Join(projectDir, filepath.FromSlash(rel)))
+		require.True(t, os.IsNotExist(err), rel)
+	}
+
 	readme, err := os.ReadFile(filepath.Join(projectDir, "README.md"))
 	require.NoError(t, err)
 	readmeText := string(readme)
-	require.Contains(t, readmeText, "多服务起步模板（Wire 装配版）")
-	require.Contains(t, readmeText, "> 起步：")
-	require.Contains(t, readmeText, "## 先看这三件事")
-	require.Contains(t, readmeText, "- 创建项目：`gorp new multi-wire`")
-	require.Contains(t, readmeText, "- 生成代码：`make generate`")
-	require.NotContains(t, readmeText, "安装代码生成工具")
-	require.Contains(t, readmeText, "### 2. 统一生成代码")
-	require.Contains(t, readmeText, "## 继续往下时再看")
-	require.Contains(t, readmeText, "## 目录速览")
-	require.Contains(t, readmeText, "目录：")
-	require.Contains(t, readmeText, "## 日志建议")
-	require.NotContains(t, readmeText, "## 技术栈")
-	require.NotContains(t, readmeText, "母仓/单服务场景")
-	require.Equal(t, 1, strings.Count(readmeText, "### 5. 本地联调"))
-	require.Contains(t, readmeText, "### 4. 运行测试")
+	require.Contains(t, readmeText, "gorp new multi-wire")
+	require.Contains(t, readmeText, "make generate")
 	require.Contains(t, readmeText, "make test")
-	require.Contains(t, readmeText, "### 5. 本地联调")
 	require.Contains(t, readmeText, "make deploy-local")
-	require.Contains(t, readmeText, "附带：")
-	require.Contains(t, readmeText, "看：")
-	require.Contains(t, readmeText, "验：")
-	require.Contains(t, readmeText, "### 8. 验证 Proto-first gRPC 双服务链路")
-	require.Contains(t, readmeText, "建议：")
-	require.Contains(t, readmeText, "配：")
-	require.Contains(t, readmeText, "主线：")
-	require.Contains(t, readmeText, "### 9. 生成 proto 代码")
-	require.Contains(t, readmeText, "修改 `proto/*.proto` 后")
-	require.Contains(t, readmeText, "生成：")
-	require.Contains(t, readmeText, "默认优先按服务间 Proto-first 接线验证；")
-	require.Contains(t, readmeText, "这一步按需执行。")
-	require.Contains(t, readmeText, "有请求上下文时优先使用 `log.Ctx(ctx)`；")
-	require.Less(t, strings.Index(readmeText, "### 4. 运行测试"), strings.Index(readmeText, "### 5. 本地联调"))
-	require.Less(t, strings.Index(readmeText, "### 5. 本地联调"), strings.Index(readmeText, "### 6. Harbor 推送镜像"))
-	require.Contains(t, readmeText, "- 统一执行 Wire 与 Proto 生成；")
-	require.Contains(t, readmeText, "- 服务入口由 `services/<service>/cmd/main.go` 承接。")
-	require.Contains(t, readmeText, "- 各服务统一由 `services/<service>/cmd/main.go` 启动；")
-	require.Contains(t, readmeText, "- 传输层注册在 `internal/server`，业务编排在 `internal/service`。")
-	require.Contains(t, readmeText, "- 通过 `deploy/compose/docker-compose.yaml` 拉起 Redis 与三组服务样板；")
-	require.Contains(t, readmeText, "- 先构建 `user-service`、`order-service`、`product-service` 三个镜像；")
-	require.Contains(t, readmeText, "- 优先使用 `gorp/log` 作为业务日志入口；")
-	require.Contains(t, readmeText, "- 传输层注册在 `internal/server`，业务编排在 `internal/service`。")
-	require.NotContains(t, readmeText, "不再通过 `services/*/start.go`")
-	require.NotContains(t, readmeText, "capability 调用统一放在 `internal/service`")
+	require.Contains(t, readmeText, "`internal/server/http`")
+	require.Contains(t, readmeText, "`internal/server/grpc`")
+	require.Contains(t, readmeText, "gorp.Run(...)")
+	require.Contains(t, readmeText, "GRPCServerRegistrar + pb.RegisterXxxServer(...)")
+	require.Contains(t, readmeText, "GRPCConnFactory + pb.NewXxxClient(conn)")
+	require.NotContains(t, readmeText, "services/*/start.go")
+	require.NotContains(t, readmeText, "third_party/")
+
+	grpcReadme, err := os.ReadFile(filepath.Join(projectDir, "services", "order", "internal", "server", "grpc", "README.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(grpcReadme), "Proto-first gRPC register / adapter")
+
+	middlewareReadme, err := os.ReadFile(filepath.Join(projectDir, "services", "order", "internal", "server", "http", "middleware", "README.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(middlewareReadme), "Service-local HTTP middleware")
+
+	pkgReadme, err := os.ReadFile(filepath.Join(projectDir, "pkg", "README.md"))
+	require.NoError(t, err)
+	pkgReadmeText := string(pkgReadme)
+	require.Contains(t, pkgReadmeText, "stable helpers shared by multiple services")
+	require.Contains(t, pkgReadmeText, "reused by at least two services")
+	require.Contains(t, pkgReadmeText, "infrastructure SDK initialization")
+
+	makefile, err := os.ReadFile(filepath.Join(projectDir, "Makefile"))
+	require.NoError(t, err)
+	makeText := string(makefile)
+	require.Contains(t, makeText, "USER_IMAGE ?= mfwverify-user-service")
+	require.Contains(t, makeText, "ORDER_IMAGE ?= mfwverify-order-service")
+	require.Contains(t, makeText, "PRODUCT_IMAGE ?= mfwverify-product-service")
+	require.NotContains(t, makeText, "docker build -f deploy/docker/Dockerfile.user -t user-service:$(IMAGE_TAG) .")
+
+	compose, err := os.ReadFile(filepath.Join(projectDir, "deploy", "compose", "docker-compose.yaml"))
+	require.NoError(t, err)
+	composeText := string(compose)
+	require.Contains(t, composeText, "container_name: mfwverify-redis")
+	require.Contains(t, composeText, "container_name: mfwverify-user")
+	require.Contains(t, composeText, "container_name: mfwverify-order")
+	require.Contains(t, composeText, "container_name: mfwverify-product")
+
+	deployment, err := os.ReadFile(filepath.Join(projectDir, "deploy", "kubernetes", "base", "deployment.yaml"))
+	require.NoError(t, err)
+	deploymentText := string(deployment)
+	require.Contains(t, deploymentText, "image: your-registry/mfwverify-user-service:latest")
+	require.Contains(t, deploymentText, "image: your-registry/mfwverify-order-service:latest")
+	require.Contains(t, deploymentText, "image: your-registry/mfwverify-product-service:latest")
+
+	devKustomization, err := os.ReadFile(filepath.Join(projectDir, "deploy", "kubernetes", "overlays", "dev", "kustomization.yaml"))
+	require.NoError(t, err)
+	devText := string(devKustomization)
+	require.Contains(t, devText, "name: your-registry/mfwverify-user-service")
+	require.Contains(t, devText, "newName: mfwverify-user-service")
+	require.Contains(t, devText, "name: your-registry/mfwverify-order-service")
+	require.Contains(t, devText, "newName: mfwverify-order-service")
+	require.Contains(t, devText, "name: your-registry/mfwverify-product-service")
+	require.Contains(t, devText, "newName: mfwverify-product-service")
 
 	userSvc, err := os.ReadFile(filepath.Join(projectDir, "services", "user", "internal", "service", "service.go"))
 	require.NoError(t, err)
-	require.Contains(t, string(userSvc), "framework/provider/grpc")
+	require.Contains(t, string(userSvc), "gorp.GetGRPCTraceID")
+	require.Contains(t, string(userSvc), "gorp.FromServerContext")
+	require.NotContains(t, string(userSvc), "framework/provider/grpc")
 	require.NotContains(t, string(userSvc), "github.com/ngq/gorp/app/grpc")
 
 	serverFiles := []string{
-		"services/user/internal/server/http.go",
-		"services/order/internal/server/http.go",
-		"services/product/internal/server/http.go",
+		"services/user/internal/server/http/routes.go",
+		"services/order/internal/server/http/routes.go",
+		"services/product/internal/server/http/routes.go",
+		"services/user/internal/server/http/handler/user.go",
+		"services/order/internal/server/http/handler/order.go",
+		"services/product/internal/server/http/handler/product.go",
 	}
 	for _, rel := range serverFiles {
 		content, err := os.ReadFile(filepath.Join(projectDir, filepath.FromSlash(rel)))
 		require.NoError(t, err, rel)
-		require.Contains(t, string(content), "framework/provider/gin", rel)
-		require.Contains(t, string(content), "ginprovider", rel)
+		require.NotContains(t, string(content), "framework/provider/gin", rel)
+		require.NotContains(t, string(content), "ginprovider", rel)
 	}
+
+	handlerFiles := []string{
+		"services/user/internal/server/http/handler/user.go",
+		"services/order/internal/server/http/handler/order.go",
+		"services/product/internal/server/http/handler/product.go",
+	}
+	for _, rel := range handlerFiles {
+		content, err := os.ReadFile(filepath.Join(projectDir, filepath.FromSlash(rel)))
+		require.NoError(t, err, rel)
+		require.Contains(t, string(content), "c.JSON(", rel)
+	}
+
+	structure, err := os.ReadFile(filepath.Join(projectDir, "docs", "structure.md"))
+	require.NoError(t, err)
+	structureText := string(structure)
+	require.Contains(t, structureText, "`internal/server/http/`")
+	require.Contains(t, structureText, "`internal/server/grpc/`")
+
+	componentTree, err := os.ReadFile(filepath.Join(projectDir, "docs", "component-tree.md"))
+	require.NoError(t, err)
+	componentTreeText := string(componentTree)
+	require.Contains(t, componentTreeText, "`services/<service>/internal/server/http/`")
+	require.Contains(t, componentTreeText, "`services/<service>/internal/server/grpc/`")
 
 	userPB, err := os.ReadFile(filepath.Join(projectDir, "proto", "user", "v1", "user.pb.go"))
 	require.NoError(t, err)

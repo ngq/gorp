@@ -4,33 +4,33 @@ import (
 	"fmt"
 	"os"
 
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
 	userdata "{{.ModuleName}}/services/user/internal/data"
-	usersvc "{{.ModuleName}}/services/user/internal/service"
+	userhttp "{{.ModuleName}}/services/user/internal/server/http"
+	"{{.FrameworkModule}}"
 )
 
-// main 是 user 服务的主入口。
-//
-// 中文说明：
-// - 直接通过 framework/bootstrap 启动当前服务；
-// - 用户日常开发时可直接 `go run ./services/user/cmd` 或 IDE 调试；
-// - 不依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("user-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+	if err := gorp.Run("user-service", gorp.HTTP(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	return frameworkbootstrap.AutoMigrateModels(rt, &userdata.UserPO{})
+func migrate(rt *gorp.HTTPRuntime) error {
+	if rt == nil || rt.DB == nil {
+		return nil
+	}
+	return rt.DB.AutoMigrate(&userdata.UserPO{})
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("user-service requires gorm database")
 	}
-	services := usersvc.NewServices(rt.DB)
-	services.User.RegisterRoutes(rt.Engine)
+	services, err := wireUserServices(rt.DB)
+	if err != nil {
+		return err
+	}
+	userhttp.RegisterRoutes(rt.Router, services)
 	return nil
 }

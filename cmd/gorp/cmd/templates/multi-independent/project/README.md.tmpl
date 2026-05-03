@@ -1,55 +1,64 @@
 # {{.ProjectName}}
 
-多服务进阶模板（更强独立治理）
+多服务进阶模板（独立治理版）
+
+> 适用场景：
+> - 已经明确需要每个服务独立 `go.mod`
+> - 需要保留 `shared/` 作为稳定共享边界
+> - 希望默认主线保持 facade-first，而不是让业务先理解 framework 内部装配
 
 ## 先看这三件事
 
 - 创建项目：`gorp new --template multi-independent`
-- 启动服务：`go run ./services/user/cmd`
-- 本地联调：`make deploy-local`
+- 生成 Wire：`make generate`
+- 启动服务：`make run-user` / `make run-order` / `make run-product`
 
-## 说明
-
-- 适合明确需要更强服务独立治理、独立 go.mod 与后续拆仓演进的团队。
-- 推荐先使用 `golayout` 或 `multi-flat-wire` 起步，再按治理需求升级到本结构。
-
-## 项目结构
+## 目录速览
 
 ```text
-├── services/                 # 各服务完全独立
-│   ├── user/                # 用户服务
-│   │   ├── cmd/             # 服务入口
-│   │   │   └── main.go      # 入口
-│   │   ├── internal/        # 服务内部代码
-│   │   ├── config/          # 服务配置
-│   │   ├── deploy/     # 服务部署配置
-│   │   └── go.mod           # 独立 go.mod
-│   ├── order/
-│   ├── product/
-│   └── gateway/
-├── shared/                   # 共享代码
-│   ├── config/              # 配置结构
-│   ├── db/                  # 数据库
-│   ├── infrastructure/      # 基础设施（Redis, Consul, Tracing...）
-│   └── logger/              # 日志
-├── deploy/              # 统一部署编排
-└── go.work                   # Go workspace
+services/
+  user/
+    cmd/
+      main.go
+      wire.go
+      wire_gen.go
+    internal/
+      biz/
+      data/
+      service/
+      server/
+        http/
+          routes.go
+          handler/
+          request/
+          response/
+          middleware/
+        grpc/
+    config/
+    go.mod
+  order/
+  product/
+shared/
+  README.md
+  config/
+  db/
+  logger/
+deploy/
+docs/
+go.work
+Makefile
 ```
 
-## 特点
-
-- 服务完全独立
-- 独立 go.mod
-- 独立部署
-- 默认入口直接复用 framework/bootstrap
-- 共享层只保留跨服务稳定复用内容
+目录说明看：`docs/structure.md`
 
 ## 默认开发主线
 
-- 每个服务默认从 `services/<service>/cmd/main.go` 启动；
-- 默认入口直接复用 framework/bootstrap，不要求先理解 provider/container 内部装配；
-- 业务主要写在 `internal/service`、`internal/data`、`internal/server`；
-- 共享层只保留跨服务稳定复用内容，不承载默认业务起步教学。
+- 每个服务统一从 `services/<service>/cmd/main.go` 启动
+- Wire 只保留在 `cmd/` 层收口依赖
+- 默认优先通过 `gorp.Run(...)` + facade runtime 启动
+- HTTP 接线放 `internal/server/http/`
+- gRPC 扩展位放 `internal/server/grpc/`
+- `shared/` 只放稳定共享 helper，不再承担服务默认装配
 
 ## 快速开始
 
@@ -59,57 +68,66 @@
 go work sync
 ```
 
-### 2. 启动服务
+### 2. 生成 Wire
 
 ```bash
-# 本地运行（分别启动）
-make run-user    # 终端 1
-make run-order   # 终端 2
-make run-product # 终端 3
+make generate
+```
 
-# 或直接运行各服务 main 入口
-go run ./services/user/cmd
-go run ./services/order/cmd
-go run ./services/product/cmd
+说明：
+- `wire.go` 只留在各服务 `cmd/` 层
+- 默认模板直接以各服务 `cmd/main.go` 作为启动主线
 
-# Docker 部署
+### 3. 启动服务
+
+```bash
+make run-user
+make run-order
+make run-product
+```
+
+说明：
+- 各服务统一走 `services/<service>/cmd/main.go`
+- HTTP 传输层统一放 `internal/server/http/`
+
+### 4. 运行测试
+
+```bash
+make test
+```
+
+说明：
+- 默认附带最小 HTTP smoke 测试
+- 业务逻辑继续放在 `internal/biz/` 与 `internal/service/`
+
+## 继续往下时再看
+
+### 5. 本地联调
+
+```bash
 make deploy-local
 ```
 
-### 3. 访问服务
+说明：
+- 使用 `deploy/compose/docker-compose.yaml`
+- 默认通过 workspace 直接运行三个服务
+- 容器名使用 `{{.KubernetesName}}-*`，避免多个生成项目在同一台机器上撞名
 
-优先先把一个服务跑通，再逐步扩到多服务联调。
-
-## 日志使用建议
-
-- 默认优先使用 `gorp/log` 作为业务日志入口；
-- 先把服务跑通，再按业务需要补日志字段。
-
-## 组件与部署提醒
-
-- 默认继续复用项目自己的 `services/<service>/cmd/main.go` 入口
-- 部署与外部组件接入按需展开，不把 README 首屏写成基础设施手册
-- 共享层只保留跨服务稳定复用内容
-
-## Makefile 命令
-
-| 命令 | 说明 |
-|-----|-----|
-| `make build` | 构建所有服务 |
-| `make deploy-local` | Docker Compose 部署 |
-| `make deploy-local-down` | 停止服务 |
-| `make test` | 运行测试 |
-
-## 服务拆分
-
-当团队需要独立发布、独立治理或独立仓库时，再按这个结构继续演进。
+### 6. Harbor 推镜像
 
 ```bash
-# 1. 复制服务目录
-cp -r services/user ../user-service-repo
-
-# 2. 复制 shared 模块（或发布为独立模块）
-cp -r shared ../user-service-repo/shared
-
-# 3. 更新 go.mod 中的 replace 指向
+make harbor-push HARBOR_REGISTRY=harbor.example.com HARBOR_NAMESPACE={{.Name}} IMAGE_TAG=v1.0.0
 ```
+
+说明：
+- 本地与 Harbor 镜像名使用项目级前缀：`{{.KubernetesName}}-user-service`、`{{.KubernetesName}}-order-service`、`{{.KubernetesName}}-product-service`
+- Kubernetes overlays 也使用同一套镜像名映射，避免构建、推送、部署三处手工改名
+
+### 7. 部署资产
+
+看：`docs/deploy.md`
+
+## 日志建议
+
+- 业务日志优先走 `gorp/log`
+- `shared/logger/` 只保留稳定共享门面，不承担 starter 教学职责

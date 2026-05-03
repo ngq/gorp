@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGoLayoutRuntimeProviderStaysCompatibilityExtension(t *testing.T) {
+func TestGoLayoutTemplateUsesFacadeInsteadOfCompatibilityProviders(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -31,7 +31,10 @@ func TestGoLayoutRuntimeProviderStaysCompatibilityExtension(t *testing.T) {
 	text := string(readme)
 	require.NotContains(t, text, "app/provider")
 	require.Contains(t, text, "cmd/app/main.go")
-	require.Contains(t, text, "typed runtime + direct constructor")
+	require.Contains(t, text, "gorp.Run")
+	require.Contains(t, text, "facade")
+	require.NotContains(t, text, "typed runtime + direct constructor")
+	require.NotContains(t, text, "BootHTTPService")
 
 	_, err = os.Stat(filepath.Join(projectDir, "app", "provider", "service", "provider.go"))
 	require.ErrorIs(t, err, os.ErrNotExist)

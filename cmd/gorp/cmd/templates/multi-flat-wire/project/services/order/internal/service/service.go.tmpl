@@ -10,7 +10,7 @@ import (
 	"{{.ModuleName}}/services/order/internal/biz"
 	"{{.ModuleName}}/services/order/internal/data"
 
-	"github.com/ngq/gorp/framework/contract"
+	"{{.FrameworkModule}}"
 	"gorm.io/gorm"
 )
 
@@ -20,19 +20,19 @@ type Services struct {
 }
 
 // NewServices 创建服务层。
-func NewServices(db *gorm.DB, userConnFactory contract.GRPCConnFactory, dlock contract.DistributedLock) *Services {
+func NewServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.DistributedLock) *Services {
 	orderRepo := data.NewOrderRepo(db)
 	orderUC := biz.NewOrderUseCase(orderRepo)
 	return &Services{
-		Order: &OrderService{uc: orderUC, userConnFactory: userConnFactory, dlock: dlock},
+	Order: &OrderService{uc: orderUC, userConnFactory: userConnFactory, dlock: dlock},
 	}
 }
 
 // OrderService 订单服务。
 type OrderService struct {
 	uc              *biz.OrderUseCase
-	userConnFactory contract.GRPCConnFactory
-	dlock           contract.DistributedLock
+	userConnFactory gorp.GRPCConnFactory
+	dlock           gorp.DistributedLock
 }
 
 // CreateOrderRequest 创建订单请求。
@@ -120,7 +120,7 @@ func (s *OrderService) GetOrderUser(ctx context.Context, id uint) (*RemoteUserRe
 		return nil, err
 	}
 
-	ctx = contract.AppendToClientContext(ctx, "x-md-demo", "hello-metadata")
+	ctx = gorp.AppendToClientContext(ctx, "x-md-demo", "hello-metadata")
 	conn, err := s.userConnFactory.Conn(ctx, "user-service")
 	if err != nil {
 		return nil, fmt.Errorf("dial user-service failed: %w", err)

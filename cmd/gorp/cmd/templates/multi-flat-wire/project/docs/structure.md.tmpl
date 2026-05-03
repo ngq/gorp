@@ -1,34 +1,35 @@
 # multi-flat-wire 模板目录说明
 
-`multi-flat-wire` 适合明确要走多服务主线且希望把 Wire 收口在 `cmd/` 层的团队。
-
-> 定位提醒：
-> - 如果你已经明确要走多服务主线，直接使用 `gorp new multi-wire`；
-> - 这里的重点是服务目录、Proto-first 契约与 Wire 编译期装配；
-> - 如果当前只是快速开始单服务业务开发，优先使用裸 `gorp new`。
+`multi-flat-wire` 适合已经明确要走多服务主线，并希望把 Wire 收口在 `cmd/` 层的团队。
 
 ## 当前模板目录
 
 ```text
-├── services/                      # 各服务代码（按服务就近聚合）
-│   ├── user/
-│   │   ├── cmd/                   # 服务启动入口与 Wire 装配边界
-│   │   │   ├── main.go
-│   │   │   ├── wire.go
-│   │   │   └── wire_gen.go
-│   │   ├── internal/
-│   │   │   ├── biz/               # 领域规则 / usecase
-│   │   │   ├── data/              # 数据访问实现
-│   │   │   ├── service/           # 应用服务编排
-│   │   │   └── server/            # HTTP / gRPC 传输注册
-│   │   └── config/                # 服务本地配置
-│   ├── order/
-│   └── product/
-├── proto/                         # Proto-first 契约目录
-├── deploy/                   # 本地联调 / 容器部署资源
-├── scripts/                       # 脚本辅助目录
-├── pkg/                           # 公共包（仅放稳定、跨服务复用的代码）
-└── docs/                          # 模板内结构说明文档
+services/
+  user/
+    cmd/
+      main.go
+      wire.go
+      wire_gen.go
+    internal/
+      biz/
+      data/
+      service/
+      server/
+        http/
+          routes.go
+          handler/
+          request/
+          response/
+          middleware/
+        grpc/
+    config/
+  order/
+  product/
+proto/
+deploy/
+pkg/
+docs/
 ```
 
 ## 各层职责
@@ -46,8 +47,6 @@
 - 这个服务如何启动
 - 依赖如何在 `cmd/` 层收口
 
-不建议把业务逻辑直接写在这里。
-
 ### 2. `services/<service>/internal/biz/`
 
 职责：
@@ -55,8 +54,6 @@
 - 领域规则
 - usecase
 - 业务核心行为
-
-这里应该尽量只表达业务含义，不直接承接中间件接入细节。
 
 ### 3. `services/<service>/internal/data/`
 
@@ -66,29 +63,37 @@
 - 数据持久化
 - 与数据库或存储层的具体读写对接
 
-如果某类第三方组件本质上是“数据访问型依赖”，例如局部缓存读写，也可以在这里被业务仓储间接使用；但不要把整个第三方基础设施目录直接塞进 `data/`。
-
 ### 4. `services/<service>/internal/service/`
 
 职责：
 
 - 应用服务编排
-- 调用 biz / data / server 之间的协作逻辑
-- 对接 framework capability 的业务使用入口
+- 调用 biz / data / capability 之间的协作逻辑
+- 对接 facade 或必要 capability 的业务使用入口
 
-这里可以出现“发消息”“调 RPC”“查缓存”的业务动作编排，但不应该直接放底层 RabbitMQ / Kafka / Redis SDK 初始化细节。
+这里可以出现“发消息”“调 RPC”“查缓存”的业务动作编排，但不应直接放底层 SDK 初始化细节。
 
-### 5. `services/<service>/internal/server/`
+### 5. `services/<service>/internal/server/http/`
 
 职责：
 
-- HTTP / gRPC 注册
-- Handler / Transport Adapter
-- 请求与响应边界处理
+- Gin route 注册
+- handler
+- request / response DTO
+- 项目级 middleware
 
-这里只做传输层接线，不承载业务核心逻辑，也不承载第三方组件接入代码。
+这里只做 HTTP 传输层接线，不承载业务核心逻辑。
 
-### 6. `proto/`
+### 6. `services/<service>/internal/server/grpc/`
+
+职责：
+
+- Proto-first gRPC register / adapter
+- 对 framework 托管的 `grpc.Server` 做最小接线
+
+这里只做 gRPC 传输层接线，不承载业务核心逻辑。
+
+### 7. `proto/`
 
 职责：
 
@@ -96,37 +101,28 @@
 - gRPC 对外接口定义
 - 跨服务通信协议边界
 
-微服务正式主线应优先围绕 `proto/` 与标准 gRPC stub/register 展开，而不是回到字符串式 RPC 调用。
-
----
-
-## 第三方组件放哪里
+## 第三方能力放哪里
 
 原则：
 
-- 不建议在项目根目录直接建一个总兜底的 `third_party/`
-- 不建议把 RabbitMQ / Redis / Kafka 这类中间件 SDK 直接写进 `internal/service/`
-- 应先区分“业务编排”和“基础设施接入细节”
+- 不默认创建 `third_party/`
+- 不默认创建 `infrastructure/`
+- 不按组件名堆目录，如 `redis/`、`consul/`、`dtm/`
 
-当前模板只固定两条边界：
+当前模板固定的边界是：
 
 - 业务动作放 `internal/service/`
-- 传输注册放 `internal/server/`
+- HTTP 接线放 `internal/server/http/`
+- gRPC 接线放 `internal/server/grpc/`
 
-其余基础设施接入细节，优先通过 framework capability / provider 解决，不在模板里继续铺开新的目录层。
-
----
+其余基础设施接入细节，优先通过 framework capability / facade 解决。
 
 ## `docs/` 目录的作用
 
-- 给目录树说明预留承接点
-- 避免把规划中的结构误写成已经落地的代码目录
-- 避免过早引入 `internal/infrastructure` / `shared/infrastructure` / `third_party` 等目录，造成模板使用者误解
-
-因此这里只保留目录规则，不把规划中的结构直接物化成模板代码目录。
-
----
+- 解释目录边界
+- 解释生成步骤
+- 指向部署入口
 
 ## 一句话总结
 
-`multi-flat-wire` 只固定三件事：服务目录、`cmd/` 层 Wire 收口、默认通过 framework/bootstrap 启动。
+`multi-flat-wire` 固定四件事：服务目录、`cmd/` 层 Wire 收口、facade-first 启动主线、`internal/server/http|grpc` 传输分层。

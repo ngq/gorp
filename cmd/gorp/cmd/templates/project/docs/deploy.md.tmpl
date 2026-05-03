@@ -1,48 +1,23 @@
-# 部署说明
+# 共享交付片段
 
-当前共享骨架基底只保留最小交付骨架，方便你先完成：
+`project` 只保留最小 Kubernetes 片段，作为公开模板重写时可复用的基础。
 
-1. 本地开发
-2. 基础 CI
-3. Docker 镜像构建
-4. 单机或简单环境部署
-
-## 本地命令
-
-```bash
-go mod tidy
-go test ./...
-go run ./cmd/app
-```
-
-## Docker 构建
-
-```bash
-docker build -t {{.Name}}:latest .
-```
-
-## Kubernetes 测试 / 预发部署
-
-当前 starter 默认同时提供最小 Kubernetes 骨架：
+## 当前包含
 
 - `deploy/kubernetes/base/`
 - `deploy/kubernetes/overlays/dev/`
 - `deploy/kubernetes/overlays/staging/`
 
-使用前请先替换：
+说明：
+- 这里提供的是共享 Kubernetes 部署片段与目录骨架，便于公开模板复用。
+- 这不代表 `contrib/configsource/kubernetes` 或 `contrib/registry/kubernetes` 已经完成真实后端能力接入。
 
-- `deploy/kubernetes/base/secret.yaml` 中的敏感占位值
-- `deploy/kubernetes/overlays/staging/kustomization.yaml` 中的镜像仓库与 tag
+## 当前不包含
 
-最小验证：
+- Dockerfile
+- Makefile
+- CI workflow
+- 业务服务启动命令
+- 生产发布流程说明
 
-```bash
-kubectl kustomize deploy/kubernetes/overlays/dev
-kubectl kustomize deploy/kubernetes/overlays/staging
-```
-
-## 生产建议
-
-- 使用 `config/app.production.yaml`（后续可自行新增）
-- 把敏感配置通过环境变量注入
-- 日志与运行时目录建议挂载到持久化存储
+这些内容由 `golayout`、`multi-flat-wire`、`multi-independent` 在各自场景内定义。

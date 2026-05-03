@@ -145,7 +145,7 @@ func renderIndexDoc() string {
 		"### 默认主路径\n\n" +
 		"- 安装 CLI：`go install github.com/ngq/gorp/cmd/gorp@latest`\n" +
 		"- 创建项目：`gorp new`\n" +
-		"- 启动项目：进入生成项目后执行 `go run ./cmd/app`\n" +
+		"- 启动项目：进入生成项目后，按所选 starter 的 README 执行对应入口命令（例如 `go run ./cmd/app` 或 `make run-user`）\n" +
 		"- 验证：`GET /healthz`\n\n" +
 		"### 多服务与补充交付路径\n\n" +
 		"- 多服务默认路径：`gorp new multi-wire`\n" +

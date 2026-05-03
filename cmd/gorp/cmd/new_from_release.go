@@ -114,7 +114,7 @@ Important:
 			return err
 		}
 
-		printScaffoldNext(cmd.OutOrStdout(), folder)
+		printScaffoldNext(cmd.OutOrStdout(), folder, newReleaseTemplate)
 		return nil
 	},
 }

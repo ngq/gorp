@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGoLayoutTemplateUsesGorpBootHTTPServiceEntrypoint(t *testing.T) {
+func TestGoLayoutTemplateUsesFacadeRunEntrypoint(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -31,8 +31,15 @@ func TestGoLayoutTemplateUsesGorpBootHTTPServiceEntrypoint(t *testing.T) {
 	require.NoError(t, err)
 	text := string(content)
 
-	require.Contains(t, text, "gorp.BootHTTPService(")
-	require.Contains(t, text, "gorp.AutoMigrateModels(rt, &data.DemoPO{})")
+	require.Contains(t, text, "gorp.Run(")
+	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMigrate(migrate)")
+	require.Contains(t, text, "gorp.WithSetup(setup)")
+	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
+	require.Contains(t, text, "return rt.DB.AutoMigrate(&data.DemoPO{})")
+	require.NotContains(t, text, "gorp.BootHTTPService(")
+	require.NotContains(t, text, "frameworkbootstrap.")
+	require.NotContains(t, text, "rt.Container")
 	require.NotContains(t, text, "cmd.Execute()")
 	require.Contains(t, text, `apphttp "example.com/golayout-entry/app/http"`)
 }
@@ -61,9 +68,93 @@ func TestGoLayoutTemplateRoutesDoNotDuplicateHealthz(t *testing.T) {
 
 	require.Contains(t, text, `api := r.Group("/api/v1")`)
 	require.NotContains(t, text, `engine.GET("/healthz"`)
+	require.NotContains(t, text, "framework/contract")
 }
 
-func TestMultiFlatWireTemplateUsesBootstrapEntrypointAndKeepsWireInCmdLayer(t *testing.T) {
+func TestGoLayoutTemplateDoesNotExposeKernelImports(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "golayout-boundary")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "golayout-boundary",
+		Module:          "example.com/golayout-boundary",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+	})
+
+	require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(starterTemplateGoLayout), projectDir, data))
+
+	var files []string
+	require.NoError(t, filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	}))
+
+	for _, path := range files {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		text := string(content)
+		require.NotContains(t, text, "framework/bootstrap", path)
+		require.NotContains(t, text, "framework/container", path)
+		require.NotContains(t, text, "framework/contract", path)
+		require.NotContains(t, text, "framework/provider", path)
+		require.NotContains(t, text, "BootHTTPService", path)
+		require.NotContains(t, text, "AutoMigrateModels", path)
+	}
+}
+
+func TestReleaseGoLayoutTemplateDoesNotExposeKernelImports(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "release-golayout-boundary")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "release-golayout-boundary",
+		Module:          "example.com/release-golayout-boundary",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+	})
+
+	srcFS, srcRoot := releaseTemplateSource(starterTemplateGoLayout)
+	require.NoError(t, renderTemplateProject(srcFS, srcRoot, projectDir, data))
+
+	var files []string
+	require.NoError(t, filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	}))
+
+	for _, path := range files {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		text := string(content)
+		require.NotContains(t, text, "framework/bootstrap", path)
+		require.NotContains(t, text, "framework/container", path)
+		require.NotContains(t, text, "framework/contract", path)
+		require.NotContains(t, text, "framework/provider", path)
+		require.NotContains(t, text, "BootHTTPService", path)
+		require.NotContains(t, text, "AutoMigrateModels", path)
+	}
+}
+
+func TestMultiFlatWireTemplateUsesFacadeEntrypointAndKeepsWireInCmdLayer(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -84,8 +175,14 @@ func TestMultiFlatWireTemplateUsesBootstrapEntrypointAndKeepsWireInCmdLayer(t *t
 	content, err := os.ReadFile(mainFile)
 	require.NoError(t, err)
 	text := string(content)
-	require.Contains(t, text, "frameworkbootstrap.BootHTTPService(")
-	require.Contains(t, text, "frameworkbootstrap.AutoMigrateModels(rt, &userdata.UserPO{})")
+	require.Contains(t, text, "gorp.Run(")
+	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMigrate(migrate)")
+	require.Contains(t, text, "gorp.WithSetup(setup)")
+	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
+	require.Contains(t, text, "return rt.DB.AutoMigrate(&userdata.UserPO{})")
+	require.NotContains(t, text, "frameworkbootstrap.BootHTTPService(")
+	require.NotContains(t, text, "frameworkbootstrap.AutoMigrateModels(")
 
 	wireFile := filepath.Join(projectDir, "services", "user", "cmd", "wire.go")
 	wireContent, err := os.ReadFile(wireFile)
@@ -95,7 +192,7 @@ func TestMultiFlatWireTemplateUsesBootstrapEntrypointAndKeepsWireInCmdLayer(t *t
 	require.Contains(t, wireText, "func wireUserServices(db *gorm.DB)")
 }
 
-func TestReleaseGoLayoutTemplateUsesGorpBootHTTPServiceEntrypoint(t *testing.T) {
+func TestReleaseGoLayoutTemplateUsesFacadeRunEntrypoint(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -118,8 +215,13 @@ func TestReleaseGoLayoutTemplateUsesGorpBootHTTPServiceEntrypoint(t *testing.T) 
 	require.NoError(t, err)
 	text := string(content)
 
-	require.Contains(t, text, "frameworkbootstrap.BootHTTPService(")
-	require.Contains(t, text, "frameworkbootstrap.AutoMigrateModels(rt, &data.DemoPO{})")
+	require.Contains(t, text, "gorp.Run(")
+	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMigrate(migrate)")
+	require.Contains(t, text, "gorp.WithSetup(setup)")
+	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
+	require.Contains(t, text, "return rt.DB.AutoMigrate(&data.DemoPO{})")
+	require.NotContains(t, text, "frameworkbootstrap.BootHTTPService(")
 	require.NotContains(t, text, "cmd.Execute()")
 	require.Contains(t, text, `apphttp "example.com/release-golayout-entry/app/http"`)
 }
@@ -149,4 +251,118 @@ func TestReleaseGoLayoutTemplateRoutesDoNotDuplicateHealthz(t *testing.T) {
 
 	require.Contains(t, text, `api := r.Group("/api/v1")`)
 	require.NotContains(t, text, `engine.GET("/healthz"`)
+}
+
+func TestGoLayoutDockerfileRunsProjectBinaryDirectly(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "golayout-docker")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "golayout-docker",
+		Module:          "example.com/golayout-docker",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+	})
+
+	require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(starterTemplateGoLayout), projectDir, data))
+
+	dockerfile, err := os.ReadFile(filepath.Join(projectDir, "Dockerfile"))
+	require.NoError(t, err)
+	text := string(dockerfile)
+	require.Contains(t, text, `ENTRYPOINT ["./app"]`)
+	require.NotContains(t, text, `"./app", "app", "start"`)
+}
+
+func TestGoLayoutDocsAndDeployAssetsFollowFacadeAndProjectScopedNaming(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "Demo_App")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "Demo_App",
+		Module:          "example.com/demo-app",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+	})
+
+	require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(starterTemplateGoLayout), projectDir, data))
+
+	readme, err := os.ReadFile(filepath.Join(projectDir, "README.md"))
+	require.NoError(t, err)
+	readmeText := string(readme)
+	require.Contains(t, readmeText, "gorp.Run")
+	require.Contains(t, readmeText, "docs/deploy.md")
+	require.Contains(t, readmeText, "demo-app")
+	require.NotContains(t, readmeText, "framework/bootstrap")
+
+	deployDoc, err := os.ReadFile(filepath.Join(projectDir, "docs", "deploy.md"))
+	require.NoError(t, err)
+	deployText := string(deployDoc)
+	require.Contains(t, deployText, "docker build -t demo-app:latest .")
+	require.Contains(t, deployText, "demo-app-config")
+	require.Contains(t, deployText, "demo-app-secret")
+	require.Contains(t, deployText, "demo-app-dev")
+	require.Contains(t, deployText, "demo-app-staging")
+
+	deployment, err := os.ReadFile(filepath.Join(projectDir, "deploy", "kubernetes", "base", "deployment.yaml"))
+	require.NoError(t, err)
+	deploymentText := string(deployment)
+	require.Contains(t, deploymentText, "name: demo-app")
+	require.Contains(t, deploymentText, "image: your-registry/demo-app:latest")
+	require.NotContains(t, deploymentText, "gorp-service")
+
+	serviceDoc, err := os.ReadFile(filepath.Join(projectDir, "deploy", "kubernetes", "base", "service.yaml"))
+	require.NoError(t, err)
+	require.Contains(t, string(serviceDoc), "name: demo-app")
+	require.NotContains(t, string(serviceDoc), "gorp-service")
+}
+
+func TestReleaseGoLayoutDocsAndDeployAssetsFollowFacadeAndProjectScopedNaming(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "Demo_App")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "Demo_App",
+		Module:          "example.com/demo-app",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+	})
+
+	srcFS, srcRoot := releaseTemplateSource(starterTemplateGoLayout)
+	require.NoError(t, renderTemplateProject(srcFS, srcRoot, projectDir, data))
+
+	readme, err := os.ReadFile(filepath.Join(projectDir, "README.md"))
+	require.NoError(t, err)
+	readmeText := string(readme)
+	require.Contains(t, readmeText, "gorp.Run")
+	require.Contains(t, readmeText, "docs/deploy.md")
+	require.Contains(t, readmeText, "demo-app")
+	require.NotContains(t, readmeText, "framework/bootstrap")
+
+	deployDoc, err := os.ReadFile(filepath.Join(projectDir, "docs", "deploy.md"))
+	require.NoError(t, err)
+	deployText := string(deployDoc)
+	require.Contains(t, deployText, "docker build -t demo-app:latest .")
+	require.Contains(t, deployText, "demo-app-config")
+	require.Contains(t, deployText, "demo-app-secret")
+	require.Contains(t, deployText, "demo-app-dev")
+	require.Contains(t, deployText, "demo-app-staging")
+
+	deployment, err := os.ReadFile(filepath.Join(projectDir, "deploy", "kubernetes", "base", "deployment.yaml"))
+	require.NoError(t, err)
+	deploymentText := string(deployment)
+	require.Contains(t, deploymentText, "name: demo-app")
+	require.Contains(t, deploymentText, "image: your-registry/demo-app:latest")
+	require.NotContains(t, deploymentText, "gorp-service")
 }

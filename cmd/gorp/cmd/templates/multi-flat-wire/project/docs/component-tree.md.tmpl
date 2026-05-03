@@ -11,7 +11,7 @@
 1. 业务规则放 `services/<service>/internal/biz/`
 2. 数据访问放 `services/<service>/internal/data/`
 3. 应用编排放 `services/<service>/internal/service/`
-4. HTTP / gRPC 传输注册放 `services/<service>/internal/server/`
+4. HTTP / gRPC 传输注册放 `services/<service>/internal/server/http/` 与 `services/<service>/internal/server/grpc/`
 5. 启动与装配放 `services/<service>/cmd/`
 
 ## 常见组件怎么归位
@@ -23,7 +23,8 @@
 | 外部 HTTP / 平台调用编排 | `internal/service/` |
 | 仓储实现 / 数据库读写 | `internal/data/` |
 | 领域规则 / 用例 | `internal/biz/` |
-| HTTP / gRPC 路由与注册 | `internal/server/` |
+| HTTP 路由与 handler | `internal/server/http/` |
+| gRPC register / adapter | `internal/server/grpc/` |
 
 ## 什么时候先不要新建目录
 
@@ -31,7 +32,7 @@
 
 - 只是刚接一个中间件
 - 只有 1~2 个服务会用到
-- 现在主要问题还是“放哪”而不是“现有结构已经失控”
+- 当前主要问题还是“放哪”，而不是“现有结构已经失控”
 
 ## 一个最小判断法
 

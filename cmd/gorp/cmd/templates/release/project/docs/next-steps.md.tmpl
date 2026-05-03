@@ -7,6 +7,10 @@
 
 说明 starter 已经跑通。接下来建议按下面顺序继续。
 
+说明：
+- 这里的“starter 已经跑通”只表示模板主链和最小业务样板可运行。
+- 它不代表相关 `contrib` 后端、治理能力或高级事务能力已经完整完成。
+
 ## 1. 先看 HTTP 入口
 
 优先阅读：
@@ -16,8 +20,9 @@
 - `app/http/handler/ping.go`
 
 这样你能快速理解：
+
 - 路由挂载在哪
-- handler 放在哪
+- handler 放在啥
 - service 怎么被调用
 
 ## 2. 再新增你自己的第一个接口
@@ -57,3 +62,7 @@ gorp model api --table <table>
 gorp template pack
 gorp new from-release --repo <owner>/<repo> --tag latest
 ```
+
+说明：
+- 这些命令表示模板打包与分发路径已经具备。
+- 它不代表 release starter 自动携带了完整外部后端能力矩阵。

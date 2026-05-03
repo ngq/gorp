@@ -4,36 +4,33 @@ import (
 	"fmt"
 	"os"
 
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
 	orderdata "{{.ModuleName}}/services/order/internal/data"
-	ordersvc "{{.ModuleName}}/services/order/internal/service"
+	orderhttp "{{.ModuleName}}/services/order/internal/server/http"
+	"{{.FrameworkModule}}"
 )
 
-// main 是 order 服务的主入口。
-//
-// 中文说明：
-// - 直接通过 framework/bootstrap 启动当前服务；
-// - 用户日常开发时可直接 `go run ./services/order/cmd` 或 IDE 调试；
-// - 不依赖共享 CLI，也不把 runtime 概念暴露给业务使用者。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("order-service", frameworkbootstrap.HTTPServiceOptions{}, migrate, setup); err != nil {
+	if err := gorp.Run("order-service", gorp.HTTP(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func migrate(rt *frameworkbootstrap.HTTPServiceRuntime) error {
-	if rt.DB == nil {
+func migrate(rt *gorp.HTTPRuntime) error {
+	if rt == nil || rt.DB == nil {
 		return nil
 	}
 	return rt.DB.AutoMigrate(&orderdata.OrderPO{})
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("order-service requires gorm database")
 	}
-	services := ordersvc.NewServices(rt.DB)
-	services.Order.RegisterRoutes(rt.Engine)
+	services, err := wireOrderServices(rt.DB)
+	if err != nil {
+		return err
+	}
+	orderhttp.RegisterRoutes(rt.Router, services)
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"{{.FrameworkModule}}/framework/contract"
+	"{{.FrameworkModule}}"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,8 +28,8 @@ func TestOrderServiceLockOrderDemo(t *testing.T) {
 }
 
 func TestOrderServiceGetOrderUserPropagatesMetadataContext(t *testing.T) {
-	ctx := contract.AppendToClientContext(context.Background(), "x-md-demo", "hello-metadata")
-	md, ok := contract.FromClientContext(ctx)
+	ctx := gorp.AppendToClientContext(context.Background(), "x-md-demo", "hello-metadata")
+	md, ok := gorp.FromClientContext(ctx)
 	require.True(t, ok)
 	require.Equal(t, "hello-metadata", md.Get("x-md-demo"))
 }

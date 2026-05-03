@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	starterTemplateBase             = "base"              // 仅保留给内部 diff/测试基线，不再作为公开推荐模板
+	starterTemplateBase             = "base" // 仅保留给内部 diff/测试基线，不再作为公开推荐模板
 	starterTemplateGoLayout         = "golayout"
 	starterTemplateMultiFlatWire    = "multi-flat-wire"   // 默认微服务起步（Wire）
 	starterTemplateMultiIndependent = "multi-independent" // 多服务更强独立治理
@@ -48,6 +48,37 @@ func toPublicGoName(s string) string {
 		}
 	}
 	return b.String()
+}
+
+func toKubernetesName(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return "gorp"
+	}
+
+	var b strings.Builder
+	lastDash := false
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+			lastDash = false
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		default:
+			if b.Len() > 0 && !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "gorp"
+	}
+	return out
 }
 
 func ensureDir(path string) error {
@@ -323,23 +354,30 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 	useReplace := strings.TrimSpace(in.FrameworkPath) != ""
 	protoUserGoPackage := in.Module + "/proto/user/v1;userv1"
 	protoUserGoPackageLen := len([]byte(protoUserGoPackage))
+	kubeName := toKubernetesName(in.Name)
 	return map[string]any{
-		"Name":                           in.Name,
-		"ProjectName":                    in.Name, // 别名，供 README 等模板使用
-		"Module":                         in.Module,
-		"ModuleName":                     in.Module, // 别名，供模板使用
-		"FrameworkModule":                in.FrameworkModule,
-		"FrameworkPath":                  normalizeFrameworkReplacePath(in.FrameworkPath),
-		"FrameworkVersion":               in.FrameworkVersion,
-		"UseReplace":                     useReplace,
-		"Backend":                        in.Backend,
-		"IsGormBackend":                  in.Backend == "" || in.Backend == "gorm",
-		"IsEntBackend":                   in.Backend == "ent",
-		"WithDB":                         in.WithDB,
-		"WithSwagger":                    in.WithSwagger,
-		"ProtoUserGoPackage":             protoUserGoPackage,
-		"ProtoUserGoPackageLenHex":       fmt.Sprintf("\\x%02x", protoUserGoPackageLen),
-		"ProtoUserGoPackageFieldLenHex":  fmt.Sprintf("\\x%02x", protoUserGoPackageLen+2),
+		"Name":                          in.Name,
+		"ProjectName":                   in.Name, // 别名，供 README 等模板使用
+		"KubernetesName":                kubeName,
+		"KubernetesConfigMapName":       kubeName + "-config",
+		"KubernetesSecretName":          kubeName + "-secret",
+		"KubernetesNamespaceDev":        kubeName + "-dev",
+		"KubernetesNamespaceStaging":    kubeName + "-staging",
+		"KubernetesNamespaceProd":       kubeName + "-prod",
+		"Module":                        in.Module,
+		"ModuleName":                    in.Module, // 别名，供模板使用
+		"FrameworkModule":               in.FrameworkModule,
+		"FrameworkPath":                 normalizeFrameworkReplacePath(in.FrameworkPath),
+		"FrameworkVersion":              in.FrameworkVersion,
+		"UseReplace":                    useReplace,
+		"Backend":                       in.Backend,
+		"IsGormBackend":                 in.Backend == "" || in.Backend == "gorm",
+		"IsEntBackend":                  in.Backend == "ent",
+		"WithDB":                        in.WithDB,
+		"WithSwagger":                   in.WithSwagger,
+		"ProtoUserGoPackage":            protoUserGoPackage,
+		"ProtoUserGoPackageLenHex":      fmt.Sprintf("\\x%02x", protoUserGoPackageLen),
+		"ProtoUserGoPackageFieldLenHex": fmt.Sprintf("\\x%02x", protoUserGoPackageLen+2),
 	}
 }
 
@@ -428,11 +466,22 @@ func renderTemplateProject(src fs.FS, srcRoot, dstRoot string, data map[string]a
 	return renderTemplateDir(src, srcRoot, dstRoot, data)
 }
 
-func printScaffoldNext(out io.Writer, folder string) {
+func printScaffoldNext(out io.Writer, folder string, templateName string) {
 	fmt.Fprintf(out, "created: %s\n", folder)
 	fmt.Fprintln(out, "next: cd", folder)
-	fmt.Fprintln(out, "      go mod tidy")
-	fmt.Fprintln(out, "      go run ./cmd/app")
+	switch normalizeStarterTemplate(templateName) {
+	case starterTemplateMultiFlatWire:
+		fmt.Fprintln(out, "      go mod tidy")
+		fmt.Fprintln(out, "      make generate")
+		fmt.Fprintln(out, "      make run-user")
+	case starterTemplateMultiIndependent:
+		fmt.Fprintln(out, "      go work sync")
+		fmt.Fprintln(out, "      make generate")
+		fmt.Fprintln(out, "      make run-user")
+	default:
+		fmt.Fprintln(out, "      go mod tidy")
+		fmt.Fprintln(out, "      go run ./cmd/app")
+	}
 }
 
 func releaseTemplateSource(name string) (fs.FS, string) {

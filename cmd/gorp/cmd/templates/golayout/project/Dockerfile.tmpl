@@ -36,5 +36,5 @@ COPY --from=builder /app .
 # 暴露端口
 EXPOSE 8080
 
-# 运行（使用 gorp CLI 命令）
-ENTRYPOINT ["./app", "app", "start"]
+# 运行（直接启动项目二进制）
+ENTRYPOINT ["./app"]

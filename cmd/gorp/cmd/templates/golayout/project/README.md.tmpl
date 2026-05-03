@@ -1,94 +1,47 @@
 # {{.ProjectName}}
 
-基于 gorp 框架的三层架构微服务模板。
+默认单服务 Gin Web API starter。
 
-## 项目结构
+说明：
+- 这里描述的是项目模板主链与单服务入口。
+- 这不代表相关 `contrib` 后端已经进入“已完成”状态。
 
-```
-{{.ProjectName}}/
-├── cmd/app/                # 应用入口
-│   └── main.go             # 项目自己的默认启动入口
-├── config/                 # 配置文件
-│   └── app.yaml
-├── app/                    # 应用层
-│   └── http/               # HTTP 路由
-│       └── routes.go
-├── internal/               # 内部实现
-│   ├── biz/                # 业务逻辑层
-│   ├── data/               # 数据访问层
-│   └── service/            # 服务层
-├── go.mod
-├── Makefile
-└── Dockerfile
-```
-
-## 架构说明
-
-| 层级 | 目录 | 职责 |
-|------|------|------|
-| 入口 | cmd/app/ | 项目自己的默认启动入口，直接复用 framework/bootstrap |
-| 应用 | app/ | 路由注册与传输层接线 |
-| 业务 | internal/biz/ | 领域对象、仓储接口、用例 |
-| 数据 | internal/data/ | 仓储实现、数据库操作 |
-| 服务 | internal/service/ | HTTP handler、请求响应转换 |
-
-## 依赖方向
-
-```
-service → biz → data
-          ↑
-      接口定义在 biz，实现在 data
-```
-
-## 快速开始
+## 启动
 
 ```bash
-# 安装依赖
 go mod tidy
-
-# 运行（直接通过项目 main 入口启动）
 go run ./cmd/app
-
-# 或使用 Makefile
-make run
 ```
 
-## 默认起步能力
+## 主要目录
 
-- HTTP 启动骨架（直接 `go run ./cmd/app`）
-- `/healthz` 健康检查
-- `/metrics` 指标端点
-- GORM 数据库起步链路（sqlite）
-- Redis / gRPC 等能力接入位
+```text
+cmd/app/main.go          # 项目入口，消费 gorp facade
+app/http/                # Gin 路由、handler、request/response、项目级 middleware
+internal/biz/            # 业务规则与仓储接口
+internal/data/           # 仓储实现与数据访问
+internal/service/        # 业务编排
+config/app.yaml          # 应用配置
+docs/deploy.md           # 部署入口
+deploy/                  # Docker / Kubernetes 交付资产
+```
 
-## API 端点
+## 默认主线
 
-默认生成结果保留最小 Demo CRUD 样板，方便你直接替换成自己的业务接口。
+- `cmd/app/main.go` 使用 `gorp.Run` 启动默认 HTTP 主线
+- `app/http/routes.go` 只注册业务路由
+- `/healthz` 与 `/metrics` 由 facade 默认主线注册
+- Demo CRUD 只是最小业务样板，可以直接替换
+- 部署资产与镜像命名说明见 `docs/deploy.md`
+- Kubernetes / 镜像默认使用项目级名称：`{{.KubernetesName}}`
+- 样板可直接替换，不代表 Kubernetes / configsource / registry contrib 已完成
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | /healthz | 健康检查 |
-| POST | /api/v1/demos | Demo 样板：创建 |
-| GET | /api/v1/demos/:id | Demo 样板：获取 |
-| GET | /api/v1/demos | Demo 样板：列表 |
-| PUT | /api/v1/demos/:id | Demo 样板：更新 |
-| DELETE | /api/v1/demos/:id | Demo 样板：删除 |
+## 开发顺序
 
-## 日志使用建议
+1. 在 `internal/biz` 定义用例与仓储接口
+2. 在 `internal/data` 实现仓储
+3. 在 `internal/service` 组织业务编排
+4. 在 `app/http/handler` 接入 Gin handler
+5. 在 `app/http/routes.go` 挂路由
 
-- 默认优先使用 `gorp/log` 作为业务日志入口；
-- 启动装配层之外，先按业务需要再逐步补上下文字段。
-
-## 装配建议
-
-- 默认主线直接使用 `cmd/app/main.go` 中的入口骨架；
-- 业务主线直接围绕 `data -> biz -> service -> http routes` 组织代码；
-- 更强编译期装配按需再切到 Wire 模板。
-
-## 配置
-
-配置文件位于 `config/app.yaml`。
-
-## License
-
-MIT
+复杂治理能力通过配置和 framework capability 接入，不在模板里按组件名堆目录。

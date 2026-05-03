@@ -3,9 +3,13 @@
 由 `gorp new from-release` 生成的补充交付 starter。
 
 > 定位：
-> - 这不是默认推荐的单服务业务起步路径；
+> - 这不是默认推荐的业务起步路径；
 > - 默认业务起步优先使用 `gorp new`；
 > - 只有明确需要 release 交付物时，再进入这里。
+
+说明：
+- 这里的 starter 交付能力只表示模板主链和发布入口已经整理好。
+- 这不代表相关 `contrib` 后端已经进入“已完成”状态。
 
 ## 当前模板包含什么
 
@@ -33,7 +37,7 @@ go run ./cmd/app
 
 - `GET /healthz`
 - `GET /api/ping`
-- `/swagger/index.html`（取决于配置）
+- `/swagger/index.html`：取决于配置
 
 ## 推荐先看哪几个文件
 
@@ -48,3 +52,4 @@ go run ./cmd/app
 - 不依赖本地框架源码路径
 - 适合通过 GitHub Release 模板资产直接创建项目
 - 默认模板资产文件名为：`gorp-template.zip`
+- starter 可直接运行，不等于具体后端能力已经完整产品化

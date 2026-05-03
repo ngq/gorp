@@ -7,6 +7,10 @@ release/base 模板适合对外分发最小 starter，默认提供：
 - CI
 - 最小部署说明
 
+说明：
+- 这里提供的是 release starter 的最小交付资产与发布入口。
+- 这不代表任何具体 `contrib` 后端已经完成真实能力接入。
+
 ## 推荐步骤
 
 ```bash
@@ -25,3 +29,4 @@ docker build -t {{.Name}}:latest .
 
 - release 模板不会写本地 `replace`
 - 更适合通过 `gorp new from-release` 创建项目后直接开始开发
+- “可以直接开始开发”只表示 starter 主链可运行，不代表相关后端能力已完成

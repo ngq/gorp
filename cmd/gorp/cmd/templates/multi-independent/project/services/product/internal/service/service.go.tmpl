@@ -1,23 +1,18 @@
-// Package service 服务层。
 package service
 
 import (
-	"net/http"
-	"strconv"
+	"context"
 
 	"{{.ModuleName}}/services/product/internal/biz"
 	"{{.ModuleName}}/services/product/internal/data"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// Services 服务层聚合。
 type Services struct {
 	Product *ProductService
 }
 
-// NewServices 创建服务层。
 func NewServices(db *gorm.DB) *Services {
 	productRepo := data.NewProductRepo(db)
 	productUC := biz.NewProductUseCase(productRepo)
@@ -26,23 +21,10 @@ func NewServices(db *gorm.DB) *Services {
 	}
 }
 
-// ProductService 商品服务。
 type ProductService struct {
 	uc *biz.ProductUseCase
 }
 
-// RegisterRoutes 注册商品服务路由。
-func (s *ProductService) RegisterRoutes(r *gin.Engine) {
-	api := r.Group("/api/v1/products")
-	{
-		api.GET("", s.List)
-		api.GET("/:id", s.GetByID)
-		api.POST("", s.Create)
-		api.DELETE("/:id", s.Delete)
-	}
-}
-
-// CreateProductRequest 创建商品请求。
 type CreateProductRequest struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
@@ -50,7 +32,6 @@ type CreateProductRequest struct {
 	Stock       int     `json:"stock"`
 }
 
-// ProductResponse 商品响应。
 type ProductResponse struct {
 	ID          uint    `json:"id"`
 	Name        string  `json:"name"`
@@ -61,84 +42,41 @@ type ProductResponse struct {
 	UpdatedAt   int64   `json:"updated_at"`
 }
 
-// List 获取商品列表。
-func (s *ProductService) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-
-	products, total, err := s.uc.List(c.Request.Context(), page, size)
+func (s *ProductService) List(ctx context.Context, page, size int) ([]ProductResponse, int64, error) {
+	products, total, err := s.uc.List(ctx, page, size)
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
-		return
+		return nil, 0, err
 	}
 
 	items := make([]ProductResponse, len(products))
 	for i, p := range products {
 		items[i] = toProductResponse(p)
 	}
-
-	ginprovider.Success(c, gin.H{"items": items, "total": total, "page": page, "size": size})
+	return items, total, nil
 }
 
-// GetByID 获取单个商品。
-func (s *ProductService) GetByID(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+func (s *ProductService) GetByID(ctx context.Context, id uint) (*ProductResponse, error) {
+	product, err := s.uc.GetByID(ctx, id)
 	if err != nil {
-		ginprovider.BadRequest(c, "invalid id")
-		return
+		return nil, err
 	}
-
-	product, err := s.uc.GetByID(c.Request.Context(), uint(id))
-	if err != nil {
-		ginprovider.NotFound(c, "product not found")
-		return
-	}
-
-	ginprovider.Success(c, toProductResponse(product))
+	resp := toProductResponse(product)
+	return &resp, nil
 }
 
-// Create 创建商品。
-func (s *ProductService) Create(c *gin.Context) {
-	var req CreateProductRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginprovider.BadRequest(c, err.Error())
-		return
-	}
-
-	product, err := s.uc.Create(c.Request.Context(), req.Name, req.Description, req.Price, req.Stock)
+func (s *ProductService) Create(ctx context.Context, req CreateProductRequest) (*ProductResponse, error) {
+	product, err := s.uc.Create(ctx, req.Name, req.Description, req.Price, req.Stock)
 	if err != nil {
-		ginprovider.InternalError(c, err.Error())
-		return
+		return nil, err
 	}
-
-	ginprovider.SuccessWithStatus(c, http.StatusCreated, toProductResponse(product))
+	resp := toProductResponse(product)
+	return &resp, nil
 }
 
-// Delete 删除商品。
-func (s *ProductService) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		ginprovider.BadRequest(c, "invalid id")
-		return
-	}
-
-	if err := s.uc.Delete(c.Request.Context(), uint(id)); err != nil {
-		ginprovider.InternalError(c, err.Error())
-		return
-	}
-
-	c.Status(http.StatusNoContent)
+func (s *ProductService) Delete(ctx context.Context, id uint) error {
+	return s.uc.Delete(ctx, id)
 }
 
-// toProductResponse 转换为响应格式。
 func toProductResponse(p *biz.Product) ProductResponse {
-	return ProductResponse{
-		ID:          p.ID,
-		Name:        p.Name,
-		Description: p.Description,
-		Price:       p.Price,
-		Stock:       p.Stock,
-		CreatedAt:   p.CreatedAt.Unix(),
-		UpdatedAt:   p.UpdatedAt.Unix(),
-	}
+	return ProductResponse{ID: p.ID, Name: p.Name, Description: p.Description, Price: p.Price, Stock: p.Stock, CreatedAt: p.CreatedAt.Unix(), UpdatedAt: p.UpdatedAt.Unix()}
 }

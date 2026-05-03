@@ -13,10 +13,11 @@
 - 业务规则：`internal/biz/`
 - 数据访问：`internal/data/`
 - 应用编排：`internal/service/`
-- 传输注册：`internal/server/`
+- HTTP 传输注册：`internal/server/http/`
+- gRPC 传输注册：`internal/server/grpc/`
 - 启动装配：`cmd/`
 
-## 什么时候再考虑新增目录
+## 什么时侯再考虑新增目录
 
 先满足下面任一条件再考虑：
 
@@ -28,3 +29,7 @@
 
 - 默认附带 Docker 开发部署与 Kubernetes 部署资产
 - 继续看：`docs/deploy.md`
+
+说明：
+- 这里的“默认附带”只表示脚手架已经放好了部署资产与样板入口。
+- 它不代表相关 Kubernetes / configsource / registry contrib 已完成。
