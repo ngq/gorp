@@ -14,6 +14,19 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+// Package zap 是 framework/provider/log 的深度定制扩展层。
+//
+// 中文说明：
+// - framework/provider/log 已内置 zap 作为默认日志后端（P1 必需依赖核），覆盖大多数场景；
+// - 本包供需要深度定制 zap 的业务使用：多 sink、动态 level、自定义 encoder、采样、hook 等；
+// - 使用方式：import 本包，构造 Logger 后通过容器注册替换默认实现：
+//
+//	c.Bind(contract.LogKey, func(c contract.Container) (any, error) {
+//	    return zap.New("debug", "json")
+//	}, true)
+//
+// - 不需要深度定制时，无需引入本包，framework 默认 zap 实现已足够。
+
 // SinkConfig 描述日志输出端配置。
 type SinkConfig struct {
 	Path string

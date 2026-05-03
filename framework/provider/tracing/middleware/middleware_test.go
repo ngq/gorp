@@ -55,8 +55,22 @@ func (testTracer) Inject(ctx context.Context, carrier contract.TextMapCarrier) e
 func TestTracingHTTPMiddlewareSetsTraceHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(TracingMiddleware(testTracer{}, "svc"))
-	r.GET("/ping", func(c *gin.Context) { c.Status(204) })
+	r.Use(func(c *gin.Context) {
+		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
+		httpCtx.SetRoutePathFunc(c.FullPath)
+		TracingMiddleware(testTracer{}, "svc")(httpCtx, func() {
+			c.Request = httpCtx.Request()
+			c.Next()
+		})
+	})
+	r.GET("/ping", func(c *gin.Context) {
+		traceID, ok := contract.FromTraceIDContext(c.Request.Context())
+		require.True(t, ok)
+		require.Equal(t, "trace-test", traceID)
+		c.Status(204)
+	})
 
 	req := httptest.NewRequest("GET", "/ping", nil)
 	w := httptest.NewRecorder()

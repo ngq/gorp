@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/framework/contract"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	"go.opentelemetry.io/otel"
@@ -34,9 +35,11 @@ type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "tracing.otel" }
-func (p *Provider) IsDefer() bool    { return true }
-func (p *Provider) Provides() []string { return []string{contract.TracerKey, contract.TracerProviderKey} }
+func (p *Provider) Name() string  { return "tracing.otel" }
+func (p *Provider) IsDefer() bool { return true }
+func (p *Provider) Provides() []string {
+	return []string{contract.TracerKey, contract.TracerProviderKey}
+}
 
 func (p *Provider) Register(c contract.Container) error {
 	c.Bind(contract.TracerProviderKey, func(c contract.Container) (any, error) {
@@ -192,6 +195,14 @@ func (p *TracerProviderWrapper) ForceFlush(ctx context.Context) error {
 	return p.provider.ForceFlush(ctx)
 }
 
+func (p *TracerProviderWrapper) Underlying() any {
+	return p.provider
+}
+
+func (p *TracerProviderWrapper) As(target any) bool {
+	return internalnative.As(p.provider, target)
+}
+
 type TracerWrapper struct {
 	tracer trace.Tracer
 	cfg    *contract.TracingConfig
@@ -251,6 +262,14 @@ func (t *TracerWrapper) Extract(ctx context.Context, carrier contract.TextMapCar
 	return ctx, nil
 }
 
+func (t *TracerWrapper) Underlying() any {
+	return t.tracer
+}
+
+func (t *TracerWrapper) As(target any) bool {
+	return internalnative.As(t.tracer, target)
+}
+
 type SpanWrapper struct {
 	span trace.Span
 }
@@ -287,7 +306,10 @@ func (s *SpanWrapper) SetAttributes(attributes map[string]any) {
 	}
 	s.span.SetAttributes(attrs...)
 }
-func (s *SpanWrapper) SetError(err error) { s.span.RecordError(err); s.span.SetStatus(codes.Error, err.Error()) }
+func (s *SpanWrapper) SetError(err error) {
+	s.span.RecordError(err)
+	s.span.SetStatus(codes.Error, err.Error())
+}
 func (s *SpanWrapper) SetStatus(code contract.SpanStatusCode, description string) {
 	var otelCode codes.Code
 	switch code {
@@ -305,24 +327,35 @@ func (s *SpanWrapper) SpanContext() contract.SpanContext {
 	return contract.SpanContext{TraceID: sc.TraceID().String(), SpanID: sc.SpanID().String(), TraceFlags: contract.TraceFlags(sc.TraceFlags()), Remote: sc.IsRemote()}
 }
 func (s *SpanWrapper) IsRecording() bool { return s.span.IsRecording() }
-func (s *SpanWrapper) Context() context.Context { return trace.ContextWithSpan(context.Background(), s.span) }
+func (s *SpanWrapper) Context() context.Context {
+	return trace.ContextWithSpan(context.Background(), s.span)
+}
+
+func (s *SpanWrapper) Underlying() any {
+	return s.span
+}
+
+func (s *SpanWrapper) As(target any) bool {
+	return internalnative.As(s.span, target)
+}
 
 type noopSpan struct{}
 
-func (s *noopSpan) End(options ...contract.SpanEndOption) {}
-func (s *noopSpan) AddEvent(name string, attributes map[string]interface{}) {}
-func (s *noopSpan) SetTag(key string, value interface{}) {}
-func (s *noopSpan) SetAttributes(attributes map[string]interface{}) {}
-func (s *noopSpan) SetError(err error) {}
+func (s *noopSpan) End(options ...contract.SpanEndOption)                      {}
+func (s *noopSpan) AddEvent(name string, attributes map[string]interface{})    {}
+func (s *noopSpan) SetTag(key string, value interface{})                       {}
+func (s *noopSpan) SetAttributes(attributes map[string]interface{})            {}
+func (s *noopSpan) SetError(err error)                                         {}
 func (s *noopSpan) SetStatus(code contract.SpanStatusCode, description string) {}
-func (s *noopSpan) SpanContext() contract.SpanContext { return contract.SpanContext{} }
-func (s *noopSpan) IsRecording() bool { return false }
-func (s *noopSpan) Context() context.Context { return context.Background() }
+func (s *noopSpan) SpanContext() contract.SpanContext                          { return contract.SpanContext{} }
+func (s *noopSpan) IsRecording() bool                                          { return false }
+func (s *noopSpan) Context() context.Context                                   { return context.Background() }
 
-type textMapCarrierWrapper struct { carrier contract.TextMapCarrier }
-func (w *textMapCarrierWrapper) Get(key string) string { return w.carrier.Get(key) }
+type textMapCarrierWrapper struct{ carrier contract.TextMapCarrier }
+
+func (w *textMapCarrierWrapper) Get(key string) string        { return w.carrier.Get(key) }
 func (w *textMapCarrierWrapper) Set(key string, value string) { w.carrier.Set(key, value) }
-func (w *textMapCarrierWrapper) Keys() []string { return w.carrier.Keys() }
+func (w *textMapCarrierWrapper) Keys() []string               { return w.carrier.Keys() }
 
 func createExporter(cfg *contract.TracingConfig) (sdktrace.SpanExporter, error) {
 	switch cfg.ExporterType {

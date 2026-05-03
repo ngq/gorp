@@ -1,4 +1,4 @@
-package nacos
+package redis
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
-	require.Equal(t, "registry.nacos", p.Name())
+	require.Equal(t, "messagequeue.redis", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.RPCRegistryKey}, p.Provides())
+	require.Equal(t, []string{contract.MessageQueueKey, contract.MessagePublisherKey, contract.MessageSubscriberKey}, p.Provides())
 }

@@ -9,9 +9,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/consul/api"
+	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/framework/contract"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
-	"github.com/hashicorp/consul/api"
 )
 
 // Provider 提供 Consul 服务发现实现。
@@ -25,8 +26,8 @@ type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "discovery.consul" }
-func (p *Provider) IsDefer() bool    { return true }
+func (p *Provider) Name() string       { return "registry.consul" }
+func (p *Provider) IsDefer() bool      { return true }
 func (p *Provider) Provides() []string { return []string{contract.RPCRegistryKey} }
 
 func (p *Provider) Register(c contract.Container) error {
@@ -279,6 +280,14 @@ func (r *Registry) Close() error {
 		return true
 	})
 	return nil
+}
+
+func (r *Registry) Underlying() any {
+	return r.client
+}
+
+func (r *Registry) As(target any) bool {
+	return internalnative.As(r.client, target)
 }
 
 func (r *Registry) buildHealthCheck(serviceID, host string, port int) *api.AgentServiceCheck {

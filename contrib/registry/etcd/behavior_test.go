@@ -29,7 +29,7 @@ func TestApplyLoadBalanceAndKeepAliveLoop(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	close(stopCh)
-	r.keepAliveLoop(nil, stopCh)
+	r.keepAliveLoop("", nil, stopCh)
 }
 
 func TestGetHelpers(t *testing.T) {

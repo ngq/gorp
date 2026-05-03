@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul/api"
+	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/framework/contract"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
-	"github.com/hashicorp/consul/api"
 )
 
 // Provider 提供 Consul KV 配置源实现。
@@ -24,8 +25,8 @@ type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "configsource.consul" }
-func (p *Provider) IsDefer() bool    { return true }
+func (p *Provider) Name() string       { return "configsource.consul" }
+func (p *Provider) IsDefer() bool      { return true }
 func (p *Provider) Provides() []string { return []string{contract.ConfigSourceKey} }
 
 func (p *Provider) Register(c contract.Container) error {
@@ -87,12 +88,12 @@ func getConfigSourceConfig(c contract.Container) (*contract.ConfigSourceConfig, 
 }
 
 type Source struct {
-	cfg     *contract.ConfigSourceConfig
-	client  *api.Client
-	kv      *api.KV
+	cfg      *contract.ConfigSourceConfig
+	client   *api.Client
+	kv       *api.KV
 	watchers sync.Map
-	mu      sync.Mutex
-	closed  bool
+	mu       sync.Mutex
+	closed   bool
 }
 
 func NewSource(cfg *contract.ConfigSourceConfig) (*Source, error) {
@@ -197,6 +198,14 @@ func (s *Source) Close() error {
 	return nil
 }
 
+func (s *Source) Underlying() any {
+	return s.client
+}
+
+func (s *Source) As(target any) bool {
+	return internalnative.As(s.client, target)
+}
+
 type consulWatcher struct {
 	source    *Source
 	key       string
@@ -204,7 +213,9 @@ type consulWatcher struct {
 	callbacks sync.Map
 }
 
-func (w *consulWatcher) OnChange(key string, callback func(value any)) { w.callbacks.Store(key, callback) }
+func (w *consulWatcher) OnChange(key string, callback func(value any)) {
+	w.callbacks.Store(key, callback)
+}
 func (w *consulWatcher) Stop() error {
 	select {
 	case <-w.stopCh:

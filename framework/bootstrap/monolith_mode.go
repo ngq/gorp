@@ -5,7 +5,7 @@ import (
 	cbnoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
 	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
 	cfglocal "github.com/ngq/gorp/framework/provider/configsource/local"
-	discoverynoop "github.com/ngq/gorp/contrib/registry/noop"
+	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
 	dlocknoop "github.com/ngq/gorp/framework/provider/dlock/noop"
 	mqnoop "github.com/ngq/gorp/framework/provider/messagequeue/noop"
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
@@ -13,7 +13,7 @@ import (
 	rpcnoop "github.com/ngq/gorp/framework/provider/rpc/noop"
 	selectornoop "github.com/ngq/gorp/framework/provider/selector/noop"
 	serviceauthnoop "github.com/ngq/gorp/framework/provider/serviceauth/noop"
-	tracingnoop "github.com/ngq/gorp/contrib/tracing/noop"
+	tracingnoop "github.com/ngq/gorp/framework/provider/tracing/noop"
 	validatenoop "github.com/ngq/gorp/framework/provider/validate/noop"
 	retrynoop "github.com/ngq/gorp/framework/provider/retry/noop"
 )

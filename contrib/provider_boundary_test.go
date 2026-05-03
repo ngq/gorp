@@ -7,7 +7,7 @@ import (
 	configsourceconsul "github.com/ngq/gorp/contrib/configsource/consul"
 	dlockredis "github.com/ngq/gorp/contrib/dlock/redis"
 	logzap "github.com/ngq/gorp/contrib/log/zap"
-	mqredis "github.com/ngq/gorp/contrib/mq/redis"
+	mqredis "github.com/ngq/gorp/contrib/messagequeue/redis"
 	registryconsul "github.com/ngq/gorp/contrib/registry/consul"
 	serviceauthmtls "github.com/ngq/gorp/contrib/serviceauth/mtls"
 	serviceauthtoken "github.com/ngq/gorp/contrib/serviceauth/token"
