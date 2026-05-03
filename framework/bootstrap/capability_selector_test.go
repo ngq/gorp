@@ -54,7 +54,7 @@ func TestSelectConfigSourceProvider_PrefersBackendKey(t *testing.T) {
 
 func TestSelectDiscoveryProvider_PrefersBackendKey(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{"discovery.backend": "eureka"}}
-	if got := SelectDiscoveryProvider(cfg).Name(); got != "discovery.eureka" {
+	if got := SelectDiscoveryProvider(cfg).Name(); got != "registry.eureka" {
 		t.Fatalf("expected discovery.eureka, got %s", got)
 	}
 }

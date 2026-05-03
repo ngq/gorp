@@ -47,6 +47,20 @@ func TestRegisterPprofEndpointsServesIndex(t *testing.T) {
 	require.True(t, strings.Contains(w.Body.String(), "profile") || strings.Contains(w.Body.String(), "pprof"))
 }
 
+func TestRegisterPprofEndpointsRejectsPost(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+
+	RegisterPprofEndpoints(router)
+
+	req := httptest.NewRequest(http.MethodPost, "/debug/pprof/", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
 type recordingRouter struct {
 	mounted []string
 }
@@ -126,12 +140,7 @@ func (r *ginTestRouter) Mount(path string, handler http.Handler) {
 		handler.ServeHTTP(c.Writer, c.Request)
 	}
 	r.engine.Handle(http.MethodGet, path, h)
-	r.engine.Handle(http.MethodPost, path, h)
-	r.engine.Handle(http.MethodPut, path, h)
-	r.engine.Handle(http.MethodDelete, path, h)
-	r.engine.Handle(http.MethodPatch, path, h)
 	r.engine.Handle(http.MethodHead, path, h)
-	r.engine.Handle(http.MethodOptions, path, h)
 }
 
 type ginGroupTestRouter struct {
@@ -204,10 +213,5 @@ func (r *ginGroupTestRouter) Mount(path string, handler http.Handler) {
 		handler.ServeHTTP(c.Writer, c.Request)
 	}
 	r.group.Handle(http.MethodGet, path, h)
-	r.group.Handle(http.MethodPost, path, h)
-	r.group.Handle(http.MethodPut, path, h)
-	r.group.Handle(http.MethodDelete, path, h)
-	r.group.Handle(http.MethodPatch, path, h)
 	r.group.Handle(http.MethodHead, path, h)
-	r.group.Handle(http.MethodOptions, path, h)
 }

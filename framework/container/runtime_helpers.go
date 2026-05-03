@@ -3,7 +3,6 @@ package container
 import (
 	"database/sql"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"github.com/ngq/gorp/framework/contract"
 	gormdb "gorm.io/gorm"
@@ -220,17 +219,17 @@ func MakeHTTP(c contract.Container) (contract.HTTP, error) {
 	return v.(contract.HTTP), nil
 }
 
-// MakeGinEngine 获取 Gin Engine，失败返回 error。
+// MakeHTTPRouter 获取 HTTPRouter，失败返回 error。
 //
 // 中文说明：
-// - 直接获取 Gin Engine，用于路由注册等场景；
-// - 与 MustMakeEngine 相比，失败时返回 error 而不 panic。
-func MakeGinEngine(c contract.Container) (*gin.Engine, error) {
-	v, err := c.Make(contract.HTTPEngineKey)
+// - 这是新的 HTTP 路由主入口 helper；
+// - 业务与模板默认应优先使用它，而不是直接获取 Gin Engine。
+func MakeHTTPRouter(c contract.Container) (contract.HTTPRouter, error) {
+	httpSvc, err := MakeHTTP(c)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*gin.Engine), nil
+	return httpSvc.Router(), nil
 }
 
 // MustMakeLogger 获取日志服务，失败 panic。
@@ -253,14 +252,24 @@ func MustMakeGorm(c contract.Container) *gormdb.DB {
 	return v.(*gormdb.DB)
 }
 
-// MustMakeEngine 获取 Gin Engine，失败 panic。
+// MustMakeHTTPRouter 获取 HTTPRouter，失败 panic。
 //
 // 中文说明：
-// - 适用于启动阶段，缺少 Engine 说明配置有误；
-// - 封装 container.MustMake，便于业务调用。
-func MustMakeEngine(c contract.Container) *gin.Engine {
-	v := c.MustMake(contract.HTTPEngineKey)
-	return v.(*gin.Engine)
+// - 适用于启动阶段，缺少 Router 说明配置有误；
+// - 这是新的默认路由主入口 helper。
+func MustMakeHTTPRouter(c contract.Container) contract.HTTPRouter {
+	httpSvc := MustMakeHTTP(c)
+	return httpSvc.Router()
+}
+
+// MustMakeHTTP 获取 HTTP 服务，失败 panic。
+//
+// 中文说明：
+// - 适用于启动阶段，缺少 HTTP 说明配置有误；
+// - 供 Router 主入口等场景复用。
+func MustMakeHTTP(c contract.Container) contract.HTTP {
+	v := c.MustMake(contract.HTTPKey)
+	return v.(contract.HTTP)
 }
 
 // MustMakeMessagePublisher 获取消息发布者，失败 panic。
