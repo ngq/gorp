@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 
 	"github.com/spf13/cobra"
 )
@@ -21,11 +21,11 @@ var modelTestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		insAny, err := c.Make(contract.DBInspectorKey)
+		insAny, err := c.Make(datacontract.DBInspectorKey)
 		if err != nil {
 			return err
 		}
-		ins := insAny.(contract.DBInspector)
+		ins := insAny.(datacontract.DBInspector)
 
 		if err := ins.Ping(cmd.Context()); err != nil {
 			return fmt.Errorf("db ping: %w", err)

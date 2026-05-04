@@ -47,9 +47,11 @@ import gorp "%s"
 
 // Middleware 返回该中间件的 framework HTTPMiddleware。
 func Middleware() gorp.HTTPMiddleware {
-	return func(c gorp.HTTPContext, next gorp.HTTPNext) {
-		if next != nil {
-			next()
+	return func(next gorp.HTTPHandler) gorp.HTTPHandler {
+		return func(c gorp.HTTPContext) {
+			if next != nil {
+				next(c)
+			}
 		}
 	}
 }

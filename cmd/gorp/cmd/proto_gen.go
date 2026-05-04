@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/spf13/cobra"
 )
 
@@ -102,7 +102,7 @@ func runProtoGen(cmd *cobra.Command, args []string) error {
 	}
 
 	// 构建选项
-	opts := contract.ProtoGenOptions{
+	opts := integrationcontract.ProtoGenOptions{
 		ProtoDir:    protoDir,
 		ProtoFiles:  protoFiles,
 		OutputDir:   out,

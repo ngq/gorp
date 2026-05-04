@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 
 	"github.com/spf13/cobra"
 )
@@ -44,17 +44,17 @@ var modelAPICmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		insAny, err := c.Make(contract.DBInspectorKey)
+		insAny, err := c.Make(datacontract.DBInspectorKey)
 		if err != nil {
 			return err
 		}
-		ins := insAny.(contract.DBInspector)
+		ins := insAny.(datacontract.DBInspector)
 
 		if modelAPITable == "" {
 			return fmt.Errorf("--table is required")
 		}
-		backend := contract.NormalizeBackendName(modelAPIBackend)
-		if backend != contract.RuntimeBackendGorm && backend != contract.RuntimeBackendEnt {
+		backend := datacontract.NormalizeBackendName(modelAPIBackend)
+		if backend != datacontract.RuntimeBackendGorm && backend != datacontract.RuntimeBackendEnt {
 			return fmt.Errorf("unsupported --backend: %s", modelAPIBackend)
 		}
 		cols, err := ins.Columns(cmd.Context(), modelAPITable)
@@ -95,7 +95,7 @@ var modelAPICmd = &cobra.Command{
 			Table     string
 			Name      string
 			Pkg       string
-			Cols      []contract.Column
+			Cols      []datacontract.Column
 			PKName    string
 			PKGoName  string
 			PKGoType  string
@@ -138,7 +138,7 @@ var modelAPICmd = &cobra.Command{
 			"api_list.go":   listTpl,
 			"api_delete.go": deleteTpl,
 		}
-		if backend == contract.RuntimeBackendEnt {
+		if backend == datacontract.RuntimeBackendEnt {
 			modelTpl = entAPIModelTpl
 			serviceTplSrc = entServiceTpl
 			httpFiles = map[string]string{
@@ -200,12 +200,12 @@ func init() {
 	modelAPICmd.Flags().StringVar(&modelAPIOut, "out", "", "output directory for http module")
 	modelAPICmd.Flags().StringVar(&modelAPIServiceOut, "service-out", "", "output directory for app service code")
 	modelAPICmd.Flags().StringVar(&modelAPIModelOut, "model-out", "", "output directory for app model code")
-	modelAPICmd.Flags().StringVar(&modelAPIBackend, "backend", string(contract.RuntimeBackendGorm), "generation backend: gorm|ent")
+	modelAPICmd.Flags().StringVar(&modelAPIBackend, "backend", string(datacontract.RuntimeBackendGorm), "generation backend: gorm|ent")
 	modelAPICmd.Flags().BoolVar(&modelAPIForce, "force", false, "overwrite existing files")
 	modelAPICmd.Flags().BoolVar(&modelAPIRegister, "register", false, "append generated module registration to app/http/routes.go when possible")
 }
 
-func goTypeFromCols(cols []contract.Column, name string) string {
+func goTypeFromCols(cols []datacontract.Column, name string) string {
 	for _, c := range cols {
 		if c.Name == name {
 			return sqliteTypeToGo(c.Type)

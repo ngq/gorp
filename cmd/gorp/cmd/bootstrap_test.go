@@ -3,17 +3,17 @@ package cmd
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 type bootstrapProviderStub struct{ name string }
 
-func (p *bootstrapProviderStub) Name() string       { return p.name }
-func (p *bootstrapProviderStub) Register(contract.Container) error { return nil }
-func (p *bootstrapProviderStub) Boot(contract.Container) error     { return nil }
-func (p *bootstrapProviderStub) IsDefer() bool                     { return false }
-func (p *bootstrapProviderStub) Provides() []string                { return nil }
+func (p *bootstrapProviderStub) Name() string                             { return p.name }
+func (p *bootstrapProviderStub) Register(runtimecontract.Container) error { return nil }
+func (p *bootstrapProviderStub) Boot(runtimecontract.Container) error     { return nil }
+func (p *bootstrapProviderStub) IsDefer() bool                            { return false }
+func (p *bootstrapProviderStub) Provides() []string                       { return nil }
 
 func TestRegisterBootstrapProvidersOverridesRuntimeAndExtras(t *testing.T) {
 	old := readBootstrapHooks()

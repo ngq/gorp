@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,5 +28,5 @@ func TestBootstrapCompatibilityHooksOnlyStoreExplicitProjectOverrides(t *testing
 
 	cfg := readBootstrapHooks()
 	require.Equal(t, runtimeProvider, cfg.runtimeProvider)
-	require.Equal(t, []contract.ServiceProvider{extra}, cfg.extraProviders)
+	require.Equal(t, []runtimecontract.ServiceProvider{extra}, cfg.extraProviders)
 }

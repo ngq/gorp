@@ -3,8 +3,8 @@ package cmd
 import (
 	"testing"
 
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	frameworktesting "github.com/ngq/gorp/framework/testing"
-	"github.com/ngq/gorp/framework/contract"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,16 +17,16 @@ type bootstrapRecordingProvider struct {
 func (p *bootstrapRecordingProvider) Name() string       { return p.name }
 func (p *bootstrapRecordingProvider) IsDefer() bool      { return false }
 func (p *bootstrapRecordingProvider) Provides() []string { return p.provides }
-func (p *bootstrapRecordingProvider) Register(c contract.Container) error {
+func (p *bootstrapRecordingProvider) Register(c runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":register")
 	for _, key := range p.provides {
 		value := p.name
 		bindKey := key
-		c.Bind(bindKey, func(contract.Container) (any, error) { return value, nil }, true)
+		c.Bind(bindKey, func(runtimecontract.Container) (any, error) { return value, nil }, true)
 	}
 	return nil
 }
-func (p *bootstrapRecordingProvider) Boot(contract.Container) error {
+func (p *bootstrapRecordingProvider) Boot(runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":boot")
 	return nil
 }

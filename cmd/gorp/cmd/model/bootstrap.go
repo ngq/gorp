@@ -2,7 +2,7 @@ package model
 
 import (
 	"github.com/ngq/gorp/framework"
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/ngq/gorp/framework/provider/app"
 	"github.com/ngq/gorp/framework/provider/config"
 	"github.com/ngq/gorp/framework/provider/log"
@@ -16,7 +16,7 @@ import (
 // - model 相关命令只需要 app/config/log/sqlx/inspect 这些能力。
 // - 因此这里没有像主 bootstrap 那样装配 HTTP、cron、gorm、ssh 等完整 provider 集合。
 // - 这样可以降低命令启动成本，也更符合职责最小化。
-func bootstrap() (*framework.Application, contract.Container, error) {
+func bootstrap() (*framework.Application, runtimecontract.Container, error) {
 	appRuntime := framework.NewApplication()
 	c := appRuntime.Container()
 

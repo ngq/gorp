@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
-	"github.com/spf13/cobra"
 )
 
 // providerNewCmd 创建一个新的 provider 骨架目录。
@@ -74,7 +74,9 @@ type Service interface {
 
 		providerSrc := fmt.Sprintf(`package %s
 
-import "github.com/ngq/gorp/framework/contract"
+import (
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+)
 
 type %sProvider struct{}
 
@@ -84,14 +86,14 @@ func (p *%sProvider) Name() string { return %q }
 func (p *%sProvider) IsDefer() bool { return false }
 func (p *%sProvider) Provides() []string { return []string{%sKey} }
 
-func (p *%sProvider) Register(c contract.Container) error {
-	c.Bind(%sKey, func(contract.Container) (any, error) {
+func (p *%sProvider) Register(c runtimecontract.Container) error {
+	c.Bind(%sKey, func(runtimecontract.Container) (any, error) {
 		return NewService(), nil
 	}, true)
 	return nil
 }
 
-func (p *%sProvider) Boot(contract.Container) error { return nil }
+func (p *%sProvider) Boot(runtimecontract.Container) error { return nil }
 `, name, pub, pub, pub, pub, name, pub, pub, pub, pub, pub, pub)
 
 		serviceSrc := fmt.Sprintf(`package %s

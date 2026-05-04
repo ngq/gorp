@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/ngq/gorp/framework/provider/proto"
 	"github.com/spf13/cobra"
 )
@@ -49,8 +49,8 @@ func init() {
 }
 
 // createProtoGenerator creates a Proto generator.
-func createProtoGenerator(includeHTTP bool) (contract.ProtoGenerator, error) {
-	return proto.NewGenerator(&contract.ProtoGeneratorConfig{
+func createProtoGenerator(includeHTTP bool) (integrationcontract.ProtoGenerator, error) {
+	return proto.NewGenerator(&integrationcontract.ProtoGeneratorConfig{
 		Enabled:               true,
 		Strategy:              "noop",
 		IncludeHTTPAnnotation: includeHTTP,

@@ -4,22 +4,22 @@ import (
 	"os"
 	"sync"
 
-	frameworkbootstrap "github.com/ngq/gorp/framework/bootstrap"
-	"github.com/ngq/gorp/framework/contract"
 	"github.com/ngq/gorp/framework"
+	frameworkbootstrap "github.com/ngq/gorp/framework/bootstrap"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 type bootstrapOption func(*bootstrapConfig)
 
 type bootstrapConfig struct {
-	extraProviders  []contract.ServiceProvider
-	runtimeProvider contract.ServiceProvider
+	extraProviders  []runtimecontract.ServiceProvider
+	runtimeProvider runtimecontract.ServiceProvider
 }
 
 var bootstrapHooks struct {
 	mu              sync.RWMutex
-	extraProviders  []contract.ServiceProvider
-	runtimeProvider contract.ServiceProvider
+	extraProviders  []runtimecontract.ServiceProvider
+	runtimeProvider runtimecontract.ServiceProvider
 }
 
 // WithAppEnv 在 bootstrap 前设置 APP_ENV。
@@ -40,7 +40,7 @@ func WithAppEnv(env string) bootstrapOption {
 // - 不修改 framework 默认 provider 组，只做顺序明确的附加注册；
 // - 传入 nil 会被忽略；
 // - 业务服务默认公开启动入口仍应优先走项目自己的 `cmd/*/main.go`。
-func WithExtraProviders(providers ...contract.ServiceProvider) bootstrapOption {
+func WithExtraProviders(providers ...runtimecontract.ServiceProvider) bootstrapOption {
 	return func(cfg *bootstrapConfig) {
 		for _, p := range providers {
 			if p == nil {
@@ -58,7 +58,7 @@ func WithExtraProviders(providers ...contract.ServiceProvider) bootstrapOption {
 // - 主要服务于共享 CLI / legacy 辅助命令链路，不是 starter 默认公开启动入口；
 // - 若未指定，则继续保持 framework/bootstrap.NewCLIApplication() 当前装配结果；
 // - 这样母仓与模板项目可以共享同一套 CLI，但业务服务默认主线仍落在项目自己的启动入口。
-func WithRuntimeProvider(p contract.ServiceProvider) bootstrapOption {
+func WithRuntimeProvider(p runtimecontract.ServiceProvider) bootstrapOption {
 	return func(cfg *bootstrapConfig) {
 		if p != nil {
 			cfg.runtimeProvider = p
@@ -75,7 +75,7 @@ func WithRuntimeProvider(p contract.ServiceProvider) bootstrapOption {
 // - examples 如保留，也只应作为参考与可选验证素材，不构成这层 hook 的默认语义来源；
 // - 在调用 cmd.Execute() 前执行一次即可；
 // - 会覆盖当前进程之前注册的 runtime provider，并替换 extra providers 列表。
-func RegisterBootstrapProviders(runtimeProvider contract.ServiceProvider, extraProviders ...contract.ServiceProvider) {
+func RegisterBootstrapProviders(runtimeProvider runtimecontract.ServiceProvider, extraProviders ...runtimecontract.ServiceProvider) {
 	bootstrapHooks.mu.Lock()
 	defer bootstrapHooks.mu.Unlock()
 
@@ -103,7 +103,7 @@ func readBootstrapHooks() bootstrapConfig {
 	return cfg
 }
 
-func bootstrap(opts ...bootstrapOption) (*framework.Application, contract.Container, error) {
+func bootstrap(opts ...bootstrapOption) (*framework.Application, runtimecontract.Container, error) {
 	cfg := readBootstrapHooks()
 	for _, opt := range opts {
 		if opt != nil {

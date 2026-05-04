@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/spf13/cobra"
 )
 
@@ -96,7 +96,7 @@ func runProtoFromService(cmd *cobra.Command, args []string) error {
 	}
 
 	// 构建选项
-	opts := contract.ServiceToProtoOptions{
+	opts := integrationcontract.ServiceToProtoOptions{
 		ServicePath: servicePath,
 		OutputPath:  outputDir,
 		Package:     pkg,
