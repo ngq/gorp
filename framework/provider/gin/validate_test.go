@@ -9,17 +9,19 @@ import (
 	"testing"
 
 	gingonic "github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 )
 
 type validateStub struct{}
 
-func (validateStub) Validate(context.Context, any) error { return nil }
-func (validateStub) ValidateVar(context.Context, any, string) error { return nil }
-func (validateStub) RegisterCustom(string, contract.CustomValidateFunc) error { return nil }
-func (validateStub) SetLocale(string) error { return nil }
-func (validateStub) TranslateError(err error) contract.AppError {
-	return contract.BadRequest(contract.ErrorReasonBadRequest, err.Error())
+func (validateStub) Validate(context.Context, any) error                          { return nil }
+func (validateStub) ValidateVar(context.Context, any, string) error               { return nil }
+func (validateStub) RegisterCustom(string, datacontract.CustomValidateFunc) error { return nil }
+func (validateStub) SetLocale(string) error                                       { return nil }
+func (validateStub) TranslateError(err error) resiliencecontract.AppError {
+	return resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())
 }
 
 type loginRequest struct {
@@ -34,7 +36,7 @@ func TestValidateBody(t *testing.T) {
 		if err := ValidateBody(c, validateStub{}, &req); err != nil {
 			return
 		}
-		fromCtx, ok := contract.FromValidatedBodyContext(c.Request.Context())
+		fromCtx, ok := supportcontract.FromValidatedBodyContext(c.Request.Context())
 		if !ok {
 			t.Fatal("expected validated body in request context")
 		}
@@ -59,12 +61,41 @@ func TestValidateBody(t *testing.T) {
 	}
 }
 
+func TestBindAndValidateJSONStoresValidatedBodyInRequestContext(t *testing.T) {
+	gingonic.SetMode(gingonic.TestMode)
+	body, _ := json.Marshal(map[string]any{"username": "alice"})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx, _ := gingonic.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = req
+
+	httpCtx := newHTTPContext(ctx)
+	var payload loginRequest
+	if err := BindAndValidateJSON(httpCtx, validateStub{}, &payload); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if payload.UserName != "alice" {
+		t.Fatalf("expected username alice, got %s", payload.UserName)
+	}
+	fromReq, ok := supportcontract.FromValidatedBodyContext(httpCtx.Request().Context())
+	if !ok {
+		t.Fatal("expected validated body in HTTPContext request context")
+	}
+	storedReq, ok := fromReq.(*loginRequest)
+	if !ok {
+		t.Fatalf("expected *loginRequest, got %T", fromReq)
+	}
+	if storedReq.UserName != "alice" {
+		t.Fatalf("expected username alice, got %s", storedReq.UserName)
+	}
+}
+
 func TestGetValidatedBodyFallsBackToRequestContext(t *testing.T) {
 	gingonic.SetMode(gingonic.TestMode)
 	ctx, _ := gingonic.CreateTestContext(httptest.NewRecorder())
 	req := httptest.NewRequest(http.MethodPost, "/login", nil)
 	body := &loginRequest{UserName: "alice"}
-	ctx.Request = req.WithContext(contract.NewValidatedBodyContext(req.Context(), body))
+	ctx.Request = req.WithContext(supportcontract.NewValidatedBodyContext(req.Context(), body))
 
 	got := GetValidatedBody(ctx)
 	storedReq, ok := got.(*loginRequest)
@@ -114,6 +145,30 @@ func TestValidateForm(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/form?name=bob", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestValidateBodyMiddlewareStoresValidatedBodyForGinHelper(t *testing.T) {
+	gingonic.SetMode(gingonic.TestMode)
+	r := gingonic.New()
+	r.Use(adaptMiddleware(ValidateBodyMiddleware(validateStub{}, &loginRequest{})))
+	r.POST("/login", func(c *gingonic.Context) {
+		got := GetValidatedBody(c)
+		storedReq, ok := got.(*loginRequest)
+		if !ok {
+			t.Fatalf("expected *loginRequest, got %T", got)
+		}
+		c.JSON(http.StatusOK, map[string]any{"username": storedReq.UserName})
+	})
+
+	body, _ := json.Marshal(map[string]any{"username": "alice"})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

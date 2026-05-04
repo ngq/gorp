@@ -8,20 +8,18 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
 type retryStub struct{}
 
-func (retryStub) Do(ctx context.Context, fn func() error) error { return fn() }
+func (retryStub) Do(ctx context.Context, fn func() error) error                         { return fn() }
 func (retryStub) DoWithResult(ctx context.Context, fn func() (any, error)) (any, error) { return fn() }
-func (retryStub) IsRetryable(err error) bool { return err != nil }
-func (retryStub) GetDefaultPolicy() contract.RetryPolicy { return contract.RetryPolicy{} }
-
+func (retryStub) IsRetryable(err error) bool                                            { return err != nil }
 func TestRetryMiddlewareUsesUnifiedTimeoutResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	policy := contract.RetryPolicy{MaxAttempts: 2, RetryableCodes: []int{http.StatusServiceUnavailable}}
+	policy := resiliencecontract.RetryPolicy{MaxAttempts: 2, RetryableCodes: []int{http.StatusServiceUnavailable}}
 	r.Use(RetryMiddleware(retryStub{}, policy))
 	r.GET("/retry", func(c *gin.Context) {
 		c.Status(http.StatusServiceUnavailable)
@@ -53,7 +51,7 @@ func TestRetryMiddlewareUsesUnifiedTimeoutResponse(t *testing.T) {
 func TestRetryMiddlewareUsesUnifiedFinalErrorResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	policy := contract.RetryPolicy{MaxAttempts: 1, RetryableCodes: []int{http.StatusServiceUnavailable}}
+	policy := resiliencecontract.RetryPolicy{MaxAttempts: 1, RetryableCodes: []int{http.StatusServiceUnavailable}}
 	r.Use(RetryMiddleware(retryStub{}, policy))
 	r.GET("/retry", func(c *gin.Context) {
 		c.Status(http.StatusServiceUnavailable)
@@ -79,5 +77,28 @@ func TestRetryMiddlewareUsesUnifiedFinalErrorResponse(t *testing.T) {
 	}
 	if resp.Data == nil {
 		t.Fatalf("expected retry metadata in data")
+	}
+}
+
+func TestRetryMiddlewareSkipsNonIdempotentMethods(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	policy := resiliencecontract.RetryPolicy{MaxAttempts: 3, RetryableCodes: []int{http.StatusServiceUnavailable}}
+	hits := 0
+	r.Use(RetryMiddleware(retryStub{}, policy))
+	r.POST("/retry", func(c *gin.Context) {
+		hits++
+		c.Status(http.StatusServiceUnavailable)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/retry", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if hits != 1 {
+		t.Fatalf("expected non-idempotent POST not retried, got hits=%d", hits)
+	}
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", w.Code)
 	}
 }

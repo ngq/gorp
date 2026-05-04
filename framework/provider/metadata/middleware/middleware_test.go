@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 	ggrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -14,16 +14,16 @@ import (
 
 type testMetadataPropagator struct{}
 
-func (testMetadataPropagator) Inject(ctx context.Context, carrier contract.MetadataCarrier) {
+func (testMetadataPropagator) Inject(ctx context.Context, carrier transportcontract.MetadataCarrier) {
 	carrier.Set("x-md-user", "u1")
 }
 
-func (testMetadataPropagator) Extract(ctx context.Context, carrier contract.MetadataCarrier) context.Context {
-	md := contract.NewMetadata()
+func (testMetadataPropagator) Extract(ctx context.Context, carrier transportcontract.MetadataCarrier) context.Context {
+	md := transportcontract.NewMetadata()
 	if v := carrier.Get("x-md-user"); v != "" {
 		md.Set("x-md-user", v)
 	}
-	return contract.NewServerContext(ctx, md)
+	return transportcontract.NewServerContext(ctx, md)
 }
 
 func TestMetadataHTTPMiddlewareExtractsIntoContext(t *testing.T) {
@@ -31,12 +31,17 @@ func TestMetadataHTTPMiddlewareExtractsIntoContext(t *testing.T) {
 	propagator := testMetadataPropagator{}
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
 		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		MetadataMiddleware(propagator)(httpCtx, func() {
-			c.Request = httpCtx.Request()
+		wrapped := MetadataMiddleware(propagator)(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
 			c.Next()
 		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
 	})
 
 	var got string

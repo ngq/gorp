@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -16,7 +16,7 @@ import (
 // - 从 gRPC metadata 提取追踪上下文；
 // - 记录方法名、错误码等信息；
 // - 支持与 OpenTelemetry 集成。
-func UnaryServerInterceptor(tracer contract.Tracer, serviceName string) grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(tracer observabilitycontract.Tracer, serviceName string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// 从 metadata 提取追踪上下文
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
@@ -31,12 +31,12 @@ func UnaryServerInterceptor(tracer contract.Tracer, serviceName string) grpc.Una
 		// 创建 Span
 		spanName := info.FullMethod
 		ctx, span := tracer.StartSpan(ctx, spanName,
-			WithSpanKind(contract.SpanKindServer),
+			WithSpanKind(observabilitycontract.SpanKindServer),
 			WithAttributes(map[string]any{
-				"rpc.system":       "grpc",
-				"rpc.method":       info.FullMethod,
-				"rpc.service":      extractServiceName(info.FullMethod),
-				"service.name":     serviceName,
+				"rpc.system":   "grpc",
+				"rpc.method":   info.FullMethod,
+				"rpc.service":  extractServiceName(info.FullMethod),
+				"service.name": serviceName,
 			}),
 		)
 		defer span.End()
@@ -47,9 +47,9 @@ func UnaryServerInterceptor(tracer contract.Tracer, serviceName string) grpc.Una
 		// 记录错误
 		if err != nil {
 			span.SetError(err)
-			span.SetStatus(contract.SpanStatusCodeError, err.Error())
+			span.SetStatus(observabilitycontract.SpanStatusCodeError, err.Error())
 		} else {
-			span.SetStatus(contract.SpanStatusCodeOk, "")
+			span.SetStatus(observabilitycontract.SpanStatusCodeOk, "")
 		}
 
 		// 注入追踪信息到响应 metadata
@@ -70,17 +70,17 @@ func UnaryServerInterceptor(tracer contract.Tracer, serviceName string) grpc.Una
 // - 自动为每个 RPC 调用创建客户端 Span；
 // - 将追踪上下文注入到 gRPC metadata；
 // - 支持跨服务追踪传播。
-func UnaryClientInterceptor(tracer contract.Tracer, serviceName string) grpc.UnaryClientInterceptor {
+func UnaryClientInterceptor(tracer observabilitycontract.Tracer, serviceName string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		// 创建 Span
 		spanName := method
 		ctx, span := tracer.StartSpan(ctx, spanName,
-			WithSpanKind(contract.SpanKindClient),
+			WithSpanKind(observabilitycontract.SpanKindClient),
 			WithAttributes(map[string]any{
-				"rpc.system":       "grpc",
-				"rpc.method":       method,
-				"rpc.service":      extractServiceName(method),
-				"service.name":     serviceName,
+				"rpc.system":   "grpc",
+				"rpc.method":   method,
+				"rpc.service":  extractServiceName(method),
+				"service.name": serviceName,
 			}),
 		)
 		defer span.End()
@@ -101,9 +101,9 @@ func UnaryClientInterceptor(tracer contract.Tracer, serviceName string) grpc.Una
 		// 记录错误
 		if err != nil {
 			span.SetError(err)
-			span.SetStatus(contract.SpanStatusCodeError, err.Error())
+			span.SetStatus(observabilitycontract.SpanStatusCodeError, err.Error())
 		} else {
-			span.SetStatus(contract.SpanStatusCodeOk, "")
+			span.SetStatus(observabilitycontract.SpanStatusCodeOk, "")
 		}
 
 		return err

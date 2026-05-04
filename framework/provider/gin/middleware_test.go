@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 )
 
 // TestRequestID 验证 RequestID 中间件是否正常工作。
@@ -17,7 +17,7 @@ func TestRequestID(t *testing.T) {
 
 	r.GET("/test", func(c *gin.Context) {
 		rid := GetRequestID(c)
-		ctxRID, ok := contract.FromRequestIDContext(c.Request.Context())
+		ctxRID, ok := supportcontract.FromRequestIDContext(c.Request.Context())
 		if !ok || ctxRID == "" {
 			t.Fatal("expected request id in request context")
 		}
@@ -83,7 +83,7 @@ func TestTraceID(t *testing.T) {
 
 	r.GET("/test", func(c *gin.Context) {
 		tid := GetTraceID(c)
-		ctxTID, ok := contract.FromTraceIDContext(c.Request.Context())
+		ctxTID, ok := supportcontract.FromTraceIDContext(c.Request.Context())
 		if !ok || ctxTID == "" {
 			t.Fatal("expected trace id in request context")
 		}
@@ -139,8 +139,8 @@ func TestGetIDsFallbackToRequestContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	req := httptest.NewRequest("GET", "/test", nil)
-	req = req.WithContext(contract.NewRequestIDContext(req.Context(), "req-1"))
-	req = req.WithContext(contract.NewTraceIDContext(req.Context(), "trace-1"))
+	req = req.WithContext(supportcontract.NewRequestIDContext(req.Context(), "req-1"))
+	req = req.WithContext(supportcontract.NewTraceIDContext(req.Context(), "trace-1"))
 	ctx.Request = req
 
 	if got := GetRequestID(ctx); got != "req-1" {

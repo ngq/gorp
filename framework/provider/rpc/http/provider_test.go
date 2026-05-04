@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 type testCircuitBreaker struct {
@@ -28,8 +30,8 @@ func (cb *testCircuitBreaker) Do(ctx context.Context, resource string, fn func()
 	return fn()
 }
 
-func (cb *testCircuitBreaker) State(ctx context.Context, resource string) contract.CircuitBreakerState {
-	return contract.CircuitBreakerStateClosed
+func (cb *testCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
+	return resiliencecontract.CircuitBreakerStateClosed
 }
 
 func TestClientCall_UsesCircuitBreaker(t *testing.T) {
@@ -41,7 +43,7 @@ func TestClientCall_UsesCircuitBreaker(t *testing.T) {
 
 	cb := &testCircuitBreaker{}
 	client := NewClient(
-		&contract.RPCConfig{Mode: "http", BaseURL: server.URL, TimeoutMS: 1000},
+		&transportcontract.RPCConfig{Mode: "http", BaseURL: server.URL, TimeoutMS: 1000},
 		nil,
 		nil,
 		nil,
@@ -75,7 +77,7 @@ func TestClientCall_PropagatesTraceIDFromContext(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(
-		&contract.RPCConfig{Mode: "http", BaseURL: server.URL, TimeoutMS: 1000},
+		&transportcontract.RPCConfig{Mode: "http", BaseURL: server.URL, TimeoutMS: 1000},
 		nil,
 		nil,
 		nil,
@@ -84,7 +86,7 @@ func TestClientCall_PropagatesTraceIDFromContext(t *testing.T) {
 		nil,
 	)
 
-	ctx := contract.NewTraceIDContext(context.Background(), "trace-123")
+	ctx := supportcontract.NewTraceIDContext(context.Background(), "trace-123")
 	var resp map[string]bool
 	if err := client.Call(ctx, "user-service", "/api/user/get", map[string]string{"id": "1"}, &resp); err != nil {
 		t.Fatalf("Call returned error: %v", err)

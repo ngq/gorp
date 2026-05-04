@@ -6,24 +6,55 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
-// RateLimiter 限流器接口。
-//
-// 中文说明：
-// - 定义通用的限流器接口，支持不同的限流算法实现；
-// - Allow 方法返回 true 表示允许请求通过，false 表示被限流；
-// - 具体实现可以是令牌桶、漏桶、滑动窗口等算法。
 type RateLimiter interface {
 	Allow(key string) bool
 }
 
-// RateLimitMiddleware 创建限流中间件。
-//
-// 中文说明：
-// - 这是 Gin provider 扩展层中间件，不属于默认 framework 主线契约；
-// - keyFunc 用于从请求中提取限流 key（如 IP、用户 ID 等）；
-// - 被限流的请求返回 429 Too Many Requests。
+func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transportcontract.HTTPMiddleware {
+	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+		return func(c transportcontract.HTTPContext) {
+			if limiter == nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+			target := resource
+			if target == "" {
+				target = c.RoutePath()
+			}
+			if target == "" && c.Request() != nil && c.Request().URL != nil {
+				target = c.Request().Method + " " + c.Request().URL.Path
+			}
+			if err := limiter.Allow(c.Context(), target); err != nil {
+				if gc, ok := unwrapGinContext(c); ok {
+					writeGinResponseHeaders(gc)
+					resp := Response{
+						Code:    CodeTooManyRequests,
+						Message: "rate limit exceeded",
+						Data:    nil,
+					}
+					gc.JSON(http.StatusTooManyRequests, resp)
+					gc.Abort()
+					return
+				}
+				c.JSON(http.StatusTooManyRequests, map[string]any{
+					"code":    CodeTooManyRequests,
+					"message": "rate limit exceeded",
+				})
+				return
+			}
+			if next != nil {
+				next(c)
+			}
+		}
+	}
+}
+
 func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := keyFunc(c)
@@ -42,11 +73,6 @@ func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string)
 	}
 }
 
-// IPKeyFunc 从请求中提取 IP 作为限流 key。
-//
-// 中文说明：
-// - 默认的限流 key 提取函数；
-// - 优先使用 X-Forwarded-For，其次 X-Real-IP，最后使用 RemoteAddr。
 func IPKeyFunc(c *gin.Context) string {
 	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
 		return xff
@@ -57,13 +83,6 @@ func IPKeyFunc(c *gin.Context) string {
 	return c.ClientIP()
 }
 
-// TokenBucketLimiter 令牌桶限流器。
-//
-// 中文说明：
-// - 令牌桶算法实现，支持突发流量；
-// - rate: 每秒放入令牌的数量；
-// - burst: 桶的最大容量；
-// - 适合允许一定突发流量的场景。
 type TokenBucketLimiter struct {
 	rate     float64
 	burst    int
@@ -72,7 +91,6 @@ type TokenBucketLimiter struct {
 	mu       sync.Mutex
 }
 
-// NewTokenBucketLimiter 创建令牌桶限流器。
 func NewTokenBucketLimiter(rate float64, burst int) *TokenBucketLimiter {
 	return &TokenBucketLimiter{
 		rate:     rate,
@@ -82,7 +100,6 @@ func NewTokenBucketLimiter(rate float64, burst int) *TokenBucketLimiter {
 	}
 }
 
-// Allow 判断是否允许请求通过。
 func (l *TokenBucketLimiter) Allow(_ string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -101,19 +118,17 @@ func (l *TokenBucketLimiter) Allow(_ string) bool {
 	return false
 }
 
-// SlidingWindowLimiter 滑动窗口限流器。
 type SlidingWindowLimiter struct {
-	limit   int
-	window  time.Duration
-	counts  map[string]*windowRecord
-	mu      sync.Mutex
+	limit  int
+	window time.Duration
+	counts map[string]*windowRecord
+	mu     sync.Mutex
 }
 
 type windowRecord struct {
 	timestamps []time.Time
 }
 
-// NewSlidingWindowLimiter 创建滑动窗口限流器。
 func NewSlidingWindowLimiter(limit int, window time.Duration) *SlidingWindowLimiter {
 	return &SlidingWindowLimiter{
 		limit:  limit,
@@ -122,7 +137,6 @@ func NewSlidingWindowLimiter(limit int, window time.Duration) *SlidingWindowLimi
 	}
 }
 
-// Allow 判断是否允许请求通过。
 func (l *SlidingWindowLimiter) Allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -149,7 +163,6 @@ func (l *SlidingWindowLimiter) Allow(key string) bool {
 	return true
 }
 
-// FixedWindowLimiter 固定窗口限流器。
 type FixedWindowLimiter struct {
 	limit   int
 	window  time.Duration
@@ -158,7 +171,6 @@ type FixedWindowLimiter struct {
 	mu      sync.Mutex
 }
 
-// NewFixedWindowLimiter 创建固定窗口限流器。
 func NewFixedWindowLimiter(limit int, window time.Duration) *FixedWindowLimiter {
 	return &FixedWindowLimiter{
 		limit:   limit,
@@ -168,7 +180,6 @@ func NewFixedWindowLimiter(limit int, window time.Duration) *FixedWindowLimiter 
 	}
 }
 
-// Allow 判断是否允许请求通过。
 func (l *FixedWindowLimiter) Allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()

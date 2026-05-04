@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
 type stubConfig struct {
@@ -19,7 +21,7 @@ func (s *stubConfig) GetInt(string) int           { return 0 }
 func (s *stubConfig) GetBool(string) bool         { return false }
 func (s *stubConfig) GetFloat(string) float64     { return 0 }
 func (s *stubConfig) Unmarshal(string, any) error { return nil }
-func (s *stubConfig) Watch(_ context.Context, _ string) (contract.ConfigWatcher, error) {
+func (s *stubConfig) Watch(_ context.Context, _ string) (datacontract.ConfigWatcher, error) {
 	return nil, nil
 }
 func (s *stubConfig) Reload(_ context.Context) error { return nil }
@@ -32,14 +34,14 @@ func TestProviderMeta(t *testing.T) {
 	if !p.IsDefer() {
 		t.Fatal("auth.jwt provider should be defer")
 	}
-	if got := p.Provides(); len(got) != 1 || got[0] != contract.AuthJWTKey {
+	if got := p.Provides(); len(got) != 1 || got[0] != securitycontract.AuthJWTKey {
 		t.Fatalf("unexpected provides: %#v", got)
 	}
 }
 
 func TestProviderBindJWTService(t *testing.T) {
 	c := container.New()
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]string{
 			"auth.jwt.secret": "s1",
 			"auth.jwt.issuer": "issuer-1",
@@ -50,18 +52,18 @@ func TestProviderBindJWTService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := c.Make(contract.AuthJWTKey)
+	v, err := c.Make(securitycontract.AuthJWTKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := v.(contract.JWTService); !ok {
-		t.Fatalf("expected contract.JWTService, got %T", v)
+	if _, ok := v.(securitycontract.JWTService); !ok {
+		t.Fatalf("expected securitycontract.JWTService, got %T", v)
 	}
 }
 
 func TestProviderCompatLegacySecretKey(t *testing.T) {
 	c := container.New()
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]string{
 			"auth.jwt_secret": "legacy-secret",
 		}}, nil
@@ -71,11 +73,11 @@ func TestProviderCompatLegacySecretKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := c.Make(contract.AuthJWTKey)
+	v, err := c.Make(securitycontract.AuthJWTKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := v.(contract.JWTService)
+	svc := v.(securitycontract.JWTService)
 	claims := svc.NewClaims(1, "user", "u1", nil, 60)
 	token, err := svc.Sign(claims)
 	if err != nil {

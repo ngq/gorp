@@ -9,19 +9,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
-// RetryMiddleware 创建 HTTP 重试中间件。
-//
-// 中文说明：
-// - 这是 Gin provider 扩展层中间件，不属于默认 framework 主线契约；
-// - 对可重试的 HTTP 状态码进行重试；
-// - 使用指数退避延迟；
-// - 仅对幂等方法（GET/HEAD/OPTIONS）重试；
-// - 支持请求体重放。
-func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.HandlerFunc {
+func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.RetryPolicy) gin.HandlerFunc {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	return func(c *gin.Context) {
@@ -65,7 +56,7 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 				return
 			}
 
-			lastErr = contract.NewError(statusCode, contract.ErrorReasonInternal, "request failed")
+			lastErr = resiliencecontract.NewError(statusCode, resiliencecontract.ErrorReasonInternal, "request failed")
 			if attempt == policy.MaxAttempts-1 {
 				break
 			}
@@ -120,13 +111,7 @@ func RetryMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.Hand
 	}
 }
 
-// RetryAllMethodsMiddleware 创建对所有 HTTP 方法重试的中间件。
-//
-// 中文说明：
-// - 这是 Gin provider 扩展层中间件，不属于默认 framework 主线契约；
-// - 与 RetryMiddleware 类似，但对所有方法都重试；
-// - 注意：POST/PUT/DELETE 等非幂等方法可能导致重复操作。
-func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy) gin.HandlerFunc {
+func RetryAllMethodsMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.RetryPolicy) gin.HandlerFunc {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	return func(c *gin.Context) {
@@ -164,7 +149,7 @@ func RetryAllMethodsMiddleware(retry contract.Retry, policy contract.RetryPolicy
 				return
 			}
 
-			lastErr = contract.NewError(statusCode, contract.ErrorReasonInternal, "request failed")
+			lastErr = resiliencecontract.NewError(statusCode, resiliencecontract.ErrorReasonInternal, "request failed")
 			if attempt == policy.MaxAttempts-1 {
 				break
 			}
@@ -265,8 +250,7 @@ func (w *retryResponseWriter) Status() int {
 	return w.statusCode
 }
 
-// DoWithRetry 辅助函数：在 handler 中执行带重试的操作。
-func DoWithRetry(c *gin.Context, retry contract.Retry, fn func(ctx context.Context) (any, error)) (any, error) {
+func DoWithRetry(c *gin.Context, retry resiliencecontract.Retry, fn func(ctx context.Context) (any, error)) (any, error) {
 	return retry.DoWithResult(c.Request.Context(), func() (any, error) {
 		return fn(c.Request.Context())
 	})

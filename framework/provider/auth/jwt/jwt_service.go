@@ -9,38 +9,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
-// JWTService 是 framework 级业务 JWT 最小实现。
-//
-// 中文说明：
-// - 这里承接真正的业务 JWT 实现边界；
-// - 面向最终用户、后台用户、客户等业务主体；
-// - 与 serviceauth/token 的服务间认证实现分离。
-// - 旧的 serviceauth/token 同名能力后续仅保留兼容壳。
 type JWTService struct {
 	secret   string
 	issuer   string
 	audience string
 }
 
-// NewJWTService 创建业务 JWT 服务。
-//
-// 中文说明：
-// - secret 为签名密钥；
-// - issuer / audience 为业务 JWT 的基础语义字段；
-// - 返回值实现 contract.JWTService，可供 provider、业务 service、middleware 统一复用。
 func NewJWTService(secret, issuer, audience string) *JWTService {
 	return &JWTService{secret: strings.TrimSpace(secret), issuer: issuer, audience: audience}
 }
 
-// Sign 对业务 claims 执行签名。
-//
-// 中文说明：
-// - 当前采用 HMAC-SHA256；
-// - 只依赖 provider 自己持有的 secret，不依赖外部全局状态。
-func (s *JWTService) Sign(claims contract.JWTClaims) (string, error) {
+func (s *JWTService) Sign(claims securitycontract.JWTClaims) (string, error) {
 	if s.secret == "" {
 		return "", fmt.Errorf("jwt secret is required")
 	}
@@ -63,12 +45,7 @@ func (s *JWTService) Sign(claims contract.JWTClaims) (string, error) {
 	return signingInput + "." + signature, nil
 }
 
-// Verify 校验业务 JWT 并返回 claims。
-//
-// 中文说明：
-// - 会校验签名、payload 格式以及过期时间；
-// - SubjectID 为 0 的 token 视为无效业务主体。
-func (s *JWTService) Verify(token string) (*contract.JWTClaims, error) {
+func (s *JWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
 	if s.secret == "" {
 		return nil, fmt.Errorf("jwt secret is required")
 	}
@@ -93,7 +70,7 @@ func (s *JWTService) Verify(token string) (*contract.JWTClaims, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid token")
 	}
-	var claims contract.JWTClaims
+	var claims securitycontract.JWTClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return nil, fmt.Errorf("invalid token")
 	}
@@ -103,17 +80,12 @@ func (s *JWTService) Verify(token string) (*contract.JWTClaims, error) {
 	return &claims, nil
 }
 
-// NewClaims 创建带默认 TTL 的业务 claims。
-//
-// 中文说明：
-// - ttlSeconds<=0 时默认回退到 24 小时；
-// - Issuer 与 Audience 继承自当前 JWTService 配置。
-func (s *JWTService) NewClaims(subjectID int64, subjectType, subjectName string, roles []string, ttlSeconds int64) contract.JWTClaims {
+func (s *JWTService) NewClaims(subjectID int64, subjectType, subjectName string, roles []string, ttlSeconds int64) securitycontract.JWTClaims {
 	now := time.Now()
 	if ttlSeconds <= 0 {
 		ttlSeconds = 86400
 	}
-	return contract.JWTClaims{
+	return securitycontract.JWTClaims{
 		SubjectID:   subjectID,
 		SubjectType: subjectType,
 		SubjectName: subjectName,

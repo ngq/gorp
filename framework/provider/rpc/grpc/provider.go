@@ -9,7 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	appgrpc "github.com/ngq/gorp/framework/provider/grpc"
 	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
@@ -22,13 +29,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Provider 提供 gRPC RPC 实现。
-//
-// 中文说明：
-// - 基于 gRPC/protobuf 实现服务间调用；
-// - 性能更高，适合高频服务间通信；
-// - 支持服务发现集成；
-// - 需要项目引入 google.golang.org/grpc 依赖。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
@@ -37,96 +37,91 @@ func (p *Provider) Name() string  { return "rpc.grpc" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
 	return []string{
-		contract.RPCClientKey,
-		contract.RPCServerKey,
-		contract.GRPCConnFactoryKey,
-		contract.GRPCServerRegistrarKey,
+		transportcontract.RPCClientKey,
+		transportcontract.RPCServerKey,
+		transportcontract.GRPCConnFactoryKey,
+		transportcontract.GRPCServerRegistrarKey,
 	}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	// 注册 Proto-first gRPC 连接工厂。
-	c.Bind(contract.GRPCConnFactoryKey, func(c contract.Container) (any, error) {
-		cfg, _ := getConfig(c)
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.GRPCConnFactoryKey, func(c runtimecontract.Container) (any, error) {
+		cfg, _ := getGRPCConfig(c)
 		return newClientFromContainer(c, cfg), nil
 	}, true)
 
-	// 注册旧统一 RPCClient 抽象，底层继续复用 Proto-first 连接工厂实现。
-	c.Bind(contract.RPCClientKey, func(c contract.Container) (any, error) {
-		return c.Make(contract.GRPCConnFactoryKey)
+	c.Bind(transportcontract.RPCClientKey, func(c runtimecontract.Container) (any, error) {
+		return c.Make(transportcontract.GRPCConnFactoryKey)
 	}, true)
 
-	// 注册 Proto-first gRPC 服务端注册器。
-	c.Bind(contract.GRPCServerRegistrarKey, func(c contract.Container) (any, error) {
-		cfg, _ := getConfig(c)
+	c.Bind(transportcontract.GRPCServerRegistrarKey, func(c runtimecontract.Container) (any, error) {
+		cfg, _ := getGRPCConfig(c)
 		return NewServer(cfg, c), nil
 	}, true)
 
-	// 注册旧统一 RPCServer 抽象，底层继续复用 Proto-first 服务端注册器实现。
-	c.Bind(contract.RPCServerKey, func(c contract.Container) (any, error) {
-		return c.Make(contract.GRPCServerRegistrarKey)
+	c.Bind(transportcontract.RPCServerKey, func(c runtimecontract.Container) (any, error) {
+		return c.Make(transportcontract.GRPCServerRegistrarKey)
 	}, true)
 
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
-func newClientFromContainer(c contract.Container, cfg *contract.RPCConfig) *Client {
-	var registry contract.ServiceRegistry
-	if c.IsBind(contract.RPCRegistryKey) {
-		regAny, _ := c.Make(contract.RPCRegistryKey)
-		registry, _ = regAny.(contract.ServiceRegistry)
+func newClientFromContainer(c runtimecontract.Container, cfg *transportcontract.RPCConfig) *Client {
+	var registry transportcontract.ServiceRegistry
+	if c.IsBind(transportcontract.RPCRegistryKey) {
+		regAny, _ := c.Make(transportcontract.RPCRegistryKey)
+		registry, _ = regAny.(transportcontract.ServiceRegistry)
 	}
 
-	var selector contract.Selector
-	if c.IsBind(contract.SelectorKey) {
-		selAny, _ := c.Make(contract.SelectorKey)
-		selector, _ = selAny.(contract.Selector)
+	var selector discoverycontract.Selector
+	if c.IsBind(discoverycontract.SelectorKey) {
+		selAny, _ := c.Make(discoverycontract.SelectorKey)
+		selector, _ = selAny.(discoverycontract.Selector)
 	}
 
-	var metadataPropagator contract.MetadataPropagator
-	if c.IsBind(contract.MetadataPropagatorKey) {
-		mdAny, _ := c.Make(contract.MetadataPropagatorKey)
-		metadataPropagator, _ = mdAny.(contract.MetadataPropagator)
+	var metadataPropagator transportcontract.MetadataPropagator
+	if c.IsBind(transportcontract.MetadataPropagatorKey) {
+		mdAny, _ := c.Make(transportcontract.MetadataPropagatorKey)
+		metadataPropagator, _ = mdAny.(transportcontract.MetadataPropagator)
 	}
 
-	var serviceAuth contract.ServiceAuthenticator
-	if c.IsBind(contract.ServiceAuthKey) {
-		authAny, _ := c.Make(contract.ServiceAuthKey)
-		serviceAuth, _ = authAny.(contract.ServiceAuthenticator)
+	var serviceAuth securitycontract.ServiceTokenIssuer
+	if c.IsBind(securitycontract.ServiceAuthKey) {
+		authAny, _ := c.Make(securitycontract.ServiceAuthKey)
+		serviceAuth, _ = authAny.(securitycontract.ServiceTokenIssuer)
 	}
 
-	var tracer contract.Tracer
-	if c.IsBind(contract.TracerKey) {
-		tracerAny, _ := c.Make(contract.TracerKey)
-		tracer, _ = tracerAny.(contract.Tracer)
+	var tracer observabilitycontract.Tracer
+	if c.IsBind(observabilitycontract.TracerKey) {
+		tracerAny, _ := c.Make(observabilitycontract.TracerKey)
+		tracer, _ = tracerAny.(observabilitycontract.Tracer)
 	}
 
-	var circuitBreaker contract.CircuitBreaker
-	if c.IsBind(contract.CircuitBreakerKey) {
-		cbAny, _ := c.Make(contract.CircuitBreakerKey)
-		circuitBreaker, _ = cbAny.(contract.CircuitBreaker)
+	var circuitBreaker resiliencecontract.CircuitBreaker
+	if c.IsBind(resiliencecontract.CircuitBreakerKey) {
+		cbAny, _ := c.Make(resiliencecontract.CircuitBreakerKey)
+		circuitBreaker, _ = cbAny.(resiliencecontract.CircuitBreaker)
 	}
 
 	return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker)
 }
 
-// getConfig 从容器获取 RPC 配置。
-func getConfig(c contract.Container) (*contract.RPCConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getGRPCConfig(c runtimecontract.Container) (*transportcontract.RPCConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
-		return &contract.RPCConfig{Mode: "grpc"}, nil
+		return &transportcontract.RPCConfig{Mode: "grpc"}, nil
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return &contract.RPCConfig{Mode: "grpc"}, nil
+		return &transportcontract.RPCConfig{Mode: "grpc"}, nil
 	}
 
-	rpcCfg := &contract.RPCConfig{
+	rpcCfg := &transportcontract.RPCConfig{
 		Mode:      "grpc",
 		Insecure:  true,
 		TimeoutMS: 30000,
@@ -138,8 +133,8 @@ func getConfig(c contract.Container) (*contract.RPCConfig, error) {
 	if target := configprovider.GetStringAny(cfg, "rpc.grpc.target", "rpc.target"); target != "" {
 		rpcCfg.Target = target
 	}
-	if insecure, ok := configprovider.GetBoolAny(cfg, "rpc.grpc.insecure"); ok {
-		rpcCfg.Insecure = insecure
+	if insecureFlag, ok := configprovider.GetBoolAny(cfg, "rpc.grpc.insecure"); ok {
+		rpcCfg.Insecure = insecureFlag
 	}
 	if timeout := configprovider.GetIntAny(cfg, "rpc.timeout_ms", "rpc.timeout"); timeout > 0 {
 		rpcCfg.TimeoutMS = timeout
@@ -151,38 +146,27 @@ func getConfig(c contract.Container) (*contract.RPCConfig, error) {
 	return rpcCfg, nil
 }
 
-// Client 是 gRPC RPC 客户端实现。
-//
-// 中文说明：
-// - 使用 grpc.ClientConn 发起调用；
-// - 支持服务发现：优先从 Registry 获取地址；
-// - Call 方法需要传入 gRPC 请求/响应对象。
 type Client struct {
-	cfg                *contract.RPCConfig
-	registry           contract.ServiceRegistry
-	selector           contract.Selector
-	metadataPropagator contract.MetadataPropagator
-	serviceAuth        contract.ServiceAuthenticator
-	tracer             contract.Tracer
-	circuitBreaker     contract.CircuitBreaker
-
-	// 连接池：按地址缓存 ClientConn
-	connPool sync.Map // map[string]*grpc.ClientConn
-
-	// 连接管理
-	mu     sync.Mutex
-	closed bool
+	cfg                *transportcontract.RPCConfig
+	registry           transportcontract.ServiceRegistry
+	selector           discoverycontract.Selector
+	metadataPropagator transportcontract.MetadataPropagator
+	serviceAuth        securitycontract.ServiceTokenIssuer
+	tracer             observabilitycontract.Tracer
+	circuitBreaker     resiliencecontract.CircuitBreaker
+	connPool           sync.Map
+	mu                 sync.Mutex
+	closed             bool
 }
 
-// NewClient 创建 gRPC RPC 客户端。
 func NewClient(
-	cfg *contract.RPCConfig,
-	registry contract.ServiceRegistry,
-	selector contract.Selector,
-	metadataPropagator contract.MetadataPropagator,
-	serviceAuth contract.ServiceAuthenticator,
-	tracer contract.Tracer,
-	circuitBreaker contract.CircuitBreaker,
+	cfg *transportcontract.RPCConfig,
+	registry transportcontract.ServiceRegistry,
+	selector discoverycontract.Selector,
+	metadataPropagator transportcontract.MetadataPropagator,
+	serviceAuth securitycontract.ServiceTokenIssuer,
+	tracer observabilitycontract.Tracer,
+	circuitBreaker resiliencecontract.CircuitBreaker,
 ) *Client {
 	return &Client{
 		cfg:                cfg,
@@ -195,14 +179,6 @@ func NewClient(
 	}
 }
 
-// Call 执行 RPC 调用。
-//
-// 中文说明：
-// - service: 目标服务名称；
-// - method: gRPC 方法全名（如 "/user.UserService/GetUser"）；
-// - req/resp: protobuf 请求/响应对象；
-// - 使用 Invoke 发起 gRPC 调用；
-// - 这是旧统一 RPC 抽象留下的兼容入口，Proto-first 主线应优先使用 Conn + pb.NewXxxClient。
 func (c *Client) Call(ctx context.Context, service, method string, req, resp any) error {
 	conn, done, err := c.getConn(ctx, service)
 	if err != nil {
@@ -210,7 +186,7 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 	}
 	if done != nil {
 		defer func() {
-			done(ctx, contract.DoneInfo{Err: err, BytesSent: true, BytesReceived: err == nil})
+			done(ctx, discoverycontract.DoneInfo{Err: err, BytesSent: true, BytesReceived: err == nil})
 		}()
 	}
 
@@ -239,7 +215,7 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 			md.Set("x-service-token", token)
 		}
 	}
-	if traceID, ok := contract.FromTraceIDContext(ctx); ok {
+	if traceID, ok := supportcontract.FromTraceIDContext(ctx); ok {
 		md.Set("x-trace-id", traceID)
 	}
 	ctx = metadata.NewOutgoingContext(ctx, md)
@@ -252,21 +228,10 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 	return nil
 }
 
-// CallRaw 执行原始数据 RPC 调用。
-//
-// 中文说明：
-// - gRPC 不推荐直接传原始字节；
-// - 此方法返回错误，建议使用 protobuf 定义。
 func (c *Client) CallRaw(ctx context.Context, service, method string, data []byte) ([]byte, error) {
 	return nil, errors.New("rpc: gRPC does not support raw bytes, use protobuf")
 }
 
-// Conn 按服务名返回可复用的 gRPC 连接。
-//
-// 中文说明：
-// - 这是 Proto-first 客户端主线使用的正式入口；
-// - 业务侧拿到连接后应继续使用 `pb.NewXxxClient(conn)` 发起调用；
-// - discovery / selector / metadata / tracing / serviceauth / 连接复用仍由 framework 负责。
 func (c *Client) Conn(ctx context.Context, service string) (*grpc.ClientConn, error) {
 	conn, _, err := c.getConn(ctx, service)
 	if err != nil {
@@ -275,7 +240,6 @@ func (c *Client) Conn(ctx context.Context, service string) (*grpc.ClientConn, er
 	return conn, nil
 }
 
-// Close 关闭所有连接。
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -295,12 +259,7 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// getConn 获取或创建服务连接。
-//
-// 中文说明：
-// - 从连接池获取，不存在则创建；
-// - 支持服务发现动态选择地址。
-func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn, contract.DoneFunc, error) {
+func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn, discoverycontract.DoneFunc, error) {
 	addr, done, err := c.resolveTarget(ctx, service)
 	if err != nil {
 		return nil, nil, err
@@ -359,8 +318,7 @@ func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn,
 	return conn, done, nil
 }
 
-// resolveTarget 解析服务目标地址。
-func (c *Client) resolveTarget(ctx context.Context, service string) (string, contract.DoneFunc, error) {
+func (c *Client) resolveTarget(ctx context.Context, service string) (string, discoverycontract.DoneFunc, error) {
 	if c.registry != nil {
 		instances, err := c.registry.Discover(ctx, service)
 		if err == nil && len(instances) > 0 {
@@ -384,12 +342,12 @@ func (c *Client) resolveTarget(ctx context.Context, service string) (string, con
 	return service, nil, nil
 }
 
-func getConfigService(c contract.Container) contract.Config {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getConfigService(c runtimecontract.Container) datacontract.Config {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil
 	}
-	cfg, _ := cfgAny.(contract.Config)
+	cfg, _ := cfgAny.(datacontract.Config)
 	return cfg
 }
 
@@ -473,46 +431,33 @@ func sanitizeCircuitBreakerSegment(segment string) string {
 	return replacer.Replace(segment)
 }
 
-// Server 是 gRPC RPC 服务端实现。
-//
-// 中文说明：
-// - 使用 grpc.Server 暴露服务；
-// - 支持独立监听端口（与 HTTP 服务分离）；
-// - Register 注册 protobuf service implementation。
 type Server struct {
-	cfg *contract.RPCConfig
-	c   contract.Container
-
-	server *grpc.Server
-	addr   string
-
-	// 服务注册
-	services sync.Map // map[string]any
-
-	// 运行状态
+	cfg      *transportcontract.RPCConfig
+	c        runtimecontract.Container
+	server   *grpc.Server
+	addr     string
+	services sync.Map
 	mu       sync.Mutex
 	running  bool
 	listener net.Listener
 }
 
-// NewServer 创建 gRPC RPC 服务端。
-func NewServer(cfg *contract.RPCConfig, c contract.Container) *Server {
+func NewServer(cfg *transportcontract.RPCConfig, c runtimecontract.Container) *Server {
 	return &Server{cfg: cfg, c: c}
 }
 
 func (s *Server) newGRPCServer() *grpc.Server {
 	opts := []grpc.ServerOption{}
 	if !s.cfg.Insecure {
-		// TODO: 支持 TLS
 	}
 
 	var unaryInterceptors []grpc.UnaryServerInterceptor
 	var streamInterceptors []grpc.StreamServerInterceptor
 	unaryInterceptors = append(unaryInterceptors, appgrpc.UnaryServerInterceptor())
 	streamInterceptors = append(streamInterceptors, appgrpc.StreamServerInterceptor())
-	if s.c.IsBind(contract.TracerKey) {
-		if tracerAny, err := s.c.Make(contract.TracerKey); err == nil {
-			if tracer, ok := tracerAny.(contract.Tracer); ok {
+	if s.c.IsBind(observabilitycontract.TracerKey) {
+		if tracerAny, err := s.c.Make(observabilitycontract.TracerKey); err == nil {
+			if tracer, ok := tracerAny.(observabilitycontract.Tracer); ok {
 				serviceName := configprovider.GetStringAny(getConfigService(s.c), "service.name", "tracing.service_name")
 				if serviceName == "" {
 					serviceName = "grpc-service"
@@ -521,17 +466,17 @@ func (s *Server) newGRPCServer() *grpc.Server {
 			}
 		}
 	}
-	if s.c.IsBind(contract.MetadataPropagatorKey) {
-		if propagatorAny, err := s.c.Make(contract.MetadataPropagatorKey); err == nil {
-			if propagator, ok := propagatorAny.(contract.MetadataPropagator); ok {
+	if s.c.IsBind(transportcontract.MetadataPropagatorKey) {
+		if propagatorAny, err := s.c.Make(transportcontract.MetadataPropagatorKey); err == nil {
+			if propagator, ok := propagatorAny.(transportcontract.MetadataPropagator); ok {
 				unaryInterceptors = append(unaryInterceptors, metadatamw.UnaryServerInterceptor(propagator))
 				streamInterceptors = append(streamInterceptors, metadatamw.StreamServerInterceptor(propagator))
 			}
 		}
 	}
-	if s.c.IsBind(contract.ServiceAuthKey) {
-		if authAny, err := s.c.Make(contract.ServiceAuthKey); err == nil {
-			if authenticator, ok := authAny.(contract.ServiceAuthenticator); ok {
+	if s.c.IsBind(securitycontract.ServiceAuthKey) {
+		if authAny, err := s.c.Make(securitycontract.ServiceAuthKey); err == nil {
+			if authenticator, ok := authAny.(securitycontract.ServiceAuthenticator); ok {
 				unaryInterceptors = append(unaryInterceptors, serviceAuthUnaryServerInterceptor(authenticator))
 				streamInterceptors = append(streamInterceptors, serviceAuthStreamServerInterceptor(authenticator))
 			}
@@ -552,23 +497,11 @@ func (s *Server) newGRPCServer() *grpc.Server {
 	return srv
 }
 
-// Register 注册服务处理器。
-//
-// 中文说明：
-// - 这是旧统一 RPC 抽象留下的弱类型注册入口；
-// - Proto-first 正式主线应优先使用下方的 `RegisterProto`；
-// - 当前保留该方法仅用于兼容历史抽象，不再作为公开 gRPC 主路径。
 func (s *Server) Register(service string, handler any) error {
 	s.services.Store(service, handler)
 	return nil
 }
 
-// RegisterProto 注册标准 protobuf service。
-//
-// 中文说明：
-// - 业务侧应通过 `RegisterProto(func(server *grpc.Server) error { ... })` 挂接 `pb.RegisterXxxServer(...)`；
-// - 这样业务主线可以保持标准 gRPC register 心智；
-// - 若底层 server 尚未初始化，会先按当前配置创建一个可注册的 gRPC server。
 func (s *Server) RegisterProto(register func(server *grpc.Server) error) error {
 	if register == nil {
 		return nil
@@ -576,13 +509,6 @@ func (s *Server) RegisterProto(register func(server *grpc.Server) error) error {
 	return register(s.Server())
 }
 
-// Start 启动 gRPC 服务。
-//
-// 中文说明：
-// - 创建 grpc.Server 并注册所有服务；
-// - 开始监听指定端口；
-// - 与 HTTP 服务端口分离；
-// - 若业务已通过 Proto-first 注册入口预先创建 server，则直接复用，不再覆盖。
 func (s *Server) Start(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -619,7 +545,6 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop 停止 gRPC 服务。
 func (s *Server) Stop(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -633,17 +558,10 @@ func (s *Server) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Addr 返回服务监听地址。
 func (s *Server) Addr() string {
 	return s.addr
 }
 
-// Server 返回底层 grpc.Server。
-//
-// 中文说明：
-// - 这是 Proto-first 注册器接口的一部分；
-// - 常规业务注册优先走 `RegisterProto`；
-// - 暴露该方法主要用于保留最小逃生舱与底层扩展能力。
 func (s *Server) Server() *grpc.Server {
 	if s.server == nil {
 		s.server = s.newGRPCServer()
@@ -651,16 +569,9 @@ func (s *Server) Server() *grpc.Server {
 	return s.server
 }
 
-// GRPCServer 返回底层 grpc.Server，供业务代码注册 protobuf service。
-//
-// 中文说明：
-// - 这是旧名称保留，方便现有内部代码逐步迁移；
-// - Proto-first 主线应优先使用 `Server()` / `RegisterProto()`。
 func (s *Server) GRPCServer() *grpc.Server {
 	return s.Server()
 }
-
-// ── serviceauth transport interceptors（内联，避免引用 contrib 包）─────────────
 
 type serviceAuthWrappedStream struct {
 	grpc.ServerStream
@@ -669,7 +580,7 @@ type serviceAuthWrappedStream struct {
 
 func (w *serviceAuthWrappedStream) Context() context.Context { return w.ctx }
 
-func serviceAuthUnaryClientInterceptor(auth contract.ServiceAuthenticator, targetService string) grpc.UnaryClientInterceptor {
+func serviceAuthUnaryClientInterceptor(auth securitycontract.ServiceTokenIssuer, targetService string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		if token, err := auth.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
 			md, ok := metadata.FromOutgoingContext(ctx)
@@ -683,7 +594,7 @@ func serviceAuthUnaryClientInterceptor(auth contract.ServiceAuthenticator, targe
 	}
 }
 
-func serviceAuthStreamClientInterceptor(auth contract.ServiceAuthenticator, targetService string) grpc.StreamClientInterceptor {
+func serviceAuthStreamClientInterceptor(auth securitycontract.ServiceTokenIssuer, targetService string) grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		if token, err := auth.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
 			md, ok := metadata.FromOutgoingContext(ctx)
@@ -697,7 +608,7 @@ func serviceAuthStreamClientInterceptor(auth contract.ServiceAuthenticator, targ
 	}
 }
 
-func serviceAuthUnaryServerInterceptor(auth contract.ServiceAuthenticator) grpc.UnaryServerInterceptor {
+func serviceAuthUnaryServerInterceptor(auth securitycontract.ServiceAuthenticator) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
@@ -709,13 +620,13 @@ func serviceAuthUnaryServerInterceptor(auth contract.ServiceAuthenticator) grpc.
 			return nil, fmt.Errorf("rpc: service authentication failed: %w", err)
 		}
 		if identity != nil {
-			ctx = contract.NewServiceIdentityContext(ctx, identity)
+			ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
 		}
 		return handler(ctx, req)
 	}
 }
 
-func serviceAuthStreamServerInterceptor(auth contract.ServiceAuthenticator) grpc.StreamServerInterceptor {
+func serviceAuthStreamServerInterceptor(auth securitycontract.ServiceAuthenticator) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := ss.Context()
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
@@ -728,7 +639,7 @@ func serviceAuthStreamServerInterceptor(auth contract.ServiceAuthenticator) grpc
 			return fmt.Errorf("rpc: service authentication failed: %w", err)
 		}
 		if identity != nil {
-			ctx = contract.NewServiceIdentityContext(ctx, identity)
+			ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
 		}
 		return handler(srv, &serviceAuthWrappedStream{ServerStream: ss, ctx: ctx})
 	}

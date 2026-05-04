@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	gogrpc "google.golang.org/grpc"
 )
 
@@ -27,14 +28,14 @@ func (cb *testCircuitBreaker) Do(ctx context.Context, resource string, fn func()
 	return fn()
 }
 
-func (cb *testCircuitBreaker) State(ctx context.Context, resource string) contract.CircuitBreakerState {
-	return contract.CircuitBreakerStateClosed
+func (cb *testCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
+	return resiliencecontract.CircuitBreakerStateClosed
 }
 
 func TestCircuitBreakerUnaryInterceptor_UsesNormalizedResource(t *testing.T) {
 	cb := &testCircuitBreaker{}
 	client := NewClient(
-		&contract.RPCConfig{Mode: "grpc", TimeoutMS: 1000},
+		&transportcontract.RPCConfig{Mode: "grpc", TimeoutMS: 1000},
 		nil,
 		nil,
 		nil,

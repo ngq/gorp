@@ -4,45 +4,31 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
-// Provider 提供 framework 级业务 JWT 服务实现。
-//
-// 中文说明：
-// - 仅负责业务 JWT（AuthJWTKey）绑定；
-// - 与 ServiceAuthKey（服务间认证）完全解耦；
-// - 统一使用 auth/jwt 边界内的实现与配置读取 helper。
 type Provider struct{}
 
-// NewProvider 创建业务 JWT Provider。
 func NewProvider() *Provider { return &Provider{} }
 
-// Name 返回 Provider 名称。
 func (p *Provider) Name() string { return "auth.jwt" }
 
-// IsDefer 返回是否延迟注册。
 func (p *Provider) IsDefer() bool { return true }
 
-// Provides 返回当前 Provider 提供的容器 key。
 func (p *Provider) Provides() []string {
-	return []string{contract.AuthJWTKey}
+	return []string{securitycontract.AuthJWTKey}
 }
 
-// Register 注册业务 JWT 服务。
-//
-// 中文说明：
-// - 若配置服务不可用，则回退到默认 secret/issuer；
-// - secret 优先读取 auth.jwt.secret，兼容 auth.jwt_secret；
-// - issuer 未配置时回退到 service.name。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.AuthJWTKey, func(c contract.Container) (any, error) {
-		cfgAny, err := c.Make(contract.ConfigKey)
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(securitycontract.AuthJWTKey, func(c runtimecontract.Container) (any, error) {
+		cfgAny, err := c.Make(datacontract.ConfigKey)
 		if err != nil {
 			return NewJWTService("default-secret-change-in-production", "gorp", ""), nil
 		}
 
-		cfg, ok := cfgAny.(contract.Config)
+		cfg, ok := cfgAny.(datacontract.Config)
 		if !ok {
 			return nil, errors.New("auth.jwt: invalid config service")
 		}
@@ -64,7 +50,6 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-// Boot 启动 Provider。
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }

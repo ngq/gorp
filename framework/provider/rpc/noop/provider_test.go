@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,8 +71,8 @@ func TestProvider(t *testing.T) {
 	assert.Equal(t, "rpc.noop", p.Name())
 	assert.True(t, p.IsDefer())
 	assert.ElementsMatch(t, []string{
-		contract.RPCClientKey,
-		contract.RPCServerKey,
-		contract.RPCRegistryKey,
+		transportcontract.RPCClientKey,
+		transportcontract.RPCServerKey,
+		transportcontract.RPCRegistryKey,
 	}, p.Provides())
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 // mockCarrier 实现 MetadataCarrier 用于测试。
@@ -54,7 +54,7 @@ func TestDefaultPropagator_Extract(t *testing.T) {
 
 	ctx := prop.Extract(context.Background(), carrier)
 
-	md, ok := contract.FromServerContext(ctx)
+	md, ok := transportcontract.FromServerContext(ctx)
 	if !ok {
 		t.Error("expected to find server metadata")
 	}
@@ -76,10 +76,10 @@ func TestDefaultPropagator_Inject(t *testing.T) {
 	})
 
 	// 创建 server context
-	md := contract.NewMetadata()
+	md := transportcontract.NewMetadata()
 	md.Set("x-md-trace-id", "trace-123")
 	md.Set("authorization", "bearer token") // 不匹配前缀
-	ctx := contract.NewServerContext(context.Background(), md)
+	ctx := transportcontract.NewServerContext(context.Background(), md)
 
 	// 注入到 carrier
 	carrier := newMockCarrier()
@@ -100,9 +100,9 @@ func TestDefaultPropagator_InjectClientMetadata(t *testing.T) {
 	prop := NewDefaultPropagator(nil, nil)
 
 	// 创建 client context
-	md := contract.NewMetadata()
+	md := transportcontract.NewMetadata()
 	md.Set("x-client-id", "client-456")
-	ctx := contract.NewClientContext(context.Background(), md)
+	ctx := transportcontract.NewClientContext(context.Background(), md)
 
 	// 注入到 carrier
 	carrier := newMockCarrier()

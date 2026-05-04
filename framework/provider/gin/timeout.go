@@ -6,14 +6,54 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
-// TimeoutMiddleware 创建请求超时中间件。
-//
-// 中文说明：
-// - 这是 Gin provider 扩展层中间件，不属于默认 framework 主线契约；
-// - 为请求设置超时时间，超过指定时间后返回 504 Gateway Timeout；
-// - 将带有超时的 context 注入到 gin.Context，业务代码可以继续复用。
+func Timeout(timeout time.Duration) transportcontract.HTTPMiddleware {
+	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+		return func(c transportcontract.HTTPContext) {
+			if timeout <= 0 {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(c.Context(), timeout)
+			defer cancel()
+			c.SetContext(ctx)
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				if next != nil {
+					next(c)
+				}
+			}()
+
+			select {
+			case <-done:
+			case <-ctx.Done():
+				if gc, ok := unwrapGinContext(c); ok {
+					writeGinResponseHeaders(gc)
+					resp := Response{
+						Code:    CodeServiceUnavailable,
+						Message: "request timeout",
+						Data:    nil,
+					}
+					gc.JSON(http.StatusGatewayTimeout, resp)
+					gc.Abort()
+					return
+				}
+				c.JSON(http.StatusGatewayTimeout, map[string]any{
+					"code":    CodeServiceUnavailable,
+					"message": "request timeout",
+				})
+			}
+		}
+	}
+}
+
 func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
@@ -41,7 +81,6 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 	}
 }
 
-// TimeoutMiddlewareWithHandler 创建带自定义超时处理的中间件。
 func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Context)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
@@ -73,7 +112,6 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 	}
 }
 
-// RequestTimeout 从 gin.Context 获取请求超时时间。
 func RequestTimeout(c *gin.Context) time.Duration {
 	ctx := c.Request.Context()
 	deadline, ok := ctx.Deadline()
@@ -87,7 +125,6 @@ func RequestTimeout(c *gin.Context) time.Duration {
 	return remaining
 }
 
-// IsRequestCanceled 检查请求是否已被取消。
 func IsRequestCanceled(c *gin.Context) bool {
 	ctx := c.Request.Context()
 	select {
