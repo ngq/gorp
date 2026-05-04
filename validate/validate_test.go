@@ -4,29 +4,37 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 type exportValidatorStub struct{}
 
-func (s *exportValidatorStub) Validate(context.Context, any) error                    { return nil }
-func (s *exportValidatorStub) ValidateVar(context.Context, any, string) error         { return nil }
-func (s *exportValidatorStub) RegisterCustom(string, contract.CustomValidateFunc) error { return nil }
-func (s *exportValidatorStub) SetLocale(string) error                                 { return nil }
-func (s *exportValidatorStub) TranslateError(error) contract.AppError                 { return nil }
+func (s *exportValidatorStub) Validate(context.Context, any) error            { return nil }
+func (s *exportValidatorStub) ValidateVar(context.Context, any, string) error { return nil }
+func (s *exportValidatorStub) RegisterCustom(string, datacontract.CustomValidateFunc) error {
+	return nil
+}
+func (s *exportValidatorStub) SetLocale(string) error                           { return nil }
+func (s *exportValidatorStub) TranslateError(error) resiliencecontract.AppError { return nil }
 
 type exportValidateContainerStub struct {
-	validator contract.Validator
+	validator datacontract.Validator
 }
 
-func (s *exportValidateContainerStub) Bind(string, contract.Factory, bool)                {}
-func (s *exportValidateContainerStub) IsBind(string) bool                                 { return true }
-func (s *exportValidateContainerStub) MustMake(key string) any                            { v, _ := s.Make(key); return v }
-func (s *exportValidateContainerStub) RegisterProvider(contract.ServiceProvider) error     { return nil }
-func (s *exportValidateContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+func (s *exportValidateContainerStub) Bind(string, runtimecontract.Factory, bool) {}
+func (s *exportValidateContainerStub) IsBind(string) bool                         { return true }
+func (s *exportValidateContainerStub) MustMake(key string) any                    { v, _ := s.Make(key); return v }
+func (s *exportValidateContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportValidateContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 func (s *exportValidateContainerStub) Make(key string) (any, error) {
-	if key == contract.ValidatorKey {
+	if key == datacontract.ValidatorKey {
 		return s.validator, nil
 	}
 	return nil, context.DeadlineExceeded

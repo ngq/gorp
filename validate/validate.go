@@ -4,29 +4,30 @@ import (
 	"context"
 
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-type Validator = contract.Validator
-type ValidatorConfig = contract.ValidatorConfig
-type ValidationError = contract.ValidationError
-type ValidationErrors = contract.ValidationErrors
-type CustomValidateFunc = contract.CustomValidateFunc
+type Validator = datacontract.Validator
+type ValidatorConfig = datacontract.ValidatorConfig
+type ValidationError = datacontract.ValidationError
+type ValidationErrors = datacontract.ValidationErrors
+type CustomValidateFunc = datacontract.CustomValidateFunc
 
-type CustomRuleConfig = contract.CustomRuleConfig
+type CustomRuleConfig = datacontract.CustomRuleConfig
 
 // Make 从容器获取统一验证器。
-func Make(c contract.Container) (contract.Validator, error) {
+func Make(c runtimecontract.Container) (datacontract.Validator, error) {
 	return container.MakeValidator(c)
 }
 
 // MustMake 从容器获取统一验证器，失败 panic。
-func MustMake(c contract.Container) contract.Validator {
+func MustMake(c runtimecontract.Container) datacontract.Validator {
 	return container.MustMakeValidator(c)
 }
 
 // Validate 使用容器中的验证器校验结构体。
-func Validate(ctx context.Context, c contract.Container, obj any) error {
+func Validate(ctx context.Context, c runtimecontract.Container, obj any) error {
 	validatorSvc, err := Make(c)
 	if err != nil {
 		return err
@@ -35,7 +36,7 @@ func Validate(ctx context.Context, c contract.Container, obj any) error {
 }
 
 // ValidateVar 使用容器中的验证器校验单个字段。
-func ValidateVar(ctx context.Context, c contract.Container, field any, tag string) error {
+func ValidateVar(ctx context.Context, c runtimecontract.Container, field any, tag string) error {
 	validatorSvc, err := Make(c)
 	if err != nil {
 		return err

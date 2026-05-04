@@ -5,30 +5,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 type exportDLockStub struct{}
 
-func (s *exportDLockStub) Lock(context.Context, string, time.Duration) error                  { return nil }
-func (s *exportDLockStub) TryLock(context.Context, string, time.Duration) (bool, error)       { return true, nil }
-func (s *exportDLockStub) Unlock(context.Context, string) error                                { return nil }
-func (s *exportDLockStub) Renew(context.Context, string, time.Duration) error                  { return nil }
-func (s *exportDLockStub) IsLocked(context.Context, string) (bool, error)                      { return true, nil }
-func (s *exportDLockStub) WithLock(context.Context, string, time.Duration, func() error) error { return nil }
-
-type exportDLockContainerStub struct {
-	lock contract.DistributedLock
+func (s *exportDLockStub) Lock(context.Context, string, time.Duration) error { return nil }
+func (s *exportDLockStub) TryLock(context.Context, string, time.Duration) (bool, error) {
+	return true, nil
+}
+func (s *exportDLockStub) Unlock(context.Context, string) error               { return nil }
+func (s *exportDLockStub) Renew(context.Context, string, time.Duration) error { return nil }
+func (s *exportDLockStub) IsLocked(context.Context, string) (bool, error)     { return true, nil }
+func (s *exportDLockStub) WithLock(context.Context, string, time.Duration, func() error) error {
+	return nil
 }
 
-func (s *exportDLockContainerStub) Bind(string, contract.Factory, bool)                {}
-func (s *exportDLockContainerStub) IsBind(string) bool                                 { return true }
-func (s *exportDLockContainerStub) MustMake(key string) any                            { v, _ := s.Make(key); return v }
-func (s *exportDLockContainerStub) RegisterProvider(contract.ServiceProvider) error     { return nil }
-func (s *exportDLockContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+type exportDLockContainerStub struct {
+	lock datacontract.DistributedLock
+}
+
+func (s *exportDLockContainerStub) Bind(string, runtimecontract.Factory, bool) {}
+func (s *exportDLockContainerStub) IsBind(string) bool                         { return true }
+func (s *exportDLockContainerStub) MustMake(key string) any                    { v, _ := s.Make(key); return v }
+func (s *exportDLockContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportDLockContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 func (s *exportDLockContainerStub) Make(key string) (any, error) {
-	if key == contract.DistributedLockKey {
+	if key == datacontract.DistributedLockKey {
 		return s.lock, nil
 	}
 	return nil, context.DeadlineExceeded

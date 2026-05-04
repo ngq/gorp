@@ -4,22 +4,27 @@ import (
 	"context"
 	"testing"
 
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	frameworkjwt "github.com/ngq/gorp/framework/provider/auth/jwt"
-	"github.com/ngq/gorp/framework/contract"
 	"github.com/stretchr/testify/require"
 )
 
 type exportJWTContainerStub struct {
-	jwtSvc contract.JWTService
+	jwtSvc securitycontract.JWTService
 }
 
-func (s *exportJWTContainerStub) Bind(string, contract.Factory, bool)                {}
-func (s *exportJWTContainerStub) IsBind(string) bool                                 { return true }
-func (s *exportJWTContainerStub) MustMake(key string) any                            { v, _ := s.Make(key); return v }
-func (s *exportJWTContainerStub) RegisterProvider(contract.ServiceProvider) error     { return nil }
-func (s *exportJWTContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+func (s *exportJWTContainerStub) Bind(string, runtimecontract.Factory, bool) {}
+func (s *exportJWTContainerStub) IsBind(string) bool                         { return true }
+func (s *exportJWTContainerStub) MustMake(key string) any                    { v, _ := s.Make(key); return v }
+func (s *exportJWTContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportJWTContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 func (s *exportJWTContainerStub) Make(key string) (any, error) {
-	if key == contract.AuthJWTKey {
+	if key == securitycontract.AuthJWTKey {
 		return s.jwtSvc, nil
 	}
 	return nil, nil
@@ -41,14 +46,14 @@ func TestExportedJWTHelpers(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), verified.SubjectID)
 
-	requestCtx := contract.NewJWTClaimsContext(context.Background(), verified)
-	requestCtx = contract.NewSubjectIDContext(requestCtx, int64(9))
+	requestCtx := securitycontract.NewJWTClaimsContext(context.Background(), verified)
+	requestCtx = securitycontract.NewSubjectIDContext(requestCtx, int64(9))
 	subjectID, ok := SubjectIDFromContext(requestCtx)
 	require.True(t, ok)
 	require.Equal(t, int64(9), subjectID)
 
-	requestCtx = contract.NewSubjectIDContext(requestCtx, verified.SubjectID)
-	requestCtx = contract.NewSubjectTypeContext(requestCtx, verified.SubjectType)
+	requestCtx = securitycontract.NewSubjectIDContext(requestCtx, verified.SubjectID)
+	requestCtx = securitycontract.NewSubjectTypeContext(requestCtx, verified.SubjectType)
 
 	gotClaims, ok := ClaimsFromRequestContext(requestCtx)
 	require.True(t, ok)

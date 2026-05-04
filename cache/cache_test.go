@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,16 +32,20 @@ func (s *exportCacheStub) Remember(ctx context.Context, key string, ttl time.Dur
 }
 
 type exportCacheContainerStub struct {
-	cache contract.Cache
+	cache datacontract.Cache
 }
 
-func (s *exportCacheContainerStub) Bind(string, contract.Factory, bool)                  {}
-func (s *exportCacheContainerStub) IsBind(string) bool                                   { return true }
-func (s *exportCacheContainerStub) MustMake(key string) any                              { v, _ := s.Make(key); return v }
-func (s *exportCacheContainerStub) RegisterProvider(contract.ServiceProvider) error       { return nil }
-func (s *exportCacheContainerStub) RegisterProviders(...contract.ServiceProvider) error   { return nil }
+func (s *exportCacheContainerStub) Bind(string, runtimecontract.Factory, bool) {}
+func (s *exportCacheContainerStub) IsBind(string) bool                         { return true }
+func (s *exportCacheContainerStub) MustMake(key string) any                    { v, _ := s.Make(key); return v }
+func (s *exportCacheContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportCacheContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 func (s *exportCacheContainerStub) Make(key string) (any, error) {
-	if key == contract.CacheKey {
+	if key == datacontract.CacheKey {
 		return s.cache, nil
 	}
 	return nil, context.DeadlineExceeded
@@ -70,5 +75,5 @@ func TestExportedCacheHelpers(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "computed", result)
-	require.Same(t, contract.ErrCacheMiss, ErrCacheMiss)
+	require.Same(t, datacontract.ErrCacheMiss, ErrCacheMiss)
 }

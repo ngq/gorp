@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,16 +19,20 @@ func (s *exportRetryStub) DoWithResult(context.Context, func() (any, error)) (an
 func (s *exportRetryStub) IsRetryable(err error) bool { return err != nil }
 
 type exportRetryContainerStub struct {
-	retry contract.Retry
+	retry resiliencecontract.Retry
 }
 
-func (s *exportRetryContainerStub) Bind(string, contract.Factory, bool)                {}
-func (s *exportRetryContainerStub) IsBind(string) bool                                 { return true }
-func (s *exportRetryContainerStub) MustMake(key string) any                            { v, _ := s.Make(key); return v }
-func (s *exportRetryContainerStub) RegisterProvider(contract.ServiceProvider) error     { return nil }
-func (s *exportRetryContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+func (s *exportRetryContainerStub) Bind(string, runtimecontract.Factory, bool) {}
+func (s *exportRetryContainerStub) IsBind(string) bool                         { return true }
+func (s *exportRetryContainerStub) MustMake(key string) any                    { v, _ := s.Make(key); return v }
+func (s *exportRetryContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportRetryContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 func (s *exportRetryContainerStub) Make(key string) (any, error) {
-	if key == contract.RetryKey {
+	if key == resiliencecontract.RetryKey {
 		return s.retry, nil
 	}
 	return nil, context.DeadlineExceeded
@@ -54,5 +59,5 @@ func TestExportedRetryHelpers(t *testing.T) {
 	ok, err := IsRetryable(containerStub, errors.New("boom"))
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.Equal(t, contract.DefaultRetryPolicy(), DefaultRetryPolicy())
+	require.Equal(t, resiliencecontract.DefaultRetryPolicy(), DefaultRetryPolicy())
 }

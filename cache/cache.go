@@ -5,25 +5,26 @@ import (
 	"time"
 
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-var ErrCacheMiss = contract.ErrCacheMiss
+var ErrCacheMiss = datacontract.ErrCacheMiss
 
-type Cache = contract.Cache
+type Cache = datacontract.Cache
 
 // Make 从容器获取统一缓存服务。
-func Make(c contract.Container) (contract.Cache, error) {
+func Make(c runtimecontract.Container) (datacontract.Cache, error) {
 	return container.MakeCache(c)
 }
 
 // MustMake 从容器获取统一缓存服务，失败 panic。
-func MustMake(c contract.Container) contract.Cache {
+func MustMake(c runtimecontract.Container) datacontract.Cache {
 	return container.MustMakeCache(c)
 }
 
 // Get 读取缓存。
-func Get(ctx context.Context, c contract.Container, key string) (string, error) {
+func Get(ctx context.Context, c runtimecontract.Container, key string) (string, error) {
 	cacheSvc, err := Make(c)
 	if err != nil {
 		return "", err
@@ -32,7 +33,7 @@ func Get(ctx context.Context, c contract.Container, key string) (string, error) 
 }
 
 // Set 写入缓存。
-func Set(ctx context.Context, c contract.Container, key, value string, ttl time.Duration) error {
+func Set(ctx context.Context, c runtimecontract.Container, key, value string, ttl time.Duration) error {
 	cacheSvc, err := Make(c)
 	if err != nil {
 		return err
@@ -41,7 +42,7 @@ func Set(ctx context.Context, c contract.Container, key, value string, ttl time.
 }
 
 // Del 删除缓存。
-func Del(ctx context.Context, c contract.Container, key string) error {
+func Del(ctx context.Context, c runtimecontract.Container, key string) error {
 	cacheSvc, err := Make(c)
 	if err != nil {
 		return err
@@ -50,7 +51,7 @@ func Del(ctx context.Context, c contract.Container, key string) error {
 }
 
 // MGet 批量读取缓存。
-func MGet(ctx context.Context, c contract.Container, keys ...string) (map[string]string, error) {
+func MGet(ctx context.Context, c runtimecontract.Container, keys ...string) (map[string]string, error) {
 	cacheSvc, err := Make(c)
 	if err != nil {
 		return nil, err
@@ -59,7 +60,7 @@ func MGet(ctx context.Context, c contract.Container, keys ...string) (map[string
 }
 
 // Remember 读取缓存，未命中时回源计算并回填。
-func Remember(ctx context.Context, c contract.Container, key string, ttl time.Duration, fn func(context.Context) (string, error)) (string, error) {
+func Remember(ctx context.Context, c runtimecontract.Container, key string, ttl time.Duration, fn func(context.Context) (string, error)) (string, error) {
 	cacheSvc, err := Make(c)
 	if err != nil {
 		return "", err
