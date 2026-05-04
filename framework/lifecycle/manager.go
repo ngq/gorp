@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Manager 统一管理服务生命周期。
@@ -29,8 +29,8 @@ type Manager struct {
 // - Priority 决定启动顺序和停止逆序。
 type ServiceEntry struct {
 	Name     string
-	Service  contract.Hostable
-	Hooks    contract.Lifecycle
+	Service  runtimecontract.Hostable
+	Hooks    runtimecontract.Lifecycle
 	Priority int // 启动优先级，数值小的先启动
 }
 
@@ -81,7 +81,7 @@ func NewManager() *Manager {
 // - 注册一个可被生命周期管理的服务；
 // - priority 数值小的先启动，后停止；
 // - hooks 可以为 nil，如果服务不需要生命周期钩子。
-func (m *Manager) Register(name string, service contract.Hostable, hooks contract.Lifecycle, priority int) {
+func (m *Manager) Register(name string, service runtimecontract.Hostable, hooks runtimecontract.Lifecycle, priority int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.services = append(m.services, ServiceEntry{

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 
 	"github.com/robfig/cron/v3"
 )
@@ -27,18 +27,18 @@ func (p *Provider) Name() string { return "cron" }
 func (p *Provider) IsDefer() bool { return false }
 
 // Provides 返回 cron provider 暴露的能力 key。
-func (p *Provider) Provides() []string { return []string{contract.CronKey} }
+func (p *Provider) Provides() []string { return []string{runtimecontract.CronKey} }
 
 // Register 绑定 Cron 服务。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.CronKey, func(contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(runtimecontract.CronKey, func(runtimecontract.Container) (any, error) {
 		return NewService(), nil
 	}, true)
 	return nil
 }
 
 // Boot cron provider 无额外启动逻辑。
-func (p *Provider) Boot(contract.Container) error { return nil }
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
 // Service 对 robfig/cron 做 framework 级封装。
 //

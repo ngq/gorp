@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +27,7 @@ func TestLocalEventBus_SubscribePublish(t *testing.T) {
 
 	// 订阅事件
 	var count int32
-	bus.Subscribe("user.created", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("user.created", func(ctx context.Context, event integrationcontract.Event) error {
 		atomic.AddInt32(&count, 1)
 		return nil
 	})
@@ -49,15 +49,15 @@ func TestLocalEventBus_MultipleHandlers(t *testing.T) {
 
 	// 订阅多个处理器
 	var results []string
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		results = append(results, "handler1")
 		return nil
 	})
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		results = append(results, "handler2")
 		return nil
 	})
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		results = append(results, "handler3")
 		return nil
 	})
@@ -74,10 +74,10 @@ func TestLocalEventBus_HandlerError(t *testing.T) {
 
 	// 订阅处理器（一个失败，一个成功）
 	var successCalled bool
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		return errors.New("handler error")
 	})
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		successCalled = true
 		return nil
 	})
@@ -104,7 +104,7 @@ func TestLocalEventBus_PublishAsync(t *testing.T) {
 
 	// 订阅事件
 	var count int32
-	bus.Subscribe("async.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("async.event", func(ctx context.Context, event integrationcontract.Event) error {
 		atomic.AddInt32(&count, 1)
 		return nil
 	})
@@ -124,7 +124,7 @@ func TestLocalEventBus_Unsubscribe(t *testing.T) {
 
 	// 订阅事件
 	var count int32
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		atomic.AddInt32(&count, 1)
 		return nil
 	})
@@ -147,7 +147,7 @@ func TestLocalEventBus_HasSubscribers(t *testing.T) {
 
 	assert.False(t, bus.HasSubscribers("test.event"))
 
-	bus.Subscribe("test.event", func(ctx context.Context, event contract.Event) error {
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
 		return nil
 	})
 

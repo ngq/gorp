@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // SafeGo 在新的 goroutine 中执行 fn，并统一 recover panic 后记录日志。
@@ -13,13 +14,13 @@ import (
 // 中文说明：
 // - 它适合替代直接 `go fn()` 的裸调用方式。
 // - 当子 goroutine panic 时，错误不会把整个进程直接打崩，而是尽量记录到统一 logger。
-func SafeGo(ctx context.Context, c contract.Container, fn func(context.Context)) {
+func SafeGo(ctx context.Context, c runtimecontract.Container, fn func(context.Context)) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				l := LoggerFromContainer(c)
 				if l != nil {
-					l.Error("panic in goroutine", contract.Field{Key: "recover", Value: r}, contract.Field{Key: "stack", Value: string(debug.Stack())})
+					l.Error("panic in goroutine", observabilitycontract.Field{Key: "recover", Value: r}, observabilitycontract.Field{Key: "stack", Value: string(debug.Stack())})
 				}
 			}
 		}()
@@ -32,7 +33,7 @@ func SafeGo(ctx context.Context, c contract.Container, fn func(context.Context))
 // - Each function gets a derived context.
 // - Panic is recovered and returned as an error.
 // - The first returned error is returned.
-func SafeGoAndWait(ctx context.Context, c contract.Container, fns ...func(context.Context) error) error {
+func SafeGoAndWait(ctx context.Context, c runtimecontract.Container, fns ...func(context.Context) error) error {
 	if len(fns) == 0 {
 		return nil
 	}

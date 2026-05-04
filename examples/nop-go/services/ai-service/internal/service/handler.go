@@ -1,4 +1,4 @@
-// Package service AI服务HTTP处理层
+﻿// Package service AI鏈嶅姟HTTP澶勭悊灞?
 package service
 
 import (
@@ -9,21 +9,21 @@ import (
 	"nop-go/services/ai-service/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
-// AIService AI HTTP服务
+// AIService AI HTTP鏈嶅姟
 type AIService struct {
 	aiUC        *biz.AIUseCase
 	modelUC     *biz.AIModelConfigUseCase
-	jwtService  contract.JWTService
+	jwtService  securitycontract.JWTService
 }
 
-// NewAIService 创建AI服务
+// NewAIService 鍒涘缓AI鏈嶅姟
 func NewAIService(
 	aiUC *biz.AIUseCase,
 	modelUC *biz.AIModelConfigUseCase,
-	jwtService contract.JWTService,
+	jwtService securitycontract.JWTService,
 ) *AIService {
 	return &AIService{
 		aiUC:       aiUC,
@@ -32,74 +32,74 @@ func NewAIService(
 	}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *AIService) RegisterRoutes(r *gin.Engine) {
-	// AI聊天路由（需要认证）
+	// AI鑱婂ぉ璺敱锛堥渶瑕佽璇侊級
 	chat := r.Group("/api/ai/chat")
 	chat.Use(s.authMiddleware())
 	{
-		chat.POST("", s.Chat)                      // 发送消息
-		chat.GET("/:id", s.GetConversation)        // 获取对话
-		chat.GET("/list", s.ListConversations)     // 对话列表
-		chat.DELETE("/:id", s.DeleteConversation)  // 删除对话
+		chat.POST("", s.Chat)                      // 鍙戦€佹秷鎭?
+		chat.GET("/:id", s.GetConversation)        // 鑾峰彇瀵硅瘽
+		chat.GET("/list", s.ListConversations)     // 瀵硅瘽鍒楄〃
+		chat.DELETE("/:id", s.DeleteConversation)  // 鍒犻櫎瀵硅瘽
 	}
 
-	// 商品推荐路由（需要认证）
+	// 鍟嗗搧鎺ㄨ崘璺敱锛堥渶瑕佽璇侊級
 	recommend := r.Group("/api/ai/recommend")
 	recommend.Use(s.authMiddleware())
 	{
-		recommend.POST("", s.GetRecommendations)               // 获取推荐
-		recommend.POST("/:id/click", s.MarkRecommendClicked)   // 标记点击
-		recommend.POST("/:id/purchase", s.MarkRecommendPurchased) // 标记购买
+		recommend.POST("", s.GetRecommendations)               // 鑾峰彇鎺ㄨ崘
+		recommend.POST("/:id/click", s.MarkRecommendClicked)   // 鏍囪鐐瑰嚮
+		recommend.POST("/:id/purchase", s.MarkRecommendPurchased) // 鏍囪璐拱
 	}
 
-	// 搜索建议路由（需要认证）
+	// 鎼滅储寤鸿璺敱锛堥渶瑕佽璇侊級
 	suggest := r.Group("/api/ai/suggest")
 	suggest.Use(s.authMiddleware())
 	{
-		suggest.POST("", s.GetSearchSuggestions) // 搜索建议
+		suggest.POST("", s.GetSearchSuggestions) // 鎼滅储寤鸿
 	}
 
-	// 内容生成路由（需要认证）
+	// 鍐呭鐢熸垚璺敱锛堥渶瑕佽璇侊級
 	content := r.Group("/api/ai/content")
 	content.Use(s.authMiddleware())
 	{
-		content.POST("", s.GenerateContent)                   // 生成内容
-		content.GET("/:id", s.GetGeneratedContent)            // 获取内容
-		content.GET("/entity/:entityId/:entityType", s.GetContentByEntity) // 按实体获取
-		content.POST("/:id/approve", s.ApproveContent)        // 审核通过
+		content.POST("", s.GenerateContent)                   // 鐢熸垚鍐呭
+		content.GET("/:id", s.GetGeneratedContent)            // 鑾峰彇鍐呭
+		content.GET("/entity/:entityId/:entityType", s.GetContentByEntity) // 鎸夊疄浣撹幏鍙?
+		content.POST("/:id/approve", s.ApproveContent)        // 瀹℃牳閫氳繃
 	}
 
-	// AI模型配置路由（需要认证）
+	// AI妯″瀷閰嶇疆璺敱锛堥渶瑕佽璇侊級
 	models := r.Group("/api/ai/models")
 	models.Use(s.authMiddleware())
 	{
-		models.GET("", s.ListModels)              // 模型列表
-		models.POST("", s.CreateModelConfig)      // 创建配置
-		models.GET("/:id", s.GetModelConfig)      // 获取配置
-		models.PUT("/:id", s.UpdateModelConfig)   // 更新配置
-		models.DELETE("/:id", s.DeleteModelConfig) // 删除配置
+		models.GET("", s.ListModels)              // 妯″瀷鍒楄〃
+		models.POST("", s.CreateModelConfig)      // 鍒涘缓閰嶇疆
+		models.GET("/:id", s.GetModelConfig)      // 鑾峰彇閰嶇疆
+		models.PUT("/:id", s.UpdateModelConfig)   // 鏇存柊閰嶇疆
+		models.DELETE("/:id", s.DeleteModelConfig) // 鍒犻櫎閰嶇疆
 	}
 }
 
-// authMiddleware JWT认证中间件
+// authMiddleware JWT璁よ瘉涓棿浠?
 func (s *AIService) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := c.GetHeader("Authorization")
 		if tokenStr == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "缺少认证令牌"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "缂哄皯璁よ瘉浠ょ墝"})
 			c.Abort()
 			return
 		}
 
-		// 去除 Bearer 前缀
+		// 鍘婚櫎 Bearer 鍓嶇紑
 		if len(tokenStr) > 7 && tokenStr[:7] == "Bearer " {
 			tokenStr = tokenStr[7:]
 		}
 
 		claims, err := s.jwtService.Verify(tokenStr)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "令牌无效"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "浠ょ墝鏃犳晥"})
 			c.Abort()
 			return
 		}
@@ -110,9 +110,9 @@ func (s *AIService) authMiddleware() gin.HandlerFunc {
 	}
 }
 
-// ========== AI聊天 ==========
+// ========== AI鑱婂ぉ ==========
 
-// Chat 发送消息
+// Chat 鍙戦€佹秷鎭?
 func (s *AIService) Chat(c *gin.Context) {
 	var req models.ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -129,11 +129,11 @@ func (s *AIService) Chat(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
-// GetConversation 获取对话
+// GetConversation 鑾峰彇瀵硅瘽
 func (s *AIService) GetConversation(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的对话ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫璇滻D"})
 		return
 	}
 
@@ -149,11 +149,11 @@ func (s *AIService) GetConversation(c *gin.Context) {
 	})
 }
 
-// ListConversations 对话列表
+// ListConversations 瀵硅瘽鍒楄〃
 func (s *AIService) ListConversations(c *gin.Context) {
 	customerID, err := strconv.ParseUint(c.Query("customer_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的客户ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫鎴稩D"})
 		return
 	}
 
@@ -174,11 +174,11 @@ func (s *AIService) ListConversations(c *gin.Context) {
 	})
 }
 
-// DeleteConversation 删除对话
+// DeleteConversation 鍒犻櫎瀵硅瘽
 func (s *AIService) DeleteConversation(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的对话ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫璇滻D"})
 		return
 	}
 
@@ -187,12 +187,12 @@ func (s *AIService) DeleteConversation(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "对话已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "瀵硅瘽宸插垹闄?})
 }
 
-// ========== 商品推荐 ==========
+// ========== 鍟嗗搧鎺ㄨ崘 ==========
 
-// GetRecommendations 获取推荐
+// GetRecommendations 鑾峰彇鎺ㄨ崘
 func (s *AIService) GetRecommendations(c *gin.Context) {
 	var req models.RecommendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -209,11 +209,11 @@ func (s *AIService) GetRecommendations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
-// MarkRecommendClicked 标记推荐点击
+// MarkRecommendClicked 鏍囪鎺ㄨ崘鐐瑰嚮
 func (s *AIService) MarkRecommendClicked(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的推荐ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勬帹鑽怚D"})
 		return
 	}
 
@@ -222,14 +222,14 @@ func (s *AIService) MarkRecommendClicked(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "已标记点击"})
+	c.JSON(http.StatusOK, gin.H{"message": "宸叉爣璁扮偣鍑?})
 }
 
-// MarkRecommendPurchased 标记推荐购买
+// MarkRecommendPurchased 鏍囪鎺ㄨ崘璐拱
 func (s *AIService) MarkRecommendPurchased(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的推荐ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勬帹鑽怚D"})
 		return
 	}
 
@@ -238,12 +238,12 @@ func (s *AIService) MarkRecommendPurchased(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "已标记购买"})
+	c.JSON(http.StatusOK, gin.H{"message": "宸叉爣璁拌喘涔?})
 }
 
-// ========== 搜索建议 ==========
+// ========== 鎼滅储寤鸿 ==========
 
-// GetSearchSuggestions 搜索建议
+// GetSearchSuggestions 鎼滅储寤鸿
 func (s *AIService) GetSearchSuggestions(c *gin.Context) {
 	var req models.SearchSuggestRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -260,9 +260,9 @@ func (s *AIService) GetSearchSuggestions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
-// ========== 内容生成 ==========
+// ========== 鍐呭鐢熸垚 ==========
 
-// GenerateContent 生成内容
+// GenerateContent 鐢熸垚鍐呭
 func (s *AIService) GenerateContent(c *gin.Context) {
 	var req models.GenerateContentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -279,11 +279,11 @@ func (s *AIService) GenerateContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
-// GetGeneratedContent 获取生成内容
+// GetGeneratedContent 鑾峰彇鐢熸垚鍐呭
 func (s *AIService) GetGeneratedContent(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的内容ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫唴瀹笽D"})
 		return
 	}
 
@@ -296,11 +296,11 @@ func (s *AIService) GetGeneratedContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": content})
 }
 
-// GetContentByEntity 按实体获取内容
+// GetContentByEntity 鎸夊疄浣撹幏鍙栧唴瀹?
 func (s *AIService) GetContentByEntity(c *gin.Context) {
 	entityID, err := strconv.ParseUint(c.Param("entityId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的实体ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫疄浣揑D"})
 		return
 	}
 
@@ -315,11 +315,11 @@ func (s *AIService) GetContentByEntity(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": contents})
 }
 
-// ApproveContent 审核通过内容
+// ApproveContent 瀹℃牳閫氳繃鍐呭
 func (s *AIService) ApproveContent(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的内容ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫唴瀹笽D"})
 		return
 	}
 
@@ -328,12 +328,12 @@ func (s *AIService) ApproveContent(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "内容已审核通过"})
+	c.JSON(http.StatusOK, gin.H{"message": "鍐呭宸插鏍搁€氳繃"})
 }
 
-// ========== AI模型配置 ==========
+// ========== AI妯″瀷閰嶇疆 ==========
 
-// ListModels 模型列表
+// ListModels 妯″瀷鍒楄〃
 func (s *AIService) ListModels(c *gin.Context) {
 	models, err := s.aiUC.ListModels(c.Request.Context())
 	if err != nil {
@@ -344,7 +344,7 @@ func (s *AIService) ListModels(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": models})
 }
 
-// CreateModelConfig 创建模型配置
+// CreateModelConfig 鍒涘缓妯″瀷閰嶇疆
 func (s *AIService) CreateModelConfig(c *gin.Context) {
 	var config models.AIModelConfig
 	if err := c.ShouldBindJSON(&config); err != nil {
@@ -360,11 +360,11 @@ func (s *AIService) CreateModelConfig(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": config})
 }
 
-// GetModelConfig 获取模型配置
+// GetModelConfig 鑾峰彇妯″瀷閰嶇疆
 func (s *AIService) GetModelConfig(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勯厤缃甀D"})
 		return
 	}
 
@@ -377,11 +377,11 @@ func (s *AIService) GetModelConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": config})
 }
 
-// UpdateModelConfig 更新模型配置
+// UpdateModelConfig 鏇存柊妯″瀷閰嶇疆
 func (s *AIService) UpdateModelConfig(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勯厤缃甀D"})
 		return
 	}
 
@@ -401,11 +401,11 @@ func (s *AIService) UpdateModelConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": config})
 }
 
-// DeleteModelConfig 删除模型配置
+// DeleteModelConfig 鍒犻櫎妯″瀷閰嶇疆
 func (s *AIService) DeleteModelConfig(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勯厤缃甀D"})
 		return
 	}
 
@@ -414,5 +414,5 @@ func (s *AIService) DeleteModelConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "配置已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "閰嶇疆宸插垹闄?})
 }

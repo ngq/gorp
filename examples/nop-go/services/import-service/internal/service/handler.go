@@ -1,4 +1,4 @@
-// Package service 导入导出服务HTTP层
+﻿// Package service 瀵煎叆瀵煎嚭鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,60 +6,60 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/import-service/internal/biz"
 	"nop-go/services/import-service/internal/models"
 )
 
-// ImportService 导入导出服务
+// ImportService 瀵煎叆瀵煎嚭鏈嶅姟
 type ImportService struct {
 	importUC *biz.ImportUseCase
 	exportUC *biz.ExportUseCase
-	jwtSvc   contract.JWTService
+	jwtSvc   securitycontract.JWTService
 }
 
-// NewImportService 创建导入导出服务
-func NewImportService(importUC *biz.ImportUseCase, exportUC *biz.ExportUseCase, jwtSvc contract.JWTService) *ImportService {
+// NewImportService 鍒涘缓瀵煎叆瀵煎嚭鏈嶅姟
+func NewImportService(importUC *biz.ImportUseCase, exportUC *biz.ExportUseCase, jwtSvc securitycontract.JWTService) *ImportService {
 	return &ImportService{importUC: importUC, exportUC: exportUC, jwtSvc: jwtSvc}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *ImportService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1/import")
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
-		// 导入配置管理
+		// 瀵煎叆閰嶇疆绠＄悊
 		api.POST("/profiles", adminAuth, s.CreateImportProfile)
 		api.GET("/profiles", s.ListImportProfiles)
 		api.GET("/profiles/:id", s.GetImportProfile)
 		api.PUT("/profiles/:id", adminAuth, s.UpdateImportProfile)
 		api.DELETE("/profiles/:id", adminAuth, s.DeleteImportProfile)
 
-		// 导入执行
+		// 瀵煎叆鎵ц
 		api.POST("/execute", adminAuth, s.ExecuteImport)
 		api.GET("/history", s.ListImportHistory)
 		api.GET("/history/:id", s.GetImportHistory)
 		api.GET("/history/:id/errors", s.GetImportErrors)
 
-		// 导出配置管理
+		// 瀵煎嚭閰嶇疆绠＄悊
 		api.POST("/export/profiles", adminAuth, s.CreateExportProfile)
 		api.GET("/export/profiles", s.ListExportProfiles)
 		api.GET("/export/profiles/:id", s.GetExportProfile)
 		api.PUT("/export/profiles/:id", adminAuth, s.UpdateExportProfile)
 		api.DELETE("/export/profiles/:id", adminAuth, s.DeleteExportProfile)
 
-		// 导出执行
+		// 瀵煎嚭鎵ц
 		api.POST("/export/execute", adminAuth, s.ExecuteExport)
 		api.GET("/export/history", s.ListExportHistory)
 		api.GET("/export/history/:id", s.GetExportHistory)
 
-		// 实体类型
+		// 瀹炰綋绫诲瀷
 		api.GET("/entity-types", s.GetEntityTypes)
 	}
 }
 
-// ========== 导入配置接口 ==========
+// ========== 瀵煎叆閰嶇疆鎺ュ彛 ==========
 
 func (s *ImportService) CreateImportProfile(c *gin.Context) {
 	var req models.ImportProfileCreateRequest
@@ -165,7 +165,7 @@ func (s *ImportService) GetImportErrors(c *gin.Context) {
 	c.JSON(http.StatusOK, errors)
 }
 
-// ========== 导出配置接口 ==========
+// ========== 瀵煎嚭閰嶇疆鎺ュ彛 ==========
 
 func (s *ImportService) CreateExportProfile(c *gin.Context) {
 	var req models.ExportProfileCreateRequest

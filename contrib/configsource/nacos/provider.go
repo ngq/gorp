@@ -8,12 +8,13 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
 	configclient "github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
+	internalnative "github.com/ngq/gorp/contrib/internal/native"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,13 +23,13 @@ const defaultNacosPollInterval = 5 * time.Second
 // Provider 提供 Nacos 配置中心实现。
 //
 // 中文说明：
-// - 使用 Nacos 配置中心；
-// - 支持多命名空间；
-// - 支持配置热更新；
-// - 支持分组管理。
-// - 当前状态：部分可用
-// - 说明：已完成 P1 最小闭环，具备 Load / Watch / Set 主流程与 fake client 行为测试；
-//   但当前仍是最小配置中心闭环，尚未进入完整产品化治理能力。
+//   - 使用 Nacos 配置中心；
+//   - 支持多命名空间；
+//   - 支持配置热更新；
+//   - 支持分组管理。
+//   - 当前状态：部分可用
+//   - 说明：已完成 P1 最小闭环，具备 Load / Watch / Set 主流程与 fake client 行为测试；
+//     但当前仍是最小配置中心闭环，尚未进入完整产品化治理能力。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
@@ -36,11 +37,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "configsource.nacos" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.ConfigSourceKey}
+	return []string{datacontract.ConfigSourceKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ConfigSourceKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getNacosConfig(c)
 		if err != nil {
 			return nil, err
@@ -51,7 +52,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
@@ -68,13 +69,13 @@ type NacosConfig struct {
 }
 
 // getNacosConfig 从容器获取配置。
-func getNacosConfig(c contract.Container) (*NacosConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getNacosConfig(c runtimecontract.Container) (*NacosConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("nacos: invalid config service")
 	}
@@ -242,7 +243,7 @@ func (s *ConfigSource) As(target any) bool {
 }
 
 // Watch 监听配置变化。
-func (s *ConfigSource) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *ConfigSource) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
 

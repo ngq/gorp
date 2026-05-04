@@ -1,4 +1,4 @@
-//go:build wireinject
+﻿//go:build wireinject
 
 package main
 
@@ -8,11 +8,11 @@ import (
 	"nop-go/services/theme-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireThemeService(db *gorm.DB, jwtSvc contract.JWTService, config biz.ThemeConfig) (*service.ThemeService, error) {
+func wireThemeService(db *gorm.DB, jwtSvc securitycontract.JWTService, config biz.ThemeConfig) (*service.ThemeService, error) {
 	panic(wire.Build(
 		data.NewThemeRepository,
 		data.NewThemeVariableRepository,

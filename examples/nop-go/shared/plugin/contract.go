@@ -1,154 +1,154 @@
-// Package plugin nop-go 插件系统核心接口
+// Package plugin nop-go 鎻掍欢绯荤粺鏍稿績鎺ュ彛
 //
-// 中文说明:
-// - 插件机制属于产品层设计,框架层 ServiceProvider + Container 已足够;
-// - 所有业务插件都实现 Plugin 接口;
-// - 通过 ToServiceProvider() 转换后注册到 gorp Container;
-// - 复用框架已有的 ServiceProvider 生命周期管理。
+// 涓枃璇存槑:
+// - 鎻掍欢鏈哄埗灞炰簬浜у搧灞傝璁?妗嗘灦灞?ServiceProvider + Container 宸茶冻澶?
+// - 鎵€鏈変笟鍔℃彃浠堕兘瀹炵幇 Plugin 鎺ュ彛;
+// - 閫氳繃 ToServiceProvider() 杞崲鍚庢敞鍐屽埌 gorp Container;
+// - 澶嶇敤妗嗘灦宸叉湁鐨?ServiceProvider 鐢熷懡鍛ㄦ湡绠＄悊銆?
 package plugin
 
 import (
 	"context"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Plugin 产品级插件基础接口
+// Plugin 浜у搧绾ф彃浠跺熀纭€鎺ュ彛
 //
-// 中文说明:
-// - 所有业务插件(payment/shipping/widget等)都必须实现这个接口;
-// - 插件通过 ToServiceProvider() 转换为 gorp ServiceProvider;
-// - 这样可以复用框架已有的 ServiceProvider 生命周期管理(Register/Boot);
-// - Install/Uninstall 用于数据库迁移和初始化配置。
+// 涓枃璇存槑:
+// - 鎵€鏈変笟鍔℃彃浠?payment/shipping/widget绛?閮藉繀椤诲疄鐜拌繖涓帴鍙?
+// - 鎻掍欢閫氳繃 ToServiceProvider() 杞崲涓?gorp ServiceProvider;
+// - 杩欐牱鍙互澶嶇敤妗嗘灦宸叉湁鐨?ServiceProvider 鐢熷懡鍛ㄦ湡绠＄悊(Register/Boot);
+// - Install/Uninstall 鐢ㄤ簬鏁版嵁搴撹縼绉诲拰鍒濆鍖栭厤缃€?
 type Plugin interface {
-	// Meta 返回插件元数据
+	// Meta 杩斿洖鎻掍欢鍏冩暟鎹?
 	//
-	// 中文说明:
-	// - 元数据从 plugin.json 加载,包含插件基本信息;
-	// - 包含: Group/FriendlyName/SystemName/Version 等。
+	// 涓枃璇存槑:
+	// - 鍏冩暟鎹粠 plugin.json 鍔犺浇,鍖呭惈鎻掍欢鍩烘湰淇℃伅;
+	// - 鍖呭惈: Group/FriendlyName/SystemName/Version 绛夈€?
 	Meta() *PluginMeta
 
-	// PluginType 返回插件类型
+	// PluginType 杩斿洖鎻掍欢绫诲瀷
 	//
-	// 中文说明:
-	// - 类型用于分类管理,例如: "payment", "shipping", "widget";
-	// - Registry 可按类型查找插件。
+	// 涓枃璇存槑:
+	// - 绫诲瀷鐢ㄤ簬鍒嗙被绠＄悊,渚嬪: "payment", "shipping", "widget";
+	// - Registry 鍙寜绫诲瀷鏌ユ壘鎻掍欢銆?
 	PluginType() string
 
-	// Install 插件安装时执行
+	// Install 鎻掍欢瀹夎鏃舵墽琛?
 	//
-	// 中文说明:
-	// - 用于创建数据库表、初始化配置、写入默认数据;
-	// - 通常在首次启用插件时调用一次;
-	// - 应包含数据库迁移逻辑。
-	Install(ctx context.Context, c contract.Container) error
+	// 涓枃璇存槑:
+	// - 鐢ㄤ簬鍒涘缓鏁版嵁搴撹〃銆佸垵濮嬪寲閰嶇疆銆佸啓鍏ラ粯璁ゆ暟鎹?
+	// - 閫氬父鍦ㄩ娆″惎鐢ㄦ彃浠舵椂璋冪敤涓€娆?
+	// - 搴斿寘鍚暟鎹簱杩佺Щ閫昏緫銆?
+	Install(ctx context.Context, c runtimecontract.Container) error
 
-	// Uninstall 插件卸载时执行
+	// Uninstall 鎻掍欢鍗歌浇鏃舵墽琛?
 	//
-	// 中文说明:
-	// - 用于清理数据、删除表(谨慎操作);
-	// - 用户明确卸载时调用;
-	// - 通常建议保留数据,只标记为已卸载。
-	Uninstall(ctx context.Context, c contract.Container) error
+	// 涓枃璇存槑:
+	// - 鐢ㄤ簬娓呯悊鏁版嵁銆佸垹闄よ〃(璋ㄦ厧鎿嶄綔);
+	// - 鐢ㄦ埛鏄庣‘鍗歌浇鏃惰皟鐢?
+	// - 閫氬父寤鸿淇濈暀鏁版嵁,鍙爣璁颁负宸插嵏杞姐€?
+	Uninstall(ctx context.Context, c runtimecontract.Container) error
 
-	// Boot 插件启动时执行
+	// Boot 鎻掍欢鍚姩鏃舵墽琛?
 	//
-	// 中文说明:
-	// - 每次服务启动时调用;
-	// - 用于初始化运行时状态、读取配置、启动 goroutine;
-	// - 在 ServiceProvider.Boot 中被调用。
-	Boot(ctx context.Context, c contract.Container) error
+	// 涓枃璇存槑:
+	// - 姣忔鏈嶅姟鍚姩鏃惰皟鐢?
+	// - 鐢ㄤ簬鍒濆鍖栬繍琛屾椂鐘舵€併€佽鍙栭厤缃€佸惎鍔?goroutine;
+	// - 鍦?ServiceProvider.Boot 涓璋冪敤銆?
+	Boot(ctx context.Context, c runtimecontract.Container) error
 
-	// ToServiceProvider 转换为 gorp ServiceProvider
+	// ToServiceProvider 杞崲涓?gorp ServiceProvider
 	//
-	// 中文说明:
-	// - 这是连接产品插件和框架容器的桥梁;
-	// - 返回的 ServiceProvider 会被注册到 Container;
-	// - 实现中应返回一个包装了插件本身的 ServiceProvider。
-	ToServiceProvider() contract.ServiceProvider
+	// 涓枃璇存槑:
+	// - 杩欐槸杩炴帴浜у搧鎻掍欢鍜屾鏋跺鍣ㄧ殑妗ユ;
+	// - 杩斿洖鐨?ServiceProvider 浼氳娉ㄥ唽鍒?Container;
+	// - 瀹炵幇涓簲杩斿洖涓€涓寘瑁呬簡鎻掍欢鏈韩鐨?ServiceProvider銆?
+	ToServiceProvider() runtimecontract.ServiceProvider
 }
 
-// PluginMeta 插件元数据
+// PluginMeta 鎻掍欢鍏冩暟鎹?
 //
-// 中文说明:
-// - 对应 plugin.json 文件内容;
-// - 用于插件的发现、展示和版本管理;
-// - SystemName 是唯一标识,命名格式: {Type}.{Provider}。
+// 涓枃璇存槑:
+// - 瀵瑰簲 plugin.json 鏂囦欢鍐呭;
+// - 鐢ㄤ簬鎻掍欢鐨勫彂鐜般€佸睍绀哄拰鐗堟湰绠＄悊;
+// - SystemName 鏄敮涓€鏍囪瘑,鍛藉悕鏍煎紡: {Type}.{Provider}銆?
 type PluginMeta struct {
-	// Group 插件分组
+	// Group 鎻掍欢鍒嗙粍
 	//
-	// 中文说明:
-	// - 用于在管理界面分组展示;
-	// - 例如: "Payment", "Shipping", "Misc", "Widgets"。
+	// 涓枃璇存槑:
+	// - 鐢ㄤ簬鍦ㄧ鐞嗙晫闈㈠垎缁勫睍绀?
+	// - 渚嬪: "Payment", "Shipping", "Misc", "Widgets"銆?
 	Group string `json:"group"`
 
-	// FriendlyName 友好名称
+	// FriendlyName 鍙嬪ソ鍚嶇О
 	//
-	// 中文说明:
-	// - 显示给用户的名称;
-	// - 例如: "支付宝支付", "顺丰速运"。
+	// 涓枃璇存槑:
+	// - 鏄剧ず缁欑敤鎴风殑鍚嶇О;
+	// - 渚嬪: "鏀粯瀹濇敮浠?, "椤轰赴閫熻繍"銆?
 	FriendlyName string `json:"friendly_name"`
 
-	// SystemName 系统名称
+	// SystemName 绯荤粺鍚嶇О
 	//
-	// 中文说明:
-	// - 唯一标识,用于查找和配置;
-	// - 命名格式: {Type}.{Provider};
-	// - 例如: "Payment.Alipay", "Shipping.FedEx"。
+	// 涓枃璇存槑:
+	// - 鍞竴鏍囪瘑,鐢ㄤ簬鏌ユ壘鍜岄厤缃?
+	// - 鍛藉悕鏍煎紡: {Type}.{Provider};
+	// - 渚嬪: "Payment.Alipay", "Shipping.FedEx"銆?
 	SystemName string `json:"system_name"`
 
-	// Version 插件版本
+	// Version 鎻掍欢鐗堟湰
 	//
-	// 中文说明:
-	// - 遵循语义化版本规范;
-	// - 例如: "1.0.0", "2.1.0"。
+	// 涓枃璇存槑:
+	// - 閬靛惊璇箟鍖栫増鏈鑼?
+	// - 渚嬪: "1.0.0", "2.1.0"銆?
 	Version string `json:"version"`
 
-	// SupportedVersions 支持的 nop-go 版本
+	// SupportedVersions 鏀寔鐨?nop-go 鐗堟湰
 	//
-	// 中文说明:
-	// - 指明兼容的主版本;
-	// - 例如: ["1.0", "1.1"]。
+	// 涓枃璇存槑:
+	// - 鎸囨槑鍏煎鐨勪富鐗堟湰;
+	// - 渚嬪: ["1.0", "1.1"]銆?
 	SupportedVersions []string `json:"supported_versions"`
 
-	// Author 作者
+	// Author 浣滆€?
 	Author string `json:"author"`
 
-	// DisplayOrder 显示顺序
+	// DisplayOrder 鏄剧ず椤哄簭
 	//
-	// 中文说明:
-	// - 用于列表排序;
-	// - 数字越小排在越前面。
+	// 涓枃璇存槑:
+	// - 鐢ㄤ簬鍒楄〃鎺掑簭;
+	// - 鏁板瓧瓒婂皬鎺掑湪瓒婂墠闈€?
 	DisplayOrder int `json:"display_order"`
 
-	// Description 插件描述
+	// Description 鎻掍欢鎻忚堪
 	Description string `json:"description"`
 
-	// DependsOn 依赖的其他插件
+	// DependsOn 渚濊禆鐨勫叾浠栨彃浠?
 	//
-	// 中文说明:
-	// - 命明前置依赖的 SystemName 列表;
-	// - Manager 会按依赖顺序加载。
+	// 涓枃璇存槑:
+	// - 鍛芥槑鍓嶇疆渚濊禆鐨?SystemName 鍒楄〃;
+	// - Manager 浼氭寜渚濊禆椤哄簭鍔犺浇銆?
 	DependsOn []string `json:"depends_on"`
 
-	// FileName 编译后的文件名
+	// FileName 缂栬瘧鍚庣殑鏂囦欢鍚?
 	//
-	// 中文说明:
-	// - 用于 Phase 2 动态加载(.so);
-	// - Phase 1 编译进主程序时可为空。
+	// 涓枃璇存槑:
+	// - 鐢ㄤ簬 Phase 2 鍔ㄦ€佸姞杞?.so);
+	// - Phase 1 缂栬瘧杩涗富绋嬪簭鏃跺彲涓虹┖銆?
 	FileName string `json:"file_name"`
 
-	// Installed 是否已安装
+	// Installed 鏄惁宸插畨瑁?
 	//
-	// 中文说明:
-	// - 由 Manager 维护;
-	// - true 表示 Install 已执行过。
+	// 涓枃璇存槑:
+	// - 鐢?Manager 缁存姢;
+	// - true 琛ㄧず Install 宸叉墽琛岃繃銆?
 	Installed bool `json:"installed"`
 
-	// InstalledVersion 已安装的版本
+	// InstalledVersion 宸插畨瑁呯殑鐗堟湰
 	//
-	// 中文说明:
-	// - 用于检测版本更新;
-	// - 与 Version 不同时可能需要升级。
+	// 涓枃璇存槑:
+	// - 鐢ㄤ簬妫€娴嬬増鏈洿鏂?
+	// - 涓?Version 涓嶅悓鏃跺彲鑳介渶瑕佸崌绾с€?
 	InstalledVersion string `json:"installed_version"`
 }

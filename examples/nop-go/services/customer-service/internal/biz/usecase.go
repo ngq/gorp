@@ -1,4 +1,4 @@
-// Package biz 客户服务业务逻辑层
+﻿// Package biz 瀹㈡埛鏈嶅姟涓氬姟閫昏緫灞?
 package biz
 
 import (
@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"nop-go/services/customer-service/internal/data"
 	"nop-go/services/customer-service/internal/models"
 	shareErrors "nop-go/shared/errors"
@@ -14,24 +14,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// CustomerUseCase 客户用例
+// CustomerUseCase 瀹㈡埛鐢ㄤ緥
 type CustomerUseCase struct {
 	customerRepo data.CustomerRepository
 	addressRepo  data.AddressRepository
 	roleRepo     data.CustomerRoleRepository
-	jwtSvc       contract.JWTService
+	jwtSvc       securitycontract.JWTService
 }
 
-// NewCustomerUseCase 创建客户用例。
+// NewCustomerUseCase 鍒涘缓瀹㈡埛鐢ㄤ緥銆?
 //
-// 中文说明：
-// - 使用 framework 级 JWTService，替代项目层 jwtSecret/jwtExpire；
-// - JWTService 统一处理签发/验证，配置从 auth.jwt.* 读取。
+// 涓枃璇存槑锛?
+// - 浣跨敤 framework 绾?JWTService锛屾浛浠ｉ」鐩眰 jwtSecret/jwtExpire锛?
+// - JWTService 缁熶竴澶勭悊绛惧彂/楠岃瘉锛岄厤缃粠 auth.jwt.* 璇诲彇銆?
 func NewCustomerUseCase(
 	customerRepo data.CustomerRepository,
 	addressRepo data.AddressRepository,
 	roleRepo data.CustomerRoleRepository,
-	jwtSvc contract.JWTService,
+	jwtSvc securitycontract.JWTService,
 ) *CustomerUseCase {
 	return &CustomerUseCase{
 		customerRepo: customerRepo,
@@ -41,7 +41,7 @@ func NewCustomerUseCase(
 	}
 }
 
-// RegisterRequest 注册请求
+// RegisterRequest 娉ㄥ唽璇锋眰
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=32"`
 	Email    string `json:"email" binding:"required,email"`
@@ -49,19 +49,19 @@ type RegisterRequest struct {
 	Password string `json:"password" binding:"required,min=6,max=32"`
 }
 
-// Register 注册客户
+// Register 娉ㄥ唽瀹㈡埛
 func (uc *CustomerUseCase) Register(ctx context.Context, req *RegisterRequest) (*models.Customer, error) {
-	// 检查用户名是否已存在
+	// 妫€鏌ョ敤鎴峰悕鏄惁宸插瓨鍦?
 	if existing, _ := uc.customerRepo.GetByUsername(ctx, req.Username); existing != nil {
 		return nil, shareErrors.ErrCustomerAlreadyExists
 	}
 
-	// 检查邮箱是否已存在
+	// 妫€鏌ラ偖绠辨槸鍚﹀凡瀛樺湪
 	if existing, _ := uc.customerRepo.GetByEmail(ctx, req.Email); existing != nil {
 		return nil, shareErrors.ErrCustomerAlreadyExists
 	}
 
-	// 密码哈希
+	// 瀵嗙爜鍝堝笇
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (uc *CustomerUseCase) Register(ctx context.Context, req *RegisterRequest) (
 		return nil, err
 	}
 
-	// 添加默认角色
+	// 娣诲姞榛樿瑙掕壊
 	if role, _ := uc.roleRepo.GetBySystemName(ctx, models.RoleRegistered); role != nil {
 		uc.customerRepo.AddRole(ctx, customer.ID, role.ID)
 	}
@@ -90,41 +90,41 @@ func (uc *CustomerUseCase) Register(ctx context.Context, req *RegisterRequest) (
 	return customer, nil
 }
 
-// LoginRequest 登录请求
+// LoginRequest 鐧诲綍璇锋眰
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
-// LoginResult 登录结果
+// LoginResult 鐧诲綍缁撴灉
 type LoginResult struct {
 	Customer *models.Customer
 	Token    string
 }
 
-// Login 登录
+// Login 鐧诲綍
 func (uc *CustomerUseCase) Login(ctx context.Context, req *LoginRequest) (*LoginResult, error) {
-	// 尝试通过用户名查找
+	// 灏濊瘯閫氳繃鐢ㄦ埛鍚嶆煡鎵?
 	customer, err := uc.customerRepo.GetByUsername(ctx, req.Username)
 	if err != nil {
-		// 尝试通过邮箱查找
+		// 灏濊瘯閫氳繃閭鏌ユ壘
 		customer, err = uc.customerRepo.GetByEmail(ctx, req.Username)
 		if err != nil {
 			return nil, shareErrors.ErrInvalidCredentials
 		}
 	}
 
-	// 验证密码
+	// 楠岃瘉瀵嗙爜
 	if err := bcrypt.CompareHashAndPassword([]byte(customer.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, shareErrors.ErrInvalidCredentials
 	}
 
-	// 检查账户状态
+	// 妫€鏌ヨ处鎴风姸鎬?
 	if !customer.IsActive {
 		return nil, shareErrors.ErrCustomerDisabled
 	}
 
-	// 更新最后登录信息
+	// 鏇存柊鏈€鍚庣櫥褰曚俊鎭?
 	now := time.Now()
 	customer.LastLoginAt = &now
 	uc.customerRepo.Update(ctx, customer)
@@ -134,7 +134,7 @@ func (uc *CustomerUseCase) Login(ctx context.Context, req *LoginRequest) (*Login
 		roles = append(roles, role.SystemName)
 	}
 
-	// 使用 framework JWTService 签发 token
+	// 浣跨敤 framework JWTService 绛惧彂 token
 	claims := uc.jwtSvc.NewClaims(int64(customer.ID), "customer", customer.Username, roles, 86400)
 	token, err := uc.jwtSvc.Sign(claims)
 	if err != nil {
@@ -146,7 +146,7 @@ func (uc *CustomerUseCase) Login(ctx context.Context, req *LoginRequest) (*Login
 	}, nil
 }
 
-// GetByID 根据ID获取客户
+// GetByID 鏍规嵁ID鑾峰彇瀹㈡埛
 func (uc *CustomerUseCase) GetByID(ctx context.Context, id uint64) (*models.Customer, error) {
 	customer, err := uc.customerRepo.GetByID(ctx, id)
 	if err != nil {
@@ -155,7 +155,7 @@ func (uc *CustomerUseCase) GetByID(ctx context.Context, id uint64) (*models.Cust
 	return customer, nil
 }
 
-// GetByEmail 根据邮箱获取客户
+// GetByEmail 鏍规嵁閭鑾峰彇瀹㈡埛
 func (uc *CustomerUseCase) GetByEmail(ctx context.Context, email string) (*models.Customer, error) {
 	customer, err := uc.customerRepo.GetByEmail(ctx, email)
 	if err != nil {
@@ -164,7 +164,7 @@ func (uc *CustomerUseCase) GetByEmail(ctx context.Context, email string) (*model
 	return customer, nil
 }
 
-// UpdateProfile 更新客户资料
+// UpdateProfile 鏇存柊瀹㈡埛璧勬枡
 func (uc *CustomerUseCase) UpdateProfile(ctx context.Context, id uint64, firstName, lastName, gender string, birthday *time.Time) (*models.Customer, error) {
 	customer, err := uc.customerRepo.GetByID(ctx, id)
 	if err != nil {
@@ -191,19 +191,19 @@ func (uc *CustomerUseCase) UpdateProfile(ctx context.Context, id uint64, firstNa
 	return customer, nil
 }
 
-// ChangePassword 修改密码
+// ChangePassword 淇敼瀵嗙爜
 func (uc *CustomerUseCase) ChangePassword(ctx context.Context, id uint64, oldPassword, newPassword string) error {
 	customer, err := uc.customerRepo.GetByID(ctx, id)
 	if err != nil {
 		return shareErrors.ErrCustomerNotFound
 	}
 
-	// 验证旧密码
+	// 楠岃瘉鏃у瘑鐮?
 	if err := bcrypt.CompareHashAndPassword([]byte(customer.PasswordHash), []byte(oldPassword)); err != nil {
 		return shareErrors.ErrPasswordMismatch
 	}
 
-	// 哈希新密码
+	// 鍝堝笇鏂板瘑鐮?
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -213,12 +213,12 @@ func (uc *CustomerUseCase) ChangePassword(ctx context.Context, id uint64, oldPas
 	return uc.customerRepo.Update(ctx, customer)
 }
 
-// List 客户列表
+// List 瀹㈡埛鍒楄〃
 func (uc *CustomerUseCase) List(ctx context.Context, page, pageSize int) ([]*models.Customer, int64, error) {
 	return uc.customerRepo.List(ctx, page, pageSize)
 }
 
-// ValidateCustomer 验证客户（供其他服务调用）
+// ValidateCustomer 楠岃瘉瀹㈡埛锛堜緵鍏朵粬鏈嶅姟璋冪敤锛?
 func (uc *CustomerUseCase) ValidateCustomer(ctx context.Context, id uint64) error {
 	customer, err := uc.customerRepo.GetByID(ctx, id)
 	if err != nil {
@@ -232,22 +232,22 @@ func (uc *CustomerUseCase) ValidateCustomer(ctx context.Context, id uint64) erro
 	return nil
 }
 
-// AddressUseCase 地址用例
+// AddressUseCase 鍦板潃鐢ㄤ緥
 type AddressUseCase struct {
 	addressRepo data.AddressRepository
 }
 
-// NewAddressUseCase 创建地址用例
+// NewAddressUseCase 鍒涘缓鍦板潃鐢ㄤ緥
 func NewAddressUseCase(addressRepo data.AddressRepository) *AddressUseCase {
 	return &AddressUseCase{addressRepo: addressRepo}
 }
 
-// CreateAddress 创建地址
+// CreateAddress 鍒涘缓鍦板潃
 func (uc *AddressUseCase) CreateAddress(ctx context.Context, address *models.Address) error {
 	return uc.addressRepo.Create(ctx, address)
 }
 
-// GetAddressByID 获取地址
+// GetAddressByID 鑾峰彇鍦板潃
 func (uc *AddressUseCase) GetAddressByID(ctx context.Context, id uint64) (*models.Address, error) {
 	address, err := uc.addressRepo.GetByID(ctx, id)
 	if err != nil {
@@ -256,12 +256,12 @@ func (uc *AddressUseCase) GetAddressByID(ctx context.Context, id uint64) (*model
 	return address, nil
 }
 
-// GetCustomerAddresses 获取客户所有地址
+// GetCustomerAddresses 鑾峰彇瀹㈡埛鎵€鏈夊湴鍧€
 func (uc *AddressUseCase) GetCustomerAddresses(ctx context.Context, customerID uint64) ([]*models.Address, error) {
 	return uc.addressRepo.GetByCustomerID(ctx, customerID)
 }
 
-// UpdateAddress 更新地址
+// UpdateAddress 鏇存柊鍦板潃
 func (uc *AddressUseCase) UpdateAddress(ctx context.Context, address *models.Address) error {
 	_, err := uc.addressRepo.GetByID(ctx, address.ID)
 	if err != nil {
@@ -270,29 +270,29 @@ func (uc *AddressUseCase) UpdateAddress(ctx context.Context, address *models.Add
 	return uc.addressRepo.Update(ctx, address)
 }
 
-// DeleteAddress 删除地址
+// DeleteAddress 鍒犻櫎鍦板潃
 func (uc *AddressUseCase) DeleteAddress(ctx context.Context, id uint64) error {
 	return uc.addressRepo.Delete(ctx, id)
 }
 
-// SetDefaultBilling 设置默认账单地址
+// SetDefaultBilling 璁剧疆榛樿璐﹀崟鍦板潃
 func (uc *AddressUseCase) SetDefaultBilling(ctx context.Context, customerID, addressID uint64) error {
 	return uc.addressRepo.SetDefaultBilling(ctx, customerID, addressID)
 }
 
-// SetDefaultShipping 设置默认配送地址
+// SetDefaultShipping 璁剧疆榛樿閰嶉€佸湴鍧€
 func (uc *AddressUseCase) SetDefaultShipping(ctx context.Context, customerID, addressID uint64) error {
 	return uc.addressRepo.SetDefaultShipping(ctx, customerID, addressID)
 }
 
-// IsErrCustomerNotFound 判断是否为客户不存在错误
+// IsErrCustomerNotFound 鍒ゆ柇鏄惁涓哄鎴蜂笉瀛樺湪閿欒
 func IsErrCustomerNotFound(err error) bool {
 	return errors.Is(err, shareErrors.ErrCustomerNotFound)
 }
 
-// ========== GDPR 用例 ==========
+// ========== GDPR 鐢ㄤ緥 ==========
 
-// GdprUseCase GDPR用例
+// GdprUseCase GDPR鐢ㄤ緥
 type GdprUseCase struct {
 	consentRepo     data.GdprConsentRepository
 	logRepo         data.GdprLogRepository
@@ -302,7 +302,7 @@ type GdprUseCase struct {
 	addressRepo     data.AddressRepository
 }
 
-// NewGdprUseCase 创建GDPR用例
+// NewGdprUseCase 鍒涘缓GDPR鐢ㄤ緥
 func NewGdprUseCase(
 	consentRepo data.GdprConsentRepository,
 	logRepo data.GdprLogRepository,
@@ -321,7 +321,7 @@ func NewGdprUseCase(
 	}
 }
 
-// CreateConsent 创建GDPR同意项
+// CreateConsent 鍒涘缓GDPR鍚屾剰椤?
 func (uc *GdprUseCase) CreateConsent(ctx context.Context, req *models.GdprConsentCreateRequest) (*models.GdprConsent, error) {
 	consent := &models.GdprConsent{
 		Message:         req.Message,
@@ -336,22 +336,22 @@ func (uc *GdprUseCase) CreateConsent(ctx context.Context, req *models.GdprConsen
 	return consent, nil
 }
 
-// GetConsent 获取GDPR同意项
+// GetConsent 鑾峰彇GDPR鍚屾剰椤?
 func (uc *GdprUseCase) GetConsent(ctx context.Context, id uint64) (*models.GdprConsent, error) {
 	return uc.consentRepo.GetByID(ctx, id)
 }
 
-// ListConsents GDPR同意项列表
+// ListConsents GDPR鍚屾剰椤瑰垪琛?
 func (uc *GdprUseCase) ListConsents(ctx context.Context) ([]*models.GdprConsent, error) {
 	return uc.consentRepo.List(ctx)
 }
 
-// ListActiveConsents 获取活动的GDPR同意项
+// ListActiveConsents 鑾峰彇娲诲姩鐨凣DPR鍚屾剰椤?
 func (uc *GdprUseCase) ListActiveConsents(ctx context.Context) ([]*models.GdprConsent, error) {
 	return uc.consentRepo.ListActive(ctx)
 }
 
-// UpdateConsent 更新GDPR同意项
+// UpdateConsent 鏇存柊GDPR鍚屾剰椤?
 func (uc *GdprUseCase) UpdateConsent(ctx context.Context, id uint64, req *models.GdprConsentUpdateRequest) (*models.GdprConsent, error) {
 	consent, err := uc.consentRepo.GetByID(ctx, id)
 	if err != nil {
@@ -370,23 +370,23 @@ func (uc *GdprUseCase) UpdateConsent(ctx context.Context, id uint64, req *models
 	return consent, nil
 }
 
-// DeleteConsent 删除GDPR同意项
+// DeleteConsent 鍒犻櫎GDPR鍚屾剰椤?
 func (uc *GdprUseCase) DeleteConsent(ctx context.Context, id uint64) error {
 	return uc.consentRepo.Delete(ctx, id)
 }
 
-// AcceptConsent 客户接受同意项
+// AcceptConsent 瀹㈡埛鎺ュ彈鍚屾剰椤?
 func (uc *GdprUseCase) AcceptConsent(ctx context.Context, req *models.CustomerConsentRequest) error {
-	// 检查同意项是否存在
+	// 妫€鏌ュ悓鎰忛」鏄惁瀛樺湪
 	consent, err := uc.consentRepo.GetByID(ctx, req.ConsentID)
 	if err != nil {
 		return err
 	}
 
-	// 检查是否已有记录
+	// 妫€鏌ユ槸鍚﹀凡鏈夎褰?
 	existing, err := uc.customerConsent.GetByCustomerAndConsent(ctx, req.CustomerID, req.ConsentID)
 	if err == nil && existing != nil {
-		// 更新现有记录
+		// 鏇存柊鐜版湁璁板綍
 		existing.IsAccepted = req.IsAccepted
 		if req.IsAccepted {
 			existing.AcceptedAt = time.Now()
@@ -394,7 +394,7 @@ func (uc *GdprUseCase) AcceptConsent(ctx context.Context, req *models.CustomerCo
 		return uc.customerConsent.Update(ctx, existing)
 	}
 
-	// 创建新记录
+	// 鍒涘缓鏂拌褰?
 	cc := &models.CustomerConsent{
 		CustomerID: req.CustomerID,
 		ConsentID:  req.ConsentID,
@@ -407,10 +407,10 @@ func (uc *GdprUseCase) AcceptConsent(ctx context.Context, req *models.CustomerCo
 		return err
 	}
 
-	// 记录日志
-	logType := 1 // 同意
+	// 璁板綍鏃ュ織
+	logType := 1 // 鍚屾剰
 	if !req.IsAccepted {
-		logType = 2 // 撤回
+		logType = 2 // 鎾ゅ洖
 	}
 	log := &models.GdprLog{
 		CustomerID:  req.CustomerID,
@@ -421,21 +421,21 @@ func (uc *GdprUseCase) AcceptConsent(ctx context.Context, req *models.CustomerCo
 	}
 	uc.logRepo.Create(ctx, log)
 
-	_ = consent // 避免未使用警告
+	_ = consent // 閬垮厤鏈娇鐢ㄨ鍛?
 	return nil
 }
 
-// GetCustomerConsents 获取客户的同意记录
+// GetCustomerConsents 鑾峰彇瀹㈡埛鐨勫悓鎰忚褰?
 func (uc *GdprUseCase) GetCustomerConsents(ctx context.Context, customerID uint64) ([]*models.CustomerConsent, error) {
 	return uc.customerConsent.GetByCustomerID(ctx, customerID)
 }
 
-// RequestDataExport 请求数据导出
+// RequestDataExport 璇锋眰鏁版嵁瀵煎嚭
 func (uc *GdprUseCase) RequestDataExport(ctx context.Context, req *models.GdprExportRequest) (*models.GdprRequest, error) {
 	gdprReq := &models.GdprRequest{
 		CustomerID:   req.CustomerID,
-		RequestType:  1, // 导出
-		Status:       0, // 待处理
+		RequestType:  1, // 瀵煎嚭
+		Status:       0, // 寰呭鐞?
 		CreatedOnUtc: time.Now().UTC(),
 	}
 	if err := uc.requestRepo.Create(ctx, gdprReq); err != nil {
@@ -444,13 +444,13 @@ func (uc *GdprUseCase) RequestDataExport(ctx context.Context, req *models.GdprEx
 	return gdprReq, nil
 }
 
-// RequestDataDeletion 请求数据删除
+// RequestDataDeletion 璇锋眰鏁版嵁鍒犻櫎
 func (uc *GdprUseCase) RequestDataDeletion(ctx context.Context, req *models.GdprDeleteRequest) (*models.GdprRequest, error) {
 	gdprReq := &models.GdprRequest{
 		CustomerID:     req.CustomerID,
-		RequestType:    2, // 删除
+		RequestType:    2, // 鍒犻櫎
 		RequestDetails: req.RequestDetails,
-		Status:         0, // 待处理
+		Status:         0, // 寰呭鐞?
 		CreatedOnUtc:   time.Now().UTC(),
 	}
 	if err := uc.requestRepo.Create(ctx, gdprReq); err != nil {
@@ -459,27 +459,27 @@ func (uc *GdprUseCase) RequestDataDeletion(ctx context.Context, req *models.Gdpr
 	return gdprReq, nil
 }
 
-// ExportCustomerData 导出客户数据
+// ExportCustomerData 瀵煎嚭瀹㈡埛鏁版嵁
 func (uc *GdprUseCase) ExportCustomerData(ctx context.Context, customerID uint64) (*models.CustomerDataExport, error) {
-	// 获取客户信息
+	// 鑾峰彇瀹㈡埛淇℃伅
 	customer, err := uc.customerRepo.GetByID(ctx, customerID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 获取地址
+	// 鑾峰彇鍦板潃
 	addresses, err := uc.addressRepo.GetByCustomerID(ctx, customerID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 获取同意记录
+	// 鑾峰彇鍚屾剰璁板綍
 	consents, err := uc.customerConsent.GetByCustomerID(ctx, customerID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 获取日志
+	// 鑾峰彇鏃ュ織
 	logs, err := uc.logRepo.GetByCustomerID(ctx, customerID)
 	if err != nil {
 		return nil, err
@@ -494,14 +494,14 @@ func (uc *GdprUseCase) ExportCustomerData(ctx context.Context, customerID uint64
 	}, nil
 }
 
-// DeleteCustomerData 删除客户数据（GDPR合规）
+// DeleteCustomerData 鍒犻櫎瀹㈡埛鏁版嵁锛圙DPR鍚堣锛?
 func (uc *GdprUseCase) DeleteCustomerData(ctx context.Context, customerID uint64) error {
-	// 删除同意记录
+	// 鍒犻櫎鍚屾剰璁板綍
 	if err := uc.customerConsent.DeleteByCustomerID(ctx, customerID); err != nil {
 		return err
 	}
 
-	// 删除客户（软删除）
+	// 鍒犻櫎瀹㈡埛锛堣蒋鍒犻櫎锛?
 	if err := uc.customerRepo.Delete(ctx, customerID); err != nil {
 		return err
 	}
@@ -509,12 +509,12 @@ func (uc *GdprUseCase) DeleteCustomerData(ctx context.Context, customerID uint64
 	return nil
 }
 
-// GetGdprRequests 获取GDPR请求列表
+// GetGdprRequests 鑾峰彇GDPR璇锋眰鍒楄〃
 func (uc *GdprUseCase) GetGdprRequests(ctx context.Context, page, pageSize int) ([]*models.GdprRequest, int64, error) {
 	return uc.requestRepo.List(ctx, page, pageSize)
 }
 
-// ProcessGdprRequest 处理GDPR请求
+// ProcessGdprRequest 澶勭悊GDPR璇锋眰
 func (uc *GdprUseCase) ProcessGdprRequest(ctx context.Context, requestID uint64, approve bool) error {
 	req, err := uc.requestRepo.GetByID(ctx, requestID)
 	if err != nil {
@@ -522,22 +522,22 @@ func (uc *GdprUseCase) ProcessGdprRequest(ctx context.Context, requestID uint64,
 	}
 
 	if approve {
-		req.Status = 1 // 已处理
+		req.Status = 1 // 宸插鐞?
 		if req.RequestType == 2 {
-			// 如果是删除请求，执行删除
+			// 濡傛灉鏄垹闄よ姹傦紝鎵ц鍒犻櫎
 			if err := uc.DeleteCustomerData(ctx, req.CustomerID); err != nil {
 				return err
 			}
 		}
 	} else {
-		req.Status = 2 // 已拒绝
+		req.Status = 2 // 宸叉嫆缁?
 	}
 
 	req.ProcessedOnUtc = time.Now().UTC()
 	return uc.requestRepo.Update(ctx, req)
 }
 
-// GetGdprLogs 获取客户的GDPR日志
+// GetGdprLogs 鑾峰彇瀹㈡埛鐨凣DPR鏃ュ織
 func (uc *GdprUseCase) GetGdprLogs(ctx context.Context, customerID uint64) ([]*models.GdprLog, error) {
 	return uc.logRepo.GetByCustomerID(ctx, customerID)
 }

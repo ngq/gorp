@@ -8,11 +8,11 @@ import (
 	"nop-go/services/affiliate-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireAffiliateService(db *gorm.DB, jwtSvc contract.JWTService, config biz.AffiliateConfig) (*service.AffiliateService, error) {
+func wireAffiliateService(db *gorm.DB, jwtSvc securitycontract.JWTService, config biz.AffiliateConfig) (*service.AffiliateService, error) {
 	panic(wire.Build(
 		data.NewAffiliateRepository,
 		data.NewAffiliateOrderRepository,

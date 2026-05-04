@@ -5,56 +5,56 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/ngq/gorp/framework/provider/proto"
 )
 
 func main() {
-	// 创建 Proto 生成器
-	generator, err := proto.NewGenerator(&contract.ProtoGeneratorConfig{
-		Enabled:              true,
-		Strategy:             "protoc",
-		DefaultProtoDir:      "./proto",
+	// 鍒涘缓 Proto 鐢熸垚鍣?
+	generator, err := proto.NewGenerator(&integrationcontract.ProtoGeneratorConfig{
+		Enabled:               true,
+		Strategy:              "protoc",
+		DefaultProtoDir:       "./proto",
 		IncludeHTTPAnnotation: true,
 	})
 	if err != nil {
-		log.Fatalf("创建生成器失败: %v", err)
+		log.Fatalf("鍒涘缓鐢熸垚鍣ㄥけ璐? %v", err)
 	}
 
-	// 从 Service 接口生成 Proto
-	err = generator.GenFromService(context.Background(), contract.ServiceToProtoOptions{
+	// 浠?Service 鎺ュ彛鐢熸垚 Proto
+	err = generator.GenFromService(context.Background(), integrationcontract.ServiceToProtoOptions{
 		ServicePath: "internal/service/customer_service.go",
 		OutputPath:  "proto/customer.proto",
 		Package:     "customer",
 		GoPackage:   "nop-go/services/customer-service/proto;customer",
 		ServiceName: "CustomerServiceRPC",
 		IncludeHTTP: true,
-		HTTPAnnotations: map[string]contract.HTTPRule{
-			"Register":       {Method: "POST", Path: "/v1/customers", Body: "*"},
-			"Login":          {Method: "POST", Path: "/v1/customers/login", Body: "*"},
-			"GetCustomer":    {Method: "GET", Path: "/v1/customers/{id}"},
-			"UpdateProfile":  {Method: "PUT", Path: "/v1/customers/{id}", Body: "*"},
-			"ChangePassword": {Method: "POST", Path: "/v1/customers/{id}/password", Body: "*"},
-			"ListCustomers":  {Method: "GET", Path: "/v1/customers"},
+		HTTPAnnotations: map[string]integrationcontract.HTTPRule{
+			"Register":         {Method: "POST", Path: "/v1/customers", Body: "*"},
+			"Login":            {Method: "POST", Path: "/v1/customers/login", Body: "*"},
+			"GetCustomer":      {Method: "GET", Path: "/v1/customers/{id}"},
+			"UpdateProfile":    {Method: "PUT", Path: "/v1/customers/{id}", Body: "*"},
+			"ChangePassword":   {Method: "POST", Path: "/v1/customers/{id}/password", Body: "*"},
+			"ListCustomers":    {Method: "GET", Path: "/v1/customers"},
 			"ValidateCustomer": {Method: "POST", Path: "/v1/customers/validate", Body: "*"},
 		},
 	})
 
 	if err != nil {
-		log.Fatalf("生成 Proto 失败: %v", err)
+		log.Fatalf("鐢熸垚 Proto 澶辫触: %v", err)
 	}
 
-	fmt.Println("✅ Proto 文件生成成功: ./proto/customer.proto")
+	fmt.Println("鉁?Proto 鏂囦欢鐢熸垚鎴愬姛: ./proto/customer.proto")
 
-	// 生成 AddressService Proto
-	err = generator.GenFromService(context.Background(), contract.ServiceToProtoOptions{
+	// 鐢熸垚 AddressService Proto
+	err = generator.GenFromService(context.Background(), integrationcontract.ServiceToProtoOptions{
 		ServicePath: "internal/service/customer_service.go",
 		OutputPath:  "proto/address.proto",
 		Package:     "address",
 		GoPackage:   "nop-go/services/customer-service/proto;address",
 		ServiceName: "AddressServiceRPC",
 		IncludeHTTP: true,
-		HTTPAnnotations: map[string]contract.HTTPRule{
+		HTTPAnnotations: map[string]integrationcontract.HTTPRule{
 			"CreateAddress":      {Method: "POST", Path: "/v1/addresses", Body: "*"},
 			"GetAddress":         {Method: "GET", Path: "/v1/addresses/{id}"},
 			"ListAddresses":      {Method: "GET", Path: "/v1/customers/{customer_id}/addresses"},
@@ -66,8 +66,8 @@ func main() {
 	})
 
 	if err != nil {
-		log.Fatalf("生成 Address Proto 失败: %v", err)
+		log.Fatalf("鐢熸垚 Address Proto 澶辫触: %v", err)
 	}
 
-	fmt.Println("✅ Proto 文件生成成功: ./proto/address.proto")
+	fmt.Println("鉁?Proto 鏂囦欢鐢熸垚鎴愬姛: ./proto/address.proto")
 }

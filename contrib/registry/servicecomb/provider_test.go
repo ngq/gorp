@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +14,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "registry.servicecomb", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.RPCRegistryKey}, p.Provides())
+	require.Equal(t, []string{transportcontract.RPCRegistryKey}, p.Provides())
 }
 
 func TestRegistryRegisterUsesClient(t *testing.T) {
@@ -51,7 +51,7 @@ func TestRegistryRegisterRejectsDuplicateInstance(t *testing.T) {
 
 func TestRegistryDiscoverUsesClient(t *testing.T) {
 	client := &fakeServiceCombClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -157,7 +157,7 @@ func TestRegistryHeartbeatNotFoundTriggersReRegister(t *testing.T) {
 
 func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 	client := &fakeServiceCombClient{
-		discoverResults: [][]contract.ServiceInstance{
+		discoverResults: [][]transportcontract.ServiceInstance{
 			{
 				{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 			},
@@ -194,7 +194,7 @@ func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 
 func TestRegistryWatchSkipsDuplicateSnapshot(t *testing.T) {
 	client := &fakeServiceCombClient{
-		discoverResults: [][]contract.ServiceInstance{
+		discoverResults: [][]transportcontract.ServiceInstance{
 			{
 				{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 			},
@@ -240,7 +240,7 @@ func TestRegistryWatchRetriesAfterSourceError(t *testing.T) {
 			errors.New("temporary unavailable"),
 			nil,
 		},
-		discoverResults: [][]contract.ServiceInstance{
+		discoverResults: [][]transportcontract.ServiceInstance{
 			{
 				{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 			},
@@ -281,7 +281,7 @@ func TestRegistryWatchEmitsEmptySnapshotAfterServiceRemoved(t *testing.T) {
 			nil,
 			ErrServiceNotFound,
 		},
-		discoverResults: [][]contract.ServiceInstance{
+		discoverResults: [][]transportcontract.ServiceInstance{
 			{
 				{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 			},
@@ -313,7 +313,7 @@ func TestRegistryWatchEmitsEmptySnapshotAfterServiceRemoved(t *testing.T) {
 
 func TestRegistryWatchChannelClosesAfterRegistryClose(t *testing.T) {
 	client := &fakeServiceCombClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -347,9 +347,9 @@ type fakeServiceCombClient struct {
 	heartbeatErr    error
 	heartbeatErrs   []error
 	discoverErr     error
-	discoverResult  []contract.ServiceInstance
+	discoverResult  []transportcontract.ServiceInstance
 	discoverErrs    []error
-	discoverResults [][]contract.ServiceInstance
+	discoverResults [][]transportcontract.ServiceInstance
 	registerCalls   int
 	deregisterCalls int
 	heartbeatCalls  int
@@ -385,7 +385,7 @@ func (f *fakeServiceCombClient) Heartbeat(ctx context.Context, cfg *ServiceCombC
 	return f.heartbeatErr
 }
 
-func (f *fakeServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]contract.ServiceInstance, error) {
+func (f *fakeServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	f.discoverCalls++
 	if len(f.discoverErrs) > 0 {
 		err := f.discoverErrs[0]
@@ -402,9 +402,9 @@ func (f *fakeServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombCo
 		if len(f.discoverResults) > 1 {
 			f.discoverResults = f.discoverResults[1:]
 		}
-		return append([]contract.ServiceInstance(nil), result...), nil
+		return append([]transportcontract.ServiceInstance(nil), result...), nil
 	}
-	return append([]contract.ServiceInstance(nil), f.discoverResult...), nil
+	return append([]transportcontract.ServiceInstance(nil), f.discoverResult...), nil
 }
 
 func testServiceCombConfig() *ServiceCombConfig {

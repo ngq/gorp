@@ -1,4 +1,4 @@
-// Package service 店铺服务HTTP层
+﻿// Package service 搴楅摵鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,30 +6,30 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/store-service/internal/biz"
 	"nop-go/services/store-service/internal/models"
 )
 
-// StoreService 店铺服务
+// StoreService 搴楅摵鏈嶅姟
 type StoreService struct {
 	storeUC  *biz.StoreUseCase
 	vendorUC *biz.VendorUseCase
-	jwtSvc   contract.JWTService
+	jwtSvc   securitycontract.JWTService
 }
 
-// NewStoreService 创建店铺服务
-func NewStoreService(storeUC *biz.StoreUseCase, vendorUC *biz.VendorUseCase, jwtSvc contract.JWTService) *StoreService {
+// NewStoreService 鍒涘缓搴楅摵鏈嶅姟
+func NewStoreService(storeUC *biz.StoreUseCase, vendorUC *biz.VendorUseCase, jwtSvc securitycontract.JWTService) *StoreService {
 	return &StoreService{storeUC: storeUC, vendorUC: vendorUC, jwtSvc: jwtSvc}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *StoreService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
-		// 店铺管理
+		// 搴楅摵绠＄悊
 		stores := api.Group("/stores")
 		stores.Use(adminAuth)
 		{
@@ -41,7 +41,7 @@ func (s *StoreService) RegisterRoutes(r *gin.Engine) {
 			stores.GET("/:id/vendors", s.GetStoreVendors)
 		}
 
-		// 供应商管理
+		// 渚涘簲鍟嗙鐞?
 		vendors := api.Group("/vendors")
 		vendors.Use(adminAuth)
 		{
@@ -58,7 +58,7 @@ func (s *StoreService) RegisterRoutes(r *gin.Engine) {
 	}
 }
 
-// ================== 店铺接口 ==================
+// ================== 搴楅摵鎺ュ彛 ==================
 
 func (s *StoreService) CreateStore(c *gin.Context) {
 	var req models.StoreCreateRequest
@@ -135,7 +135,7 @@ func (s *StoreService) GetStoreVendors(c *gin.Context) {
 	c.JSON(http.StatusOK, vendors)
 }
 
-// ================== 供应商接口 ==================
+// ================== 渚涘簲鍟嗘帴鍙?==================
 
 func (s *StoreService) CreateVendor(c *gin.Context) {
 	var req models.VendorCreateRequest

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
 	configclient "github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,7 +15,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "configsource.nacos", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.ConfigSourceKey}, p.Provides())
+	require.Equal(t, []string{datacontract.ConfigSourceKey}, p.Provides())
 }
 
 func TestConfigSourceLoadAndSet(t *testing.T) {

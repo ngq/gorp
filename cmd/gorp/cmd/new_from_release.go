@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +79,7 @@ Important:
 			return err
 		}
 		if newReleaseBackend == "" {
-			newReleaseBackend = string(contract.RuntimeBackendGorm)
+			newReleaseBackend = string(datacontract.RuntimeBackendGorm)
 		}
 		project.Backend = newReleaseBackend
 
@@ -124,7 +124,7 @@ func init() {
 	newFromReleaseCmd.Flags().StringVar(&newReleaseTag, "tag", "latest", "Release tag (or 'latest')")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseAsset, "asset", "", "Release asset file name (default depends on --template)")
 	newFromReleaseCmd.Flags().StringVar(&newReleaseTemplate, "template", starterTemplateGoLayout, "release starter template: golayout, multi-flat-wire, multi-independent")
-	newFromReleaseCmd.Flags().StringVar(&newReleaseBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
+	newFromReleaseCmd.Flags().StringVar(&newReleaseBackend, "backend", string(datacontract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newFromReleaseCmd.Flags().BoolVar(&newReleaseWithDB, "with-db", true, "include DB sample and CRUD example")
 	newFromReleaseCmd.Flags().BoolVar(&newReleaseWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
 }

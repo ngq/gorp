@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ func TestWithContextFieldsUsesContextLogger(t *testing.T) {
 	SetDefault(defaultStub)
 	ctx := WithContext(context.Background(), requestStub)
 
-	withLogger, ok := WithContextFields(ctx, contract.Field{Key: "trace_id", Value: "trace-1"}).(*loggerStub)
+	withLogger, ok := WithContextFields(ctx, observabilitycontract.Field{Key: "trace_id", Value: "trace-1"}).(*loggerStub)
 	require.True(t, ok)
-	require.Equal(t, []contract.Field{{Key: "trace_id", Value: "trace-1"}}, withLogger.fields)
+	require.Equal(t, []observabilitycontract.Field{{Key: "trace_id", Value: "trace-1"}}, withLogger.fields)
 }

@@ -4,20 +4,20 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"github.com/stretchr/testify/require"
 )
 
 type loggerStub struct {
-	fields []contract.Field
+	fields []observabilitycontract.Field
 }
 
-func (l *loggerStub) Debug(string, ...contract.Field) {}
-func (l *loggerStub) Info(string, ...contract.Field)  {}
-func (l *loggerStub) Warn(string, ...contract.Field)  {}
-func (l *loggerStub) Error(string, ...contract.Field) {}
-func (l *loggerStub) With(fields ...contract.Field) contract.Logger {
-	copied := make([]contract.Field, len(fields))
+func (l *loggerStub) Debug(string, ...observabilitycontract.Field) {}
+func (l *loggerStub) Info(string, ...observabilitycontract.Field)  {}
+func (l *loggerStub) Warn(string, ...observabilitycontract.Field)  {}
+func (l *loggerStub) Error(string, ...observabilitycontract.Field) {}
+func (l *loggerStub) With(fields ...observabilitycontract.Field) observabilitycontract.Logger {
+	copied := make([]observabilitycontract.Field, len(fields))
 	copy(copied, fields)
 	return &loggerStub{fields: copied}
 }
@@ -51,23 +51,23 @@ func TestWithUsesDefaultLogger(t *testing.T) {
 	stub := &loggerStub{}
 	SetDefault(stub)
 	withLogger, ok := With(
-		contract.Field{Key: "trace_id", Value: "trace-1"},
-		contract.Field{Key: "request_id", Value: "req-1"},
+		observabilitycontract.Field{Key: "trace_id", Value: "trace-1"},
+		observabilitycontract.Field{Key: "request_id", Value: "req-1"},
 	).(*loggerStub)
 	require.True(t, ok)
-	require.Equal(t, []contract.Field{
+	require.Equal(t, []observabilitycontract.Field{
 		{Key: "trace_id", Value: "trace-1"},
 		{Key: "request_id", Value: "req-1"},
 	}, withLogger.fields)
 }
 
 func TestFieldHelpers(t *testing.T) {
-	require.Equal(t, contract.Field{Key: "name", Value: "alice"}, String("name", "alice"))
-	require.Equal(t, contract.Field{Key: "age", Value: 18}, Int("age", 18))
-	require.Equal(t, contract.Field{Key: "id", Value: int64(42)}, Int64("id", 42))
-	require.Equal(t, contract.Field{Key: "ok", Value: true}, Bool("ok", true))
-	require.Equal(t, contract.Field{Key: "payload", Value: map[string]int{"a": 1}}, Any("payload", map[string]int{"a": 1}))
+	require.Equal(t, observabilitycontract.Field{Key: "name", Value: "alice"}, String("name", "alice"))
+	require.Equal(t, observabilitycontract.Field{Key: "age", Value: 18}, Int("age", 18))
+	require.Equal(t, observabilitycontract.Field{Key: "id", Value: int64(42)}, Int64("id", 42))
+	require.Equal(t, observabilitycontract.Field{Key: "ok", Value: true}, Bool("ok", true))
+	require.Equal(t, observabilitycontract.Field{Key: "payload", Value: map[string]int{"a": 1}}, Any("payload", map[string]int{"a": 1}))
 
 	err := context.Canceled
-	require.Equal(t, contract.Field{Key: "err", Value: err}, Err(err))
+	require.Equal(t, observabilitycontract.Field{Key: "err", Value: err}, Err(err))
 }

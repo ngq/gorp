@@ -5,45 +5,35 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
-// Provider 把日志服务注册进容器。
-//
-// 中文说明：
-// - 对外统一暴露 contract.LogKey，业务层不需要直接依赖 zap；
-// - zap 是 framework 的必需依赖核（P1），直接内化在本包（zap_backend.go），不再经由 contrib/log/zap；
-// - 业务若需深度定制 zap（多 sink、动态 level、自定义 encoder），使用 contrib/log/zap 扩展层注册替换；
-// - 日志配置项较多，在 Register 中集中做默认值解析与驱动选择；
-// - 当前阶段正式冻结的口径是：
-//  1. 对外承诺面优先是"统一日志能力"
-//  2. 文件路径推导仍属于 runtime convention 语义的一部分
-//  3. 当 file/rotate 且未显式提供 `log.file` 时：优先走 `contract.Root` 的 `LogPath()`，否则最小回退到 `./gorp.log`
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string      { return "log" }
-func (p *Provider) IsDefer() bool     { return false }
-func (p *Provider) Provides() []string { return []string{contract.LogKey} }
+func (p *Provider) Name() string       { return "log" }
+func (p *Provider) IsDefer() bool      { return false }
+func (p *Provider) Provides() []string { return []string{observabilitycontract.LogKey} }
 
-// Register 绑定统一日志服务。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.LogKey, func(c contract.Container) (any, error) {
-		var cfg contract.Config
-		if c.IsBind(contract.ConfigKey) {
-			if v, err := c.Make(contract.ConfigKey); err == nil {
-				cfg, _ = v.(contract.Config)
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(observabilitycontract.LogKey, func(c runtimecontract.Container) (any, error) {
+		var cfg datacontract.Config
+		if c.IsBind(datacontract.ConfigKey) {
+			if v, err := c.Make(datacontract.ConfigKey); err == nil {
+				cfg, _ = v.(datacontract.Config)
 			}
 		}
 
 		level := "info"
 		format := "console"
-		driver := "stdout" // stdout|single|rotate
+		driver := "stdout"
 		file := ""
 		rotatePattern := ""
-		rotateMaxAge := "168h" // 7d
+		rotateMaxAge := "168h"
 		rotateTime := "24h"
 		ljMaxSize := 100
 		ljMaxBackups := 7
@@ -96,8 +86,8 @@ func (p *Provider) Register(c contract.Container) error {
 
 		if driver != "stdout" {
 			if file == "" {
-				if rootAny, err := c.Make(contract.RootKey); err == nil {
-					if rootSvc, ok := rootAny.(contract.Root); ok {
+				if rootAny, err := c.Make(runtimecontract.RootKey); err == nil {
+					if rootSvc, ok := rootAny.(runtimecontract.Root); ok {
 						file = filepath.Join(rootSvc.LogPath(), "gorp.log")
 					}
 				}
@@ -132,5 +122,4 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-// Boot log provider 无额外启动逻辑。
-func (p *Provider) Boot(contract.Container) error { return nil }
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }

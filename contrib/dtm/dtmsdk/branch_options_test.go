@@ -3,18 +3,18 @@ package dtmsdk
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSAGABuilder_AddBranchKeepsBranchRetryMetadata(t *testing.T) {
-	cfg := &contract.DTMConfig{Enabled: true}
+	cfg := &integrationcontract.DTMConfig{Enabled: true}
 	client, err := NewDTMClient(cfg)
 	require.NoError(t, err)
 
 	saga := client.SAGA("branch-options")
-	saga.AddBranch("/action", "/compensate", nil, contract.BranchOptions{
+	saga.AddBranch("/action", "/compensate", nil, integrationcontract.BranchOptions{
 		RetryCount:    3,
 		RetryInterval: 5,
 	})

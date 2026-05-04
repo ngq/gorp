@@ -9,29 +9,25 @@ import (
 	"os"
 	"sync"
 
-	"github.com/ngq/gorp/framework/contract"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
+
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
-// Provider 提供 mTLS 服务认证实现。
-//
-// 中文说明：
-// - 基于双向 TLS 实现服务间认证；
-// - 支持证书验证和身份提取；
-// - 支持证书轮换；
-// - 当前已从 framework/provider 真实下沉到 contrib 层。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "serviceauth.mtls" }
-func (p *Provider) IsDefer() bool    { return true }
+func (p *Provider) Name() string  { return "serviceauth.mtls" }
+func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.ServiceAuthKey, contract.ServiceIdentityKey}
+	return []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ServiceAuthKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(securitycontract.ServiceAuthKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getServiceAuthConfig(c)
 		if err != nil {
 			return nil, err
@@ -39,12 +35,12 @@ func (p *Provider) Register(c contract.Container) error {
 		return NewMTLSAuthenticator(cfg)
 	}, true)
 
-	c.Bind(contract.ServiceIdentityKey, func(c contract.Container) (any, error) {
+	c.Bind(securitycontract.ServiceIdentityKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getServiceAuthConfig(c)
 		if err != nil {
 			return nil, err
 		}
-		return &contract.ServiceIdentity{
+		return &securitycontract.ServiceIdentity{
 			ServiceID:   cfg.ServiceName,
 			ServiceName: cfg.ServiceName,
 			Namespace:   cfg.Namespace,
@@ -55,32 +51,27 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-// getServiceAuthConfig 从容器获取服务认证配置。
-func getServiceAuthConfig(c contract.Container) (*contract.ServiceAuthConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getServiceAuthConfig(c runtimecontract.Container) (*securitycontract.ServiceAuthConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("serviceauth: invalid config service")
 	}
 
-	authCfg := &contract.ServiceAuthConfig{
+	authCfg := &securitycontract.ServiceAuthConfig{
 		Mode:        "mtls",
 		MTLSEnabled: true,
 	}
 
-	if mode := configprovider.GetStringAny(cfg,
-		"serviceauth.mode",
-		"service_auth.mode",
-	); mode != "" {
+	if mode := configprovider.GetStringAny(cfg, "serviceauth.mode", "service_auth.mode"); mode != "" {
 		authCfg.Mode = mode
 	}
-
 	if name := configprovider.GetStringAny(cfg, "service.name"); name != "" {
 		authCfg.ServiceName = name
 	}
@@ -91,41 +82,24 @@ func getServiceAuthConfig(c contract.Container) (*contract.ServiceAuthConfig, er
 		authCfg.Environment = env
 	}
 
-	if certFile := configprovider.GetStringAny(cfg,
-		"serviceauth.mtls.cert_file",
-		"service_auth.mtls.cert_file",
-		"service_auth.mtls_cert_file",
-	); certFile != "" {
+	if certFile := configprovider.GetStringAny(cfg, "serviceauth.mtls.cert_file", "service_auth.mtls.cert_file", "service_auth.mtls_cert_file"); certFile != "" {
 		authCfg.MTLSCertFile = certFile
 	}
-	if keyFile := configprovider.GetStringAny(cfg,
-		"serviceauth.mtls.key_file",
-		"service_auth.mtls.key_file",
-		"service_auth.mtls_key_file",
-	); keyFile != "" {
+	if keyFile := configprovider.GetStringAny(cfg, "serviceauth.mtls.key_file", "service_auth.mtls.key_file", "service_auth.mtls_key_file"); keyFile != "" {
 		authCfg.MTLSKeyFile = keyFile
 	}
-	if caFile := configprovider.GetStringAny(cfg,
-		"serviceauth.mtls.ca_file",
-		"service_auth.mtls.ca_file",
-		"service_auth.mtls_ca_file",
-	); caFile != "" {
+	if caFile := configprovider.GetStringAny(cfg, "serviceauth.mtls.ca_file", "service_auth.mtls.ca_file", "service_auth.mtls_ca_file"); caFile != "" {
 		authCfg.MTLSCAFile = caFile
 	}
-	if serverName := configprovider.GetStringAny(cfg,
-		"serviceauth.mtls.server_name",
-		"service_auth.mtls.server_name",
-		"service_auth.mtls_server_name",
-	); serverName != "" {
+	if serverName := configprovider.GetStringAny(cfg, "serviceauth.mtls.server_name", "service_auth.mtls.server_name", "service_auth.mtls_server_name"); serverName != "" {
 		authCfg.MTLSServerName = serverName
 	}
 
 	return authCfg, nil
 }
 
-// MTLSAuthenticator 是 mTLS 服务认证器实现。
 type MTLSAuthenticator struct {
-	cfg *contract.ServiceAuthConfig
+	cfg *securitycontract.ServiceAuthConfig
 
 	tlsConfig *tls.Config
 	certPool  *x509.CertPool
@@ -133,8 +107,7 @@ type MTLSAuthenticator struct {
 	certMu    sync.RWMutex
 }
 
-// NewMTLSAuthenticator 创建 mTLS 认证器。
-func NewMTLSAuthenticator(cfg *contract.ServiceAuthConfig) (*MTLSAuthenticator, error) {
+func NewMTLSAuthenticator(cfg *securitycontract.ServiceAuthConfig) (*MTLSAuthenticator, error) {
 	auth := &MTLSAuthenticator{cfg: cfg}
 
 	if cfg.MTLSCAFile != "" {
@@ -170,8 +143,7 @@ func NewMTLSAuthenticator(cfg *contract.ServiceAuthConfig) (*MTLSAuthenticator, 
 	return auth, nil
 }
 
-// Authenticate 验证服务身份（从上下文提取证书）。
-func (a *MTLSAuthenticator) Authenticate(ctx context.Context) (*contract.ServiceIdentity, error) {
+func (a *MTLSAuthenticator) Authenticate(ctx context.Context) (*securitycontract.ServiceIdentity, error) {
 	tlsConnState := extractTLSState(ctx)
 	if tlsConnState == nil {
 		return nil, errors.New("serviceauth.mtls: no TLS connection found")
@@ -183,26 +155,14 @@ func (a *MTLSAuthenticator) Authenticate(ctx context.Context) (*contract.Service
 	return a.authenticateByCert(cert)
 }
 
-// AuthenticateWithToken 使用令牌验证（不支持）。
-func (a *MTLSAuthenticator) AuthenticateWithToken(ctx context.Context, token string) (*contract.ServiceIdentity, error) {
-	return nil, errors.New("serviceauth.mtls: token authentication not supported, use certificate instead")
+func (a *MTLSAuthenticator) AuthenticatePeerCertificate(ctx context.Context, cert *x509.Certificate) (*securitycontract.ServiceIdentity, error) {
+	_ = ctx
+	return a.authenticateByCert(cert)
 }
 
-// AuthenticateWithCert 使用证书验证服务身份。
-func (a *MTLSAuthenticator) AuthenticateWithCert(ctx context.Context, cert *tls.Certificate) (*contract.ServiceIdentity, error) {
-	if cert == nil || len(cert.Certificate) == 0 {
-		return nil, errors.New("serviceauth.mtls: invalid certificate")
-	}
-	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return nil, fmt.Errorf("serviceauth.mtls: parse certificate failed: %w", err)
-	}
-	return a.authenticateByCert(x509Cert)
-}
-
-// GetCurrentIdentity 获取当前服务身份。
-func (a *MTLSAuthenticator) GetCurrentIdentity(ctx context.Context) (*contract.ServiceIdentity, error) {
-	return &contract.ServiceIdentity{
+func (a *MTLSAuthenticator) GetCurrentIdentity(ctx context.Context) (*securitycontract.ServiceIdentity, error) {
+	_ = ctx
+	return &securitycontract.ServiceIdentity{
 		ServiceID:   a.cfg.ServiceName,
 		ServiceName: a.cfg.ServiceName,
 		Namespace:   a.cfg.Namespace,
@@ -210,7 +170,7 @@ func (a *MTLSAuthenticator) GetCurrentIdentity(ctx context.Context) (*contract.S
 	}, nil
 }
 
-func (a *MTLSAuthenticator) authenticateByCert(cert *x509.Certificate) (*contract.ServiceIdentity, error) {
+func (a *MTLSAuthenticator) authenticateByCert(cert *x509.Certificate) (*securitycontract.ServiceIdentity, error) {
 	if cert == nil {
 		return nil, errors.New("serviceauth.mtls: nil certificate")
 	}
@@ -218,7 +178,7 @@ func (a *MTLSAuthenticator) authenticateByCert(cert *x509.Certificate) (*contrac
 	if serviceName == "" {
 		return nil, errors.New("serviceauth.mtls: certificate missing common name")
 	}
-	return &contract.ServiceIdentity{
+	return &securitycontract.ServiceIdentity{
 		ServiceID:   serviceName,
 		ServiceName: serviceName,
 		Namespace:   a.cfg.Namespace,

@@ -1,68 +1,54 @@
-// Package bootstrap 服务启动封装
-// 直接使用框架能力，提供类型别名简化调用
 package bootstrap
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/bootstrap"
+	frameworkbootstrap "github.com/ngq/gorp/framework/bootstrap"
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 
 	gormpkg "gorm.io/gorm"
 )
 
-// 类型别名，简化调用
-type HTTPServiceOptions = bootstrap.HTTPServiceOptions
-type HTTPServiceRuntime = bootstrap.HTTPServiceRuntime
+type HTTPServiceOptions = frameworkbootstrap.HTTPServiceOptions
+type HTTPServiceRuntime = frameworkbootstrap.HTTPServiceRuntime
+type Options = frameworkbootstrap.HTTPServiceOptions
 
-// 函数别名，直接委托给框架
 var (
-	// NewHTTPServiceRuntime 创建 HTTP 服务运行时
-	NewHTTPServiceRuntime = bootstrap.NewHTTPServiceRuntime
-	// BootHTTPService 启动 HTTP 服务
-	BootHTTPService = bootstrap.BootHTTPService
-	// RegisterHealthCheck 注册健康检查端点
-	RegisterHealthCheck = bootstrap.RegisterHealthCheck
-	// RegisterMetricsEndpoint 注册 Prometheus 指标端点
-	RegisterMetricsEndpoint = bootstrap.RegisterMetricsEndpoint
-	// RunHTTP 启动 HTTP 服务
-	RunHTTP = bootstrap.RunHTTP
+	NewHTTPServiceRuntime   = frameworkbootstrap.NewHTTPServiceRuntime
+	BootHTTPService         = frameworkbootstrap.BootHTTPService
+	RegisterHealthCheck     = frameworkbootstrap.RegisterHealthCheck
+	RegisterMetricsEndpoint = frameworkbootstrap.RegisterMetricsEndpoint
+	RunHTTP                 = frameworkbootstrap.RunHTTP
 )
 
-// Options 初始化选项（兼容旧代码）
-type Options = bootstrap.HTTPServiceOptions
-
-// MustMakeJWTService 从容器获取 JWT 服务
-func MustMakeJWTService(c contract.Container) contract.JWTService {
+func MustMakeJWTService(c runtimecontract.Container) securitycontract.JWTService {
 	return container.MustMakeJWTService(c)
 }
 
-// MustMakeValidator 从容器获取 Validator
-func MustMakeValidator(c contract.Container) contract.Validator {
+func MustMakeValidator(c runtimecontract.Container) datacontract.Validator {
 	return container.MustMakeValidator(c)
 }
 
-// MustMakeRetry 从容器获取 Retry
-func MustMakeRetry(c contract.Container) contract.Retry {
+func MustMakeRetry(c runtimecontract.Container) resiliencecontract.Retry {
 	return container.MustMakeRetry(c)
 }
 
-// MustMakeLogger 从容器获取 Logger
-func MustMakeLogger(c contract.Container) contract.Logger {
+func MustMakeLogger(c runtimecontract.Container) observabilitycontract.Logger {
 	return container.MustMakeLogger(c)
 }
 
-// MustMakeGorm 从容器获取 Gorm DB
-func MustMakeGorm(c contract.Container) *gormpkg.DB {
+func MustMakeGorm(c runtimecontract.Container) *gormpkg.DB {
 	return container.MustMakeGorm(c)
 }
 
-// MustMakeEngine 从容器获取 Gin Engine
-func MustMakeEngine(c contract.Container) *gin.Engine {
+func MustMakeEngine(c runtimecontract.Container) *gin.Engine {
 	return container.MustMakeEngine(c)
 }
 
-// MustMakeConfig 从容器获取 Config
-func MustMakeConfig(c contract.Container) contract.Config {
+func MustMakeConfig(c runtimecontract.Container) datacontract.Config {
 	return container.MustMakeConfig(c)
 }

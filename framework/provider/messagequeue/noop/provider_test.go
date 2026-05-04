@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +40,7 @@ func TestNoopSubscriber(t *testing.T) {
 	subscriber := &noopSubscriber{}
 
 	// 测试 Subscribe
-	unsub, err := subscriber.Subscribe(context.Background(), "test-topic", func(ctx context.Context, msg *contract.Message) error {
+	unsub, err := subscriber.Subscribe(context.Background(), "test-topic", func(ctx context.Context, msg *integrationcontract.Message) error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -57,8 +57,8 @@ func TestProvider(t *testing.T) {
 	assert.Equal(t, "messagequeue.noop", p.Name())
 	assert.True(t, p.IsDefer())
 	assert.ElementsMatch(t, []string{
-		contract.MessageQueueKey,
-		contract.MessagePublisherKey,
-		contract.MessageSubscriberKey,
+		integrationcontract.MessageQueueKey,
+		integrationcontract.MessagePublisherKey,
+		integrationcontract.MessageSubscriberKey,
 	}, p.Provides())
 }

@@ -9,28 +9,23 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
+
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
-// Provider 提供 Consul KV 配置源实现。
-//
-// 中文说明：
-// - 从 Consul KV 存储读取配置；
-// - 支持配置热更新（通过 Watch 监听变化）；
-// - 支持动态写入配置；
-// - 当前已从 framework/provider 真实下沉到 contrib 层。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
 func (p *Provider) Name() string       { return "configsource.consul" }
 func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{contract.ConfigSourceKey} }
+func (p *Provider) Provides() []string { return []string{datacontract.ConfigSourceKey} }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ConfigSourceKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getConfigSourceConfig(c)
 		if err != nil {
 			return nil, err
@@ -41,46 +36,34 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-func getConfigSourceConfig(c contract.Container) (*contract.ConfigSourceConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getConfigSourceConfig(c runtimecontract.Container) (*datacontract.ConfigSourceConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("config: invalid config service")
 	}
 
-	sourceCfg := &contract.ConfigSourceConfig{Type: contract.ConfigSourceConsul}
+	sourceCfg := &datacontract.ConfigSourceConfig{Type: datacontract.ConfigSourceConsul}
 
-	if addr := configprovider.GetStringAny(cfg,
-		"configsource.consul.addr",
-		"config_source.consul.addr",
-		"config_source.consul_addr",
-	); addr != "" {
+	if addr := configprovider.GetStringAny(cfg, "configsource.consul.addr", "config_source.consul.addr", "config_source.consul_addr"); addr != "" {
 		sourceCfg.ConsulAddr = addr
 	} else {
 		sourceCfg.ConsulAddr = "localhost:8500"
 	}
 
-	if path := configprovider.GetStringAny(cfg,
-		"configsource.consul.path",
-		"config_source.consul.path",
-		"config_source.consul_path",
-	); path != "" {
+	if path := configprovider.GetStringAny(cfg, "configsource.consul.path", "config_source.consul.path", "config_source.consul_path"); path != "" {
 		sourceCfg.ConsulPath = path
 	} else {
 		sourceCfg.ConsulPath = "config/"
 	}
 
-	if token := configprovider.GetStringAny(cfg,
-		"configsource.consul.token",
-		"config_source.consul.token",
-		"config_source.consul_token",
-	); token != "" {
+	if token := configprovider.GetStringAny(cfg, "configsource.consul.token", "config_source.consul.token", "config_source.consul_token"); token != "" {
 		sourceCfg.ConsulToken = token
 	}
 
@@ -88,7 +71,7 @@ func getConfigSourceConfig(c contract.Container) (*contract.ConfigSourceConfig, 
 }
 
 type Source struct {
-	cfg      *contract.ConfigSourceConfig
+	cfg      *datacontract.ConfigSourceConfig
 	client   *api.Client
 	kv       *api.KV
 	watchers sync.Map
@@ -96,7 +79,7 @@ type Source struct {
 	closed   bool
 }
 
-func NewSource(cfg *contract.ConfigSourceConfig) (*Source, error) {
+func NewSource(cfg *datacontract.ConfigSourceConfig) (*Source, error) {
 	consulCfg := api.DefaultConfig()
 	if cfg.ConsulAddr != "" {
 		consulCfg.Address = cfg.ConsulAddr
@@ -167,7 +150,7 @@ func (s *Source) Set(ctx context.Context, key string, value any) error {
 	return nil
 }
 
-func (s *Source) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *Source) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -216,6 +199,7 @@ type consulWatcher struct {
 func (w *consulWatcher) OnChange(key string, callback func(value any)) {
 	w.callbacks.Store(key, callback)
 }
+
 func (w *consulWatcher) Stop() error {
 	select {
 	case <-w.stopCh:

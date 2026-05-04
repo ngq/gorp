@@ -8,11 +8,11 @@ import (
 	"nop-go/services/ai-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireAIService(db *gorm.DB, jwtSvc contract.JWTService, config biz.AIConfig) (*service.AIService, error) {
+func wireAIService(db *gorm.DB, jwtSvc securitycontract.JWTService, config biz.AIConfig) (*service.AIService, error) {
 	panic(wire.Build(
 		data.NewAIConversationRepository,
 		data.NewAIMessageRepository,

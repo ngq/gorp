@@ -8,11 +8,11 @@ import (
 	"nop-go/services/customer-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireCustomerService(db *gorm.DB, jwtSvc contract.JWTService) (*service.CustomerService, error) {
+func wireCustomerService(db *gorm.DB, jwtSvc securitycontract.JWTService) (*service.CustomerService, error) {
 	panic(wire.Build(
 		data.NewCustomerRepository,
 		data.NewAddressRepository,

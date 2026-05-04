@@ -6,30 +6,28 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
 	"github.com/redis/go-redis/v9"
+
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Provider 提供 Redis 分布式锁实现。
-//
-// 中文说明：
-// - 使用 Redis SET NX EX 原子命令实现；
-// - 支持锁续约（看门狗）；
-// - 只能释放自己持有的锁；
-// - 当前已从 framework/provider 真实下沉到 contrib 层。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "dlock.redis" }
-func (p *Provider) IsDefer() bool    { return true }
-func (p *Provider) Provides() []string { return []string{contract.DistributedLockKey} }
+func (p *Provider) Name() string  { return "dlock.redis" }
+func (p *Provider) IsDefer() bool { return true }
+func (p *Provider) Provides() []string {
+	return []string{datacontract.DistributedLockKey}
+}
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.DistributedLockKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.DistributedLockKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getLockConfig(c)
 		if err != nil {
 			return nil, err
@@ -39,19 +37,18 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-// getLockConfig 从容器获取分布式锁配置。
-func getLockConfig(c contract.Container) (*contract.DistributedLockConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getLockConfig(c runtimecontract.Container) (*datacontract.DistributedLockConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("dlock: invalid config service")
 	}
-	lockCfg := &contract.DistributedLockConfig{
+	lockCfg := &datacontract.DistributedLockConfig{
 		Type:          "redis",
 		DefaultTTL:    30 * time.Second,
 		RetryInterval: 100 * time.Millisecond,
@@ -77,14 +74,13 @@ func getLockConfig(c contract.Container) (*contract.DistributedLockConfig, error
 	return lockCfg, nil
 }
 
-// Lock 是 Redis 分布式锁实现。
 type Lock struct {
-	cfg      *contract.DistributedLockConfig
-	client   *redis.Client
+	cfg       *datacontract.DistributedLockConfig
+	client    *redis.Client
 	heldLocks sync.Map
-	watchdog sync.Map
-	closed   bool
-	mu       sync.Mutex
+	watchdog  sync.Map
+	closed    bool
+	mu        sync.Mutex
 }
 
 type heldLock struct {
@@ -93,8 +89,7 @@ type heldLock struct {
 	held  time.Time
 }
 
-// NewLock 创建 Redis 分布式锁。
-func NewLock(cfg *contract.DistributedLockConfig) (*Lock, error) {
+func NewLock(cfg *datacontract.DistributedLockConfig) (*Lock, error) {
 	client := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr, Password: cfg.RedisPassword, DB: cfg.RedisDB})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -104,7 +99,6 @@ func NewLock(cfg *contract.DistributedLockConfig) (*Lock, error) {
 	return &Lock{cfg: cfg, client: client}, nil
 }
 
-// Lock 获取锁（阻塞）。
 func (l *Lock) Lock(ctx context.Context, key string, ttl time.Duration) error {
 	fullKey := l.cfg.KeyPrefix + key
 	token := generateToken()
@@ -115,7 +109,7 @@ func (l *Lock) Lock(ctx context.Context, key string, ttl time.Duration) error {
 		}
 		if ok {
 			l.heldLocks.Store(fullKey, &heldLock{value: fullKey, token: token, held: time.Now()})
-			l.startWatchdog(ctx, fullKey, token, ttl)
+			l.startWatchdog(fullKey, ttl)
 			return nil
 		}
 		select {
@@ -127,7 +121,6 @@ func (l *Lock) Lock(ctx context.Context, key string, ttl time.Duration) error {
 	return errors.New("dlock: failed to acquire lock after max retries")
 }
 
-// TryLock 尝试获取锁（非阻塞）。
 func (l *Lock) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 	fullKey := l.cfg.KeyPrefix + key
 	token := generateToken()
@@ -137,7 +130,7 @@ func (l *Lock) TryLock(ctx context.Context, key string, ttl time.Duration) (bool
 	}
 	if ok {
 		l.heldLocks.Store(fullKey, &heldLock{value: fullKey, token: token, held: time.Now()})
-		l.startWatchdog(ctx, fullKey, token, ttl)
+		l.startWatchdog(fullKey, ttl)
 	}
 	return ok, nil
 }
@@ -150,7 +143,6 @@ func (l *Lock) tryLock(ctx context.Context, key string, token string, ttl time.D
 	return ok, nil
 }
 
-// Unlock 释放锁。
 func (l *Lock) Unlock(ctx context.Context, key string) error {
 	fullKey := l.cfg.KeyPrefix + key
 	held, ok := l.heldLocks.Load(fullKey)
@@ -176,7 +168,6 @@ func (l *Lock) Unlock(ctx context.Context, key string) error {
 	return nil
 }
 
-// Renew 续约锁。
 func (l *Lock) Renew(ctx context.Context, key string, ttl time.Duration) error {
 	fullKey := l.cfg.KeyPrefix + key
 	held, ok := l.heldLocks.Load(fullKey)
@@ -200,7 +191,6 @@ func (l *Lock) Renew(ctx context.Context, key string, ttl time.Duration) error {
 	return nil
 }
 
-// IsLocked 检查锁是否被持有。
 func (l *Lock) IsLocked(ctx context.Context, key string) (bool, error) {
 	if l == nil || l.client == nil {
 		return false, errors.New("dlock: client not initialized")
@@ -213,7 +203,6 @@ func (l *Lock) IsLocked(ctx context.Context, key string) (bool, error) {
 	return result > 0, nil
 }
 
-// WithLock 获取锁并执行函数。
 func (l *Lock) WithLock(ctx context.Context, key string, ttl time.Duration, fn func() error) error {
 	if err := l.Lock(ctx, key, ttl); err != nil {
 		return err
@@ -222,10 +211,10 @@ func (l *Lock) WithLock(ctx context.Context, key string, ttl time.Duration, fn f
 	return fn()
 }
 
-func (l *Lock) startWatchdog(ctx context.Context, key string, token string, ttl time.Duration) {
+func (l *Lock) startWatchdog(fullKey string, ttl time.Duration) {
 	interval := ttl / 3
 	ctx, cancel := context.WithCancel(context.Background())
-	l.watchdog.Store(key, cancel)
+	l.watchdog.Store(fullKey, cancel)
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -234,9 +223,10 @@ func (l *Lock) startWatchdog(ctx context.Context, key string, token string, ttl 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				renewCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-				_ = l.Renew(renewCtx, key, ttl)
-				cancel()
+				renewCtx, done := context.WithTimeout(context.Background(), time.Second)
+				lockKey := strings.TrimPrefix(fullKey, l.cfg.KeyPrefix)
+				_ = l.Renew(renewCtx, lockKey, ttl)
+				done()
 			}
 		}
 	}()

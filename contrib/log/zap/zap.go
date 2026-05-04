@@ -7,42 +7,27 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// Package zap 是 framework/provider/log 的深度定制扩展层。
-//
-// 中文说明：
-// - framework/provider/log 已内置 zap 作为默认日志后端（P1 必需依赖核），覆盖大多数场景；
-// - 本包供需要深度定制 zap 的业务使用：多 sink、动态 level、自定义 encoder、采样、hook 等；
-// - 使用方式：import 本包，构造 Logger 后通过容器注册替换默认实现：
-//
-//	c.Bind(contract.LogKey, func(c contract.Container) (any, error) {
-//	    return zap.New("debug", "json")
-//	}, true)
-//
-// - 不需要深度定制时，无需引入本包，framework 默认 zap 实现已足够。
-
-// SinkConfig 描述日志输出端配置。
 type SinkConfig struct {
-	Path string
-	Driver string
-	Filename string
+	Path          string
+	Driver        string
+	Filename      string
 	RotatePattern string
-	RotateMaxAge time.Duration
-	RotateTime time.Duration
-	MaxSizeMB int
-	MaxBackups int
-	MaxAgeDays int
-	Compress bool
-	LocalTime bool
+	RotateMaxAge  time.Duration
+	RotateTime    time.Duration
+	MaxSizeMB     int
+	MaxBackups    int
+	MaxAgeDays    int
+	Compress      bool
+	LocalTime     bool
 }
 
-// Logger 是 contract.Logger 的 zap 实现。
 type Logger struct {
 	l *zap.Logger
 }
@@ -83,15 +68,23 @@ func NewWithSink(level, format string, sink SinkConfig) (*Logger, error) {
 	return &Logger{l: logger}, nil
 }
 
-func (z *Logger) Debug(msg string, fields ...contract.Field) { z.l.Debug(msg, toZapFields(fields)...) }
-func (z *Logger) Info(msg string, fields ...contract.Field)  { z.l.Info(msg, toZapFields(fields)...) }
-func (z *Logger) Warn(msg string, fields ...contract.Field)  { z.l.Warn(msg, toZapFields(fields)...) }
-func (z *Logger) Error(msg string, fields ...contract.Field) { z.l.Error(msg, toZapFields(fields)...) }
-func (z *Logger) With(fields ...contract.Field) contract.Logger {
+func (z *Logger) Debug(msg string, fields ...observabilitycontract.Field) {
+	z.l.Debug(msg, toZapFields(fields)...)
+}
+func (z *Logger) Info(msg string, fields ...observabilitycontract.Field) {
+	z.l.Info(msg, toZapFields(fields)...)
+}
+func (z *Logger) Warn(msg string, fields ...observabilitycontract.Field) {
+	z.l.Warn(msg, toZapFields(fields)...)
+}
+func (z *Logger) Error(msg string, fields ...observabilitycontract.Field) {
+	z.l.Error(msg, toZapFields(fields)...)
+}
+func (z *Logger) With(fields ...observabilitycontract.Field) observabilitycontract.Logger {
 	return &Logger{l: z.l.With(toZapFields(fields)...)}
 }
 
-func toZapFields(fields []contract.Field) []zap.Field {
+func toZapFields(fields []observabilitycontract.Field) []zap.Field {
 	out := make([]zap.Field, 0, len(fields))
 	for _, f := range fields {
 		out = append(out, zap.Any(f.Key, f.Value))

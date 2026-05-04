@@ -1,4 +1,4 @@
-// Package service 本地化服务HTTP层
+﻿// Package service 鏈湴鍖栨湇鍔TTP灞?
 package service
 
 import (
@@ -6,29 +6,29 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/localization-service/internal/biz"
 	"nop-go/services/localization-service/internal/models"
 )
 
-// LocalizationService 本地化服务
+// LocalizationService 鏈湴鍖栨湇鍔?
 type LocalizationService struct {
 	locUC *biz.LocalizationUseCase
-	jwtSvc contract.JWTService
+	jwtSvc securitycontract.JWTService
 }
 
-// NewLocalizationService 创建本地化服务
-func NewLocalizationService(locUC *biz.LocalizationUseCase, jwtSvc contract.JWTService) *LocalizationService {
+// NewLocalizationService 鍒涘缓鏈湴鍖栨湇鍔?
+func NewLocalizationService(locUC *biz.LocalizationUseCase, jwtSvc securitycontract.JWTService) *LocalizationService {
 	return &LocalizationService{locUC: locUC, jwtSvc: jwtSvc}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *LocalizationService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1/localization")
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
-		// 语言管理
+		// 璇█绠＄悊
 		api.POST("/languages", adminAuth, s.CreateLanguage)
 		api.GET("/languages", s.ListLanguages)
 		api.GET("/languages/published", s.ListPublishedLanguages)
@@ -37,7 +37,7 @@ func (s *LocalizationService) RegisterRoutes(r *gin.Engine) {
 		api.PUT("/languages/:id", adminAuth, s.UpdateLanguage)
 		api.DELETE("/languages/:id", adminAuth, s.DeleteLanguage)
 
-		// 本地化资源管理
+		// 鏈湴鍖栬祫婧愮鐞?
 		api.POST("/resources", adminAuth, s.CreateResource)
 		api.GET("/resources", s.ListResourcesByLanguage)
 		api.GET("/resources/:id", s.GetResource)
@@ -46,14 +46,14 @@ func (s *LocalizationService) RegisterRoutes(r *gin.Engine) {
 		api.PUT("/resources/batch", adminAuth, s.BatchUpdateResources)
 		api.DELETE("/resources/:id", adminAuth, s.DeleteResource)
 
-		// 翻译接口
+		// 缈昏瘧鎺ュ彛
 		api.GET("/translate", s.Translate)
 		api.GET("/translate/:language_id/:resource_name", s.GetTranslation)
 		api.GET("/translations/:language_id", s.GetAllTranslations)
 		api.GET("/groups/:language_id", s.GetResourceGroups)
 		api.GET("/groups/:language_id/:group", s.GetResourcesByGroup)
 
-		// 货币管理
+		// 璐у竵绠＄悊
 		api.POST("/currencies", adminAuth, s.CreateCurrency)
 		api.GET("/currencies", s.ListCurrencies)
 		api.GET("/currencies/published", s.ListPublishedCurrencies)
@@ -64,7 +64,7 @@ func (s *LocalizationService) RegisterRoutes(r *gin.Engine) {
 	}
 }
 
-// ========== 语言管理接口 ==========
+// ========== 璇█绠＄悊鎺ュ彛 ==========
 
 func (s *LocalizationService) CreateLanguage(c *gin.Context) {
 	var req models.LanguageCreateRequest
@@ -150,7 +150,7 @@ func (s *LocalizationService) DeleteLanguage(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// ========== 本地化资源接口 ==========
+// ========== 鏈湴鍖栬祫婧愭帴鍙?==========
 
 func (s *LocalizationService) CreateResource(c *gin.Context) {
 	var req models.ResourceCreateRequest
@@ -255,7 +255,7 @@ func (s *LocalizationService) DeleteResource(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// ========== 翻译接口 ==========
+// ========== 缈昏瘧鎺ュ彛 ==========
 
 func (s *LocalizationService) Translate(c *gin.Context) {
 	languageID, _ := strconv.ParseUint(c.Query("language_id"), 10, 64)
@@ -268,7 +268,7 @@ func (s *LocalizationService) Translate(c *gin.Context) {
 
 	translation, err := s.locUC.GetTranslation(c.Request.Context(), uint(languageID), resourceName)
 	if err != nil {
-		// 未找到翻译时返回原文
+		// 鏈壘鍒扮炕璇戞椂杩斿洖鍘熸枃
 		c.JSON(http.StatusOK, gin.H{"value": resourceName})
 		return
 	}
@@ -326,7 +326,7 @@ func (s *LocalizationService) GetResourcesByGroup(c *gin.Context) {
 	c.JSON(http.StatusOK, resources)
 }
 
-// ========== 货币接口 ==========
+// ========== 璐у竵鎺ュ彛 ==========
 
 func (s *LocalizationService) CreateCurrency(c *gin.Context) {
 	var currency models.Currency

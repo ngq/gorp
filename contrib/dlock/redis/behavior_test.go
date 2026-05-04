@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +18,7 @@ func TestGenerateTokenProducesDistinctValues(t *testing.T) {
 }
 
 func TestLockUnlockRenewRequireHeldLock(t *testing.T) {
-	lock := &Lock{cfg: &contract.DistributedLockConfig{KeyPrefix: "lock:"}}
+	lock := &Lock{cfg: &datacontract.DistributedLockConfig{KeyPrefix: "lock:"}}
 	_, err := lock.IsLocked(context.Background(), "demo")
 	require.Error(t, err)
 
@@ -32,7 +32,7 @@ func TestLockUnlockRenewRequireHeldLock(t *testing.T) {
 }
 
 func TestWithLockReturnsAcquireError(t *testing.T) {
-	lock := &Lock{cfg: &contract.DistributedLockConfig{KeyPrefix: "lock:"}}
+	lock := &Lock{cfg: &datacontract.DistributedLockConfig{KeyPrefix: "lock:"}}
 	err := lock.WithLock(context.Background(), "demo", time.Second, func() error { return nil })
 	require.Error(t, err)
 }

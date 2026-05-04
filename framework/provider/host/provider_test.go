@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/ngq/gorp/framework/lifecycle"
 )
 
@@ -26,8 +26,8 @@ func TestProvider_IsDefer(t *testing.T) {
 func TestProvider_Provides(t *testing.T) {
 	p := NewProvider()
 	provides := p.Provides()
-	if len(provides) != 1 || provides[0] != contract.HostKey {
-		t.Errorf("expected provides [%s], got %v", contract.HostKey, provides)
+	if len(provides) != 1 || provides[0] != runtimecontract.HostKey {
+		t.Errorf("expected provides [%s], got %v", runtimecontract.HostKey, provides)
 	}
 }
 

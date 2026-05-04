@@ -1,4 +1,4 @@
-// Package service 媒体服务HTTP层
+﻿// Package service 濯掍綋鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,50 +6,50 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/media-service/internal/biz"
 	"nop-go/services/media-service/internal/models"
 )
 
-// MediaService 媒体服务
+// MediaService 濯掍綋鏈嶅姟
 type MediaService struct {
 	mediaUC *biz.MediaUseCase
-	jwtSvc  contract.JWTService
+	jwtSvc  securitycontract.JWTService
 }
 
-// NewMediaService 创建媒体服务
-func NewMediaService(mediaUC *biz.MediaUseCase, jwtSvc contract.JWTService) *MediaService {
+// NewMediaService 鍒涘缓濯掍綋鏈嶅姟
+func NewMediaService(mediaUC *biz.MediaUseCase, jwtSvc securitycontract.JWTService) *MediaService {
 	return &MediaService{mediaUC: mediaUC, jwtSvc: jwtSvc}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *MediaService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1/media")
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
-		// 图片管理
+		// 鍥剧墖绠＄悊
 		api.POST("/pictures", s.UploadPicture)
 		api.GET("/pictures", adminAuth, s.ListPictures)
 		api.GET("/pictures/:id", s.GetPicture)
 		api.DELETE("/pictures/:id", adminAuth, s.DeletePicture)
 
-		// 商品图片
+		// 鍟嗗搧鍥剧墖
 		api.GET("/products/:product_id/pictures", s.GetProductPictures)
 		api.DELETE("/products/:product_id/pictures/:picture_id", adminAuth, s.DeleteProductPicture)
 
-		// 文档管理
+		// 鏂囨。绠＄悊
 		api.POST("/documents", adminAuth, s.UploadDocument)
 		api.GET("/documents", adminAuth, s.ListDocuments)
 		api.GET("/documents/:id", s.GetDocument)
 		api.DELETE("/documents/:id", adminAuth, s.DeleteDocument)
 
-		// 静态文件服务
+		// 闈欐€佹枃浠舵湇鍔?
 		r.Static("/media", "./uploads")
 	}
 }
 
-// UploadPicture 上传图片
+// UploadPicture 涓婁紶鍥剧墖
 func (s *MediaService) UploadPicture(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {

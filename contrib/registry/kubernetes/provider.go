@@ -9,7 +9,9 @@ import (
 	"time"
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,14 +33,14 @@ var (
 
 type Provider struct{}
 
-func NewProvider() *Provider                        { return &Provider{} }
-func (p *Provider) Name() string                    { return "registry.kubernetes" }
-func (p *Provider) IsDefer() bool                   { return true }
-func (p *Provider) Provides() []string              { return []string{contract.RPCRegistryKey} }
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func NewProvider() *Provider                               { return &Provider{} }
+func (p *Provider) Name() string                           { return "registry.kubernetes" }
+func (p *Provider) IsDefer() bool                          { return true }
+func (p *Provider) Provides() []string                     { return []string{transportcontract.RPCRegistryKey} }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getKubernetesConfig(c)
 		if err != nil {
 			return nil, err
@@ -63,12 +65,12 @@ type KubernetesConfig struct {
 	PollInterval       time.Duration
 }
 
-func getKubernetesConfig(c contract.Container) (*KubernetesConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("kubernetes: invalid config service")
 	}
@@ -108,8 +110,8 @@ func getKubernetesConfig(c contract.Container) (*KubernetesConfig, error) {
 }
 
 type discoveryClient interface {
-	Discover(ctx context.Context, namespace, name string) ([]contract.ServiceInstance, error)
-	Watch(ctx context.Context, namespace, name string, onUpdate func([]contract.ServiceInstance)) error
+	Discover(ctx context.Context, namespace, name string) ([]transportcontract.ServiceInstance, error)
+	Watch(ctx context.Context, namespace, name string, onUpdate func([]transportcontract.ServiceInstance)) error
 }
 
 type nativeClientProvider interface {
@@ -121,7 +123,7 @@ type Registry struct {
 	client discoveryClient
 
 	mu            sync.RWMutex
-	endpointCache map[string][]contract.ServiceInstance
+	endpointCache map[string][]transportcontract.ServiceInstance
 	closeMu       sync.Mutex
 	closed        bool
 	watchCancels  []context.CancelFunc
@@ -142,7 +144,7 @@ func NewRegistryWithClient(cfg *KubernetesConfig, client discoveryClient) (*Regi
 	return &Registry{
 		config:        cfg,
 		client:        client,
-		endpointCache: make(map[string][]contract.ServiceInstance),
+		endpointCache: make(map[string][]transportcontract.ServiceInstance),
 	}, nil
 }
 
@@ -154,10 +156,10 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	return ErrRegisterNotSupported
 }
 
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	r.mu.RLock()
 	if instances, ok := r.endpointCache[name]; ok && len(instances) > 0 {
-		cached := append([]contract.ServiceInstance(nil), instances...)
+		cached := append([]transportcontract.ServiceInstance(nil), instances...)
 		r.mu.RUnlock()
 		return cached, nil
 	}
@@ -172,12 +174,12 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 		return nil, err
 	}
 	r.mu.Lock()
-	r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+	r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 	r.mu.Unlock()
 	return instances, nil
 }
 
-func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.ServiceInstance, error) {
+func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportcontract.ServiceInstance, error) {
 	r.closeMu.Lock()
 	defer r.closeMu.Unlock()
 	if r.closed {
@@ -186,16 +188,16 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 
 	watchCtx, cancel := context.WithCancel(ctx)
 	r.watchCancels = append(r.watchCancels, cancel)
-	ch := make(chan []contract.ServiceInstance, 10)
+	ch := make(chan []transportcontract.ServiceInstance, 10)
 
 	go func() {
 		defer close(ch)
-		_ = r.client.Watch(watchCtx, r.config.Namespace, name, func(instances []contract.ServiceInstance) {
+		_ = r.client.Watch(watchCtx, r.config.Namespace, name, func(instances []transportcontract.ServiceInstance) {
 			r.mu.Lock()
-			r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+			r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 			r.mu.Unlock()
 			select {
-			case ch <- append([]contract.ServiceInstance(nil), instances...):
+			case ch <- append([]transportcontract.ServiceInstance(nil), instances...):
 			case <-watchCtx.Done():
 			default:
 			}
@@ -207,7 +209,7 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		if err != nil {
 			if errors.Is(err, ErrServiceNotFound) {
 				select {
-				case ch <- []contract.ServiceInstance{}:
+				case ch <- []transportcontract.ServiceInstance{}:
 				case <-watchCtx.Done():
 				default:
 				}
@@ -215,7 +217,7 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 			return
 		}
 		select {
-		case ch <- append([]contract.ServiceInstance(nil), instances...):
+		case ch <- append([]transportcontract.ServiceInstance(nil), instances...):
 		case <-watchCtx.Done():
 		default:
 		}
@@ -271,7 +273,7 @@ func (c *clientGoDiscoveryClient) Underlying() any {
 	return c.client
 }
 
-func (c *clientGoDiscoveryClient) Discover(ctx context.Context, namespace, name string) ([]contract.ServiceInstance, error) {
+func (c *clientGoDiscoveryClient) Discover(ctx context.Context, namespace, name string) ([]transportcontract.ServiceInstance, error) {
 	endpoints, err := c.client.CoreV1().Endpoints(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -286,7 +288,7 @@ func (c *clientGoDiscoveryClient) Discover(ctx context.Context, namespace, name 
 	return instances, nil
 }
 
-func (c *clientGoDiscoveryClient) Watch(ctx context.Context, namespace, name string, onUpdate func([]contract.ServiceInstance)) error {
+func (c *clientGoDiscoveryClient) Watch(ctx context.Context, namespace, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
 	for {
 		watcher, err := c.client.CoreV1().Endpoints(namespace).Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", name).String(),
@@ -304,7 +306,7 @@ func (c *clientGoDiscoveryClient) Watch(ctx context.Context, namespace, name str
 	}
 }
 
-func consumeEndpointsWatch(ctx context.Context, serviceName string, watcher watch.Interface, onUpdate func([]contract.ServiceInstance)) (bool, error) {
+func consumeEndpointsWatch(ctx context.Context, serviceName string, watcher watch.Interface, onUpdate func([]transportcontract.ServiceInstance)) (bool, error) {
 	defer watcher.Stop()
 	for {
 		select {
@@ -319,7 +321,7 @@ func consumeEndpointsWatch(ctx context.Context, serviceName string, watcher watc
 				continue
 			}
 			if event.Type == watch.Deleted {
-				onUpdate([]contract.ServiceInstance{})
+				onUpdate([]transportcontract.ServiceInstance{})
 				continue
 			}
 			onUpdate(endpointsToInstances(serviceName, endpoints))
@@ -355,11 +357,11 @@ func buildRegistryRESTConfig(cfg *KubernetesConfig) (*rest.Config, error) {
 	return nil, ErrNotInCluster
 }
 
-func endpointsToInstances(serviceName string, endpoints *corev1.Endpoints) []contract.ServiceInstance {
+func endpointsToInstances(serviceName string, endpoints *corev1.Endpoints) []transportcontract.ServiceInstance {
 	if endpoints == nil {
 		return nil
 	}
-	result := make([]contract.ServiceInstance, 0)
+	result := make([]transportcontract.ServiceInstance, 0)
 	for _, subset := range endpoints.Subsets {
 		for _, address := range subset.Addresses {
 			for _, port := range subset.Ports {
@@ -374,7 +376,7 @@ func endpointsToInstances(serviceName string, endpoints *corev1.Endpoints) []con
 				if address.TargetRef != nil && address.TargetRef.Name != "" {
 					meta["target_name"] = address.TargetRef.Name
 				}
-				result = append(result, contract.ServiceInstance{
+				result = append(result, transportcontract.ServiceInstance{
 					ID:       generateInstanceID(serviceName, fullAddr),
 					Name:     serviceName,
 					Address:  fullAddr,

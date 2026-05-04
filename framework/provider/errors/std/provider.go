@@ -3,7 +3,8 @@ package std
 import (
 	"context"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供统一错误处理实现。
@@ -16,21 +17,21 @@ type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "errors.default" }
-func (p *Provider) IsDefer() bool    { return true }
+func (p *Provider) Name() string  { return "errors.default" }
+func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.ErrorsKey}
+	return []string{resiliencecontract.ErrorsKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
+func (p *Provider) Register(c runtimecontract.Container) error {
 	// 注册错误处理器
-	c.Bind(contract.ErrorsKey, func(c contract.Container) (any, error) {
+	c.Bind(resiliencecontract.ErrorsKey, func(c runtimecontract.Container) (any, error) {
 		return &errorHandler{}, nil
 	}, true)
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
@@ -52,23 +53,23 @@ type errorHandler struct{}
 func (h *errorHandler) HTTPToGRPC(httpCode int) int {
 	// gRPC 错误码定义
 	const (
-		CodeOK                  = 0
-		CodeCanceled            = 1
-		CodeUnknown             = 2
-		CodeInvalidArgument     = 3
-		CodeDeadlineExceeded    = 4
-		CodeNotFound            = 5
-		CodeAlreadyExists       = 6
-		CodePermissionDenied    = 7
-		CodeResourceExhausted   = 8
-		CodeFailedPrecondition  = 9
-		CodeAborted             = 10
-		CodeOutOfRange          = 11
-		CodeUnimplemented       = 12
-		CodeInternal            = 13
-		CodeUnavailable         = 14
-		CodeDataLoss            = 15
-		CodeUnauthenticated     = 16
+		CodeOK                 = 0
+		CodeCanceled           = 1
+		CodeUnknown            = 2
+		CodeInvalidArgument    = 3
+		CodeDeadlineExceeded   = 4
+		CodeNotFound           = 5
+		CodeAlreadyExists      = 6
+		CodePermissionDenied   = 7
+		CodeResourceExhausted  = 8
+		CodeFailedPrecondition = 9
+		CodeAborted            = 10
+		CodeOutOfRange         = 11
+		CodeUnimplemented      = 12
+		CodeInternal           = 13
+		CodeUnavailable        = 14
+		CodeDataLoss           = 15
+		CodeUnauthenticated    = 16
 	)
 
 	switch httpCode {
@@ -140,18 +141,18 @@ func (h *errorHandler) GRPCToHTTP(grpcCode int) int {
 }
 
 // WrapError 包装错误为 AppError。
-func (h *errorHandler) WrapError(ctx context.Context, err error, code int, reason contract.ErrorReason, message string) contract.AppError {
+func (h *errorHandler) WrapError(ctx context.Context, err error, code int, reason resiliencecontract.ErrorReason, message string) resiliencecontract.AppError {
 	if err == nil {
 		return nil
 	}
 
 	// 如果已经是 AppError，添加原因
-	if appErr, ok := err.(contract.AppError); ok {
+	if appErr, ok := err.(resiliencecontract.AppError); ok {
 		return appErr.WithCause(err)
 	}
 
 	// 创建新的 AppError
-	return contract.NewError(code, reason, message).WithCause(err)
+	return resiliencecontract.NewError(code, reason, message).WithCause(err)
 }
 
 // IsBusinessError 判断是否为业务错误。
@@ -160,12 +161,12 @@ func (h *errorHandler) WrapError(ctx context.Context, err error, code int, reaso
 // - 业务错误通常是 4xx 错误；
 // - 系统错误通常是 5xx 错误。
 func (h *errorHandler) IsBusinessError(err error) bool {
-	code := contract.Code(err)
+	code := resiliencecontract.Code(err)
 	return code >= 400 && code < 500
 }
 
 // IsSystemError 判断是否为系统错误。
 func (h *errorHandler) IsSystemError(err error) bool {
-	code := contract.Code(err)
+	code := resiliencecontract.Code(err)
 	return code >= 500
 }

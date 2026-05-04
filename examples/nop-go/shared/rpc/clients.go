@@ -1,34 +1,34 @@
-// Package rpc RPC 客户端封装
-// 基于框架 contract.RPCClient 能力
+// Package rpc RPC 瀹㈡埛绔皝瑁?
+// 鍩轰簬妗嗘灦 transportcontract.RPCClient 鑳藉姏
 package rpc
 
 import (
 	"context"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 
 	"nop-go/shared/inventory"
 	"nop-go/shared/payment"
 )
 
 const (
-	// 服务名称常量
+	// 鏈嶅姟鍚嶇О甯搁噺
 	ServiceInventory = "inventory-service"
 	ServicePrice     = "price-service"
 	ServicePayment   = "payment-service"
 )
 
-// InventoryClient 库存服务客户端
+// InventoryClient 搴撳瓨鏈嶅姟瀹㈡埛绔?
 type InventoryClient struct {
-	client contract.RPCClient
+	client transportcontract.RPCClient
 }
 
-// NewInventoryClient 创建库存服务客户端
-func NewInventoryClient(client contract.RPCClient) *InventoryClient {
+// NewInventoryClient 鍒涘缓搴撳瓨鏈嶅姟瀹㈡埛绔?
+func NewInventoryClient(client transportcontract.RPCClient) *InventoryClient {
 	return &InventoryClient{client: client}
 }
 
-// ReserveStock 预留库存
+// ReserveStock 棰勭暀搴撳瓨
 func (c *InventoryClient) ReserveStock(ctx context.Context, req *inventory.ReserveStockRequest) (*inventory.ReserveStockResponse, error) {
 	resp := &inventory.ReserveStockResponse{}
 	err := c.client.Call(ctx, ServiceInventory, "ReserveStock", req, resp)
@@ -39,41 +39,41 @@ func (c *InventoryClient) ReserveStock(ctx context.Context, req *inventory.Reser
 	return resp, err
 }
 
-// ConfirmStock 确认库存
+// ConfirmStock 纭搴撳瓨
 func (c *InventoryClient) ConfirmStock(ctx context.Context, req *inventory.ConfirmStockRequest) (*inventory.ConfirmStockResponse, error) {
 	resp := &inventory.ConfirmStockResponse{}
 	err := c.client.Call(ctx, ServiceInventory, "ConfirmStock", req, resp)
 	return resp, err
 }
 
-// ReleaseStock 释放库存
+// ReleaseStock 閲婃斁搴撳瓨
 func (c *InventoryClient) ReleaseStock(ctx context.Context, req *inventory.ReleaseStockRequest) (*inventory.ReleaseStockResponse, error) {
 	resp := &inventory.ReleaseStockResponse{}
 	err := c.client.Call(ctx, ServiceInventory, "ReleaseStock", req, resp)
 	return resp, err
 }
 
-// PriceClient 价格服务客户端
+// PriceClient 浠锋牸鏈嶅姟瀹㈡埛绔?
 type PriceClient struct {
-	client contract.RPCClient
+	client transportcontract.RPCClient
 }
 
-// NewPriceClient 创建价格服务客户端
-func NewPriceClient(client contract.RPCClient) *PriceClient {
+// NewPriceClient 鍒涘缓浠锋牸鏈嶅姟瀹㈡埛绔?
+func NewPriceClient(client transportcontract.RPCClient) *PriceClient {
 	return &PriceClient{client: client}
 }
 
-// PaymentClient 支付服务客户端
+// PaymentClient 鏀粯鏈嶅姟瀹㈡埛绔?
 type PaymentClient struct {
-	client contract.RPCClient
+	client transportcontract.RPCClient
 }
 
-// NewPaymentClient 创建支付服务客户端
-func NewPaymentClient(client contract.RPCClient) *PaymentClient {
+// NewPaymentClient 鍒涘缓鏀粯鏈嶅姟瀹㈡埛绔?
+func NewPaymentClient(client transportcontract.RPCClient) *PaymentClient {
 	return &PaymentClient{client: client}
 }
 
-// CreatePayment 创建支付
+// CreatePayment 鍒涘缓鏀粯
 func (c *PaymentClient) CreatePayment(ctx context.Context, req *payment.CreatePaymentRequest) (*payment.CreatePaymentResponse, error) {
 	resp := &payment.CreatePaymentResponse{}
 	err := c.client.Call(ctx, ServicePayment, "CreatePayment", req, resp)
@@ -84,7 +84,7 @@ func (c *PaymentClient) CreatePayment(ctx context.Context, req *payment.CreatePa
 	return resp, err
 }
 
-// CancelPayment 取消支付
+// CancelPayment 鍙栨秷鏀粯
 func (c *PaymentClient) CancelPayment(ctx context.Context, req *payment.CancelPaymentRequest) (*payment.CancelPaymentResponse, error) {
 	resp := &payment.CancelPaymentResponse{}
 	err := c.client.Call(ctx, ServicePayment, "CancelPayment", req, resp)

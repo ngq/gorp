@@ -1,5 +1,5 @@
-// Package dlock 分布式锁封装
-// 基于框架 contract.DistributedLock 能力
+// Package dlock 鍒嗗竷寮忛攣灏佽
+// 鍩轰簬妗嗘灦 datacontract.DistributedLock 鑳藉姏
 package dlock
 
 import (
@@ -7,36 +7,36 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 )
 
-// Lock 分布式锁
+// Lock 鍒嗗竷寮忛攣
 type Lock struct {
 	key    string
-	locker contract.DistributedLock
+	locker datacontract.DistributedLock
 }
 
-// Release 释放锁
+// Release 閲婃斁閿?
 func (l *Lock) Release(ctx context.Context) error {
 	return l.locker.Unlock(ctx, l.key)
 }
 
-// LockManager 锁管理器
+// LockManager 閿佺鐞嗗櫒
 type LockManager struct {
-	locker contract.DistributedLock
+	locker datacontract.DistributedLock
 }
 
-// NewLockManager 创建锁管理器
-func NewLockManager(locker contract.DistributedLock) *LockManager {
+// NewLockManager 鍒涘缓閿佺鐞嗗櫒
+func NewLockManager(locker datacontract.DistributedLock) *LockManager {
 	return &LockManager{locker: locker}
 }
 
-// AcquireLock 获取锁
+// AcquireLock 鑾峰彇閿?
 //
-// 中文说明：
-// - 获取指定 key 的分布式锁；
-// - 支持超时时间；
-// - 使用框架 DistributedLock 能力。
+// 涓枃璇存槑锛?
+// - 鑾峰彇鎸囧畾 key 鐨勫垎甯冨紡閿侊紱
+// - 鏀寔瓒呮椂鏃堕棿锛?
+// - 浣跨敤妗嗘灦 DistributedLock 鑳藉姏銆?
 func AcquireLock(ctx context.Context, mgr *LockManager, key string, ttl time.Duration) (*Lock, error) {
 	if err := mgr.locker.Lock(ctx, key, ttl); err != nil {
 		return nil, err
@@ -44,18 +44,18 @@ func AcquireLock(ctx context.Context, mgr *LockManager, key string, ttl time.Dur
 	return &Lock{key: key, locker: mgr.locker}, nil
 }
 
-// AcquireInventoryLock 获取库存锁
+// AcquireInventoryLock 鑾峰彇搴撳瓨閿?
 //
-// 中文说明：
-// - 为商品+仓库获取分布式锁；
-// - 防止超卖；
-// - 使用框架 DistributedLock 能力。
+// 涓枃璇存槑锛?
+// - 涓哄晢鍝?浠撳簱鑾峰彇鍒嗗竷寮忛攣锛?
+// - 闃叉瓒呭崠锛?
+// - 浣跨敤妗嗘灦 DistributedLock 鑳藉姏銆?
 func AcquireInventoryLock(ctx context.Context, mgr *LockManager, productID, warehouseID uint64, ttl time.Duration) (*Lock, error) {
 	key := inventoryLockKey(productID, warehouseID)
 	return AcquireLock(ctx, mgr, key, ttl)
 }
 
-// inventoryLockKey 生成库存锁 key
+// inventoryLockKey 鐢熸垚搴撳瓨閿?key
 func inventoryLockKey(productID, warehouseID uint64) string {
 	return fmt.Sprintf("inventory:%d:%d", productID, warehouseID)
 }

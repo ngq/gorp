@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +16,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "registry.eureka", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.RPCRegistryKey}, p.Provides())
+	require.Equal(t, []string{transportcontract.RPCRegistryKey}, p.Provides())
 }
 
 func TestRegistryRegisterUsesClient(t *testing.T) {
@@ -55,7 +55,7 @@ func TestRegistryDeregisterUsesClient(t *testing.T) {
 
 func TestRegistryDiscoverUsesClient(t *testing.T) {
 	client := &fakeEurekaClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "USER-SERVICE:10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -161,10 +161,10 @@ func TestRegistryCloseRejectsOperations(t *testing.T) {
 
 func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 	client := &fakeEurekaClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "USER-SERVICE:10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
-		watchUpdates: make(chan []contract.ServiceInstance, 1),
+		watchUpdates: make(chan []transportcontract.ServiceInstance, 1),
 	}
 	registry, err := NewRegistryWithClient(testEurekaConfig(), client)
 	require.NoError(t, err)
@@ -180,7 +180,7 @@ func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 		t.Fatal("expected initial watch snapshot")
 	}
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "USER-SERVICE:10.0.0.2:8080", Name: "user-service", Address: "10.0.0.2:8080", Healthy: true},
 	})
 
@@ -195,10 +195,10 @@ func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 
 func TestRegistryWatchSkipsDuplicateSnapshot(t *testing.T) {
 	client := &fakeEurekaClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "USER-SERVICE:10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
-		watchUpdates: make(chan []contract.ServiceInstance, 2),
+		watchUpdates: make(chan []transportcontract.ServiceInstance, 2),
 	}
 	registry, err := NewRegistryWithClient(testEurekaConfig(), client)
 	require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestRegistryWatchSkipsDuplicateSnapshot(t *testing.T) {
 		t.Fatal("expected initial watch snapshot")
 	}
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "USER-SERVICE:10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 	})
 
@@ -363,9 +363,9 @@ func TestHTTPEurekaClientWatchRetriesAfterSourceError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	updates := make(chan []contract.ServiceInstance, 4)
+	updates := make(chan []transportcontract.ServiceInstance, 4)
 	go func() {
-		_ = client.Watch(ctx, cfg, "user-service", func(instances []contract.ServiceInstance) {
+		_ = client.Watch(ctx, cfg, "user-service", func(instances []transportcontract.ServiceInstance) {
 			updates <- instances
 		})
 	}()
@@ -389,10 +389,10 @@ func TestHTTPEurekaClientWatchRetriesAfterSourceError(t *testing.T) {
 
 func TestRegistryWatchRetriesAfterClientWatchError(t *testing.T) {
 	client := &fakeEurekaClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "USER-SERVICE:10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
-		watchUpdates: make(chan []contract.ServiceInstance, 1),
+		watchUpdates: make(chan []transportcontract.ServiceInstance, 1),
 		watchErrs:    []error{errors.New("temporary watch error")},
 	}
 	cfg := testEurekaConfig()
@@ -413,7 +413,7 @@ func TestRegistryWatchRetriesAfterClientWatchError(t *testing.T) {
 		return client.watchCalls >= 2
 	}, time.Second, 10*time.Millisecond)
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "USER-SERVICE:10.0.0.2:8080", Name: "user-service", Address: "10.0.0.2:8080", Healthy: true},
 	})
 
@@ -460,10 +460,10 @@ type fakeEurekaClient struct {
 	heartbeatErr    error
 	heartbeatErrs   []error
 	discoverErr     error
-	discoverResult  []contract.ServiceInstance
+	discoverResult  []transportcontract.ServiceInstance
 	discoverErrs    []error
-	discoverResults [][]contract.ServiceInstance
-	watchUpdates    chan []contract.ServiceInstance
+	discoverResults [][]transportcontract.ServiceInstance
+	watchUpdates    chan []transportcontract.ServiceInstance
 	watchErrs       []error
 	registerCalls   int
 	deregisterCalls int
@@ -492,7 +492,7 @@ func (f *fakeEurekaClient) Heartbeat(ctx context.Context, cfg *EurekaConfig, nam
 	return f.heartbeatErr
 }
 
-func (f *fakeEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]contract.ServiceInstance, error) {
+func (f *fakeEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	f.discoverCalls++
 	if len(f.discoverErrs) > 0 {
 		err := f.discoverErrs[0]
@@ -509,12 +509,12 @@ func (f *fakeEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name
 		if len(f.discoverResults) > 1 {
 			f.discoverResults = f.discoverResults[1:]
 		}
-		return append([]contract.ServiceInstance(nil), result...), nil
+		return append([]transportcontract.ServiceInstance(nil), result...), nil
 	}
-	return append([]contract.ServiceInstance(nil), f.discoverResult...), nil
+	return append([]transportcontract.ServiceInstance(nil), f.discoverResult...), nil
 }
 
-func (f *fakeEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]contract.ServiceInstance)) error {
+func (f *fakeEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
 	f.watchCalls++
 	if len(f.watchErrs) > 0 {
 		err := f.watchErrs[0]
@@ -535,9 +535,9 @@ func (f *fakeEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name st
 	}
 }
 
-func (f *fakeEurekaClient) push(instances []contract.ServiceInstance) {
+func (f *fakeEurekaClient) push(instances []transportcontract.ServiceInstance) {
 	if f.watchUpdates == nil {
-		f.watchUpdates = make(chan []contract.ServiceInstance, 1)
+		f.watchUpdates = make(chan []transportcontract.ServiceInstance, 1)
 	}
 	f.watchUpdates <- instances
 }

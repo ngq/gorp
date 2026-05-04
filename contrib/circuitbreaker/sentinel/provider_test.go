@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	base "github.com/alibaba/sentinel-golang/core/base"
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,19 +12,19 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "circuitbreaker.sentinel", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.CircuitBreakerKey, contract.RateLimiterKey}, p.Provides())
+	require.Equal(t, []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}, p.Provides())
 }
 
 func TestInterfaceCompatibility(t *testing.T) {
-	var cb contract.CircuitBreaker = NewSentinelCircuitBreaker(&contract.CircuitBreakerConfig{})
-	var rl contract.RateLimiter = NewSentinelRateLimiter(&contract.CircuitBreakerConfig{})
+	var cb resiliencecontract.CircuitBreaker = NewSentinelCircuitBreaker(&resiliencecontract.CircuitBreakerConfig{})
+	var rl resiliencecontract.RateLimiter = NewSentinelRateLimiter(&resiliencecontract.CircuitBreakerConfig{})
 	require.NotNil(t, cb)
 	require.NotNil(t, rl)
 }
 
 func TestNativeEscapeHatch(t *testing.T) {
-	cb := NewSentinelCircuitBreaker(&contract.CircuitBreakerConfig{})
-	rl := NewSentinelRateLimiter(&contract.CircuitBreakerConfig{})
+	cb := NewSentinelCircuitBreaker(&resiliencecontract.CircuitBreakerConfig{})
+	rl := NewSentinelRateLimiter(&resiliencecontract.CircuitBreakerConfig{})
 
 	require.NotNil(t, cb.Underlying())
 	require.NotNil(t, rl.Underlying())

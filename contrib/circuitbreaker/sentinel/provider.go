@@ -11,7 +11,9 @@ import (
 	sentinelcb "github.com/alibaba/sentinel-golang/core/circuitbreaker"
 	"github.com/alibaba/sentinel-golang/core/isolation"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 var sentinelEntry = sentinel.Entry
@@ -32,10 +34,10 @@ func NewProvider() *Provider      { return &Provider{} }
 func (p *Provider) Name() string  { return "circuitbreaker.sentinel" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.CircuitBreakerKey, contract.RateLimiterKey}
+	return []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
+func (p *Provider) Register(c runtimecontract.Container) error {
 	cfg, err := getCircuitBreakerConfig(c)
 	if err != nil {
 		return err
@@ -45,22 +47,22 @@ func (p *Provider) Register(c contract.Container) error {
 			return fmt.Errorf("circuitbreaker.sentinel: init failed: %w", err)
 		}
 	}
-	c.Bind(contract.CircuitBreakerKey, func(c contract.Container) (any, error) {
+	c.Bind(resiliencecontract.CircuitBreakerKey, func(c runtimecontract.Container) (any, error) {
 		return NewSentinelCircuitBreaker(cfg), nil
 	}, true)
-	c.Bind(contract.RateLimiterKey, func(c contract.Container) (any, error) {
+	c.Bind(resiliencecontract.RateLimiterKey, func(c runtimecontract.Container) (any, error) {
 		return NewSentinelRateLimiter(cfg), nil
 	}, true)
 	return nil
 }
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-func getCircuitBreakerConfig(c contract.Container) (*contract.CircuitBreakerConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getCircuitBreakerConfig(c runtimecontract.Container) (*resiliencecontract.CircuitBreakerConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("circuitbreaker: invalid config service")
 	}
@@ -70,11 +72,11 @@ func getCircuitBreakerConfig(c contract.Container) (*contract.CircuitBreakerConf
 		enabled = cfg.GetBool("circuit_breaker.enabled")
 	}
 
-	cbCfg := &contract.CircuitBreakerConfig{
+	cbCfg := &resiliencecontract.CircuitBreakerConfig{
 		Enabled:         enabled,
 		Strategy:        "sentinel",
-		ResourceConfigs: make(map[string]contract.ResourceConfig),
-		DefaultConfig: contract.ResourceConfig{
+		ResourceConfigs: make(map[string]resiliencecontract.ResourceConfig),
+		DefaultConfig: resiliencecontract.ResourceConfig{
 			Threshold:             0.5,
 			MinRequestCount:       10,
 			MaxConcurrentRequests: 100,
@@ -85,7 +87,7 @@ func getCircuitBreakerConfig(c contract.Container) (*contract.CircuitBreakerConf
 	return cbCfg, nil
 }
 
-func initSentinel(cfg *contract.CircuitBreakerConfig) error {
+func initSentinel(cfg *resiliencecontract.CircuitBreakerConfig) error {
 	if err := sentinelInitDefault(); err != nil {
 		return err
 	}
@@ -118,7 +120,7 @@ func initSentinel(cfg *contract.CircuitBreakerConfig) error {
 	return nil
 }
 
-func buildCircuitBreakerRule(resource string, current contract.ResourceConfig, defaults contract.ResourceConfig) *sentinelcb.Rule {
+func buildCircuitBreakerRule(resource string, current resiliencecontract.ResourceConfig, defaults resiliencecontract.ResourceConfig) *sentinelcb.Rule {
 	minRequest := current.MinRequestCount
 	if minRequest <= 0 {
 		minRequest = defaults.MinRequestCount
@@ -153,7 +155,7 @@ func buildCircuitBreakerRule(resource string, current contract.ResourceConfig, d
 }
 
 type resourceState struct {
-	state        contract.CircuitBreakerState
+	state        resiliencecontract.CircuitBreakerState
 	lastChanged  time.Time
 	lastFailure  error
 	successCount int64
@@ -161,11 +163,11 @@ type resourceState struct {
 }
 
 type SentinelCircuitBreaker struct {
-	cfg    *contract.CircuitBreakerConfig
+	cfg    *resiliencecontract.CircuitBreakerConfig
 	states sync.Map
 }
 
-func NewSentinelCircuitBreaker(cfg *contract.CircuitBreakerConfig) *SentinelCircuitBreaker {
+func NewSentinelCircuitBreaker(cfg *resiliencecontract.CircuitBreakerConfig) *SentinelCircuitBreaker {
 	return &SentinelCircuitBreaker{cfg: cfg}
 }
 
@@ -184,7 +186,7 @@ func (cb *SentinelCircuitBreaker) RecordSuccess(ctx context.Context, resource st
 	state := cb.loadState(resource)
 	state.successCount++
 	state.lastFailure = nil
-	state.state = contract.CircuitBreakerStateClosed
+	state.state = resiliencecontract.CircuitBreakerStateClosed
 	state.lastChanged = time.Now()
 }
 
@@ -192,7 +194,7 @@ func (cb *SentinelCircuitBreaker) RecordFailure(ctx context.Context, resource st
 	state := cb.loadState(resource)
 	state.failureCount++
 	state.lastFailure = err
-	state.state = contract.CircuitBreakerStateOpen
+	state.state = resiliencecontract.CircuitBreakerStateOpen
 	state.lastChanged = time.Now()
 }
 
@@ -215,17 +217,17 @@ func (cb *SentinelCircuitBreaker) Do(ctx context.Context, resource string, fn fu
 	return nil
 }
 
-func (cb *SentinelCircuitBreaker) State(ctx context.Context, resource string) contract.CircuitBreakerState {
+func (cb *SentinelCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
 	state := cb.loadState(resource)
-	if state.state == contract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
-		state.state = contract.CircuitBreakerStateHalfOpen
+	if state.state == resiliencecontract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
+		state.state = resiliencecontract.CircuitBreakerStateHalfOpen
 	}
 	return state.state
 }
 
 func (cb *SentinelCircuitBreaker) loadState(resource string) *resourceState {
 	actual, _ := cb.states.LoadOrStore(resource, &resourceState{
-		state:       contract.CircuitBreakerStateClosed,
+		state:       resiliencecontract.CircuitBreakerStateClosed,
 		lastChanged: time.Now(),
 	})
 	return actual.(*resourceState)
@@ -241,15 +243,15 @@ func (cb *SentinelCircuitBreaker) shouldHalfOpen(state *resourceState) bool {
 
 func (cb *SentinelCircuitBreaker) markOpen(resource string, err error) {
 	state := cb.loadState(resource)
-	state.state = contract.CircuitBreakerStateOpen
+	state.state = resiliencecontract.CircuitBreakerStateOpen
 	state.lastFailure = err
 	state.lastChanged = time.Now()
 }
 
 func (cb *SentinelCircuitBreaker) markHalfOpenIfRecovered(resource string) {
 	state := cb.loadState(resource)
-	if state.state == contract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
-		state.state = contract.CircuitBreakerStateHalfOpen
+	if state.state == resiliencecontract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
+		state.state = resiliencecontract.CircuitBreakerStateHalfOpen
 		state.lastChanged = time.Now()
 	}
 }
@@ -263,10 +265,10 @@ func (cb *SentinelCircuitBreaker) As(target any) bool {
 }
 
 type SentinelRateLimiter struct {
-	cfg *contract.CircuitBreakerConfig
+	cfg *resiliencecontract.CircuitBreakerConfig
 }
 
-func NewSentinelRateLimiter(cfg *contract.CircuitBreakerConfig) *SentinelRateLimiter {
+func NewSentinelRateLimiter(cfg *resiliencecontract.CircuitBreakerConfig) *SentinelRateLimiter {
 	return &SentinelRateLimiter{cfg: cfg}
 }
 
@@ -288,7 +290,7 @@ func (rl *SentinelRateLimiter) AllowN(ctx context.Context, resource string, n in
 	return nil
 }
 
-func (rl *SentinelRateLimiter) Reserve(ctx context.Context, resource string) contract.Reservation {
+func (rl *SentinelRateLimiter) Reserve(ctx context.Context, resource string) resiliencecontract.Reservation {
 	if err := rl.Allow(ctx, resource); err != nil {
 		return &sentinelReservation{ok: false}
 	}

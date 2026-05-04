@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +40,7 @@ func TestWatcherOnChangeStoresCallback(t *testing.T) {
 }
 
 func TestSourceWatchRejectsClosedSource(t *testing.T) {
-	s := &Source{cfg: &contract.ConfigSourceConfig{EtcdPath: "/config"}, closed: true}
+	s := &Source{cfg: &datacontract.ConfigSourceConfig{EtcdPath: "/config"}, closed: true}
 	_, err := s.Watch(context.Background(), "demo")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "source closed")
@@ -52,12 +53,16 @@ func TestSourceCloseWithoutClientPanicsToday(t *testing.T) {
 
 type etcdConfigInvalidContainerStub struct{}
 
-func (etcdConfigInvalidContainerStub) Bind(string, contract.Factory, bool) {}
+func (etcdConfigInvalidContainerStub) Bind(string, runtimecontract.Factory, bool) {}
 func (etcdConfigInvalidContainerStub) IsBind(string) bool { return true }
 func (etcdConfigInvalidContainerStub) Make(string) (any, error) { return 1, nil }
 func (etcdConfigInvalidContainerStub) MustMake(string) any { return 1 }
-func (etcdConfigInvalidContainerStub) RegisterProvider(contract.ServiceProvider) error { return nil }
-func (etcdConfigInvalidContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+func (etcdConfigInvalidContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (etcdConfigInvalidContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 
 func TestEtcdSourceErrorHelper(t *testing.T) {
 	err := errors.New("boom")

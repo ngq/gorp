@@ -1,16 +1,16 @@
-// Package main 库存服务入口
+// Package main 搴撳瓨鏈嶅姟鍏ュ彛
 package main
 
 import (
 	"fmt"
 	"os"
 
+	"nop-go/services/inventory-service/internal/models"
 	"nop-go/shared/bootstrap"
 	"nop-go/shared/dlock"
-	"nop-go/services/inventory-service/internal/models"
 
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"gorm.io/gorm"
 )
 
@@ -44,19 +44,19 @@ func autoMigrate(db *gorm.DB) error {
 		&models.TierPrice{},
 	)
 	if err != nil {
-		return fmt.Errorf("表结构迁移失败: %w", err)
+		return fmt.Errorf("琛ㄧ粨鏋勮縼绉诲け璐? %w", err)
 	}
 	return nil
 }
 
 func initLockManager(rt *bootstrap.HTTPServiceRuntime) *dlock.LockManager {
-	// 使用框架的分布式锁能力
-	locker, err := container.MakeAppService[contract.DistributedLock](rt.Container, contract.DistributedLockKey)
+	// 浣跨敤妗嗘灦鐨勫垎甯冨紡閿佽兘鍔?
+	locker, err := container.MakeAppService[datacontract.DistributedLock](rt.Container, datacontract.DistributedLockKey)
 	if err != nil {
-		rt.Logger.Info("分布式锁未配置，使用 noop 实现")
-		// 返回 nil，业务层会处理
+		rt.Logger.Info("鍒嗗竷寮忛攣鏈厤缃紝浣跨敤 noop 瀹炵幇")
+		// 杩斿洖 nil锛屼笟鍔″眰浼氬鐞?
 		return nil
 	}
-	rt.Logger.Info("分布式锁管理器初始化完成")
+	rt.Logger.Info("鍒嗗竷寮忛攣绠＄悊鍣ㄥ垵濮嬪寲瀹屾垚")
 	return dlock.NewLockManager(locker)
 }

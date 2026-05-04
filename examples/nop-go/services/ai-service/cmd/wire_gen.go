@@ -8,7 +8,7 @@ import (
 	"nop-go/services/ai-service/internal/service"
 	"nop-go/shared/bootstrap"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
@@ -40,7 +40,7 @@ func aiConfigFromRuntime(rt *bootstrap.HTTPServiceRuntime) biz.AIConfig {
 	return config
 }
 
-func wireAIService(db *gorm.DB, jwtSvc contract.JWTService, config biz.AIConfig) (*service.AIService, error) {
+func wireAIService(db *gorm.DB, jwtSvc securitycontract.JWTService, config biz.AIConfig) (*service.AIService, error) {
 	convRepo := data.NewAIConversationRepository(db)
 	msgRepo := data.NewAIMessageRepository(db)
 	recRepo := data.NewAIRecommendationRepository(db)

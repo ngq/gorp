@@ -430,12 +430,16 @@ $ gorp middleware new
 // app/http/middleware/ratelimit/middleware.go
 package ratelimit
 
-import "github.com/gin-gonic/gin"
+import gorp "github.com/ngq/gorp/framework/contract"
 
-// Middleware 返回该中间件的 gin.HandlerFunc。
-func Middleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        c.Next()
+// Middleware 返回该中间件的 gorp.HTTPMiddleware。
+func Middleware() gorp.HTTPMiddleware {
+    return func(next gorp.HTTPHandler) gorp.HTTPHandler {
+        return func(c gorp.HTTPContext) {
+            if next != nil {
+                next(c)
+            }
+        }
     }
 }
 ```
@@ -446,7 +450,7 @@ func Middleware() gin.HandlerFunc {
 // internal/handler/setup.go
 import "your-project/app/http/middleware/ratelimit"
 
-rt.Engine.Use(ratelimit.Middleware())
+rt.Router.Use(ratelimit.Middleware())
 ```
 
 ---

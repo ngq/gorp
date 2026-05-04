@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -92,5 +92,5 @@ func TestProvider(t *testing.T) {
 
 	assert.Equal(t, "dtm.noop", p.Name())
 	assert.True(t, p.IsDefer())
-	assert.ElementsMatch(t, []string{contract.DTMKey}, p.Provides())
+	assert.ElementsMatch(t, []string{integrationcontract.DTMKey}, p.Provides())
 }

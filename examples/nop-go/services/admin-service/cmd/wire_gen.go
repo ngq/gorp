@@ -7,11 +7,11 @@ import (
 	"nop-go/services/admin-service/internal/data"
 	"nop-go/services/admin-service/internal/service"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireAdminService(db *gorm.DB, jwtSvc contract.JWTService) (*service.AdminService, error) {
+func wireAdminService(db *gorm.DB, jwtSvc securitycontract.JWTService) (*service.AdminService, error) {
 	userRepo := data.NewAdminUserRepository(db)
 	roleRepo := data.NewAdminRoleRepository(db)
 	permissionRepo := data.NewAdminPermissionRepository(db)

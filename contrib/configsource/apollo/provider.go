@@ -15,7 +15,8 @@ import (
 	apolloconfig "github.com/apolloconfig/agollo/v4/env/config"
 	apollostorage "github.com/apolloconfig/agollo/v4/storage"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,11 +49,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "configsource.apollo" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.ConfigSourceKey}
+	return []string{datacontract.ConfigSourceKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ConfigSourceKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getApolloConfig(c)
 		if err != nil {
 			return nil, err
@@ -63,7 +64,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 // ApolloConfig 定义 Apollo 配置。
 type ApolloConfig struct {
@@ -76,13 +77,13 @@ type ApolloConfig struct {
 	WatchRetryInterval time.Duration
 }
 
-func getApolloConfig(c contract.Container) (*ApolloConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getApolloConfig(c runtimecontract.Container) (*ApolloConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("apollo: invalid config service")
 	}
@@ -230,7 +231,7 @@ func (s *ConfigSource) As(target any) bool {
 	return internalnative.As(s.Underlying(), target)
 }
 
-func (s *ConfigSource) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *ConfigSource) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
 

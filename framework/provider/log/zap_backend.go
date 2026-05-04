@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -47,7 +47,7 @@ func newZapLogger(level, format string) (*zapLogger, error) {
 // 中文说明：
 // - 供 framework 内部其他 provider（如 gin provider）在容器尚未就绪时获取兜底 logger；
 // - 返回 contract.Logger 接口，调用方无需感知 zap 细节。
-func NewDefaultLogger() (contract.Logger, error) {
+func NewDefaultLogger() (observabilitycontract.Logger, error) {
 	return newZapLogger("info", "console")
 }
 
@@ -84,23 +84,23 @@ func newZapLoggerWithSink(level, format string, sink SinkConfig) (*zapLogger, er
 	return &zapLogger{l: logger}, nil
 }
 
-func (z *zapLogger) Debug(msg string, fields ...contract.Field) {
+func (z *zapLogger) Debug(msg string, fields ...observabilitycontract.Field) {
 	z.l.Debug(msg, toZapFields(fields)...)
 }
-func (z *zapLogger) Info(msg string, fields ...contract.Field) {
+func (z *zapLogger) Info(msg string, fields ...observabilitycontract.Field) {
 	z.l.Info(msg, toZapFields(fields)...)
 }
-func (z *zapLogger) Warn(msg string, fields ...contract.Field) {
+func (z *zapLogger) Warn(msg string, fields ...observabilitycontract.Field) {
 	z.l.Warn(msg, toZapFields(fields)...)
 }
-func (z *zapLogger) Error(msg string, fields ...contract.Field) {
+func (z *zapLogger) Error(msg string, fields ...observabilitycontract.Field) {
 	z.l.Error(msg, toZapFields(fields)...)
 }
-func (z *zapLogger) With(fields ...contract.Field) contract.Logger {
+func (z *zapLogger) With(fields ...observabilitycontract.Field) observabilitycontract.Logger {
 	return &zapLogger{l: z.l.With(toZapFields(fields)...)}
 }
 
-func toZapFields(fields []contract.Field) []zap.Field {
+func toZapFields(fields []observabilitycontract.Field) []zap.Field {
 	out := make([]zap.Field, 0, len(fields))
 	for _, f := range fields {
 		out = append(out, zap.Any(f.Key, f.Value))

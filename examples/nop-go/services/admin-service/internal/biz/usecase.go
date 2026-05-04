@@ -1,4 +1,4 @@
-// Package biz 管理后台服务业务逻辑层
+// Package biz 绠＄悊鍚庡彴鏈嶅姟涓氬姟閫昏緫灞?
 package biz
 
 import (
@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"nop-go/services/admin-service/internal/data"
 	"nop-go/services/admin-service/internal/models"
 )
@@ -16,15 +16,15 @@ type AdminUserUseCase struct {
 	userRepo data.AdminUserRepository
 	roleRepo data.AdminRoleRepository
 	logRepo  data.ActivityLogRepository
-	jwtSvc   contract.JWTService
+	jwtSvc   securitycontract.JWTService
 }
 
-// NewAdminUserUseCase 创建管理后台用户 UseCase。
+// NewAdminUserUseCase 鍒涘缓绠＄悊鍚庡彴鐢ㄦ埛 UseCase銆?
 //
-// 中文说明：
-// - 使用 framework 级 JWTService，替代项目层 jwtSecret/jwtExpire；
-// - JWTService 统一处理签发/验证，配置从 auth.jwt.* 读取。
-func NewAdminUserUseCase(userRepo data.AdminUserRepository, roleRepo data.AdminRoleRepository, logRepo data.ActivityLogRepository, jwtSvc contract.JWTService) *AdminUserUseCase {
+// 涓枃璇存槑锛?
+// - 浣跨敤 framework 绾?JWTService锛屾浛浠ｉ」鐩眰 jwtSecret/jwtExpire锛?
+// - JWTService 缁熶竴澶勭悊绛惧彂/楠岃瘉锛岄厤缃粠 auth.jwt.* 璇诲彇銆?
+func NewAdminUserUseCase(userRepo data.AdminUserRepository, roleRepo data.AdminRoleRepository, logRepo data.ActivityLogRepository, jwtSvc securitycontract.JWTService) *AdminUserUseCase {
 	return &AdminUserUseCase{userRepo: userRepo, roleRepo: roleRepo, logRepo: logRepo, jwtSvc: jwtSvc}
 }
 
@@ -47,7 +47,7 @@ func (uc *AdminUserUseCase) Login(ctx context.Context, username, password string
 		roles = append(roles, role.SystemName)
 	}
 
-	// 使用 framework JWTService 签发 token
+	// 浣跨敤 framework JWTService 绛惧彂 token
 	claims := uc.jwtSvc.NewClaims(int64(user.ID), "admin", user.Username, roles, 86400)
 	token, err := uc.jwtSvc.Sign(claims)
 	if err != nil {

@@ -1,4 +1,4 @@
-// Package service 客户服务HTTP层
+﻿// Package service 瀹㈡埛鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,27 +6,27 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/customer-service/internal/biz"
 	"nop-go/services/customer-service/internal/models"
 	shareModels "nop-go/shared/models"
 )
 
-// CustomerService 客户服务
+// CustomerService 瀹㈡埛鏈嶅姟
 type CustomerService struct {
 	customerUC *biz.CustomerUseCase
 	addressUC  *biz.AddressUseCase
 	gdprUC     *biz.GdprUseCase
-	jwtSvc     contract.JWTService
+	jwtSvc     securitycontract.JWTService
 }
 
-// NewCustomerService 创建客户服务。
+// NewCustomerService 鍒涘缓瀹㈡埛鏈嶅姟銆?
 //
-// 中文说明：
-// - 使用 framework 级 JWTService，替代项目层 jwtSecret；
-// - 中间件改用 framework 提供的 AuthMiddleware。
-func NewCustomerService(customerUC *biz.CustomerUseCase, addressUC *biz.AddressUseCase, gdprUC *biz.GdprUseCase, jwtSvc contract.JWTService) *CustomerService {
+// 涓枃璇存槑锛?
+// - 浣跨敤 framework 绾?JWTService锛屾浛浠ｉ」鐩眰 jwtSecret锛?
+// - 涓棿浠舵敼鐢?framework 鎻愪緵鐨?AuthMiddleware銆?
+func NewCustomerService(customerUC *biz.CustomerUseCase, addressUC *biz.AddressUseCase, gdprUC *biz.GdprUseCase, jwtSvc securitycontract.JWTService) *CustomerService {
 	return &CustomerService{
 		customerUC: customerUC,
 		addressUC:  addressUC,
@@ -35,18 +35,18 @@ func NewCustomerService(customerUC *biz.CustomerUseCase, addressUC *biz.AddressU
 	}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *CustomerService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
-	// 使用 framework JWT middleware
+	// 浣跨敤 framework JWT middleware
 	customerAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "customer")
 	{
-		// 认证相关
+		// 璁よ瘉鐩稿叧
 		api.POST("/auth/register", s.Register)
 		api.POST("/auth/login", s.Login)
 		api.GET("/auth/me", customerAuth, s.GetCurrentUser)
 
-		// 客户管理
+		// 瀹㈡埛绠＄悊
 		customers := api.Group("/customers")
 		customers.Use(customerAuth)
 		{
@@ -57,7 +57,7 @@ func (s *CustomerService) RegisterRoutes(r *gin.Engine) {
 			customers.GET("", s.ListCustomers)
 		}
 
-		// 地址管理
+		// 鍦板潃绠＄悊
 		addresses := api.Group("/customers/:customer_id/addresses")
 		addresses.Use(customerAuth)
 		{
@@ -70,36 +70,36 @@ func (s *CustomerService) RegisterRoutes(r *gin.Engine) {
 			addresses.PUT("/:id/default-shipping", s.SetDefaultShipping)
 		}
 
-		// GDPR 合规管理
+		// GDPR 鍚堣绠＄悊
 		gdpr := api.Group("/gdpr")
 		{
-			// GDPR 同意项管理（管理员）
+			// GDPR 鍚屾剰椤圭鐞嗭紙绠＄悊鍛橈級
 			gdpr.GET("/consents", s.ListConsents)
 			gdpr.POST("/consents", s.CreateConsent)
 			gdpr.GET("/consents/:id", s.GetConsent)
 			gdpr.PUT("/consents/:id", s.UpdateConsent)
 			gdpr.DELETE("/consents/:id", s.DeleteConsent)
 
-			// 客户同意操作
+			// 瀹㈡埛鍚屾剰鎿嶄綔
 			gdpr.POST("/accept", customerAuth, s.AcceptConsent)
 			gdpr.GET("/customers/:customer_id/consents", customerAuth, s.GetCustomerConsents)
 
-			// 数据导出/删除请求
+			// 鏁版嵁瀵煎嚭/鍒犻櫎璇锋眰
 			gdpr.POST("/export", customerAuth, s.RequestDataExport)
 			gdpr.POST("/delete", customerAuth, s.RequestDataDeletion)
 			gdpr.GET("/customers/:customer_id/export", customerAuth, s.ExportCustomerData)
 
-			// GDPR 请求管理（管理员）
+			// GDPR 璇锋眰绠＄悊锛堢鐞嗗憳锛?
 			gdpr.GET("/requests", s.ListGdprRequests)
 			gdpr.POST("/requests/:id/process", s.ProcessGdprRequest)
 
-			// GDPR 日志
+			// GDPR 鏃ュ織
 			gdpr.GET("/customers/:customer_id/logs", customerAuth, s.GetGdprLogs)
 		}
 	}
 }
 
-// Register 注册
+// Register 娉ㄥ唽
 func (s *CustomerService) Register(c *gin.Context) {
 	var req biz.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,7 +116,7 @@ func (s *CustomerService) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, ToCustomerResponse(customer))
 }
 
-// Login 登录
+// Login 鐧诲綍
 func (s *CustomerService) Login(c *gin.Context) {
 	var req biz.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -136,7 +136,7 @@ func (s *CustomerService) Login(c *gin.Context) {
 	})
 }
 
-// GetCurrentUser 获取当前用户
+// GetCurrentUser 鑾峰彇褰撳墠鐢ㄦ埛
 func (s *CustomerService) GetCurrentUser(c *gin.Context) {
 	subjectID, ok := jwtmiddleware.SubjectIDFromContext(c)
 	if !ok || subjectID == 0 {
@@ -151,7 +151,7 @@ func (s *CustomerService) GetCurrentUser(c *gin.Context) {
 	c.JSON(http.StatusOK, ToCustomerResponse(customer))
 }
 
-// GetCustomer 获取客户
+// GetCustomer 鑾峰彇瀹㈡埛
 func (s *CustomerService) GetCustomer(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -168,7 +168,7 @@ func (s *CustomerService) GetCustomer(c *gin.Context) {
 	c.JSON(http.StatusOK, ToCustomerResponse(customer))
 }
 
-// ValidateCustomer 验证客户（供其他服务调用）
+// ValidateCustomer 楠岃瘉瀹㈡埛锛堜緵鍏朵粬鏈嶅姟璋冪敤锛?
 func (s *CustomerService) ValidateCustomer(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -184,7 +184,7 @@ func (s *CustomerService) ValidateCustomer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"valid": true})
 }
 
-// UpdateProfile 更新资料
+// UpdateProfile 鏇存柊璧勬枡
 func (s *CustomerService) UpdateProfile(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -212,7 +212,7 @@ func (s *CustomerService) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, ToCustomerResponse(customer))
 }
 
-// ChangePassword 修改密码
+// ChangePassword 淇敼瀵嗙爜
 func (s *CustomerService) ChangePassword(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -237,7 +237,7 @@ func (s *CustomerService) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "password changed"})
 }
 
-// ListCustomers 客户列表
+// ListCustomers 瀹㈡埛鍒楄〃
 func (s *CustomerService) ListCustomers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
@@ -256,7 +256,7 @@ func (s *CustomerService) ListCustomers(c *gin.Context) {
 	c.JSON(http.StatusOK, shareModels.NewPagingResponse(items, total, page, pageSize))
 }
 
-// GetAddresses 获取地址列表
+// GetAddresses 鑾峰彇鍦板潃鍒楄〃
 func (s *CustomerService) GetAddresses(c *gin.Context) {
 	customerID, err := strconv.ParseUint(c.Param("customer_id"), 10, 64)
 	if err != nil {
@@ -278,7 +278,7 @@ func (s *CustomerService) GetAddresses(c *gin.Context) {
 	c.JSON(http.StatusOK, items)
 }
 
-// CreateAddress 创建地址
+// CreateAddress 鍒涘缓鍦板潃
 func (s *CustomerService) CreateAddress(c *gin.Context) {
 	customerID, err := strconv.ParseUint(c.Param("customer_id"), 10, 64)
 	if err != nil {
@@ -315,7 +315,7 @@ func (s *CustomerService) CreateAddress(c *gin.Context) {
 	c.JSON(http.StatusCreated, ToAddressResponse(address))
 }
 
-// GetAddress 获取地址
+// GetAddress 鑾峰彇鍦板潃
 func (s *CustomerService) GetAddress(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -332,7 +332,7 @@ func (s *CustomerService) GetAddress(c *gin.Context) {
 	c.JSON(http.StatusOK, ToAddressResponse(address))
 }
 
-// UpdateAddress 更新地址
+// UpdateAddress 鏇存柊鍦板潃
 func (s *CustomerService) UpdateAddress(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -372,7 +372,7 @@ func (s *CustomerService) UpdateAddress(c *gin.Context) {
 	c.JSON(http.StatusOK, ToAddressResponse(address))
 }
 
-// DeleteAddress 删除地址
+// DeleteAddress 鍒犻櫎鍦板潃
 func (s *CustomerService) DeleteAddress(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -388,7 +388,7 @@ func (s *CustomerService) DeleteAddress(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// SetDefaultBilling 设置默认账单地址
+// SetDefaultBilling 璁剧疆榛樿璐﹀崟鍦板潃
 func (s *CustomerService) SetDefaultBilling(c *gin.Context) {
 	customerID, err := strconv.ParseUint(c.Param("customer_id"), 10, 64)
 	if err != nil {
@@ -409,7 +409,7 @@ func (s *CustomerService) SetDefaultBilling(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "default billing address set"})
 }
 
-// SetDefaultShipping 设置默认配送地址
+// SetDefaultShipping 璁剧疆榛樿閰嶉€佸湴鍧€
 func (s *CustomerService) SetDefaultShipping(c *gin.Context) {
 	customerID, err := strconv.ParseUint(c.Param("customer_id"), 10, 64)
 	if err != nil {
@@ -430,9 +430,9 @@ func (s *CustomerService) SetDefaultShipping(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "default shipping address set"})
 }
 
-// DTO 定义
+// DTO 瀹氫箟
 
-// CustomerResponse 客户响应
+// CustomerResponse 瀹㈡埛鍝嶅簲
 type CustomerResponse struct {
 	ID            uint64 `json:"id"`
 	Username      string `json:"username"`
@@ -449,7 +449,7 @@ type CustomerResponse struct {
 	CreatedAt     string `json:"created_at"`
 }
 
-// ToCustomerResponse 转换为响应
+// ToCustomerResponse 杞崲涓哄搷搴?
 func ToCustomerResponse(c *models.Customer) CustomerResponse {
 	return CustomerResponse{
 		ID:            c.ID,
@@ -468,7 +468,7 @@ func ToCustomerResponse(c *models.Customer) CustomerResponse {
 	}
 }
 
-// AddressResponse 地址响应
+// AddressResponse 鍦板潃鍝嶅簲
 type AddressResponse struct {
 	ID                uint64 `json:"id"`
 	CustomerID        uint64 `json:"customer_id"`
@@ -489,7 +489,7 @@ type AddressResponse struct {
 	IsDefaultShipping bool   `json:"is_default_shipping"`
 }
 
-// ToAddressResponse 转换为响应
+// ToAddressResponse 杞崲涓哄搷搴?
 func ToAddressResponse(a *models.Address) AddressResponse {
 	return AddressResponse{
 		ID:                a.ID,
@@ -512,7 +512,7 @@ func ToAddressResponse(a *models.Address) AddressResponse {
 	}
 }
 
-// AddressCreateRequest 创建地址请求
+// AddressCreateRequest 鍒涘缓鍦板潃璇锋眰
 type AddressCreateRequest struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
@@ -527,7 +527,7 @@ type AddressCreateRequest struct {
 	ZipCode   string `json:"zip_code"`
 }
 
-// ========== GDPR 处理器 ==========
+// ========== GDPR 澶勭悊鍣?==========
 
 func (s *CustomerService) ListConsents(c *gin.Context) {
 	list, err := s.gdprUC.ListConsents(c.Request.Context())

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -15,7 +15,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "configsource.kubernetes", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.ConfigSourceKey}, p.Provides())
+	require.Equal(t, []string{datacontract.ConfigSourceKey}, p.Provides())
 }
 
 func TestConfigSourceLoadAndGet(t *testing.T) {

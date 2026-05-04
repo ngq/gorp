@@ -16,7 +16,9 @@ import (
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/contrib/registry/internal/lifecycle"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 var (
@@ -42,11 +44,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "registry.eureka" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.RPCRegistryKey}
+	return []string{transportcontract.RPCRegistryKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getEurekaConfig(c)
 		if err != nil {
 			return nil, err
@@ -57,7 +59,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 type EurekaConfig struct {
 	ServerURL             string
@@ -70,13 +72,13 @@ type EurekaConfig struct {
 	WatchInterval         time.Duration
 }
 
-func getEurekaConfig(c contract.Container) (*EurekaConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getEurekaConfig(c runtimecontract.Container) (*EurekaConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("eureka: invalid config service")
 	}
@@ -121,8 +123,8 @@ type eurekaClient interface {
 	Register(ctx context.Context, cfg *EurekaConfig, name, addr string, meta map[string]string) error
 	Deregister(ctx context.Context, cfg *EurekaConfig, name, addr string) error
 	Heartbeat(ctx context.Context, cfg *EurekaConfig, name, addr string) error
-	Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]contract.ServiceInstance, error)
-	Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]contract.ServiceInstance)) error
+	Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]transportcontract.ServiceInstance, error)
+	Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error
 }
 
 // HTTPClientProvider exposes the current HTTP transport object for native down-dive.
@@ -137,7 +139,7 @@ type Registry struct {
 	mu            sync.RWMutex
 	registered    map[string]map[string]string
 	renewals      map[string]context.CancelFunc
-	endpointCache map[string][]contract.ServiceInstance
+	endpointCache map[string][]transportcontract.ServiceInstance
 	watchCache    map[string]string
 	closeMu       sync.Mutex
 	closed        bool
@@ -161,7 +163,7 @@ func NewRegistryWithClient(cfg *EurekaConfig, client eurekaClient) (*Registry, e
 		client:        client,
 		registered:    make(map[string]map[string]string),
 		renewals:      make(map[string]context.CancelFunc),
-		endpointCache: make(map[string][]contract.ServiceInstance),
+		endpointCache: make(map[string][]transportcontract.ServiceInstance),
 		watchCache:    make(map[string]string),
 	}, nil
 }
@@ -208,10 +210,10 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	return nil
 }
 
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	r.mu.RLock()
 	if instances, ok := r.endpointCache[name]; ok && len(instances) > 0 {
-		cached := append([]contract.ServiceInstance(nil), instances...)
+		cached := append([]transportcontract.ServiceInstance(nil), instances...)
 		r.mu.RUnlock()
 		return cached, nil
 	}
@@ -227,7 +229,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 	}
 
 	r.mu.Lock()
-	r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+	r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 	r.mu.Unlock()
 	return instances, nil
 }
@@ -242,7 +244,7 @@ func (r *Registry) As(target any) bool {
 	return internalnative.As(r.client, target)
 }
 
-func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.ServiceInstance, error) {
+func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportcontract.ServiceInstance, error) {
 	r.closeMu.Lock()
 	defer r.closeMu.Unlock()
 
@@ -253,8 +255,9 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 	watchCtx, cancel := context.WithCancel(ctx)
 	r.watchCancels = append(r.watchCancels, cancel)
 
-	ch := make(chan []contract.ServiceInstance, 10)
-	emit := func(instances []contract.ServiceInstance) bool {
+	ch := make(chan []transportcontract.ServiceInstance, 10)
+	var workers sync.WaitGroup
+	emit := func(instances []transportcontract.ServiceInstance) bool {
 		key := snapshotKey(instances)
 
 		r.mu.Lock()
@@ -267,12 +270,12 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		if len(instances) == 0 {
 			delete(r.endpointCache, name)
 		} else {
-			r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+			r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 		}
 		r.mu.Unlock()
 
 		select {
-		case ch <- append([]contract.ServiceInstance(nil), instances...):
+		case ch <- append([]transportcontract.ServiceInstance(nil), instances...):
 			return true
 		case <-watchCtx.Done():
 			return false
@@ -281,10 +284,11 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		}
 	}
 
+	workers.Add(1)
 	go func() {
-		defer close(ch)
+		defer workers.Done()
 		for {
-			err := r.client.Watch(watchCtx, r.config, name, func(instances []contract.ServiceInstance) {
+			err := r.client.Watch(watchCtx, r.config, name, func(instances []transportcontract.ServiceInstance) {
 				emit(instances)
 			})
 			if err == nil || watchCtx.Err() != nil {
@@ -301,7 +305,9 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		}
 	}()
 
+	workers.Add(1)
 	go func() {
+		defer workers.Done()
 		instances, err := r.Discover(watchCtx, name)
 		if err != nil {
 			if errors.Is(err, ErrServiceNotFound) {
@@ -310,6 +316,11 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 			return
 		}
 		emit(instances)
+	}()
+
+	go func() {
+		workers.Wait()
+		close(ch)
 	}()
 
 	return ch, nil
@@ -463,7 +474,7 @@ func (c *httpEurekaClient) Heartbeat(ctx context.Context, cfg *EurekaConfig, nam
 	return nil
 }
 
-func (c *httpEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]contract.ServiceInstance, error) {
+func (c *httpEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(cfg.ServerURL, "/")+"/eureka/apps/"+url.PathEscape(strings.ToUpper(name)), nil)
 	if err != nil {
 		return nil, err
@@ -496,13 +507,13 @@ func (c *httpEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name
 		return nil, ErrServiceNotFound
 	}
 
-	result := make([]contract.ServiceInstance, 0, len(instances))
+	result := make([]transportcontract.ServiceInstance, 0, len(instances))
 	for _, instance := range instances {
 		port := instance.Port.Value
 		if port == 0 {
 			port = cfg.InstancePort
 		}
-		result = append(result, contract.ServiceInstance{
+		result = append(result, transportcontract.ServiceInstance{
 			ID:       instance.InstanceID,
 			Name:     strings.ToLower(instance.App),
 			Address:  fmt.Sprintf("%s:%d", instance.IPAddr, port),
@@ -514,7 +525,7 @@ func (c *httpEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name
 	return result, nil
 }
 
-func (c *httpEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]contract.ServiceInstance)) error {
+func (c *httpEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
 	interval := cfg.WatchInterval
 	if interval <= 0 {
 		interval = 5 * time.Second
@@ -533,7 +544,7 @@ func (c *httpEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name st
 				if errors.Is(err, ErrServiceNotFound) {
 					if last != "[]" {
 						last = "[]"
-						onUpdate([]contract.ServiceInstance{})
+						onUpdate([]transportcontract.ServiceInstance{})
 					}
 					continue
 				}
@@ -620,7 +631,7 @@ func cloneStringMap(input map[string]string) map[string]string {
 	return out
 }
 
-func sortServiceInstances(instances []contract.ServiceInstance) {
+func sortServiceInstances(instances []transportcontract.ServiceInstance) {
 	sort.Slice(instances, func(i, j int) bool {
 		if instances[i].ID != instances[j].ID {
 			return instances[i].ID < instances[j].ID
@@ -629,7 +640,7 @@ func sortServiceInstances(instances []contract.ServiceInstance) {
 	})
 }
 
-func snapshotKey(instances []contract.ServiceInstance) string {
+func snapshotKey(instances []transportcontract.ServiceInstance) string {
 	if len(instances) == 0 {
 		return "<empty>"
 	}

@@ -1,4 +1,4 @@
-// Package service 购物车服务HTTP层
+﻿// Package service 璐墿杞︽湇鍔TTP灞?
 package service
 
 import (
@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/cart-service/internal/biz"
 	"nop-go/services/cart-service/internal/models"
@@ -15,21 +15,21 @@ import (
 type CartService struct {
 	cartUC     *biz.CartUseCase
 	wishlistUC *biz.WishlistUseCase
-	jwtSvc     contract.JWTService
+	jwtSvc     securitycontract.JWTService
 }
 
-// NewCartService 创建购物车服务。
+// NewCartService 鍒涘缓璐墿杞︽湇鍔°€?
 //
-// 中文说明：
-// - 使用 framework 级 JWTService，替代项目层 jwtSecret；
-// - 中间件改用 framework 提供的 AuthMiddleware。
-func NewCartService(cartUC *biz.CartUseCase, wishlistUC *biz.WishlistUseCase, jwtSvc contract.JWTService) *CartService {
+// 涓枃璇存槑锛?
+// - 浣跨敤 framework 绾?JWTService锛屾浛浠ｉ」鐩眰 jwtSecret锛?
+// - 涓棿浠舵敼鐢?framework 鎻愪緵鐨?AuthMiddleware銆?
+func NewCartService(cartUC *biz.CartUseCase, wishlistUC *biz.WishlistUseCase, jwtSvc securitycontract.JWTService) *CartService {
 	return &CartService{cartUC: cartUC, wishlistUC: wishlistUC, jwtSvc: jwtSvc}
 }
 
 func (s *CartService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
-	// 使用 framework JWT middleware
+	// 浣跨敤 framework JWT middleware
 	customerAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "customer")
 	{
 		cart := api.Group("/cart")

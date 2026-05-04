@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/ngq/gorp/framework/goroutine"
 )
 
@@ -42,13 +42,13 @@ func (e *BaseEvent) OccurredAt() time.Time { return e.occurredAt }
 // - 适合单体应用内部事件通信，后续可演进为 MQ。
 type LocalEventBus struct {
 	mu          sync.RWMutex
-	subscribers map[string][]contract.EventHandler
+	subscribers map[string][]integrationcontract.EventHandler
 }
 
 // NewLocalEventBus 创建本地事件总线。
 func NewLocalEventBus() *LocalEventBus {
 	return &LocalEventBus{
-		subscribers: make(map[string][]contract.EventHandler),
+		subscribers: make(map[string][]integrationcontract.EventHandler),
 	}
 }
 
@@ -58,7 +58,7 @@ func NewLocalEventBus() *LocalEventBus {
 // - 注册事件处理器；
 // - 同一事件可以有多个处理器，按注册顺序执行；
 // - 处理器执行失败不会影响其他处理器的执行。
-func (b *LocalEventBus) Subscribe(eventName string, handler contract.EventHandler) {
+func (b *LocalEventBus) Subscribe(eventName string, handler integrationcontract.EventHandler) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -72,7 +72,7 @@ func (b *LocalEventBus) Subscribe(eventName string, handler contract.EventHandle
 // - 处理器按注册顺序依次执行；
 // - 如果某个处理器失败，记录错误但继续执行其他处理器；
 // - 返回第一个遇到的错误。
-func (b *LocalEventBus) Publish(ctx context.Context, event contract.Event) error {
+func (b *LocalEventBus) Publish(ctx context.Context, event integrationcontract.Event) error {
 	b.mu.RLock()
 	handlers := b.subscribers[event.Name()]
 	b.mu.RUnlock()
@@ -98,7 +98,7 @@ func (b *LocalEventBus) Publish(ctx context.Context, event contract.Event) error
 // - 立即返回，事件在后台 goroutine 中处理；
 // - 使用 goroutine.SafeGo 包装，确保 panic 不会导致程序崩溃；
 // - 适合不需要等待处理完成的场景。
-func (b *LocalEventBus) PublishAsync(ctx context.Context, event contract.Event) error {
+func (b *LocalEventBus) PublishAsync(ctx context.Context, event integrationcontract.Event) error {
 	b.mu.RLock()
 	handlers := b.subscribers[event.Name()]
 	b.mu.RUnlock()

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +66,7 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 		project.FrameworkPath = "" // 清空路径，不生成 replace
 	}
 	if newOfflineBackend == "" {
-		newOfflineBackend = string(contract.RuntimeBackendGorm)
+		newOfflineBackend = string(datacontract.RuntimeBackendGorm)
 	}
 	project.Backend = newOfflineBackend
 
@@ -103,7 +103,7 @@ func init() {
 	newCmd.Args = cobra.MaximumNArgs(1)
 	newCmd.ValidArgs = []string{newIntentMultiWire}
 	newCmd.Flags().StringVar(&newOfflineTemplate, "template", starterTemplateGoLayout, "starter template: golayout, multi-flat-wire, multi-independent")
-	newCmd.Flags().StringVar(&newOfflineBackend, "backend", string(contract.RuntimeBackendGorm), "starter backend: gorm|ent")
+	newCmd.Flags().StringVar(&newOfflineBackend, "backend", string(datacontract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
 	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), if set, no replace directive will be generated")

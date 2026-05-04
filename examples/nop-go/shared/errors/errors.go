@@ -1,174 +1,174 @@
-// Package errors 提供统一的错误码定义
+﻿// Package errors 鎻愪緵缁熶竴鐨勯敊璇爜瀹氫箟
 //
-// 中文说明：
-// - 定义所有服务的业务错误码；
-// - 与 gorp 框架的 AppError 对齐；
-// - 支持国际化错误消息。
+// 涓枃璇存槑锛?
+// - 瀹氫箟鎵€鏈夋湇鍔＄殑涓氬姟閿欒鐮侊紱
+// - 涓?gorp 妗嗘灦鐨?AppError 瀵归綈锛?
+// - 鏀寔鍥介檯鍖栭敊璇秷鎭€?
 package errors
 
 import (
 	"fmt"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
-// 错误码范围分配：
-// - 1000-1999: 通用错误
-// - 2000-2999: 客户服务错误
-// - 3000-3999: 商品服务错误
-// - 4000-4999: 订单服务错误
-// - 5000-5999: 支付服务错误
-// - 6000-6999: 库存服务错误
-// - 7000-7999: 物流服务错误
+// 閿欒鐮佽寖鍥村垎閰嶏細
+// - 1000-1999: 閫氱敤閿欒
+// - 2000-2999: 瀹㈡埛鏈嶅姟閿欒
+// - 3000-3999: 鍟嗗搧鏈嶅姟閿欒
+// - 4000-4999: 璁㈠崟鏈嶅姟閿欒
+// - 5000-5999: 鏀粯鏈嶅姟閿欒
+// - 6000-6999: 搴撳瓨鏈嶅姟閿欒
+// - 7000-7999: 鐗╂祦鏈嶅姟閿欒
 
-// 通用错误码
+// 閫氱敤閿欒鐮?
 var (
-	ErrBadRequest   = NewBizError(1001, "请求参数错误")
-	ErrUnauthorized = NewBizError(1002, "未授权访问")
-	ErrForbidden    = NewBizError(1003, "禁止访问")
-	ErrNotFound     = NewBizError(1004, "资源不存在")
-	ErrConflict     = NewBizError(1005, "资源冲突")
-	ErrInternal     = NewBizError(1006, "服务器内部错误")
-	ErrServiceUnavailable = NewBizError(1007, "服务暂时不可用")
+	ErrBadRequest   = NewBizError(1001, "璇锋眰鍙傛暟閿欒")
+	ErrUnauthorized = NewBizError(1002, "鏈巿鏉冭闂?)
+	ErrForbidden    = NewBizError(1003, "绂佹璁块棶")
+	ErrNotFound     = NewBizError(1004, "璧勬簮涓嶅瓨鍦?)
+	ErrConflict     = NewBizError(1005, "璧勬簮鍐茬獊")
+	ErrInternal     = NewBizError(1006, "鏈嶅姟鍣ㄥ唴閮ㄩ敊璇?)
+	ErrServiceUnavailable = NewBizError(1007, "鏈嶅姟鏆傛椂涓嶅彲鐢?)
 )
 
-// 客户服务错误码
+// 瀹㈡埛鏈嶅姟閿欒鐮?
 var (
-	ErrCustomerNotFound      = NewBizError(2001, "客户不存在")
-	ErrCustomerAlreadyExists = NewBizError(2002, "客户已存在")
-	ErrInvalidCredentials    = NewBizError(2003, "用户名或密码错误")
-	ErrEmailNotVerified      = NewBizError(2004, "邮箱未验证")
-	ErrPhoneNotVerified      = NewBizError(2005, "手机未验证")
-	ErrCustomerDisabled      = NewBizError(2006, "账户已被禁用")
-	ErrInvalidPassword       = NewBizError(2007, "密码格式不正确")
-	ErrPasswordMismatch      = NewBizError(2008, "密码不匹配")
-	ErrAddressNotFound       = NewBizError(2009, "地址不存在")
+	ErrCustomerNotFound      = NewBizError(2001, "瀹㈡埛涓嶅瓨鍦?)
+	ErrCustomerAlreadyExists = NewBizError(2002, "瀹㈡埛宸插瓨鍦?)
+	ErrInvalidCredentials    = NewBizError(2003, "鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒")
+	ErrEmailNotVerified      = NewBizError(2004, "閭鏈獙璇?)
+	ErrPhoneNotVerified      = NewBizError(2005, "鎵嬫満鏈獙璇?)
+	ErrCustomerDisabled      = NewBizError(2006, "璐︽埛宸茶绂佺敤")
+	ErrInvalidPassword       = NewBizError(2007, "瀵嗙爜鏍煎紡涓嶆纭?)
+	ErrPasswordMismatch      = NewBizError(2008, "瀵嗙爜涓嶅尮閰?)
+	ErrAddressNotFound       = NewBizError(2009, "鍦板潃涓嶅瓨鍦?)
 )
 
-// 商品服务错误码
+// 鍟嗗搧鏈嶅姟閿欒鐮?
 var (
-	ErrProductNotFound       = NewBizError(3001, "商品不存在")
-	ErrProductNotPublished   = NewBizError(3002, "商品未上架")
-	ErrCategoryNotFound      = NewBizError(3003, "分类不存在")
-	ErrManufacturerNotFound  = NewBizError(3004, "品牌不存在")
-	ErrProductReviewNotFound = NewBizError(3005, "商品评论不存在")
-	ErrDuplicateSku          = NewBizError(3006, "SKU已存在")
+	ErrProductNotFound       = NewBizError(3001, "鍟嗗搧涓嶅瓨鍦?)
+	ErrProductNotPublished   = NewBizError(3002, "鍟嗗搧鏈笂鏋?)
+	ErrCategoryNotFound      = NewBizError(3003, "鍒嗙被涓嶅瓨鍦?)
+	ErrManufacturerNotFound  = NewBizError(3004, "鍝佺墝涓嶅瓨鍦?)
+	ErrProductReviewNotFound = NewBizError(3005, "鍟嗗搧璇勮涓嶅瓨鍦?)
+	ErrDuplicateSku          = NewBizError(3006, "SKU宸插瓨鍦?)
 )
 
-// 订单服务错误码
+// 璁㈠崟鏈嶅姟閿欒鐮?
 var (
-	ErrOrderNotFound         = NewBizError(4001, "订单不存在")
-	ErrOrderAlreadyPaid      = NewBizError(4002, "订单已支付")
-	ErrOrderAlreadyCancelled = NewBizError(4003, "订单已取消")
-	ErrOrderCannotCancel     = NewBizError(4004, "订单无法取消")
-	ErrOrderCannotModify     = NewBizError(4005, "订单无法修改")
-	ErrInvalidOrderStatus    = NewBizError(4006, "订单状态无效")
-	ErrGiftCardNotFound      = NewBizError(4007, "礼品卡不存在")
-	ErrGiftCardExpired       = NewBizError(4008, "礼品卡已过期")
-	ErrGiftCardUsed          = NewBizError(4009, "礼品卡已使用")
-	ErrReturnRequestNotFound = NewBizError(4010, "退货请求不存在")
+	ErrOrderNotFound         = NewBizError(4001, "璁㈠崟涓嶅瓨鍦?)
+	ErrOrderAlreadyPaid      = NewBizError(4002, "璁㈠崟宸叉敮浠?)
+	ErrOrderAlreadyCancelled = NewBizError(4003, "璁㈠崟宸插彇娑?)
+	ErrOrderCannotCancel     = NewBizError(4004, "璁㈠崟鏃犳硶鍙栨秷")
+	ErrOrderCannotModify     = NewBizError(4005, "璁㈠崟鏃犳硶淇敼")
+	ErrInvalidOrderStatus    = NewBizError(4006, "璁㈠崟鐘舵€佹棤鏁?)
+	ErrGiftCardNotFound      = NewBizError(4007, "绀煎搧鍗′笉瀛樺湪")
+	ErrGiftCardExpired       = NewBizError(4008, "绀煎搧鍗″凡杩囨湡")
+	ErrGiftCardUsed          = NewBizError(4009, "绀煎搧鍗″凡浣跨敤")
+	ErrReturnRequestNotFound = NewBizError(4010, "閫€璐ц姹備笉瀛樺湪")
 )
 
-// 支付服务错误码
+// 鏀粯鏈嶅姟閿欒鐮?
 var (
-	ErrPaymentNotFound       = NewBizError(5001, "支付记录不存在")
-	ErrPaymentFailed         = NewBizError(5002, "支付失败")
-	ErrPaymentTimeout        = NewBizError(5003, "支付超时")
-	ErrPaymentAlreadyRefunded = NewBizError(5004, "支付已退款")
-	ErrRefundFailed          = NewBizError(5005, "退款失败")
-	ErrInvalidPaymentMethod  = NewBizError(5006, "无效的支付方式")
+	ErrPaymentNotFound       = NewBizError(5001, "鏀粯璁板綍涓嶅瓨鍦?)
+	ErrPaymentFailed         = NewBizError(5002, "鏀粯澶辫触")
+	ErrPaymentTimeout        = NewBizError(5003, "鏀粯瓒呮椂")
+	ErrPaymentAlreadyRefunded = NewBizError(5004, "鏀粯宸查€€娆?)
+	ErrRefundFailed          = NewBizError(5005, "閫€娆惧け璐?)
+	ErrInvalidPaymentMethod  = NewBizError(5006, "鏃犳晥鐨勬敮浠樻柟寮?)
 )
 
-// 库存服务错误码
+// 搴撳瓨鏈嶅姟閿欒鐮?
 var (
-	ErrInventoryNotFound     = NewBizError(6001, "库存记录不存在")
-	ErrInsufficientStock     = NewBizError(6002, "库存不足")
-	ErrStockReservationFailed = NewBizError(6003, "库存预留失败")
-	ErrWarehouseNotFound     = NewBizError(6004, "仓库不存在")
-	ErrInventoryLocked       = NewBizError(6005, "库存被锁定")
+	ErrInventoryNotFound     = NewBizError(6001, "搴撳瓨璁板綍涓嶅瓨鍦?)
+	ErrInsufficientStock     = NewBizError(6002, "搴撳瓨涓嶈冻")
+	ErrStockReservationFailed = NewBizError(6003, "搴撳瓨棰勭暀澶辫触")
+	ErrWarehouseNotFound     = NewBizError(6004, "浠撳簱涓嶅瓨鍦?)
+	ErrInventoryLocked       = NewBizError(6005, "搴撳瓨琚攣瀹?)
 )
 
-// 物流服务错误码
+// 鐗╂祦鏈嶅姟閿欒鐮?
 var (
-	ErrShipmentNotFound     = NewBizError(7001, "发货单不存在")
-	ErrShippingMethodNotFound = NewBizError(7002, "配送方式不存在")
-	ErrInvalidTrackingNumber = NewBizError(7003, "无效的物流单号")
-	ErrShipmentAlreadyDelivered = NewBizError(7004, "发货单已送达")
+	ErrShipmentNotFound     = NewBizError(7001, "鍙戣揣鍗曚笉瀛樺湪")
+	ErrShippingMethodNotFound = NewBizError(7002, "閰嶉€佹柟寮忎笉瀛樺湪")
+	ErrInvalidTrackingNumber = NewBizError(7003, "鏃犳晥鐨勭墿娴佸崟鍙?)
+	ErrShipmentAlreadyDelivered = NewBizError(7004, "鍙戣揣鍗曞凡閫佽揪")
 )
 
-// BizError 业务错误
+// BizError 涓氬姟閿欒
 type BizError struct {
 	Code    int
 	Message string
 }
 
-// NewBizError 创建业务错误
+// NewBizError 鍒涘缓涓氬姟閿欒
 func NewBizError(code int, message string) *BizError {
 	return &BizError{Code: code, Message: message}
 }
 
-// Error 实现 error 接口
+// Error 瀹炵幇 error 鎺ュ彛
 func (e *BizError) Error() string {
 	return e.Message
 }
 
-// ToAppError 转换为 gorp AppError
-// 中文说明: 将自定义 BizError 转换为框架标准的 AppError
-func (e *BizError) ToAppError() contract.AppError {
-	// 根据错误码映射到对应的 HTTP 状态码和 Reason
+// ToAppError 杞崲涓?gorp AppError
+// 涓枃璇存槑: 灏嗚嚜瀹氫箟 BizError 杞崲涓烘鏋舵爣鍑嗙殑 AppError
+func (e *BizError) ToAppError() resiliencecontract.AppError {
+	// 鏍规嵁閿欒鐮佹槧灏勫埌瀵瑰簲鐨?HTTP 鐘舵€佺爜鍜?Reason
 	var code int
-	var reason contract.ErrorReason
+	var reason resiliencecontract.ErrorReason
 
-	// 错误码范围映射:
-	// - 1000-1999: 通用错误,默认 400
-	// - 2000-2999: 客户服务错误,默认 400
-	// - 3000-3999: 商品服务错误,默认 404
-	// - 4000-3999: 订单服务错误,默认 400
-	// - 5000-5999: 支付服务错误,默认 400
-	// - 6000-6999: 库存服务错误,默认 400
-	// - 7000-7999: 物流服务错误,默认 404
+	// 閿欒鐮佽寖鍥存槧灏?
+	// - 1000-1999: 閫氱敤閿欒,榛樿 400
+	// - 2000-2999: 瀹㈡埛鏈嶅姟閿欒,榛樿 400
+	// - 3000-3999: 鍟嗗搧鏈嶅姟閿欒,榛樿 404
+	// - 4000-3999: 璁㈠崟鏈嶅姟閿欒,榛樿 400
+	// - 5000-5999: 鏀粯鏈嶅姟閿欒,榛樿 400
+	// - 6000-6999: 搴撳瓨鏈嶅姟閿欒,榛樿 400
+	// - 7000-7999: 鐗╂祦鏈嶅姟閿欒,榛樿 404
 	switch {
 	case e.Code >= 1000 && e.Code < 2000:
-		code = contract.ErrorCodeBadRequest
-		reason = contract.ErrorReasonBadRequest
+		code = resiliencecontract.ErrorCodeBadRequest
+		reason = resiliencecontract.ErrorReasonBadRequest
 	case e.Code >= 2000 && e.Code < 3000:
-		// 客户相关错误,多数为 400/401/404
+		// 瀹㈡埛鐩稿叧閿欒,澶氭暟涓?400/401/404
 		switch e.Code {
 		case 2001, 2009: // Not Found
-			code = contract.ErrorCodeNotFound
-			reason = contract.ErrorReasonNotFound
+			code = resiliencecontract.ErrorCodeNotFound
+			reason = resiliencecontract.ErrorReasonNotFound
 		case 2003, 2006: // Unauthorized/Forbidden
-			code = contract.ErrorCodeUnauthorized
-			reason = contract.ErrorReasonUnauthorized
+			code = resiliencecontract.ErrorCodeUnauthorized
+			reason = resiliencecontract.ErrorReasonUnauthorized
 		default:
-			code = contract.ErrorCodeBadRequest
-			reason = contract.ErrorReasonBadRequest
+			code = resiliencecontract.ErrorCodeBadRequest
+			reason = resiliencecontract.ErrorReasonBadRequest
 		}
 	case e.Code >= 3000 && e.Code < 4000:
-		code = contract.ErrorCodeNotFound
-		reason = contract.ErrorReasonNotFound
+		code = resiliencecontract.ErrorCodeNotFound
+		reason = resiliencecontract.ErrorReasonNotFound
 	case e.Code >= 4000 && e.Code < 5000:
-		code = contract.ErrorCodeBadRequest
-		reason = contract.ErrorReasonBadRequest
+		code = resiliencecontract.ErrorCodeBadRequest
+		reason = resiliencecontract.ErrorReasonBadRequest
 	case e.Code >= 5000 && e.Code < 6000:
-		code = contract.ErrorCodeBadRequest
-		reason = contract.ErrorReasonBadRequest
+		code = resiliencecontract.ErrorCodeBadRequest
+		reason = resiliencecontract.ErrorReasonBadRequest
 	case e.Code >= 6000 && e.Code < 7000:
-		// 库存不足等错误属于业务冲突
-		code = contract.ErrorCodeConflict
-		reason = contract.ErrorReasonConflict
+		// 搴撳瓨涓嶈冻绛夐敊璇睘浜庝笟鍔″啿绐?
+		code = resiliencecontract.ErrorCodeConflict
+		reason = resiliencecontract.ErrorReasonConflict
 	case e.Code >= 7000 && e.Code < 8000:
-		code = contract.ErrorCodeNotFound
-		reason = contract.ErrorReasonNotFound
+		code = resiliencecontract.ErrorCodeNotFound
+		reason = resiliencecontract.ErrorReasonNotFound
 	default:
-		code = contract.ErrorCodeInternalServerError
-		reason = contract.ErrorReasonInternal
+		code = resiliencecontract.ErrorCodeInternalServerError
+		reason = resiliencecontract.ErrorReasonInternal
 	}
 
-	return contract.NewError(code, reason, e.Message)
+	return resiliencecontract.NewError(code, reason, e.Message)
 }
 
-// Is 判断错误是否相等
+// Is 鍒ゆ柇閿欒鏄惁鐩哥瓑
 func (e *BizError) Is(target error) bool {
 	t, ok := target.(*BizError)
 	if !ok {
@@ -177,7 +177,7 @@ func (e *BizError) Is(target error) bool {
 	return e.Code == t.Code
 }
 
-// WrapError 包装错误
+// WrapError 鍖呰閿欒
 func WrapError(err error, code int, message string) *BizError {
 	return &BizError{
 		Code:    code,

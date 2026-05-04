@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,7 +12,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "registry.consul", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.RPCRegistryKey}, p.Provides())
+	require.Equal(t, []string{transportcontract.RPCRegistryKey}, p.Provides())
 }
 
 func TestRegistryUnderlyingAndAs(t *testing.T) {

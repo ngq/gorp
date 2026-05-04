@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +14,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "registry.polaris", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.RPCRegistryKey}, p.Provides())
+	require.Equal(t, []string{transportcontract.RPCRegistryKey}, p.Provides())
 }
 
 func TestRegistryRegisterUsesClient(t *testing.T) {
@@ -51,7 +51,7 @@ func TestRegistryRegisterRejectsDuplicateInstance(t *testing.T) {
 
 func TestRegistryDiscoverUsesClient(t *testing.T) {
 	client := &fakePolarisRegistryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -113,10 +113,10 @@ func TestRegistryCloseRejectsOperations(t *testing.T) {
 
 func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 	client := &fakePolarisRegistryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
-		watchUpdates: make(chan []contract.ServiceInstance, 1),
+		watchUpdates: make(chan []transportcontract.ServiceInstance, 1),
 	}
 	registry, err := NewRegistryWithClient(testPolarisRegistryConfig(), client)
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestRegistryWatchDeliversInitialAndUpdatedSnapshot(t *testing.T) {
 		t.Fatal("expected initial watch snapshot")
 	}
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "user-service-10.0.0.2:8080", Name: "user-service", Address: "10.0.0.2:8080", Healthy: true},
 	})
 
@@ -156,11 +156,11 @@ func TestRegistryWatchAfterCloseFails(t *testing.T) {
 
 func TestRegistryWatchRetriesAfterClientError(t *testing.T) {
 	client := &fakePolarisRegistryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "user-service-10.0.0.1:8080", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
 		watchErrs:    []error{errors.New("polaris watch unavailable")},
-		watchUpdates: make(chan []contract.ServiceInstance, 1),
+		watchUpdates: make(chan []transportcontract.ServiceInstance, 1),
 	}
 	cfg := testPolarisRegistryConfig()
 	cfg.WatchRetryInterval = 10 * time.Millisecond
@@ -176,7 +176,7 @@ func TestRegistryWatchRetriesAfterClientError(t *testing.T) {
 		t.Fatal("expected initial snapshot")
 	}
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "user-service-10.0.0.9:8080", Name: "user-service", Address: "10.0.0.9:8080", Healthy: true},
 	})
 
@@ -191,11 +191,11 @@ func TestRegistryWatchRetriesAfterClientError(t *testing.T) {
 
 func TestRegistryWatchSkipsDuplicateSnapshotWithDifferentOrder(t *testing.T) {
 	client := &fakePolarisRegistryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "b", Name: "user-service", Address: "10.0.0.2:8080", Healthy: true},
 			{ID: "a", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		},
-		watchUpdates: make(chan []contract.ServiceInstance, 2),
+		watchUpdates: make(chan []transportcontract.ServiceInstance, 2),
 	}
 	registry, err := NewRegistryWithClient(testPolarisRegistryConfig(), client)
 	require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestRegistryWatchSkipsDuplicateSnapshotWithDifferentOrder(t *testing.T) {
 		t.Fatal("expected initial watch snapshot")
 	}
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "a", Name: "user-service", Address: "10.0.0.1:8080", Healthy: true},
 		{ID: "b", Name: "user-service", Address: "10.0.0.2:8080", Healthy: true},
 	})
@@ -228,8 +228,8 @@ type fakePolarisRegistryClient struct {
 	registerErr     error
 	deregisterErr   error
 	discoverErr     error
-	discoverResult  []contract.ServiceInstance
-	watchUpdates    chan []contract.ServiceInstance
+	discoverResult  []transportcontract.ServiceInstance
+	watchUpdates    chan []transportcontract.ServiceInstance
 	watchErrs       []error
 	registerCalls   int
 	deregisterCalls int
@@ -256,15 +256,15 @@ func (f *fakePolarisRegistryClient) Deregister(ctx context.Context, cfg *Polaris
 	return f.deregisterErr
 }
 
-func (f *fakePolarisRegistryClient) Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]contract.ServiceInstance, error) {
+func (f *fakePolarisRegistryClient) Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	f.discoverCalls++
 	if f.discoverErr != nil {
 		return nil, f.discoverErr
 	}
-	return append([]contract.ServiceInstance(nil), f.discoverResult...), nil
+	return append([]transportcontract.ServiceInstance(nil), f.discoverResult...), nil
 }
 
-func (f *fakePolarisRegistryClient) Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]contract.ServiceInstance)) error {
+func (f *fakePolarisRegistryClient) Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
 	f.watchCalls++
 	if len(f.watchErrs) > 0 {
 		err := f.watchErrs[0]
@@ -285,9 +285,9 @@ func (f *fakePolarisRegistryClient) Watch(ctx context.Context, cfg *PolarisConfi
 	}
 }
 
-func (f *fakePolarisRegistryClient) push(instances []contract.ServiceInstance) {
+func (f *fakePolarisRegistryClient) push(instances []transportcontract.ServiceInstance) {
 	if f.watchUpdates == nil {
-		f.watchUpdates = make(chan []contract.ServiceInstance, 1)
+		f.watchUpdates = make(chan []transportcontract.ServiceInstance, 1)
 	}
 	f.watchUpdates <- instances
 }

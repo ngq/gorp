@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +33,7 @@ func TestNoopCircuitBreaker(t *testing.T) {
 
 	// 测试 State
 	state := cb.State(context.Background(), "test-resource")
-	assert.Equal(t, contract.CircuitBreakerStateClosed, state)
+	assert.Equal(t, resiliencecontract.CircuitBreakerStateClosed, state)
 }
 
 func TestNoopRateLimiter(t *testing.T) {
@@ -66,7 +66,7 @@ func TestProvider(t *testing.T) {
 	assert.Equal(t, "circuitbreaker.noop", p.Name())
 	assert.True(t, p.IsDefer())
 	assert.ElementsMatch(t, []string{
-		contract.CircuitBreakerKey,
-		contract.RateLimiterKey,
+		resiliencecontract.CircuitBreakerKey,
+		resiliencecontract.RateLimiterKey,
 	}, p.Provides())
 }

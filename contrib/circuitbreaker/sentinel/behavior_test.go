@@ -10,7 +10,9 @@ import (
 	base "github.com/alibaba/sentinel-golang/core/base"
 	sentinelcb "github.com/alibaba/sentinel-golang/core/circuitbreaker"
 	"github.com/alibaba/sentinel-golang/core/isolation"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,33 +25,43 @@ func (cbConfigStub) GetInt(string) int                                          
 func (cbConfigStub) GetBool(string) bool                                           { return false }
 func (cbConfigStub) GetFloat(string) float64                                       { return 0 }
 func (cbConfigStub) Unmarshal(string, any) error                                   { return nil }
-func (cbConfigStub) Watch(context.Context, string) (contract.ConfigWatcher, error) { return nil, nil }
+func (cbConfigStub) Watch(context.Context, string) (datacontract.ConfigWatcher, error) {
+	return nil, nil
+}
 func (cbConfigStub) Reload(context.Context) error                                  { return nil }
 
 type invalidConfigContainerStub struct{}
 
-func (invalidConfigContainerStub) Bind(string, contract.Factory, bool)                 {}
+func (invalidConfigContainerStub) Bind(string, runtimecontract.Factory, bool)          {}
 func (invalidConfigContainerStub) IsBind(string) bool                                  { return true }
 func (invalidConfigContainerStub) Make(string) (any, error)                            { return 1, nil }
 func (invalidConfigContainerStub) MustMake(string) any                                 { return 1 }
-func (invalidConfigContainerStub) RegisterProvider(contract.ServiceProvider) error     { return nil }
-func (invalidConfigContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
-
-type sentinelContainerStub struct {
-	cfg contract.Config
+func (invalidConfigContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (invalidConfigContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
 }
 
-func (s sentinelContainerStub) Bind(string, contract.Factory, bool) {}
+type sentinelContainerStub struct {
+	cfg datacontract.Config
+}
+
+func (s sentinelContainerStub) Bind(string, runtimecontract.Factory, bool) {}
 func (s sentinelContainerStub) IsBind(string) bool                  { return true }
 func (s sentinelContainerStub) Make(key string) (any, error) {
-	if key == contract.ConfigKey {
+	if key == datacontract.ConfigKey {
 		return s.cfg, nil
 	}
 	return nil, errors.New("not found")
 }
 func (s sentinelContainerStub) MustMake(string) any                                 { return s.cfg }
-func (s sentinelContainerStub) RegisterProvider(contract.ServiceProvider) error     { return nil }
-func (s sentinelContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+func (s sentinelContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s sentinelContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 
 func TestGetCircuitBreakerConfigDefaults(t *testing.T) {
 	cfg := cbConfigStub{}
@@ -69,18 +81,18 @@ func TestGetCircuitBreakerConfigRejectsInvalidConfigService(t *testing.T) {
 }
 
 func TestSentinelCircuitBreakerDoTracksFailureAndSuccess(t *testing.T) {
-	cb := NewSentinelCircuitBreaker(&contract.CircuitBreakerConfig{
-		DefaultConfig: contract.ResourceConfig{Timeout: 5 * time.Millisecond},
+	cb := NewSentinelCircuitBreaker(&resiliencecontract.CircuitBreakerConfig{
+		DefaultConfig: resiliencecontract.ResourceConfig{Timeout: 5 * time.Millisecond},
 	})
 
 	errBoom := errors.New("boom")
 	err := cb.Do(context.Background(), "resource", func() error { return errBoom })
 	require.ErrorIs(t, err, errBoom)
-	require.Equal(t, contract.CircuitBreakerStateOpen, cb.State(context.Background(), "resource"))
+	require.Equal(t, resiliencecontract.CircuitBreakerStateOpen, cb.State(context.Background(), "resource"))
 
 	time.Sleep(10 * time.Millisecond)
 	cb.RecordSuccess(context.Background(), "resource")
-	require.Equal(t, contract.CircuitBreakerStateClosed, cb.State(context.Background(), "resource"))
+	require.Equal(t, resiliencecontract.CircuitBreakerStateClosed, cb.State(context.Background(), "resource"))
 }
 
 func TestSentinelCircuitBreakerAllowMarksOpenOnBlock(t *testing.T) {
@@ -90,14 +102,14 @@ func TestSentinelCircuitBreakerAllowMarksOpenOnBlock(t *testing.T) {
 	}
 	defer func() { sentinelEntry = original }()
 
-	cb := NewSentinelCircuitBreaker(&contract.CircuitBreakerConfig{})
+	cb := NewSentinelCircuitBreaker(&resiliencecontract.CircuitBreakerConfig{})
 	err := cb.Allow(context.Background(), "blocked-resource")
 	require.Error(t, err)
-	require.Equal(t, contract.CircuitBreakerStateOpen, cb.State(context.Background(), "blocked-resource"))
+	require.Equal(t, resiliencecontract.CircuitBreakerStateOpen, cb.State(context.Background(), "blocked-resource"))
 }
 
 func TestSentinelRateLimiterReserveWaitAndTimeout(t *testing.T) {
-	rl := NewSentinelRateLimiter(&contract.CircuitBreakerConfig{})
+	rl := NewSentinelRateLimiter(&resiliencecontract.CircuitBreakerConfig{})
 	require.NoError(t, rl.AllowN(context.Background(), "resource", 0))
 
 	res := rl.Reserve(context.Background(), "resource")
@@ -119,8 +131,8 @@ func TestInitSentinelLoadsRulesFromConfig(t *testing.T) {
 	_, _ = isolation.LoadRules(nil)
 	_, _ = sentinelcb.LoadRules(nil)
 
-	err := initSentinel(&contract.CircuitBreakerConfig{
-		ResourceConfigs: map[string]contract.ResourceConfig{
+	err := initSentinel(&resiliencecontract.CircuitBreakerConfig{
+		ResourceConfigs: map[string]resiliencecontract.ResourceConfig{
 			"order.create": {
 				Threshold:             0.7,
 				MinRequestCount:       20,
@@ -129,7 +141,7 @@ func TestInitSentinelLoadsRulesFromConfig(t *testing.T) {
 				Interval:              2 * time.Second,
 			},
 		},
-		DefaultConfig: contract.ResourceConfig{
+		DefaultConfig: resiliencecontract.ResourceConfig{
 			Threshold:             0.5,
 			MinRequestCount:       10,
 			MaxConcurrentRequests: 5,
@@ -152,7 +164,7 @@ func TestInitSentinelLoadsRulesFromConfig(t *testing.T) {
 }
 
 func TestBuildCircuitBreakerRuleFallsBackToDefaultConfig(t *testing.T) {
-	rule := buildCircuitBreakerRule("order.pay", contract.ResourceConfig{}, contract.ResourceConfig{
+	rule := buildCircuitBreakerRule("order.pay", resiliencecontract.ResourceConfig{}, resiliencecontract.ResourceConfig{
 		Threshold:       0.6,
 		MinRequestCount: 12,
 		Timeout:         4 * time.Second,
@@ -171,24 +183,24 @@ func TestInitSentinelReturnsInitError(t *testing.T) {
 	sentinelInitDefault = func() error { return errors.New("init failed") }
 	defer func() { sentinelInitDefault = original }()
 
-	err := initSentinel(&contract.CircuitBreakerConfig{
-		ResourceConfigs: map[string]contract.ResourceConfig{},
-		DefaultConfig:   contract.ResourceConfig{},
+	err := initSentinel(&resiliencecontract.CircuitBreakerConfig{
+		ResourceConfigs: map[string]resiliencecontract.ResourceConfig{},
+		DefaultConfig:   resiliencecontract.ResourceConfig{},
 	})
 	require.EqualError(t, err, "init failed")
 }
 
 func TestBuildCircuitBreakerRuleReturnsNilWithoutEffectiveThresholds(t *testing.T) {
-	rule := buildCircuitBreakerRule("order.empty", contract.ResourceConfig{}, contract.ResourceConfig{})
+	rule := buildCircuitBreakerRule("order.empty", resiliencecontract.ResourceConfig{}, resiliencecontract.ResourceConfig{})
 	require.Nil(t, rule)
 }
 
 func TestBuildCircuitBreakerRuleUsesDefaultThresholdWhenOnlyThresholdMissing(t *testing.T) {
-	rule := buildCircuitBreakerRule("order.partial", contract.ResourceConfig{
+	rule := buildCircuitBreakerRule("order.partial", resiliencecontract.ResourceConfig{
 		MinRequestCount: 9,
 		Timeout:         2 * time.Second,
 		Interval:        time.Second,
-	}, contract.ResourceConfig{
+	}, resiliencecontract.ResourceConfig{
 		Threshold: 0.55,
 	})
 	require.NotNil(t, rule)

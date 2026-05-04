@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +32,7 @@ func TestDTMClient_SAGA(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := &contract.DTMConfig{
+	cfg := &integrationcontract.DTMConfig{
 		Enabled:       true,
 		Endpoint:      server.URL,
 		Timeout:       3,
@@ -74,7 +74,7 @@ func TestDTMClient_SAGA(t *testing.T) {
 }
 
 func TestDTMClient_SAGA_SubmitRequiresSteps(t *testing.T) {
-	cfg := &contract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789"}
+	cfg := &integrationcontract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789"}
 	client, err := NewDTMClient(cfg)
 	require.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestDTMClient_TCC(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true, Endpoint: server.URL, Timeout: 3, RetryCount: 2, RetryInterval: 4})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true, Endpoint: server.URL, Timeout: 3, RetryCount: 2, RetryInterval: 4})
 	assert.NoError(t, err)
 
 	tcc := client.TCC("test-tcc")
@@ -143,7 +143,7 @@ func TestDTMClient_XA(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true, Endpoint: server.URL, Timeout: 3})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true, Endpoint: server.URL, Timeout: 3})
 	assert.NoError(t, err)
 
 	xa := client.XA("test-xa")
@@ -173,7 +173,7 @@ func TestDTMClient_XA(t *testing.T) {
 }
 
 func TestDTMClient_Barrier(t *testing.T) {
-	cfg := &contract.DTMConfig{
+	cfg := &integrationcontract.DTMConfig{
 		Enabled:  true,
 		Endpoint: "http://localhost:36789",
 	}
@@ -200,7 +200,7 @@ func TestDTMClient_Barrier(t *testing.T) {
 }
 
 func TestBarrierRejectsMissingIdentity(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true})
 	require.NoError(t, err)
 
 	require.ErrorIs(t, client.Barrier("", "").Call(context.Background(), func(db any) error { return nil }), ErrBarrierTransType)
@@ -210,7 +210,7 @@ func TestBarrierRejectsMissingIdentity(t *testing.T) {
 }
 
 func TestDTMClient_TCCRequiresSteps(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true})
 	require.NoError(t, err)
 
 	err = client.TCC("empty").Submit(context.Background())
@@ -218,7 +218,7 @@ func TestDTMClient_TCCRequiresSteps(t *testing.T) {
 }
 
 func TestDTMClient_TCCBuildValidatesStepFields(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true})
 	require.NoError(t, err)
 
 	builder := client.TCC("invalid").Add("/try", "", "/cancel", nil).(*tccBuilder)
@@ -228,7 +228,7 @@ func TestDTMClient_TCCBuildValidatesStepFields(t *testing.T) {
 }
 
 func TestDTMClient_XARequiresSteps(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true})
 	require.NoError(t, err)
 
 	err = client.XA("empty").Submit(context.Background())
@@ -236,7 +236,7 @@ func TestDTMClient_XARequiresSteps(t *testing.T) {
 }
 
 func TestDTMClient_XABuildValidatesStepFields(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true})
 	require.NoError(t, err)
 
 	builder := client.XA("invalid").Add("", nil).(*xaBuilder)
@@ -263,7 +263,7 @@ func TestDTMClient_Query(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := &contract.DTMConfig{
+	cfg := &integrationcontract.DTMConfig{
 		Enabled:  true,
 		Endpoint: server.URL,
 	}
@@ -286,7 +286,7 @@ func TestDTMClient_Query(t *testing.T) {
 }
 
 func TestDTMClient_QueryRequiresGID(t *testing.T) {
-	cfg := &contract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789"}
+	cfg := &integrationcontract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789"}
 	client, err := NewDTMClient(cfg)
 	require.NoError(t, err)
 
@@ -296,11 +296,11 @@ func TestDTMClient_QueryRequiresGID(t *testing.T) {
 }
 
 func TestSAGABuilder_AddBranch(t *testing.T) {
-	cfg := &contract.DTMConfig{Enabled: true}
+	cfg := &integrationcontract.DTMConfig{Enabled: true}
 	client, _ := NewDTMClient(cfg)
 
 	saga := client.SAGA("test")
-	saga.AddBranch("/action", "/compensate", nil, contract.BranchOptions{
+	saga.AddBranch("/action", "/compensate", nil, integrationcontract.BranchOptions{
 		RetryCount:    3,
 		RetryInterval: 5,
 		Timeout:       9,
@@ -326,7 +326,7 @@ func TestDTMClient_APIBaseURL(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			client, err := NewDTMClient(&contract.DTMConfig{Endpoint: tc.endpoint, Timeout: 1})
+			client, err := NewDTMClient(&integrationcontract.DTMConfig{Endpoint: tc.endpoint, Timeout: 1})
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, client.apiBaseURL())
 		})
@@ -352,7 +352,7 @@ func TestDTMClient_RetriesTransientSubmitFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := NewDTMClient(&contract.DTMConfig{
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{
 		Enabled:       true,
 		Endpoint:      server.URL,
 		Timeout:       1,
@@ -381,7 +381,7 @@ func TestDTMClient_DoesNotRetryPermanentSubmitFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := NewDTMClient(&contract.DTMConfig{
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{
 		Enabled:       true,
 		Endpoint:      server.URL,
 		Timeout:       1,
@@ -412,7 +412,7 @@ func TestDTMClient_StopsRetryWhenContextCanceled(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := NewDTMClient(&contract.DTMConfig{
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{
 		Enabled:       true,
 		Endpoint:      server.URL,
 		Timeout:       1,
@@ -450,11 +450,11 @@ func TestProvider_Name(t *testing.T) {
 	p := NewProvider()
 	assert.Equal(t, "dtm.sdk", p.Name())
 	assert.True(t, p.IsDefer())
-	assert.ElementsMatch(t, []string{contract.DTMKey}, p.Provides())
+	assert.ElementsMatch(t, []string{integrationcontract.DTMKey}, p.Provides())
 }
 
 func TestDTMClientUnderlyingAndAs(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789", Timeout: 1})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789", Timeout: 1})
 	require.NoError(t, err)
 
 	require.Same(t, client, client.Underlying())
@@ -465,7 +465,7 @@ func TestDTMClientUnderlyingAndAs(t *testing.T) {
 }
 
 func TestDTMClientHTTPClientProvider(t *testing.T) {
-	client, err := NewDTMClient(&contract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789", Timeout: 3})
+	client, err := NewDTMClient(&integrationcontract.DTMConfig{Enabled: true, Endpoint: "http://localhost:36789", Timeout: 3})
 	require.NoError(t, err)
 
 	var provider HTTPClientProvider = client

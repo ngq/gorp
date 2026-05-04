@@ -13,18 +13,11 @@ import (
 	"time"
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Provider 提供 DTM 分布式事务客户端适配器。
-//
-// 中文说明：
-// - DTM 是成熟的分布式事务管理器（https://dtm.pub）；
-// - framework 不自研事务协调器，而是对官方 HTTP API 做轻量适配；
-// - 当前已经支持最小可用的 SAGA submit 与 Query 闭环；
-// - TCC / XA / Barrier 仍保留轻量骨架，后续若需要更完整能力，再接官方 SDK。
-// - 当前状态：部分可用
-// - 说明：已具备 SAGA 最小闭环，但 TCC / XA / Barrier 仍是轻量骨架，当前不能按完整分布式事务能力对外宣传。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
@@ -32,38 +25,33 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "dtm.sdk" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.DTMKey}
+	return []string{integrationcontract.DTMKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.DTMKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(integrationcontract.DTMKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getDTMConfig(c)
 		if err != nil {
 			return nil, err
 		}
 		return NewDTMClient(cfg)
 	}, true)
-
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
-	return nil
-}
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-// getDTMConfig 从容器获取 DTM 配置。
-func getDTMConfig(c contract.Container) (*contract.DTMConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getDTMConfig(c runtimecontract.Container) (*integrationcontract.DTMConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("dtm: invalid config service")
 	}
 
-	dtmCfg := &contract.DTMConfig{
+	dtmCfg := &integrationcontract.DTMConfig{
 		Enabled:         true,
 		Endpoint:        "http://localhost:36789",
 		Timeout:         10,
@@ -72,7 +60,6 @@ func getDTMConfig(c contract.Container) (*contract.DTMConfig, error) {
 		CallbackPort:    8080,
 		CallbackAddress: "localhost",
 	}
-
 	if endpoint := cfg.GetString("dtm.endpoint"); endpoint != "" {
 		dtmCfg.Endpoint = endpoint
 	}
@@ -94,11 +81,9 @@ func getDTMConfig(c contract.Container) (*contract.DTMConfig, error) {
 	if retryInterval := cfg.GetInt("dtm.retry_interval"); retryInterval > 0 {
 		dtmCfg.RetryInterval = retryInterval
 	}
-
 	return dtmCfg, nil
 }
 
-// ErrDTMSDKNotImported 表示更完整的高级事务模式仍需引入官方 SDK。
 var ErrDTMSDKNotImported = errors.New(`dtm: advanced transaction modes still require the official SDK, please run:
   go get github.com/dtm-labs/client
 
@@ -118,24 +103,16 @@ var (
 	ErrBarrierCallback        = errors.New("dtm: barrier callback is required")
 )
 
-// DTMClient 是 DTM 客户端适配器。
-//
-// 中文说明：
-// - 这是面向 framework 的轻量实现，而不是完整复刻官方 SDK；
-// - 当前聚焦“真正最小可用链路”：newGid / saga submit / query；
-// - 这样 starter 和样板项目已经可以验证 DTM 基础接线路径。
 type DTMClient struct {
-	cfg        *contract.DTMConfig
+	cfg        *integrationcontract.DTMConfig
 	httpClient *http.Client
 }
 
-// HTTPClientProvider exposes the current HTTP transport for down-dive use.
 type HTTPClientProvider interface {
 	HTTPClient() *http.Client
 }
 
-// NewDTMClient 创建 DTM 客户端。
-func NewDTMClient(cfg *contract.DTMConfig) (*DTMClient, error) {
+func NewDTMClient(cfg *integrationcontract.DTMConfig) (*DTMClient, error) {
 	timeout := time.Duration(cfg.Timeout) * time.Second
 	if timeout <= 0 {
 		timeout = 10 * time.Second
@@ -148,48 +125,35 @@ func NewDTMClient(cfg *contract.DTMConfig) (*DTMClient, error) {
 	}, nil
 }
 
-// Underlying returns the current lightweight DTM adapter instance.
 func (c *DTMClient) Underlying() any {
 	return c
 }
 
-// As projects the current lightweight DTM adapter into the requested target.
 func (c *DTMClient) As(target any) bool {
 	return internalnative.As(c, target)
 }
 
-// HTTPClient returns the underlying HTTP transport used by the adapter.
 func (c *DTMClient) HTTPClient() *http.Client {
 	return c.httpClient
 }
 
-// SAGA 创建 SAGA 事务。
-func (c *DTMClient) SAGA(name string) contract.SAGABuilder {
+func (c *DTMClient) SAGA(name string) integrationcontract.SAGABuilder {
 	return &sagaBuilder{client: c, name: name}
 }
 
-// TCC 创建 TCC 事务。
-func (c *DTMClient) TCC(name string) contract.TCCBuilder {
+func (c *DTMClient) TCC(name string) integrationcontract.TCCBuilder {
 	return &tccBuilder{client: c, name: name}
 }
 
-// XA 创建 XA 事务。
-func (c *DTMClient) XA(name string) contract.XABuilder {
+func (c *DTMClient) XA(name string) integrationcontract.XABuilder {
 	return &xaBuilder{client: c, name: name}
 }
 
-// Barrier 创建 Barrier 事务。
-func (c *DTMClient) Barrier(transType, gid string) contract.BarrierHandler {
+func (c *DTMClient) Barrier(transType, gid string) integrationcontract.BarrierHandler {
 	return &barrierHandler{client: c, transType: transType, gid: gid}
 }
 
-// Query 查询事务状态。
-//
-// 中文说明：
-// - 通过 DTM HTTP API `GET /api/dtmsvr/query?gid=...` 查询；
-// - 返回字段做了宽松兼容，避免后续 DTM 响应细节轻微变化时直接失效；
-// - 对当前 framework 来说，只要能拿到 gid / status / trans_type / steps 就足够支撑最小验证链路。
-func (c *DTMClient) Query(ctx context.Context, gid string) (*contract.TransactionInfo, error) {
+func (c *DTMClient) Query(ctx context.Context, gid string) (*integrationcontract.TransactionInfo, error) {
 	gid = strings.TrimSpace(gid)
 	if gid == "" {
 		return nil, errors.New("dtm: gid is required")
@@ -219,7 +183,6 @@ type sagaSubmitRequest struct {
 	RequestTimeout int64               `json:"request_timeout,omitempty"`
 }
 
-// sagaBuilder 是 SAGA 事务构建器。
 type sagaBuilder struct {
 	client *DTMClient
 	name   string
@@ -236,16 +199,12 @@ type sagaStep struct {
 	timeout       int
 }
 
-func (b *sagaBuilder) Add(action string, compensate string, payload any) contract.SAGABuilder {
-	b.steps = append(b.steps, sagaStep{
-		action:     action,
-		compensate: compensate,
-		payload:    payload,
-	})
+func (b *sagaBuilder) Add(action string, compensate string, payload any) integrationcontract.SAGABuilder {
+	b.steps = append(b.steps, sagaStep{action: action, compensate: compensate, payload: payload})
 	return b
 }
 
-func (b *sagaBuilder) AddBranch(action string, compensate string, payload any, opts contract.BranchOptions) contract.SAGABuilder {
+func (b *sagaBuilder) AddBranch(action string, compensate string, payload any, opts integrationcontract.BranchOptions) integrationcontract.SAGABuilder {
 	b.steps = append(b.steps, sagaStep{
 		action:        action,
 		compensate:    compensate,
@@ -262,12 +221,10 @@ func (b *sagaBuilder) Submit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	gid, err := b.client.newGID(ctx)
 	if err != nil {
 		return err
 	}
-
 	body := sagaSubmitRequest{
 		GID:            gid,
 		TransType:      "saga",
@@ -280,15 +237,14 @@ func (b *sagaBuilder) Submit(ctx context.Context) error {
 	if err := b.client.submit(ctx, body); err != nil {
 		return err
 	}
-
 	b.gid = gid
 	return nil
 }
 
-func (b *sagaBuilder) Build() (*contract.SAGATransaction, error) {
-	steps := make([]contract.SAGAStep, len(b.steps))
+func (b *sagaBuilder) Build() (*integrationcontract.SAGATransaction, error) {
+	steps := make([]integrationcontract.SAGAStep, len(b.steps))
 	for i, step := range b.steps {
-		steps[i] = contract.SAGAStep{
+		steps[i] = integrationcontract.SAGAStep{
 			Action:        step.action,
 			Compensate:    step.compensate,
 			Payload:       step.payload,
@@ -297,14 +253,13 @@ func (b *sagaBuilder) Build() (*contract.SAGATransaction, error) {
 			Timeout:       step.timeout,
 		}
 	}
-	return &contract.SAGATransaction{GID: b.gid, Steps: steps}, nil
+	return &integrationcontract.SAGATransaction{GID: b.gid, Steps: steps}, nil
 }
 
 func (b *sagaBuilder) buildSteps() ([]map[string]string, []string, error) {
 	if len(b.steps) == 0 {
 		return nil, nil, ErrSagaNoSteps
 	}
-
 	steps := make([]map[string]string, 0, len(b.steps))
 	payloads := make([]string, 0, len(b.steps))
 	for _, step := range b.steps {
@@ -315,16 +270,12 @@ func (b *sagaBuilder) buildSteps() ([]map[string]string, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("dtm: marshal saga payload failed: %w", err)
 		}
-		steps = append(steps, map[string]string{
-			"action":     step.action,
-			"compensate": step.compensate,
-		})
+		steps = append(steps, map[string]string{"action": step.action, "compensate": step.compensate})
 		payloads = append(payloads, payload)
 	}
 	return steps, payloads, nil
 }
 
-// tccBuilder 是 TCC 事务构建器骨架。
 type tccBuilder struct {
 	client *DTMClient
 	name   string
@@ -351,13 +302,8 @@ type TCCStep struct {
 	Payload any
 }
 
-func (b *tccBuilder) Add(try string, confirm string, cancel string, payload any) contract.TCCBuilder {
-	b.steps = append(b.steps, tccStep{
-		try:     try,
-		confirm: confirm,
-		cancel:  cancel,
-		payload: payload,
-	})
+func (b *tccBuilder) Add(try string, confirm string, cancel string, payload any) integrationcontract.TCCBuilder {
+	b.steps = append(b.steps, tccStep{try: try, confirm: confirm, cancel: cancel, payload: payload})
 	return b
 }
 
@@ -366,12 +312,10 @@ func (b *tccBuilder) Submit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	gid, err := b.client.newGID(ctx)
 	if err != nil {
 		return err
 	}
-
 	body := map[string]any{
 		"gid":             gid,
 		"trans_type":      "tcc",
@@ -384,7 +328,6 @@ func (b *tccBuilder) Submit(ctx context.Context) error {
 	if err := b.client.submit(ctx, body); err != nil {
 		return err
 	}
-
 	b.gid = gid
 	return nil
 }
@@ -398,12 +341,7 @@ func (b *tccBuilder) Build() (*TCCTransaction, error) {
 		if strings.TrimSpace(step.try) == "" || strings.TrimSpace(step.confirm) == "" || strings.TrimSpace(step.cancel) == "" {
 			return nil, ErrTCCStepRequired
 		}
-		steps[i] = TCCStep{
-			Try:     step.try,
-			Confirm: step.confirm,
-			Cancel:  step.cancel,
-			Payload: step.payload,
-		}
+		steps[i] = TCCStep{Try: step.try, Confirm: step.confirm, Cancel: step.cancel, Payload: step.payload}
 	}
 	return &TCCTransaction{GID: b.gid, Steps: steps}, nil
 }
@@ -412,7 +350,6 @@ func (b *tccBuilder) buildSteps() ([]map[string]string, []string, error) {
 	if len(b.steps) == 0 {
 		return nil, nil, ErrTCCNoSteps
 	}
-
 	steps := make([]map[string]string, 0, len(b.steps))
 	payloads := make([]string, 0, len(b.steps))
 	for _, step := range b.steps {
@@ -423,17 +360,12 @@ func (b *tccBuilder) buildSteps() ([]map[string]string, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("dtm: marshal tcc payload failed: %w", err)
 		}
-		steps = append(steps, map[string]string{
-			"try":     step.try,
-			"confirm": step.confirm,
-			"cancel":  step.cancel,
-		})
+		steps = append(steps, map[string]string{"try": step.try, "confirm": step.confirm, "cancel": step.cancel})
 		payloads = append(payloads, payload)
 	}
 	return steps, payloads, nil
 }
 
-// xaBuilder 是 XA 事务构建器骨架。
 type xaBuilder struct {
 	client *DTMClient
 	name   string
@@ -456,7 +388,7 @@ type XAStep struct {
 	Payload any
 }
 
-func (b *xaBuilder) Add(url string, payload any) contract.XABuilder {
+func (b *xaBuilder) Add(url string, payload any) integrationcontract.XABuilder {
 	b.steps = append(b.steps, xaStep{url: url, payload: payload})
 	return b
 }
@@ -466,12 +398,10 @@ func (b *xaBuilder) Submit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	gid, err := b.client.newGID(ctx)
 	if err != nil {
 		return err
 	}
-
 	body := map[string]any{
 		"gid":             gid,
 		"trans_type":      "xa",
@@ -484,7 +414,6 @@ func (b *xaBuilder) Submit(ctx context.Context) error {
 	if err := b.client.submit(ctx, body); err != nil {
 		return err
 	}
-
 	b.gid = gid
 	return nil
 }
@@ -507,7 +436,6 @@ func (b *xaBuilder) buildSteps() ([]map[string]string, []string, error) {
 	if len(b.steps) == 0 {
 		return nil, nil, ErrXANoSteps
 	}
-
 	steps := make([]map[string]string, 0, len(b.steps))
 	payloads := make([]string, 0, len(b.steps))
 	for _, step := range b.steps {
@@ -518,15 +446,12 @@ func (b *xaBuilder) buildSteps() ([]map[string]string, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("dtm: marshal xa payload failed: %w", err)
 		}
-		steps = append(steps, map[string]string{
-			"url": step.url,
-		})
+		steps = append(steps, map[string]string{"url": step.url})
 		payloads = append(payloads, payload)
 	}
 	return steps, payloads, nil
 }
 
-// barrierHandler 是 Barrier 事务处理器骨架。
 type barrierHandler struct {
 	client    *DTMClient
 	transType string
@@ -539,6 +464,7 @@ type BarrierContext struct {
 }
 
 func (h *barrierHandler) Call(ctx context.Context, fn func(db any) error) error {
+	_ = ctx
 	if strings.TrimSpace(h.transType) == "" {
 		return ErrBarrierTransType
 	}
@@ -551,10 +477,7 @@ func (h *barrierHandler) Call(ctx context.Context, fn func(db any) error) error 
 	if fn == nil {
 		return ErrBarrierCallback
 	}
-	return fn(&BarrierContext{
-		TransType: h.transType,
-		GID:       h.gid,
-	})
+	return fn(&BarrierContext{TransType: h.transType, GID: h.gid})
 }
 
 func isSupportedBarrierType(transType string) bool {
@@ -572,7 +495,6 @@ func (c *DTMClient) newGID(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("dtm: build newGid request failed: %w", err)
 	}
-
 	var result struct {
 		GID string `json:"gid"`
 	}
@@ -590,13 +512,11 @@ func (c *DTMClient) submit(ctx context.Context, body any) error {
 	if err != nil {
 		return fmt.Errorf("dtm: marshal submit request failed: %w", err)
 	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiBaseURL()+"/submit", bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("dtm: build submit request failed: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-
 	if err := c.doJSON(req, nil); err != nil {
 		return fmt.Errorf("dtm: submit failed: %w", err)
 	}
@@ -648,13 +568,11 @@ func (c *DTMClient) doJSON(req *http.Request, out any) error {
 			return err
 		}
 	}
-
 	return lastErr
 }
 
 func decodeResponse(resp *http.Response, out any) error {
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		message := strings.TrimSpace(string(body))
@@ -663,12 +581,10 @@ func decodeResponse(resp *http.Response, out any) error {
 		}
 		return errors.New(message)
 	}
-
 	if out == nil {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil
 	}
-
 	decoder := json.NewDecoder(resp.Body)
 	decoder.UseNumber()
 	if err := decoder.Decode(out); err != nil && !errors.Is(err, io.EOF) {
@@ -697,7 +613,6 @@ func sleepRetry(ctx context.Context, interval time.Duration) error {
 	}
 	timer := time.NewTimer(interval)
 	defer timer.Stop()
-
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -717,9 +632,9 @@ func marshalPayload(payload any) (string, error) {
 	return string(data), nil
 }
 
-func parseTransactionInfo(raw map[string]any, fallbackGID string) *contract.TransactionInfo {
+func parseTransactionInfo(raw map[string]any, fallbackGID string) *integrationcontract.TransactionInfo {
 	payload := unwrapTransactionPayload(raw)
-	info := &contract.TransactionInfo{
+	info := &integrationcontract.TransactionInfo{
 		GID:             fallbackGID,
 		Status:          stringFromMap(payload, "status"),
 		TransactionType: stringFromMap(payload, "trans_type", "transaction_type"),
@@ -748,18 +663,18 @@ func unwrapTransactionPayload(raw map[string]any) map[string]any {
 	return raw
 }
 
-func parseTransactionSteps(raw map[string]any) []contract.TransactionStep {
+func parseTransactionSteps(raw map[string]any) []integrationcontract.TransactionStep {
 	values, ok := raw["steps"].([]any)
 	if !ok {
 		return nil
 	}
-	steps := make([]contract.TransactionStep, 0, len(values))
+	steps := make([]integrationcontract.TransactionStep, 0, len(values))
 	for _, value := range values {
 		stepMap, ok := value.(map[string]any)
 		if !ok {
 			continue
 		}
-		steps = append(steps, contract.TransactionStep{
+		steps = append(steps, integrationcontract.TransactionStep{
 			BranchID: stringFromMap(stepMap, "branch_id", "branchID"),
 			Status:   stringFromMap(stepMap, "status"),
 			Op:       stringFromMap(stepMap, "op"),

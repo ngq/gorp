@@ -12,7 +12,9 @@ import (
 	"time"
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	polarissdk "github.com/polarismesh/polaris-go"
 	polarismodel "github.com/polarismesh/polaris-go/pkg/model"
 )
@@ -38,10 +40,10 @@ type Provider struct{}
 func NewProvider() *Provider           { return &Provider{} }
 func (p *Provider) Name() string       { return "registry.polaris" }
 func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{contract.RPCRegistryKey} }
+func (p *Provider) Provides() []string { return []string{transportcontract.RPCRegistryKey} }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getPolarisConfig(c)
 		if err != nil {
 			return nil, err
@@ -51,7 +53,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 type PolarisConfig struct {
 	Address            string
@@ -64,12 +66,12 @@ type PolarisConfig struct {
 	WatchRetryInterval time.Duration
 }
 
-func getPolarisConfig(c contract.Container) (*PolarisConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("polaris: invalid config service")
 	}
@@ -98,8 +100,8 @@ func getPolarisConfig(c contract.Container) (*PolarisConfig, error) {
 type polarisRegistryClient interface {
 	Register(ctx context.Context, cfg *PolarisConfig, name, addr string, meta map[string]string) error
 	Deregister(ctx context.Context, cfg *PolarisConfig, name, addr string) error
-	Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]contract.ServiceInstance, error)
-	Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]contract.ServiceInstance)) error
+	Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]transportcontract.ServiceInstance, error)
+	Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error
 }
 
 type polarisRegistryNativeClient interface {
@@ -111,7 +113,7 @@ type Registry struct {
 	client polarisRegistryClient
 
 	mu            sync.RWMutex
-	endpointCache map[string][]contract.ServiceInstance
+	endpointCache map[string][]transportcontract.ServiceInstance
 	registered    map[string]struct{}
 	closeMu       sync.Mutex
 	closed        bool
@@ -132,7 +134,7 @@ func NewRegistryWithClient(cfg *PolarisConfig, client polarisRegistryClient) (*R
 	return &Registry{
 		config:        cfg,
 		client:        client,
-		endpointCache: make(map[string][]contract.ServiceInstance),
+		endpointCache: make(map[string][]transportcontract.ServiceInstance),
 		registered:    make(map[string]struct{}),
 	}, nil
 }
@@ -169,10 +171,10 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	return nil
 }
 
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	r.mu.RLock()
 	if instances, ok := r.endpointCache[name]; ok && len(instances) > 0 {
-		cached := append([]contract.ServiceInstance(nil), instances...)
+		cached := append([]transportcontract.ServiceInstance(nil), instances...)
 		r.mu.RUnlock()
 		return cached, nil
 	}
@@ -189,12 +191,12 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 	sortServiceInstances(instances)
 
 	r.mu.Lock()
-	r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+	r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 	r.mu.Unlock()
 	return instances, nil
 }
 
-func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.ServiceInstance, error) {
+func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportcontract.ServiceInstance, error) {
 	r.closeMu.Lock()
 	defer r.closeMu.Unlock()
 
@@ -205,11 +207,11 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 	watchCtx, cancel := context.WithCancel(ctx)
 	r.watchCancels = append(r.watchCancels, cancel)
 
-	ch := make(chan []contract.ServiceInstance, 10)
+	ch := make(chan []transportcontract.ServiceInstance, 10)
 	var emitMu sync.Mutex
 	lastSnapshot := ""
-	emit := func(instances []contract.ServiceInstance) {
-		sorted := append([]contract.ServiceInstance(nil), instances...)
+	emit := func(instances []transportcontract.ServiceInstance) {
+		sorted := append([]transportcontract.ServiceInstance(nil), instances...)
 		sortServiceInstances(sorted)
 		current := snapshotKey(sorted)
 
@@ -225,12 +227,12 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		if len(sorted) == 0 {
 			delete(r.endpointCache, name)
 		} else {
-			r.endpointCache[name] = append([]contract.ServiceInstance(nil), sorted...)
+			r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), sorted...)
 		}
 		r.mu.Unlock()
 
 		select {
-		case ch <- append([]contract.ServiceInstance(nil), sorted...):
+		case ch <- append([]transportcontract.ServiceInstance(nil), sorted...):
 		case <-watchCtx.Done():
 		default:
 		}
@@ -239,7 +241,7 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 	go func() {
 		defer close(ch)
 		for {
-			err := r.client.Watch(watchCtx, r.config, name, func(instances []contract.ServiceInstance) {
+			err := r.client.Watch(watchCtx, r.config, name, func(instances []transportcontract.ServiceInstance) {
 				emit(instances)
 			})
 			if err == nil || watchCtx.Err() != nil {
@@ -257,7 +259,7 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		instances, err := r.Discover(watchCtx, name)
 		if err != nil {
 			if errors.Is(err, ErrServiceNotFound) {
-				emit([]contract.ServiceInstance{})
+				emit([]transportcontract.ServiceInstance{})
 			}
 			return
 		}
@@ -387,7 +389,7 @@ func (c *officialPolarisRegistryClient) Deregister(ctx context.Context, cfg *Pol
 	return translatePolarisRegistryError(err)
 }
 
-func (c *officialPolarisRegistryClient) Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]contract.ServiceInstance, error) {
+func (c *officialPolarisRegistryClient) Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	_, consumer, err := c.ensureClients(cfg)
 	if err != nil {
 		return nil, err
@@ -406,7 +408,7 @@ func (c *officialPolarisRegistryClient) Discover(ctx context.Context, cfg *Polar
 	return instances, nil
 }
 
-func (c *officialPolarisRegistryClient) Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]contract.ServiceInstance)) error {
+func (c *officialPolarisRegistryClient) Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
 	_, consumer, err := c.ensureClients(cfg)
 	if err != nil {
 		return err
@@ -438,7 +440,7 @@ func (c *officialPolarisRegistryClient) Watch(ctx context.Context, cfg *PolarisC
 			instances, convErr := c.Discover(ctx, cfg, name)
 			if convErr != nil {
 				if errors.Is(convErr, ErrServiceNotFound) {
-					onUpdate([]contract.ServiceInstance{})
+					onUpdate([]transportcontract.ServiceInstance{})
 					continue
 				}
 				return convErr
@@ -495,17 +497,17 @@ func mergePolarisMetadata(base map[string]string, override map[string]string) ma
 	return merged
 }
 
-func polarisInstancesToContract(response *polarismodel.InstancesResponse) []contract.ServiceInstance {
+func polarisInstancesToContract(response *polarismodel.InstancesResponse) []transportcontract.ServiceInstance {
 	if response == nil {
 		return nil
 	}
 	sourceInstances := response.GetInstances()
-	instances := make([]contract.ServiceInstance, 0, len(sourceInstances))
+	instances := make([]transportcontract.ServiceInstance, 0, len(sourceInstances))
 	for _, instance := range sourceInstances {
 		if instance == nil {
 			continue
 		}
-		instances = append(instances, contract.ServiceInstance{
+		instances = append(instances, transportcontract.ServiceInstance{
 			ID:       instance.GetId(),
 			Name:     instance.GetService(),
 			Address:  fmt.Sprintf("%s:%d", instance.GetHost(), instance.GetPort()),
@@ -563,15 +565,15 @@ func translatePolarisRegistryError(err error) error {
 
 type inMemoryPolarisClient struct {
 	mu       sync.RWMutex
-	services map[string][]contract.ServiceInstance
-	watchers map[string][]chan []contract.ServiceInstance
+	services map[string][]transportcontract.ServiceInstance
+	watchers map[string][]chan []transportcontract.ServiceInstance
 }
 
 func (c *inMemoryPolarisClient) Register(ctx context.Context, cfg *PolarisConfig, name, addr string, meta map[string]string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.services == nil {
-		c.services = make(map[string][]contract.ServiceInstance)
+		c.services = make(map[string][]transportcontract.ServiceInstance)
 	}
 	fullMeta := make(map[string]string)
 	for k, v := range cfg.ServiceMeta {
@@ -580,7 +582,7 @@ func (c *inMemoryPolarisClient) Register(ctx context.Context, cfg *PolarisConfig
 	for k, v := range meta {
 		fullMeta[k] = v
 	}
-	instance := contract.ServiceInstance{
+	instance := transportcontract.ServiceInstance{
 		ID:       generateServiceID(name, addr),
 		Name:     name,
 		Address:  addr,
@@ -606,24 +608,24 @@ func (c *inMemoryPolarisClient) Deregister(ctx context.Context, cfg *PolarisConf
 	return ErrServiceNotFound
 }
 
-func (c *inMemoryPolarisClient) Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]contract.ServiceInstance, error) {
+func (c *inMemoryPolarisClient) Discover(ctx context.Context, cfg *PolarisConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	instances := c.services[name]
 	if len(instances) == 0 {
 		return nil, ErrServiceNotFound
 	}
-	result := make([]contract.ServiceInstance, len(instances))
+	result := make([]transportcontract.ServiceInstance, len(instances))
 	copy(result, instances)
 	return result, nil
 }
 
-func (c *inMemoryPolarisClient) Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]contract.ServiceInstance)) error {
-	ch := make(chan []contract.ServiceInstance, 4)
+func (c *inMemoryPolarisClient) Watch(ctx context.Context, cfg *PolarisConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
+	ch := make(chan []transportcontract.ServiceInstance, 4)
 
 	c.mu.Lock()
 	if c.watchers == nil {
-		c.watchers = make(map[string][]chan []contract.ServiceInstance)
+		c.watchers = make(map[string][]chan []transportcontract.ServiceInstance)
 	}
 	c.watchers[name] = append(c.watchers[name], ch)
 	c.mu.Unlock()
@@ -654,8 +656,8 @@ func (c *inMemoryPolarisClient) Watch(ctx context.Context, cfg *PolarisConfig, n
 }
 
 func (c *inMemoryPolarisClient) notifyWatchersLocked(name string) {
-	watchers := append([]chan []contract.ServiceInstance(nil), c.watchers[name]...)
-	instances := append([]contract.ServiceInstance(nil), c.services[name]...)
+	watchers := append([]chan []transportcontract.ServiceInstance(nil), c.watchers[name]...)
+	instances := append([]transportcontract.ServiceInstance(nil), c.services[name]...)
 	for _, watcher := range watchers {
 		select {
 		case watcher <- instances:
@@ -668,7 +670,7 @@ func generateServiceID(name, addr string) string {
 	return fmt.Sprintf("%s-%s", name, addr)
 }
 
-func sortServiceInstances(instances []contract.ServiceInstance) {
+func sortServiceInstances(instances []transportcontract.ServiceInstance) {
 	sort.Slice(instances, func(i, j int) bool {
 		if instances[i].ID != instances[j].ID {
 			return instances[i].ID < instances[j].ID
@@ -677,7 +679,7 @@ func sortServiceInstances(instances []contract.ServiceInstance) {
 	})
 }
 
-func snapshotKey(instances []contract.ServiceInstance) string {
+func snapshotKey(instances []transportcontract.ServiceInstance) string {
 	if len(instances) == 0 {
 		return ""
 	}

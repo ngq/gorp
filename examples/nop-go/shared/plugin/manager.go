@@ -1,4 +1,4 @@
-// Package plugin 插件管理器
+// Package plugin 鎻掍欢绠＄悊鍣?
 package plugin
 
 import (
@@ -10,85 +10,85 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Manager 插件管理器
+// Manager 鎻掍欢绠＄悊鍣?
 //
-// 中文说明:
-// - 负责插件的发现、加载、安装、卸载等生命周期管理;
-// - 使用 gorp Container 注册插件服务;
-// - 支持插件依赖排序;
-// - Discover 只发现不加载,Register 才注册到 Container。
+// 涓枃璇存槑:
+// - 璐熻矗鎻掍欢鐨勫彂鐜般€佸姞杞姐€佸畨瑁呫€佸嵏杞界瓑鐢熷懡鍛ㄦ湡绠＄悊;
+// - 浣跨敤 gorp Container 娉ㄥ唽鎻掍欢鏈嶅姟;
+// - 鏀寔鎻掍欢渚濊禆鎺掑簭;
+// - Discover 鍙彂鐜颁笉鍔犺浇,Register 鎵嶆敞鍐屽埌 Container銆?
 type Manager struct {
-	mu          sync.RWMutex
-	container   contract.Container
-	plugins     map[string]Plugin      // systemName -> Plugin 实例
-	metas       map[string]*PluginMeta // systemName -> Meta 元数据
-	pluginsDir  string                 // 插件目录路径
+	mu         sync.RWMutex
+	container  runtimecontract.Container
+	plugins    map[string]Plugin      // systemName -> Plugin 瀹炰緥
+	metas      map[string]*PluginMeta // systemName -> Meta 鍏冩暟鎹?
+	pluginsDir string                 // 鎻掍欢鐩綍璺緞
 }
 
-// NewManager 创建插件管理器
+// NewManager 鍒涘缓鎻掍欢绠＄悊鍣?
 //
-// 中文说明:
-// - container 是 gorp 依赖注入容器;
-// - pluginsDir 是插件目录路径,通常是 "./plugins";
-// - 创建后需要调用 Discover() 发现可用插件。
-func NewManager(container contract.Container, pluginsDir string) *Manager {
+// 涓枃璇存槑:
+// - container 鏄?gorp 渚濊禆娉ㄥ叆瀹瑰櫒;
+// - pluginsDir 鏄彃浠剁洰褰曡矾寰?閫氬父鏄?"./plugins";
+// - 鍒涘缓鍚庨渶瑕佽皟鐢?Discover() 鍙戠幇鍙敤鎻掍欢銆?
+func NewManager(container runtimecontract.Container, pluginsDir string) *Manager {
 	return &Manager{
-		container:   container,
-		plugins:     make(map[string]Plugin),
-		metas:       make(map[string]*PluginMeta),
-		pluginsDir:  pluginsDir,
+		container:  container,
+		plugins:    make(map[string]Plugin),
+		metas:      make(map[string]*PluginMeta),
+		pluginsDir: pluginsDir,
 	}
 }
 
-// Discover 扫描并发现所有插件
+// Discover 鎵弿骞跺彂鐜版墍鏈夋彃浠?
 //
-// 中文说明:
-// - 扫描 plugins/ 目录下的所有 plugin.json;
-// - 解析元数据并验证版本兼容性;
-// - 只发现不加载,不创建插件实例;
-// - 实际注册需要调用 Register() 方法。
+// 涓枃璇存槑:
+// - 鎵弿 plugins/ 鐩綍涓嬬殑鎵€鏈?plugin.json;
+// - 瑙ｆ瀽鍏冩暟鎹苟楠岃瘉鐗堟湰鍏煎鎬?
+// - 鍙彂鐜颁笉鍔犺浇,涓嶅垱寤烘彃浠跺疄渚?
+// - 瀹為檯娉ㄥ唽闇€瑕佽皟鐢?Register() 鏂规硶銆?
 func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// 清空已发现的元数据
+	// 娓呯┖宸插彂鐜扮殑鍏冩暟鎹?
 	m.metas = make(map[string]*PluginMeta)
 
-	// 检查插件目录是否存在
+	// 妫€鏌ユ彃浠剁洰褰曟槸鍚﹀瓨鍦?
 	entries, err := os.ReadDir(m.pluginsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // 插件目录不存在,不是错误
+			return nil // 鎻掍欢鐩綍涓嶅瓨鍦?涓嶆槸閿欒
 		}
 		return fmt.Errorf("read plugins directory: %w", err)
 	}
 
-	// 扫描每个子目录
+	// 鎵弿姣忎釜瀛愮洰褰?
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			continue // 只处理目录
+			continue // 鍙鐞嗙洰褰?
 		}
 
 		pluginDir := filepath.Join(m.pluginsDir, entry.Name())
 		metaPath := filepath.Join(pluginDir, "plugin.json")
 
-		// 读取 plugin.json
+		// 璇诲彇 plugin.json
 		data, err := os.ReadFile(metaPath)
 		if err != nil {
-			continue // 没有 plugin.json,跳过
+			continue // 娌℃湁 plugin.json,璺宠繃
 		}
 
 		var meta PluginMeta
 		if err := json.Unmarshal(data, &meta); err != nil {
-			continue // 解析失败,跳过
+			continue // 瑙ｆ瀽澶辫触,璺宠繃
 		}
 
-		// 验证基本字段
+		// 楠岃瘉鍩烘湰瀛楁
 		if meta.SystemName == "" {
-			continue // system_name 必填
+			continue // system_name 蹇呭～
 		}
 
 		m.metas[meta.SystemName] = &meta
@@ -97,13 +97,13 @@ func (m *Manager) Discover() error {
 	return nil
 }
 
-// Register 注册一个插件实例
+// Register 娉ㄥ唽涓€涓彃浠跺疄渚?
 //
-// 中文说明:
-// - 将插件实例注册到管理器;
-// - 同时转换为 ServiceProvider 注册到 gorp Container;
-// - 注册后插件可通过 Container.Make() 获取;
-// - 注册成功后会自动添加到全局 Registry。
+// 涓枃璇存槑:
+// - 灏嗘彃浠跺疄渚嬫敞鍐屽埌绠＄悊鍣?
+// - 鍚屾椂杞崲涓?ServiceProvider 娉ㄥ唽鍒?gorp Container;
+// - 娉ㄥ唽鍚庢彃浠跺彲閫氳繃 Container.Make() 鑾峰彇;
+// - 娉ㄥ唽鎴愬姛鍚庝細鑷姩娣诲姞鍒板叏灞€ Registry銆?
 func (m *Manager) Register(p Plugin) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -118,34 +118,34 @@ func (m *Manager) Register(p Plugin) error {
 		return fmt.Errorf("plugin system_name is empty")
 	}
 
-	// 注册到管理器内部映射
+	// 娉ㄥ唽鍒扮鐞嗗櫒鍐呴儴鏄犲皠
 	m.plugins[systemName] = p
 	m.metas[systemName] = meta
 
-	// 转换为 ServiceProvider
+	// 杞崲涓?ServiceProvider
 	sp := p.ToServiceProvider()
 	if sp == nil {
 		return fmt.Errorf("plugin %s ToServiceProvider returns nil", systemName)
 	}
 
-	// 注册到 Container
+	// 娉ㄥ唽鍒?Container
 	if err := m.container.RegisterProvider(sp); err != nil {
 		return fmt.Errorf("register plugin %s to container: %w", systemName, err)
 	}
 
-	// 注册到全局 Registry
+	// 娉ㄥ唽鍒板叏灞€ Registry
 	GetRegistry().Register(p)
 
 	return nil
 }
 
-// Install 安装插件
+// Install 瀹夎鎻掍欢
 //
-// 中文说明:
-// - 调用插件的 Install 方法;
-// - 用于创建数据库表、初始化配置;
-// - 安装后标记 meta.Installed = true;
-// - 通常只需调用一次。
+// 涓枃璇存槑:
+// - 璋冪敤鎻掍欢鐨?Install 鏂规硶;
+// - 鐢ㄤ簬鍒涘缓鏁版嵁搴撹〃銆佸垵濮嬪寲閰嶇疆;
+// - 瀹夎鍚庢爣璁?meta.Installed = true;
+// - 閫氬父鍙渶璋冪敤涓€娆°€?
 func (m *Manager) Install(ctx context.Context, systemName string) error {
 	m.mu.RLock()
 	p, ok := m.plugins[systemName]
@@ -155,12 +155,12 @@ func (m *Manager) Install(ctx context.Context, systemName string) error {
 		return fmt.Errorf("plugin %s not registered", systemName)
 	}
 
-	// 调用插件安装方法
+	// 璋冪敤鎻掍欢瀹夎鏂规硶
 	if err := p.Install(ctx, m.container); err != nil {
 		return fmt.Errorf("install plugin %s: %w", systemName, err)
 	}
 
-	// 更新元数据
+	// 鏇存柊鍏冩暟鎹?
 	m.mu.Lock()
 	if meta, ok := m.metas[systemName]; ok {
 		meta.Installed = true
@@ -171,13 +171,13 @@ func (m *Manager) Install(ctx context.Context, systemName string) error {
 	return nil
 }
 
-// Uninstall 卸载插件
+// Uninstall 鍗歌浇鎻掍欢
 //
-// 中文说明:
-// - 调用插件的 Uninstall 方法;
-// - 用于清理数据、删除表(谨慎);
-// - 卸载后从管理器移除;
-// - 注意: 不从 Container 移除已绑定的服务。
+// 涓枃璇存槑:
+// - 璋冪敤鎻掍欢鐨?Uninstall 鏂规硶;
+// - 鐢ㄤ簬娓呯悊鏁版嵁銆佸垹闄よ〃(璋ㄦ厧);
+// - 鍗歌浇鍚庝粠绠＄悊鍣ㄧЩ闄?
+// - 娉ㄦ剰: 涓嶄粠 Container 绉婚櫎宸茬粦瀹氱殑鏈嶅姟銆?
 func (m *Manager) Uninstall(ctx context.Context, systemName string) error {
 	m.mu.RLock()
 	p, ok := m.plugins[systemName]
@@ -187,12 +187,12 @@ func (m *Manager) Uninstall(ctx context.Context, systemName string) error {
 		return fmt.Errorf("plugin %s not registered", systemName)
 	}
 
-	// 调用插件卸载方法
+	// 璋冪敤鎻掍欢鍗歌浇鏂规硶
 	if err := p.Uninstall(ctx, m.container); err != nil {
 		return fmt.Errorf("uninstall plugin %s: %w", systemName, err)
 	}
 
-	// 从管理器移除
+	// 浠庣鐞嗗櫒绉婚櫎
 	m.mu.Lock()
 	delete(m.plugins, systemName)
 	if meta, ok := m.metas[systemName]; ok {
@@ -204,33 +204,33 @@ func (m *Manager) Uninstall(ctx context.Context, systemName string) error {
 	return nil
 }
 
-// Boot 启动所有已安装的插件
+// Boot 鍚姩鎵€鏈夊凡瀹夎鐨勬彃浠?
 //
-// 中文说明:
-// - 按依赖顺序依次调用插件的 Boot 方法;
-// - 用于初始化运行时状态、读取配置;
-// - 在服务启动时调用;
-// - 如果某个插件 Boot 失败,会返回错误。
+// 涓枃璇存槑:
+// - 鎸変緷璧栭『搴忎緷娆¤皟鐢ㄦ彃浠剁殑 Boot 鏂规硶;
+// - 鐢ㄤ簬鍒濆鍖栬繍琛屾椂鐘舵€併€佽鍙栭厤缃?
+// - 鍦ㄦ湇鍔″惎鍔ㄦ椂璋冪敤;
+// - 濡傛灉鏌愪釜鎻掍欢 Boot 澶辫触,浼氳繑鍥為敊璇€?
 func (m *Manager) Boot(ctx context.Context) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// 解析依赖顺序
+	// 瑙ｆ瀽渚濊禆椤哄簭
 	order, err := m.resolveDependencyOrder()
 	if err != nil {
 		return fmt.Errorf("resolve dependency order: %w", err)
 	}
 
-	// 按顺序启动
+	// 鎸夐『搴忓惎鍔?
 	for _, systemName := range order {
 		p, ok := m.plugins[systemName]
 		if !ok {
-			continue // 未注册,跳过
+			continue // 鏈敞鍐?璺宠繃
 		}
 
 		meta := p.Meta()
 		if meta == nil || !meta.Installed {
-			continue // 未安装,跳过
+			continue // 鏈畨瑁?璺宠繃
 		}
 
 		if err := p.Boot(ctx, m.container); err != nil {
@@ -241,11 +241,11 @@ func (m *Manager) Boot(ctx context.Context) error {
 	return nil
 }
 
-// GetPlugin 获取插件实例
+// GetPlugin 鑾峰彇鎻掍欢瀹炰緥
 //
-// 中文说明:
-// - 通过 systemName 获取已注册的插件;
-// - 用于业务代码调用插件方法。
+// 涓枃璇存槑:
+// - 閫氳繃 systemName 鑾峰彇宸叉敞鍐岀殑鎻掍欢;
+// - 鐢ㄤ簬涓氬姟浠ｇ爜璋冪敤鎻掍欢鏂规硶銆?
 func (m *Manager) GetPlugin(systemName string) (Plugin, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -253,12 +253,12 @@ func (m *Manager) GetPlugin(systemName string) (Plugin, bool) {
 	return p, ok
 }
 
-// GetPaymentMethod 获取支付插件
+// GetPaymentMethod 鑾峰彇鏀粯鎻掍欢
 //
-// 中文说明:
-// - 类型安全的获取支付插件;
-// - 返回 PaymentMethod 接口;
-// - 如果插件不是支付类型,返回 false。
+// 涓枃璇存槑:
+// - 绫诲瀷瀹夊叏鐨勮幏鍙栨敮浠樻彃浠?
+// - 杩斿洖 PaymentMethod 鎺ュ彛;
+// - 濡傛灉鎻掍欢涓嶆槸鏀粯绫诲瀷,杩斿洖 false銆?
 func (m *Manager) GetPaymentMethod(systemName string) (PaymentMethod, bool) {
 	p, ok := m.GetPlugin(systemName)
 	if !ok {
@@ -269,7 +269,7 @@ func (m *Manager) GetPaymentMethod(systemName string) (PaymentMethod, bool) {
 	return pm, ok
 }
 
-// GetShippingMethod 获取配送插件
+// GetShippingMethod 鑾峰彇閰嶉€佹彃浠?
 func (m *Manager) GetShippingMethod(systemName string) (ShippingMethod, bool) {
 	p, ok := m.GetPlugin(systemName)
 	if !ok {
@@ -280,7 +280,7 @@ func (m *Manager) GetShippingMethod(systemName string) (ShippingMethod, bool) {
 	return sm, ok
 }
 
-// GetWidgetPlugin 获取小部件插件
+// GetWidgetPlugin 鑾峰彇灏忛儴浠舵彃浠?
 func (m *Manager) GetWidgetPlugin(systemName string) (WidgetPlugin, bool) {
 	p, ok := m.GetPlugin(systemName)
 	if !ok {
@@ -291,12 +291,12 @@ func (m *Manager) GetWidgetPlugin(systemName string) (WidgetPlugin, bool) {
 	return wp, ok
 }
 
-// ListPlugins 列出所有已发现的插件元数据
+// ListPlugins 鍒楀嚭鎵€鏈夊凡鍙戠幇鐨勬彃浠跺厓鏁版嵁
 //
-// 中文说明:
-// - 包含已注册和未注册的;
-// - 按 DisplayOrder 排序;
-// - 用于管理后台展示插件列表。
+// 涓枃璇存槑:
+// - 鍖呭惈宸叉敞鍐屽拰鏈敞鍐岀殑;
+// - 鎸?DisplayOrder 鎺掑簭;
+// - 鐢ㄤ簬绠＄悊鍚庡彴灞曠ず鎻掍欢鍒楄〃銆?
 func (m *Manager) ListPlugins() []*PluginMeta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -306,7 +306,7 @@ func (m *Manager) ListPlugins() []*PluginMeta {
 		result = append(result, meta)
 	}
 
-	// 按 DisplayOrder 排序
+	// 鎸?DisplayOrder 鎺掑簭
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].DisplayOrder < result[j].DisplayOrder
 	})
@@ -314,7 +314,7 @@ func (m *Manager) ListPlugins() []*PluginMeta {
 	return result
 }
 
-// ListInstalledPlugins 列出已安装的插件
+// ListInstalledPlugins 鍒楀嚭宸插畨瑁呯殑鎻掍欢
 func (m *Manager) ListInstalledPlugins() []*PluginMeta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -333,11 +333,11 @@ func (m *Manager) ListInstalledPlugins() []*PluginMeta {
 	return result
 }
 
-// ListPluginsByType 按类型列出插件
+// ListPluginsByType 鎸夌被鍨嬪垪鍑烘彃浠?
 //
-// 中文说明:
-// - pluginType 例如: "payment", "shipping";
-// - 用于管理后台按分类展示。
+// 涓枃璇存槑:
+// - pluginType 渚嬪: "payment", "shipping";
+// - 鐢ㄤ簬绠＄悊鍚庡彴鎸夊垎绫诲睍绀恒€?
 func (m *Manager) ListPluginsByType(pluginType string) []*PluginMeta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -357,28 +357,28 @@ func (m *Manager) ListPluginsByType(pluginType string) []*PluginMeta {
 	return result
 }
 
-// resolveDependencyOrder 解析依赖顺序(拓扑排序)
+// resolveDependencyOrder 瑙ｆ瀽渚濊禆椤哄簭(鎷撴墤鎺掑簭)
 //
-// 中文说明:
-// - 根据 meta.DependsOn 构建依赖图;
-// - 拓扑排序确保依赖先加载;
-// - 检测循环依赖并返回错误。
+// 涓枃璇存槑:
+// - 鏍规嵁 meta.DependsOn 鏋勫缓渚濊禆鍥?
+// - 鎷撴墤鎺掑簭纭繚渚濊禆鍏堝姞杞?
+// - 妫€娴嬪惊鐜緷璧栧苟杩斿洖閿欒銆?
 func (m *Manager) resolveDependencyOrder() ([]string, error) {
-	// 构建依赖图
+	// 鏋勫缓渚濊禆鍥?
 	graph := make(map[string][]string)
 	for systemName, meta := range m.metas {
 		graph[systemName] = meta.DependsOn
 	}
 
-	// 拓扑排序
+	// 鎷撴墤鎺掑簭
 	var result []string
 	visited := make(map[string]bool)
-	visiting := make(map[string]bool) // 用于检测循环
+	visiting := make(map[string]bool) // 鐢ㄤ簬妫€娴嬪惊鐜?
 
 	var visit func(string) error
 	visit = func(node string) error {
 		if visited[node] {
-			return nil // 已访问
+			return nil // 宸茶闂?
 		}
 		if visiting[node] {
 			return fmt.Errorf("circular dependency detected at %s", node)
@@ -397,7 +397,7 @@ func (m *Manager) resolveDependencyOrder() ([]string, error) {
 		return nil
 	}
 
-	// 遍历所有节点
+	// 閬嶅巻鎵€鏈夎妭鐐?
 	for node := range graph {
 		if err := visit(node); err != nil {
 			return nil, err
@@ -407,11 +407,11 @@ func (m *Manager) resolveDependencyOrder() ([]string, error) {
 	return result, nil
 }
 
-// SetInstalled 更新插件安装状态
+// SetInstalled 鏇存柊鎻掍欢瀹夎鐘舵€?
 //
-// 中文说明:
-// - 用于从数据库恢复安装状态;
-// - 启动时调用,恢复上次保存的状态。
+// 涓枃璇存槑:
+// - 鐢ㄤ簬浠庢暟鎹簱鎭㈠瀹夎鐘舵€?
+// - 鍚姩鏃惰皟鐢?鎭㈠涓婃淇濆瓨鐨勭姸鎬併€?
 func (m *Manager) SetInstalled(systemName string, installed bool, version string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

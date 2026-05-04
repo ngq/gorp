@@ -7,29 +7,29 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
 	"github.com/redis/go-redis/v9"
+
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Provider 提供 Redis PubSub 消息队列实现。
-//
-// 中文说明：
-// - 使用 Redis Pub/Sub 实现发布/订阅模式；
-// - 使用 Redis List 实现点对点队列；
-// - 轻量级，适合简单场景；
-// - 当前已从 framework/provider 真实下沉到 contrib 层。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "messagequeue.redis" }
-func (p *Provider) IsDefer() bool    { return true }
+func (p *Provider) Name() string  { return "messagequeue.redis" }
+func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.MessageQueueKey, contract.MessagePublisherKey, contract.MessageSubscriberKey}
+	return []string{
+		integrationcontract.MessageQueueKey,
+		integrationcontract.MessagePublisherKey,
+		integrationcontract.MessageSubscriberKey,
+	}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.MessageQueueKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(integrationcontract.MessageQueueKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getMQConfig(c)
 		if err != nil {
 			return nil, err
@@ -37,7 +37,7 @@ func (p *Provider) Register(c contract.Container) error {
 		return NewQueue(cfg)
 	}, true)
 
-	c.Bind(contract.MessagePublisherKey, func(c contract.Container) (any, error) {
+	c.Bind(integrationcontract.MessagePublisherKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getMQConfig(c)
 		if err != nil {
 			return nil, err
@@ -49,7 +49,7 @@ func (p *Provider) Register(c contract.Container) error {
 		return queue.Publisher(), nil
 	}, true)
 
-	c.Bind(contract.MessageSubscriberKey, func(c contract.Container) (any, error) {
+	c.Bind(integrationcontract.MessageSubscriberKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getMQConfig(c)
 		if err != nil {
 			return nil, err
@@ -64,20 +64,19 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
-// getMQConfig 从容器获取消息队列配置。
-func getMQConfig(c contract.Container) (*contract.MessageQueueConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getMQConfig(c runtimecontract.Container) (*integrationcontract.MessageQueueConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("messagequeue: invalid config service")
 	}
 
-	mqCfg := &contract.MessageQueueConfig{
+	mqCfg := &integrationcontract.MessageQueueConfig{
 		Type:           "redis",
 		MaxRetry:       3,
 		RetryDelay:     time.Second,
@@ -101,9 +100,8 @@ func getMQConfig(c contract.Container) (*contract.MessageQueueConfig, error) {
 	return mqCfg, nil
 }
 
-// Queue 是 Redis 消息队列实现。
 type Queue struct {
-	cfg    *contract.MessageQueueConfig
+	cfg    *integrationcontract.MessageQueueConfig
 	client *redis.Client
 	pubsub *redis.PubSub
 	mu     sync.Mutex
@@ -111,8 +109,7 @@ type Queue struct {
 	closed bool
 }
 
-// NewQueue 创建 Redis 消息队列。
-func NewQueue(cfg *contract.MessageQueueConfig) (*Queue, error) {
+func NewQueue(cfg *integrationcontract.MessageQueueConfig) (*Queue, error) {
 	client := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr, Password: cfg.RedisPassword, DB: cfg.RedisDB})
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 	defer cancel()
@@ -122,8 +119,13 @@ func NewQueue(cfg *contract.MessageQueueConfig) (*Queue, error) {
 	return &Queue{cfg: cfg, client: client, subs: make(map[string]context.CancelFunc)}, nil
 }
 
-func (q *Queue) Publisher() contract.MessagePublisher { return &redisPublisher{queue: q} }
-func (q *Queue) Subscriber() contract.MessageSubscriber { return &redisSubscriber{queue: q} }
+func (q *Queue) Publisher() integrationcontract.MessagePublisher {
+	return &redisPublisher{queue: q}
+}
+
+func (q *Queue) Subscriber() integrationcontract.MessageSubscriber {
+	return &redisSubscriber{queue: q}
+}
 
 func (q *Queue) Close() error {
 	q.mu.Lock()
@@ -148,8 +150,8 @@ type redisPublisher struct {
 	queue *Queue
 }
 
-func (p *redisPublisher) Publish(ctx context.Context, topic string, message []byte, options ...contract.PublishOption) error {
-	cfg := &contract.PublishConfig{}
+func (p *redisPublisher) Publish(ctx context.Context, topic string, message []byte, options ...integrationcontract.PublishOption) error {
+	cfg := &integrationcontract.PublishConfig{}
 	for _, opt := range options {
 		opt(cfg)
 	}
@@ -176,8 +178,8 @@ func (p *redisPublisher) PublishWithPriority(ctx context.Context, topic string, 
 	return p.queue.client.LPush(ctx, queueName, message).Err()
 }
 
-func (p *redisPublisher) Send(ctx context.Context, queue string, message []byte, options ...contract.PublishOption) error {
-	cfg := &contract.PublishConfig{}
+func (p *redisPublisher) Send(ctx context.Context, queue string, message []byte, options ...integrationcontract.PublishOption) error {
+	cfg := &integrationcontract.PublishConfig{}
 	for _, opt := range options {
 		opt(cfg)
 	}
@@ -191,7 +193,7 @@ type redisSubscriber struct {
 	queue *Queue
 }
 
-func (s *redisSubscriber) Subscribe(ctx context.Context, topic string, handler contract.MessageHandler) (contract.UnsubscribeFunc, error) {
+func (s *redisSubscriber) Subscribe(ctx context.Context, topic string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
 	if s.queue.closed {
@@ -212,7 +214,7 @@ func (s *redisSubscriber) Subscribe(ctx context.Context, topic string, handler c
 				if !ok {
 					return
 				}
-				message := &contract.Message{ID: "", Topic: topic, Body: []byte(msg.Payload), Timestamp: time.Now()}
+				message := &integrationcontract.Message{ID: "", Topic: topic, Body: []byte(msg.Payload), Timestamp: time.Now()}
 				_ = handler(subCtx, message)
 			}
 		}
@@ -226,11 +228,12 @@ func (s *redisSubscriber) Subscribe(ctx context.Context, topic string, handler c
 	}, nil
 }
 
-func (s *redisSubscriber) SubscribeWithGroup(ctx context.Context, topic string, group string, handler contract.MessageHandler) (contract.UnsubscribeFunc, error) {
+func (s *redisSubscriber) SubscribeWithGroup(ctx context.Context, topic string, group string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
+	_ = group
 	return s.Subscribe(ctx, topic, handler)
 }
 
-func (s *redisSubscriber) Consume(ctx context.Context, queue string, handler contract.MessageHandler) error {
+func (s *redisSubscriber) Consume(ctx context.Context, queue string, handler integrationcontract.MessageHandler) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -244,7 +247,7 @@ func (s *redisSubscriber) Consume(ctx context.Context, queue string, handler con
 			}
 			return err
 		}
-		message := &contract.Message{ID: "", Queue: queue, Body: []byte(result[1]), Timestamp: time.Now()}
+		message := &integrationcontract.Message{ID: "", Queue: queue, Body: []byte(result[1]), Timestamp: time.Now()}
 		if err := handler(ctx, message); err != nil {
 			s.queue.client.RPush(ctx, queue, result[1])
 		}

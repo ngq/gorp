@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,5 +40,5 @@ func TestProvider(t *testing.T) {
 
 	assert.Equal(t, "dlock.noop", p.Name())
 	assert.True(t, p.IsDefer())
-	assert.ElementsMatch(t, []string{contract.DistributedLockKey}, p.Provides())
+	assert.ElementsMatch(t, []string{datacontract.DistributedLockKey}, p.Provides())
 }

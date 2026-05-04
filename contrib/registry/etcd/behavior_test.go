@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +25,7 @@ func TestParseAddrAndGenerateServiceID(t *testing.T) {
 
 func TestApplyLoadBalanceAndKeepAliveLoop(t *testing.T) {
 	r := &Registry{cfg: &DiscoveryConfig{LoadBalance: "random"}}
-	instances := []contract.ServiceInstance{{ID: "1"}, {ID: "2"}}
+	instances := []transportcontract.ServiceInstance{{ID: "1"}, {ID: "2"}}
 	require.Len(t, r.applyLoadBalance(instances), 2)
 
 	stopCh := make(chan struct{})
@@ -62,12 +63,16 @@ func TestGetDiscoveryConfigRejectsInvalidConfigService(t *testing.T) {
 
 type etcdDiscoveryInvalidContainerStub struct{}
 
-func (etcdDiscoveryInvalidContainerStub) Bind(string, contract.Factory, bool) {}
+func (etcdDiscoveryInvalidContainerStub) Bind(string, runtimecontract.Factory, bool) {}
 func (etcdDiscoveryInvalidContainerStub) IsBind(string) bool { return true }
 func (etcdDiscoveryInvalidContainerStub) Make(string) (any, error) { return 1, nil }
 func (etcdDiscoveryInvalidContainerStub) MustMake(string) any { return 1 }
-func (etcdDiscoveryInvalidContainerStub) RegisterProvider(contract.ServiceProvider) error { return nil }
-func (etcdDiscoveryInvalidContainerStub) RegisterProviders(...contract.ServiceProvider) error { return nil }
+func (etcdDiscoveryInvalidContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (etcdDiscoveryInvalidContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
 
 func TestRegistryCloseWithoutClientPanicsToday(t *testing.T) {
 	r := &Registry{}

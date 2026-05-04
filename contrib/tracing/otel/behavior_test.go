@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +25,7 @@ func (c *testTextMapCarrier) Keys() []string {
 }
 
 func TestTracerProviderAndTracer_StartInjectExtractAndShutdown(t *testing.T) {
-	provider, err := NewTracerProvider(&contract.TracingConfig{
+	provider, err := NewTracerProvider(&observabilitycontract.TracingConfig{
 		Enabled:          true,
 		ExporterType:     "stdout",
 		ServiceName:      "order-service",
@@ -37,9 +37,9 @@ func TestTracerProviderAndTracer_StartInjectExtractAndShutdown(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	tracer := NewTracer(provider, &contract.TracingConfig{ServiceName: "order-service"})
-	ctx, span := tracer.StartSpan(context.Background(), "op", func(cfg *contract.SpanConfig) {
-		cfg.Kind = contract.SpanKindServer
+	tracer := NewTracer(provider, &observabilitycontract.TracingConfig{ServiceName: "order-service"})
+	ctx, span := tracer.StartSpan(context.Background(), "op", func(cfg *observabilitycontract.SpanConfig) {
+		cfg.Kind = observabilitycontract.SpanKindServer
 	})
 	require.True(t, span.IsRecording())
 
@@ -50,7 +50,7 @@ func TestTracerProviderAndTracer_StartInjectExtractAndShutdown(t *testing.T) {
 	extracted, err := tracer.Extract(context.Background(), carrier)
 	require.NoError(t, err)
 	extractedSpan := tracer.SpanFromContext(extracted)
-	require.NotEqual(t, contract.SpanContext{}, extractedSpan.SpanContext())
+	require.NotEqual(t, observabilitycontract.SpanContext{}, extractedSpan.SpanContext())
 
 	span.AddEvent("done", map[string]any{"ok": true})
 	span.SetTag("service", "order")
@@ -69,8 +69,8 @@ func TestCreateSamplerAndNoopSpan(t *testing.T) {
 
 	span := (&noopSpan{})
 	span.SetError(errors.New("ignored"))
-	span.SetStatus(contract.SpanStatusCodeError, "bad")
-	span.End(func(cfg *contract.SpanEndConfig) {
+	span.SetStatus(observabilitycontract.SpanStatusCodeError, "bad")
+	span.End(func(cfg *observabilitycontract.SpanEndConfig) {
 		cfg.EndTime = time.Now()
 	})
 	require.False(t, span.IsRecording())

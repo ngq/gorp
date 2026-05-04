@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 )
 
 // GetAny 返回第一个存在的配置值。
-func GetAny(cfg contract.Config, keys ...string) (any, bool) {
+func GetAny(cfg datacontract.Config, keys ...string) (any, bool) {
 	if cfg == nil {
 		return nil, false
 	}
@@ -25,7 +25,7 @@ func GetAny(cfg contract.Config, keys ...string) (any, bool) {
 }
 
 // GetStringAny 返回第一个非空字符串配置。
-func GetStringAny(cfg contract.Config, keys ...string) string {
+func GetStringAny(cfg datacontract.Config, keys ...string) string {
 	if cfg == nil {
 		return ""
 	}
@@ -49,7 +49,7 @@ func GetStringAny(cfg contract.Config, keys ...string) string {
 }
 
 // GetBoolAny 返回第一个可解析布尔配置及是否存在。
-func GetBoolAny(cfg contract.Config, keys ...string) (bool, bool) {
+func GetBoolAny(cfg datacontract.Config, keys ...string) (bool, bool) {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
 		if !ok {
@@ -75,7 +75,7 @@ func GetBoolAny(cfg contract.Config, keys ...string) (bool, bool) {
 }
 
 // GetIntAny 返回第一个可解析整数配置。
-func GetIntAny(cfg contract.Config, keys ...string) int {
+func GetIntAny(cfg datacontract.Config, keys ...string) int {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
 		if !ok {
@@ -99,7 +99,7 @@ func GetIntAny(cfg contract.Config, keys ...string) int {
 }
 
 // GetFloatAny 返回第一个可解析浮点配置。
-func GetFloatAny(cfg contract.Config, keys ...string) float64 {
+func GetFloatAny(cfg datacontract.Config, keys ...string) float64 {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
 		if !ok {
@@ -125,7 +125,7 @@ func GetFloatAny(cfg contract.Config, keys ...string) float64 {
 }
 
 // GetStringSliceAny 返回第一个字符串切片配置。
-func GetStringSliceAny(cfg contract.Config, keys ...string) []string {
+func GetStringSliceAny(cfg datacontract.Config, keys ...string) []string {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
 		if !ok {
@@ -155,7 +155,7 @@ func GetStringSliceAny(cfg contract.Config, keys ...string) []string {
 }
 
 // GetStringMapAny 返回第一个字符串 map 配置。
-func GetStringMapAny(cfg contract.Config, keys ...string) map[string]string {
+func GetStringMapAny(cfg datacontract.Config, keys ...string) map[string]string {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
 		if !ok {

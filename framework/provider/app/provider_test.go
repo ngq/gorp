@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 func TestProvider_ProvidesRootKey(t *testing.T) {
 	p := NewProvider()
-	if got := p.Provides(); len(got) != 1 || got[0] != contract.RootKey {
+	if got := p.Provides(); len(got) != 1 || got[0] != runtimecontract.RootKey {
 		t.Fatalf("unexpected provides keys: %v", got)
 	}
 }
@@ -20,14 +21,14 @@ type stubConfig struct {
 	values map[string]string
 }
 
-func (s *stubConfig) Env() string                  { return "testing" }
-func (s *stubConfig) Get(key string) any           { return s.values[key] }
-func (s *stubConfig) GetString(key string) string  { return s.values[key] }
-func (s *stubConfig) GetInt(string) int            { return 0 }
-func (s *stubConfig) GetBool(string) bool          { return false }
-func (s *stubConfig) GetFloat(string) float64      { return 0 }
-func (s *stubConfig) Unmarshal(string, any) error  { return nil }
-func (s *stubConfig) Watch(context.Context, string) (contract.ConfigWatcher, error) {
+func (s *stubConfig) Env() string                 { return "testing" }
+func (s *stubConfig) Get(key string) any          { return s.values[key] }
+func (s *stubConfig) GetString(key string) string { return s.values[key] }
+func (s *stubConfig) GetInt(string) int           { return 0 }
+func (s *stubConfig) GetBool(string) bool         { return false }
+func (s *stubConfig) GetFloat(string) float64     { return 0 }
+func (s *stubConfig) Unmarshal(string, any) error { return nil }
+func (s *stubConfig) Watch(context.Context, string) (datacontract.ConfigWatcher, error) {
 	return nil, nil
 }
 func (s *stubConfig) Reload(context.Context) error { return nil }
@@ -56,7 +57,7 @@ func TestProvider_DefaultPathsFollowWorkingDir(t *testing.T) {
 
 func TestProvider_ConfigurablePaths(t *testing.T) {
 	c := container.New()
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]string{
 			"app.paths.base":    "custom-root",
 			"app.paths.storage": "var",

@@ -13,7 +13,9 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 var (
@@ -40,11 +42,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "registry.zookeeper" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.RPCRegistryKey}
+	return []string{transportcontract.RPCRegistryKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getZookeeperConfig(c)
 		if err != nil {
 			return nil, err
@@ -55,7 +57,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 type ZookeeperConfig struct {
 	Servers            []string
@@ -68,13 +70,13 @@ type ZookeeperConfig struct {
 	ServiceMeta        map[string]string
 }
 
-func getZookeeperConfig(c contract.Container) (*ZookeeperConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getZookeeperConfig(c runtimecontract.Container) (*ZookeeperConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("zookeeper: invalid config service")
 	}
@@ -126,7 +128,7 @@ type Registry struct {
 	backend zkBackend
 
 	mu                  sync.RWMutex
-	endpointCache       map[string][]contract.ServiceInstance
+	endpointCache       map[string][]transportcontract.ServiceInstance
 	watchSnapshots      map[string]string
 	registeredInstances map[string]string
 	closeMu             sync.Mutex
@@ -152,7 +154,7 @@ func NewRegistryWithBackend(cfg *ZookeeperConfig, backend zkBackend) (*Registry,
 	return &Registry{
 		config:              cfg,
 		backend:             backend,
-		endpointCache:       make(map[string][]contract.ServiceInstance),
+		endpointCache:       make(map[string][]transportcontract.ServiceInstance),
 		watchSnapshots:      make(map[string]string),
 		registeredInstances: make(map[string]string),
 	}, nil
@@ -226,10 +228,10 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	return nil
 }
 
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	r.mu.RLock()
 	if instances, ok := r.endpointCache[name]; ok && len(instances) > 0 {
-		cached := append([]contract.ServiceInstance(nil), instances...)
+		cached := append([]transportcontract.ServiceInstance(nil), instances...)
 		r.mu.RUnlock()
 		return cached, nil
 	}
@@ -252,7 +254,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 	}
 	sort.Strings(children)
 
-	result := make([]contract.ServiceInstance, 0, len(children))
+	result := make([]transportcontract.ServiceInstance, 0, len(children))
 	for _, child := range children {
 		data, getErr := r.backend.Get(path.Join(servicePath, child))
 		if getErr != nil {
@@ -263,7 +265,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 		if err := json.Unmarshal(data, &record); err != nil {
 			return nil, fmt.Errorf("zookeeper: decode instance failed: %w", err)
 		}
-		result = append(result, contract.ServiceInstance{
+		result = append(result, transportcontract.ServiceInstance{
 			ID:       record.ID,
 			Name:     record.Name,
 			Address:  record.Address,
@@ -273,12 +275,12 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 	}
 	sortServiceInstances(result)
 	r.mu.Lock()
-	r.endpointCache[name] = append([]contract.ServiceInstance(nil), result...)
+	r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), result...)
 	r.mu.Unlock()
 	return result, nil
 }
 
-func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.ServiceInstance, error) {
+func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportcontract.ServiceInstance, error) {
 	r.closeMu.Lock()
 	defer r.closeMu.Unlock()
 
@@ -289,9 +291,10 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 	watchCtx, cancel := context.WithCancel(ctx)
 	r.watchCancels = append(r.watchCancels, cancel)
 
-	ch := make(chan []contract.ServiceInstance, 10)
+	ch := make(chan []transportcontract.ServiceInstance, 10)
 	servicePath := path.Join(r.config.BasePath, name)
-	emit := func(instances []contract.ServiceInstance) bool {
+	var workers sync.WaitGroup
+	emit := func(instances []transportcontract.ServiceInstance) bool {
 		snapshot := snapshotKey(instances)
 
 		r.mu.Lock()
@@ -304,7 +307,7 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		r.mu.Unlock()
 
 		select {
-		case ch <- append([]contract.ServiceInstance(nil), instances...):
+		case ch <- append([]transportcontract.ServiceInstance(nil), instances...):
 			return true
 		case <-watchCtx.Done():
 			return false
@@ -313,8 +316,9 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		}
 	}
 
+	workers.Add(1)
 	go func() {
-		defer close(ch)
+		defer workers.Done()
 		for {
 			err := r.backend.WatchChildren(watchCtx, servicePath, func() {
 				r.mu.Lock()
@@ -347,7 +351,9 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		}
 	}()
 
+	workers.Add(1)
 	go func() {
+		defer workers.Done()
 		instances, err := r.Discover(watchCtx, name)
 		if err != nil {
 			if errors.Is(err, ErrServiceNotFound) {
@@ -356,6 +362,11 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 			return
 		}
 		emit(instances)
+	}()
+
+	go func() {
+		workers.Wait()
+		close(ch)
 	}()
 
 	return ch, nil
@@ -524,7 +535,7 @@ func mergeMeta(base map[string]string, extra map[string]string) map[string]strin
 	return result
 }
 
-func sortServiceInstances(instances []contract.ServiceInstance) {
+func sortServiceInstances(instances []transportcontract.ServiceInstance) {
 	sort.Slice(instances, func(i, j int) bool {
 		if instances[i].ID != instances[j].ID {
 			return instances[i].ID < instances[j].ID
@@ -533,7 +544,7 @@ func sortServiceInstances(instances []contract.ServiceInstance) {
 	})
 }
 
-func snapshotKey(instances []contract.ServiceInstance) string {
+func snapshotKey(instances []transportcontract.ServiceInstance) string {
 	if len(instances) == 0 {
 		return "<empty>"
 	}

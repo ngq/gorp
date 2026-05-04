@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供 noop 熔断器实现。
@@ -17,25 +18,25 @@ type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "circuitbreaker.noop" }
-func (p *Provider) IsDefer() bool    { return true }
+func (p *Provider) Name() string  { return "circuitbreaker.noop" }
+func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.CircuitBreakerKey, contract.RateLimiterKey}
+	return []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.CircuitBreakerKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(resiliencecontract.CircuitBreakerKey, func(c runtimecontract.Container) (any, error) {
 		return &noopCircuitBreaker{}, nil
 	}, true)
 
-	c.Bind(contract.RateLimiterKey, func(c contract.Container) (any, error) {
+	c.Bind(resiliencecontract.RateLimiterKey, func(c runtimecontract.Container) (any, error) {
 		return &noopRateLimiter{}, nil
 	}, true)
 
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
@@ -59,8 +60,8 @@ func (cb *noopCircuitBreaker) Do(ctx context.Context, resource string, fn func()
 }
 
 // State 获取熔断器状态（总是返回关闭状态）。
-func (cb *noopCircuitBreaker) State(ctx context.Context, resource string) contract.CircuitBreakerState {
-	return contract.CircuitBreakerStateClosed
+func (cb *noopCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
+	return resiliencecontract.CircuitBreakerStateClosed
 }
 
 // noopRateLimiter 是 RateLimiter 的空实现。
@@ -77,7 +78,7 @@ func (rl *noopRateLimiter) AllowN(ctx context.Context, resource string, n int) e
 }
 
 // Reserve 预留令牌（立即成功）。
-func (rl *noopRateLimiter) Reserve(ctx context.Context, resource string) contract.Reservation {
+func (rl *noopRateLimiter) Reserve(ctx context.Context, resource string) resiliencecontract.Reservation {
 	return &noopReservation{}
 }
 
@@ -94,7 +95,7 @@ func (rl *noopRateLimiter) WaitTimeout(ctx context.Context, resource string, tim
 // noopReservation 是 Reservation 的空实现。
 type noopReservation struct{}
 
-func (r *noopReservation) OK() bool                { return true }
-func (r *noopReservation) Delay() time.Duration     { return 0 }
-func (r *noopReservation) Cancel()                  {}
-func (r *noopReservation) CancelAt(t time.Time)     {}
+func (r *noopReservation) OK() bool             { return true }
+func (r *noopReservation) Delay() time.Duration { return 0 }
+func (r *noopReservation) Cancel()              {}
+func (r *noopReservation) CancelAt(t time.Time) {}

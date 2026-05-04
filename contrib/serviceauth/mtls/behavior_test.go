@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMTLSAuthenticator_AuthenticateRejectsMissingTLSState(t *testing.T) {
-	auth, err := NewMTLSAuthenticator(&contract.ServiceAuthConfig{})
+	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{})
 	require.NoError(t, err)
 
 	_, err = auth.Authenticate(context.Background())
@@ -28,7 +28,7 @@ func TestMTLSAuthenticator_AuthenticateRejectsMissingTLSState(t *testing.T) {
 }
 
 func TestMTLSAuthenticator_AuthenticateRejectsMissingPeerCertificate(t *testing.T) {
-	auth, err := NewMTLSAuthenticator(&contract.ServiceAuthConfig{})
+	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{})
 	require.NoError(t, err)
 
 	ctx := context.WithValue(context.Background(), "tls_state", &tls.ConnectionState{})
@@ -37,15 +37,15 @@ func TestMTLSAuthenticator_AuthenticateRejectsMissingPeerCertificate(t *testing.
 	require.Contains(t, err.Error(), "no client certificate provided")
 }
 
-func TestMTLSAuthenticator_AuthenticateWithCertExtractsIdentity(t *testing.T) {
-	cert := testCertificate(t, "user-service")
-	auth, err := NewMTLSAuthenticator(&contract.ServiceAuthConfig{
+func TestMTLSAuthenticator_AuthenticatePeerCertificateExtractsIdentity(t *testing.T) {
+	cert := testX509Certificate(t, "user-service")
+	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{
 		Namespace:   "prod",
 		Environment: "online",
 	})
 	require.NoError(t, err)
 
-	identity, err := auth.AuthenticateWithCert(context.Background(), cert)
+	identity, err := auth.AuthenticatePeerCertificate(context.Background(), cert)
 	require.NoError(t, err)
 	require.Equal(t, "user-service", identity.ServiceID)
 	require.Equal(t, "user-service", identity.ServiceName)
@@ -53,17 +53,17 @@ func TestMTLSAuthenticator_AuthenticateWithCertExtractsIdentity(t *testing.T) {
 	require.Equal(t, "online", identity.Environment)
 }
 
-func TestMTLSAuthenticator_AuthenticateWithCertRejectsInvalidCertificate(t *testing.T) {
-	auth, err := NewMTLSAuthenticator(&contract.ServiceAuthConfig{})
+func TestMTLSAuthenticator_AuthenticatePeerCertificateRejectsInvalidCertificate(t *testing.T) {
+	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{})
 	require.NoError(t, err)
 
-	_, err = auth.AuthenticateWithCert(context.Background(), &tls.Certificate{})
+	_, err = auth.AuthenticatePeerCertificate(context.Background(), nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid certificate")
+	require.Contains(t, err.Error(), "nil certificate")
 }
 
 func TestMTLSAuthenticator_GetCurrentIdentity(t *testing.T) {
-	auth, err := NewMTLSAuthenticator(&contract.ServiceAuthConfig{
+	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName: "order-service",
 		Namespace:   "prod",
 		Environment: "online",
@@ -80,7 +80,7 @@ func TestNewMTLSAuthenticator_LoadsCAAndKeyPair(t *testing.T) {
 	dir := t.TempDir()
 	caPath, certPath, keyPath := writeTestMTLSFiles(t, dir, "svc-a")
 
-	auth, err := NewMTLSAuthenticator(&contract.ServiceAuthConfig{
+	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{
 		MTLSCAFile:   caPath,
 		MTLSCertFile: certPath,
 		MTLSKeyFile:  keyPath,
@@ -91,7 +91,7 @@ func TestNewMTLSAuthenticator_LoadsCAAndKeyPair(t *testing.T) {
 	require.Len(t, auth.tlsConfig.Certificates, 1)
 }
 
-func testCertificate(t *testing.T, cn string) *tls.Certificate {
+func testX509Certificate(t *testing.T, cn string) *x509.Certificate {
 	t.Helper()
 	_, cert, _ := generateCertificatePEM(t, cn)
 	parsed, err := tls.X509KeyPair(cert, cert)
@@ -109,7 +109,9 @@ func testCertificate(t *testing.T, cn string) *tls.Certificate {
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
 	require.NoError(t, err)
-	return &tls.Certificate{Certificate: [][]byte{der}, PrivateKey: priv}
+	parsedCert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return parsedCert
 }
 
 func writeTestMTLSFiles(t *testing.T, dir, cn string) (string, string, string) {

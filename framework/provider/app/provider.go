@@ -4,10 +4,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-const AppKey = contract.RootKey
+const AppKey = runtimecontract.RootKey
 
 const (
 	configBasePathKey    = "app.paths.base"
@@ -27,7 +28,7 @@ const (
 // - 当前它更接近 runtime convention provider：提供 framework 默认业务起步路径需要的宿主目录约定；
 // - framework 冻仓阶段先把它统一收进 `contract.RootKey` 语义，再继续观察是否需要进一步从 core provider 中下沉约定。
 type App interface {
-	contract.Root
+	runtimecontract.Root
 }
 
 type Provider struct{}
@@ -42,11 +43,11 @@ func (p *Provider) Name() string { return "app" }
 func (p *Provider) IsDefer() bool { return false }
 
 // Provides 返回 app provider 暴露的能力 key。
-func (p *Provider) Provides() []string { return []string{contract.RootKey} }
+func (p *Provider) Provides() []string { return []string{runtimecontract.RootKey} }
 
 // Register 绑定应用路径服务。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(AppKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(AppKey, func(c runtimecontract.Container) (any, error) {
 		wd, err := os.Getwd()
 		if err != nil {
 			return nil, err
@@ -87,7 +88,7 @@ func (p *Provider) Register(c contract.Container) error {
 }
 
 // Boot app provider 无额外启动逻辑。
-func (p *Provider) Boot(contract.Container) error { return nil }
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
 type service struct {
 	base    string
@@ -105,15 +106,15 @@ func (s *service) LogPath() string     { return s.log }
 func (s *service) ConfigPath() string  { return s.config }
 func (s *service) TempPath() string    { return s.temp }
 
-func getConfig(c contract.Container) contract.Config {
-	if !c.IsBind(contract.ConfigKey) {
+func getConfig(c runtimecontract.Container) datacontract.Config {
+	if !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}
-	v, err := c.Make(contract.ConfigKey)
+	v, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil
 	}
-	cfg, _ := v.(contract.Config)
+	cfg, _ := v.(datacontract.Config)
 	return cfg
 }
 

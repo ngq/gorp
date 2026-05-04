@@ -92,14 +92,17 @@ func callDownstream(cb contract.CircuitBreaker, url string) error {
 ### 3. 限流保护 API
 
 ```go
-func apiHandler(rl contract.RateLimiter) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
-        if err := rl.Allow(ctx, "api:/v1/users"); err != nil {
-            ctx.JSON(429, gin.H{"error": "rate limited"})
-            ctx.Abort()
-            return
+func apiRateLimit(rl contract.RateLimiter) gorp.HTTPMiddleware {
+    return func(next gorp.HTTPHandler) gorp.HTTPHandler {
+        return func(ctx gorp.HTTPContext) {
+            if err := rl.Allow(ctx.Context(), "api:/v1/users"); err != nil {
+                ctx.JSON(429, map[string]any{"error": "rate limited"})
+                return
+            }
+            if next != nil {
+                next(ctx)
+            }
         }
-        // 处理请求
     }
 }
 ```

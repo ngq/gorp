@@ -7,7 +7,11 @@ import (
 
 	"github.com/ngq/gorp/framework/bootstrap"
 	frameworkcontainer "github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	frameworkgrpc "github.com/ngq/gorp/framework/provider/grpc"
 )
 
@@ -41,7 +45,7 @@ var (
 type HTTPRuntime = bootstrap.HTTPServiceRuntime
 
 // ServiceProvider 复用 contract 层 provider 声明。
-type ServiceProvider = contract.ServiceProvider
+type ServiceProvider = runtimecontract.ServiceProvider
 
 // MigrateFunc 定义迁移回调契约。
 type MigrateFunc func(*HTTPRuntime) error
@@ -50,7 +54,7 @@ type MigrateFunc func(*HTTPRuntime) error
 type SetupFunc func(*HTTPRuntime) error
 
 // HTTPRouteRegistrar 定义默认 HTTP 路由注册契约。
-type HTTPRouteRegistrar func(router contract.HTTPRouter, container contract.Container) error
+type HTTPRouteRegistrar func(router transportcontract.HTTPRouter, container runtimecontract.Container) error
 
 // HTTPServiceOptions 是 facade 暴露的最小 HTTP 选项视图。
 type HTTPServiceOptions struct {
@@ -295,38 +299,38 @@ func composeSetup(prev, next SetupFunc) SetupFunc {
 }
 
 // MakeGRPCConnFactory 获取 Proto-first gRPC 连接工厂。
-func MakeGRPCConnFactory(c contract.Container) (contract.GRPCConnFactory, error) {
+func MakeGRPCConnFactory(c runtimecontract.Container) (transportcontract.GRPCConnFactory, error) {
 	return frameworkcontainer.MakeGRPCConnFactory(c)
 }
 
 // MakeGRPCServerRegistrar 获取 Proto-first gRPC 服务端注册器。
-func MakeGRPCServerRegistrar(c contract.Container) (contract.GRPCServerRegistrar, error) {
+func MakeGRPCServerRegistrar(c runtimecontract.Container) (transportcontract.GRPCServerRegistrar, error) {
 	return frameworkcontainer.MakeGRPCServerRegistrar(c)
 }
 
 // MakeDistributedLock 获取分布式锁能力。
-func MakeDistributedLock(c contract.Container) (contract.DistributedLock, error) {
+func MakeDistributedLock(c runtimecontract.Container) (datacontract.DistributedLock, error) {
 	return frameworkcontainer.MakeDistributedLock(c)
 }
 
 // MakeMessagePublisher 获取消息发布能力。
-func MakeMessagePublisher(c contract.Container) (contract.MessagePublisher, error) {
+func MakeMessagePublisher(c runtimecontract.Container) (integrationcontract.MessagePublisher, error) {
 	return frameworkcontainer.MakeMessagePublisher(c)
 }
 
 // MakeMessageSubscriber 获取消息订阅能力。
-func MakeMessageSubscriber(c contract.Container) (contract.MessageSubscriber, error) {
+func MakeMessageSubscriber(c runtimecontract.Container) (integrationcontract.MessageSubscriber, error) {
 	return frameworkcontainer.MakeMessageSubscriber(c)
 }
 
 // WithServiceIdentity 把服务身份写入上下文。
-func WithServiceIdentity(ctx context.Context, identity *contract.ServiceIdentity) context.Context {
-	return contract.NewServiceIdentityContext(ctx, identity)
+func WithServiceIdentity(ctx context.Context, identity *securitycontract.ServiceIdentity) context.Context {
+	return securitycontract.NewServiceIdentityContext(ctx, identity)
 }
 
 // FromServiceIdentity 读取上下文中的服务身份。
-func FromServiceIdentity(ctx context.Context) (*contract.ServiceIdentity, bool) {
-	return contract.FromServiceIdentityContext(ctx)
+func FromServiceIdentity(ctx context.Context) (*securitycontract.ServiceIdentity, bool) {
+	return securitycontract.FromServiceIdentityContext(ctx)
 }
 
 // GetGRPCTraceID 从 gRPC context 读取 trace id。

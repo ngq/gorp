@@ -1,10 +1,10 @@
-// Package wechat 微信支付插件
+﻿// Package wechat 寰俊鏀粯鎻掍欢
 //
-// 中文说明:
-// - 实现微信支付:JSAPI支付、APP支付、H5支付、Native支付;
-// - 支持 PaymentMethod 接口;
-// - 通过 ToServiceProvider 注册到 gorp Container;
-// - 配置项包括: app_id、mch_id、api_key、api_v3_key、cert_path。
+// 涓枃璇存槑:
+// - 瀹炵幇寰俊鏀粯:JSAPI鏀粯銆丄PP鏀粯銆丠5鏀粯銆丯ative鏀粯;
+// - 鏀寔 PaymentMethod 鎺ュ彛;
+// - 閫氳繃 ToServiceProvider 娉ㄥ唽鍒?gorp Container;
+// - 閰嶇疆椤瑰寘鎷? app_id銆乵ch_id銆乤pi_key銆乤pi_v3_key銆乧ert_path銆?
 package wechat
 
 import (
@@ -14,32 +14,34 @@ import (
 
 	"nop-go/shared/plugin"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// WechatPayPlugin 微信支付插件实现
+// WechatPayPlugin 寰俊鏀粯鎻掍欢瀹炵幇
 //
-// 中文说明:
-// - 实现 plugin.Plugin 和 plugin.PaymentMethod 接口;
-// - 支持多种支付方式:JSAPI、APP、H5、Native;
-// - 通过 payType 配置项指定支付方式。
+// 涓枃璇存槑:
+// - 瀹炵幇 plugin.Plugin 鍜?plugin.PaymentMethod 鎺ュ彛;
+// - 鏀寔澶氱鏀粯鏂瑰紡:JSAPI銆丄PP銆丠5銆丯ative;
+// - 閫氳繃 payType 閰嶇疆椤规寚瀹氭敮浠樻柟寮忋€?
 type WechatPayPlugin struct {
 	meta   *plugin.PluginMeta
 	config map[string]string
 }
 
-// New 创建微信支付插件实例
+// New 鍒涘缓寰俊鏀粯鎻掍欢瀹炰緥
 func New() *WechatPayPlugin {
 	return &WechatPayPlugin{
 		meta: &plugin.PluginMeta{
 			Group:             "Payment",
-			FriendlyName:      "微信支付",
+			FriendlyName:      "寰俊鏀粯",
 			SystemName:        "Payment.Wechat",
 			Version:           "1.0.0",
 			SupportedVersions: []string{"1.0"},
 			Author:            "nop-go Team",
 			DisplayOrder:      2,
-			Description:       "微信支付:JSAPI支付、APP支付、H5支付、Native支付",
+			Description:       "寰俊鏀粯:JSAPI鏀粯銆丄PP鏀粯銆丠5鏀粯銆丯ative鏀粯",
 		},
 		config: make(map[string]string),
 	}
@@ -48,11 +50,11 @@ func New() *WechatPayPlugin {
 func (p *WechatPayPlugin) Meta() *plugin.PluginMeta { return p.meta }
 func (p *WechatPayPlugin) PluginType() string       { return "payment" }
 
-// Install 插件安装
-func (p *WechatPayPlugin) Install(ctx context.Context, c contract.Container) error {
-	logger, err := c.Make(contract.LogKey)
+// Install 鎻掍欢瀹夎
+func (p *WechatPayPlugin) Install(ctx context.Context, c runtimecontract.Container) error {
+	logger, err := c.Make(observabilitycontract.LogKey)
 	if err == nil {
-		if log, ok := logger.(contract.Logger); ok {
+		if log, ok := logger.(observabilitycontract.Logger); ok {
 			log.Info("Installing Wechat payment plugin...")
 		}
 	}
@@ -60,25 +62,25 @@ func (p *WechatPayPlugin) Install(ctx context.Context, c contract.Container) err
 	return nil
 }
 
-// Uninstall 插件卸载
-func (p *WechatPayPlugin) Uninstall(ctx context.Context, c contract.Container) error {
+// Uninstall 鎻掍欢鍗歌浇
+func (p *WechatPayPlugin) Uninstall(ctx context.Context, c runtimecontract.Container) error {
 	fmt.Println("[WechatPay] Plugin uninstalled")
 	return nil
 }
 
-// Boot 插件启动
+// Boot 鎻掍欢鍚姩
 //
-// 中文说明:
-// - 从配置服务读取微信支付参数;
-// - 参数包括: app_id、mch_id、api_key、api_v3_key、cert_path。
-func (p *WechatPayPlugin) Boot(ctx context.Context, c contract.Container) error {
-	cfg, err := c.Make(contract.ConfigKey)
+// 涓枃璇存槑:
+// - 浠庨厤缃湇鍔¤鍙栧井淇℃敮浠樺弬鏁?
+// - 鍙傛暟鍖呮嫭: app_id銆乵ch_id銆乤pi_key銆乤pi_v3_key銆乧ert_path銆?
+func (p *WechatPayPlugin) Boot(ctx context.Context, c runtimecontract.Container) error {
+	cfg, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		fmt.Println("[WechatPay] Config service not available")
 		return nil
 	}
 
-	config, ok := cfg.(contract.Config)
+	config, ok := cfg.(datacontract.Config)
 	if !ok {
 		return nil
 	}
@@ -97,19 +99,19 @@ func (p *WechatPayPlugin) Boot(ctx context.Context, c contract.Container) error 
 	return nil
 }
 
-// ToServiceProvider 转换为 gorp ServiceProvider
-func (p *WechatPayPlugin) ToServiceProvider() contract.ServiceProvider {
+// ToServiceProvider 杞崲涓?gorp ServiceProvider
+func (p *WechatPayPlugin) ToServiceProvider() runtimecontract.ServiceProvider {
 	return &WechatServiceProvider{plugin: p}
 }
 
-// ProcessPayment 处理支付
+// ProcessPayment 澶勭悊鏀粯
 //
-// 中文说明:
-// - 根据 payType 创建不同类型的支付订单;
-// - JSAPI: 返回 prepay_id 供前端调用;
-// - Native: 返回二维码链接;
-// - H5: 返回跳转链接;
-// - APP: 返回 APP 调用参数。
+// 涓枃璇存槑:
+// - 鏍规嵁 payType 鍒涘缓涓嶅悓绫诲瀷鐨勬敮浠樿鍗?
+// - JSAPI: 杩斿洖 prepay_id 渚涘墠绔皟鐢?
+// - Native: 杩斿洖浜岀淮鐮侀摼鎺?
+// - H5: 杩斿洖璺宠浆閾炬帴;
+// - APP: 杩斿洖 APP 璋冪敤鍙傛暟銆?
 func (p *WechatPayPlugin) ProcessPayment(ctx context.Context, req *plugin.ProcessPaymentRequest) (*plugin.ProcessPaymentResult, error) {
 	if p.config["app_id"] == "" || p.config["mch_id"] == "" {
 		return nil, fmt.Errorf("wechat pay app_id or mch_id not configured")
@@ -118,25 +120,25 @@ func (p *WechatPayPlugin) ProcessPayment(ctx context.Context, req *plugin.Proces
 	txnID := fmt.Sprintf("WX%s%d", time.Now().Format("20060102150405"), req.OrderID)
 	payType := p.config["pay_type"]
 	if payType == "" {
-		payType = "native" // 默认扫码支付
+		payType = "native" // 榛樿鎵爜鏀粯
 	}
 
 	var redirectURL, qrCodeURL string
 
 	switch payType {
 	case "native":
-		// Native 扫码支付:返回二维码内容
+		// Native 鎵爜鏀粯:杩斿洖浜岀淮鐮佸唴瀹?
 		qrCodeURL = fmt.Sprintf("weixin://wxpay/bizpayurl?pr=%s", txnID)
 	case "h5":
-		// H5 支付:返回跳转链接
+		// H5 鏀粯:杩斿洖璺宠浆閾炬帴
 		redirectURL = fmt.Sprintf("https://wx.tenpay.com/cgi-bin/mmpayweb-bin/checkmweb?prepay_id=%s", txnID)
 	case "jsapi":
-		// JSAPI 支付:需要 openid
+		// JSAPI 鏀粯:闇€瑕?openid
 		openid := req.CustomFields["openid"]
 		if openid == "" {
 			return nil, fmt.Errorf("jsapi payment requires openid in custom_fields")
 		}
-		// 返回 prepay_id 供前端使用
+		// 杩斿洖 prepay_id 渚涘墠绔娇鐢?
 		return &plugin.ProcessPaymentResult{
 			Success:       true,
 			TransactionID: txnID,
@@ -147,7 +149,7 @@ func (p *WechatPayPlugin) ProcessPayment(ctx context.Context, req *plugin.Proces
 			},
 		}, nil
 	case "app":
-		// APP 支付:返回 APP 调用参数
+		// APP 鏀粯:杩斿洖 APP 璋冪敤鍙傛暟
 		return &plugin.ProcessPaymentResult{
 			Success:       true,
 			TransactionID: txnID,
@@ -175,12 +177,12 @@ func (p *WechatPayPlugin) ProcessPayment(ctx context.Context, req *plugin.Proces
 	}, nil
 }
 
-// Refund 退款
+// Refund 閫€娆?
 //
-// 中文说明:
-// - 微信支付支持全额和部分退款;
-// - 需要原交易流水号;
-// - 返回退款流水号。
+// 涓枃璇存槑:
+// - 寰俊鏀粯鏀寔鍏ㄩ鍜岄儴鍒嗛€€娆?
+// - 闇€瑕佸師浜ゆ槗娴佹按鍙?
+// - 杩斿洖閫€娆炬祦姘村彿銆?
 func (p *WechatPayPlugin) Refund(ctx context.Context, req *plugin.RefundRequest) (*plugin.RefundResult, error) {
 	if p.config["mch_id"] == "" {
 		return nil, fmt.Errorf("wechat pay mch_id not configured")
@@ -194,112 +196,112 @@ func (p *WechatPayPlugin) Refund(ctx context.Context, req *plugin.RefundRequest)
 	}, nil
 }
 
-// Capture 捕获预授权
+// Capture 鎹曡幏棰勬巿鏉?
 //
-// 中文说明:
-// - 微信支付不支持预授权模式;
-// - 返回错误提示。
+// 涓枃璇存槑:
+// - 寰俊鏀粯涓嶆敮鎸侀鎺堟潈妯″紡;
+// - 杩斿洖閿欒鎻愮ず銆?
 func (p *WechatPayPlugin) Capture(ctx context.Context, req *plugin.CaptureRequest) (*plugin.CaptureResult, error) {
 	return nil, fmt.Errorf("wechat pay does not support capture (pre-authorization)")
 }
 
-// Void 取消预授权
+// Void 鍙栨秷棰勬巿鏉?
 func (p *WechatPayPlugin) Void(ctx context.Context, req *plugin.VoidRequest) (*plugin.VoidResult, error) {
 	return nil, fmt.Errorf("wechat pay does not support void (cancel pre-authorization)")
 }
 
-// GetConfiguration 获取支付配置项
+// GetConfiguration 鑾峰彇鏀粯閰嶇疆椤?
 func (p *WechatPayPlugin) GetConfiguration() []plugin.PaymentConfigItem {
 	return []plugin.PaymentConfigItem{
 		{
 			Name:     "app_id",
-			Label:    "微信AppID",
+			Label:    "寰俊AppID",
 			Type:     "text",
 			Required: true,
-			HelpText: "微信公众号/小程序/APP的AppID",
+			HelpText: "寰俊鍏紬鍙?灏忕▼搴?APP鐨凙ppID",
 		},
 		{
 			Name:     "mch_id",
-			Label:    "商户号",
+			Label:    "鍟嗘埛鍙?,
 			Type:     "text",
 			Required: true,
-			HelpText: "微信支付分配的商户号",
+			HelpText: "寰俊鏀粯鍒嗛厤鐨勫晢鎴峰彿",
 		},
 		{
 			Name:     "api_key",
-			Label:    "API密钥(V2)",
+			Label:    "API瀵嗛挜(V2)",
 			Type:     "password",
 			Required: true,
-			HelpText: "商户平台设置的API密钥,用于V2接口签名",
+			HelpText: "鍟嗘埛骞冲彴璁剧疆鐨凙PI瀵嗛挜,鐢ㄤ簬V2鎺ュ彛绛惧悕",
 		},
 		{
 			Name:     "api_v3_key",
-			Label:    "APIv3密钥",
+			Label:    "APIv3瀵嗛挜",
 			Type:     "password",
 			Required: false,
-			HelpText: "商户平台设置的APIv3密钥,用于V3接口",
+			HelpText: "鍟嗘埛骞冲彴璁剧疆鐨凙PIv3瀵嗛挜,鐢ㄤ簬V3鎺ュ彛",
 		},
 		{
 			Name:     "cert_path",
-			Label:    "商户证书路径",
+			Label:    "鍟嗘埛璇佷功璺緞",
 			Type:     "text",
 			Required: false,
-			HelpText: "商户API证书文件路径(apiclient_cert.p12)",
+			HelpText: "鍟嗘埛API璇佷功鏂囦欢璺緞(apiclient_cert.p12)",
 		},
 		{
 			Name:     "pay_type",
-			Label:    "支付方式",
+			Label:    "鏀粯鏂瑰紡",
 			Type:     "select",
 			Required: true,
 			Default:  "native",
 			Options: []plugin.PaymentConfigOption{
-				{Value: "native", Label: "Native扫码支付"},
-				{Value: "jsapi", Label: "JSAPI公众号支付"},
-				{Value: "h5", Label: "H5支付"},
-				{Value: "app", Label: "APP支付"},
+				{Value: "native", Label: "Native鎵爜鏀粯"},
+				{Value: "jsapi", Label: "JSAPI鍏紬鍙锋敮浠?},
+				{Value: "h5", Label: "H5鏀粯"},
+				{Value: "app", Label: "APP鏀粯"},
 			},
-			HelpText: "选择默认支付方式",
+			HelpText: "閫夋嫨榛樿鏀粯鏂瑰紡",
 		},
 		{
 			Name:     "sandbox",
-			Label:    "沙箱模式",
+			Label:    "娌欑妯″紡",
 			Type:     "boolean",
 			Required: false,
 			Default:  "false",
-			HelpText: "开启后使用微信支付沙箱环境",
+			HelpText: "寮€鍚悗浣跨敤寰俊鏀粯娌欑鐜",
 		},
 		{
 			Name:     "notify_url",
-			Label:    "异步通知URL",
+			Label:    "寮傛閫氱煡URL",
 			Type:     "text",
 			Required: false,
-			HelpText: "支付结果异步通知地址",
+			HelpText: "鏀粯缁撴灉寮傛閫氱煡鍦板潃",
 		},
 	}
 }
 
-// ValidateConfiguration 验证配置
+// ValidateConfiguration 楠岃瘉閰嶇疆
 func (p *WechatPayPlugin) ValidateConfiguration(config map[string]string) error {
 	if config["app_id"] == "" {
-		return fmt.Errorf("app_id 是必填项")
+		return fmt.Errorf("app_id 鏄繀濉」")
 	}
 	if config["mch_id"] == "" {
-		return fmt.Errorf("mch_id 是必填项")
+		return fmt.Errorf("mch_id 鏄繀濉」")
 	}
 	if config["api_key"] == "" {
-		return fmt.Errorf("api_key 是必填项")
+		return fmt.Errorf("api_key 鏄繀濉」")
 	}
 
 	payType := config["pay_type"]
 	validPayTypes := map[string]bool{"native": true, "jsapi": true, "h5": true, "app": true}
 	if payType != "" && !validPayTypes[payType] {
-		return fmt.Errorf("无效的 pay_type: %s", payType)
+		return fmt.Errorf("鏃犳晥鐨?pay_type: %s", payType)
 	}
 
 	return nil
 }
 
-// WechatServiceProvider gorp ServiceProvider 实现
+// WechatServiceProvider gorp ServiceProvider 瀹炵幇
 type WechatServiceProvider struct {
 	plugin *WechatPayPlugin
 }
@@ -308,14 +310,14 @@ func (sp *WechatServiceProvider) Name() string       { return "plugin.payment.we
 func (sp *WechatServiceProvider) IsDefer() bool      { return false }
 func (sp *WechatServiceProvider) Provides() []string { return []string{"plugin.payment.wechat"} }
 
-func (sp *WechatServiceProvider) Register(c contract.Container) error {
-	c.Bind("plugin.payment.wechat", func(c contract.Container) (interface{}, error) {
+func (sp *WechatServiceProvider) Register(c runtimecontract.Container) error {
+	c.Bind("plugin.payment.wechat", func(c runtimecontract.Container) (interface{}, error) {
 		return sp.plugin, nil
 	}, true)
 	return nil
 }
 
-func (sp *WechatServiceProvider) Boot(c contract.Container) error {
+func (sp *WechatServiceProvider) Boot(c runtimecontract.Container) error {
 	plugin.GetRegistry().Register(sp.plugin)
 	ctx := context.Background()
 	return sp.plugin.Boot(ctx, c)

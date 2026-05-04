@@ -5,24 +5,25 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	"github.com/stretchr/testify/assert"
 )
 
 // mockLogger 用于测试的模拟日志器
 type mockLogger struct {
 	lastMessage string
-	lastFields  []contract.Field
+	lastFields  []observabilitycontract.Field
 }
 
-func (m *mockLogger) Debug(msg string, fields ...contract.Field) {}
-func (m *mockLogger) Info(msg string, fields ...contract.Field)  {}
-func (m *mockLogger) Warn(msg string, fields ...contract.Field)  {}
-func (m *mockLogger) Error(msg string, fields ...contract.Field) {
+func (m *mockLogger) Debug(msg string, fields ...observabilitycontract.Field) {}
+func (m *mockLogger) Info(msg string, fields ...observabilitycontract.Field)  {}
+func (m *mockLogger) Warn(msg string, fields ...observabilitycontract.Field)  {}
+func (m *mockLogger) Error(msg string, fields ...observabilitycontract.Field) {
 	m.lastMessage = msg
 	m.lastFields = fields
 }
-func (m *mockLogger) With(fields ...contract.Field) contract.Logger {
+func (m *mockLogger) With(fields ...observabilitycontract.Field) observabilitycontract.Logger {
 	return m
 }
 
@@ -30,7 +31,7 @@ func TestLogReporter_ReportSync(t *testing.T) {
 	logger := &mockLogger{}
 	reporter := NewLogReporter(logger)
 
-	report := &contract.ErrorReport{
+	report := &resiliencecontract.ErrorReport{
 		Error:   errors.New("test error"),
 		Message: "test message",
 		Tags:    map[string]string{"env": "test"},
@@ -46,7 +47,7 @@ func TestLogReporter_ReportSync(t *testing.T) {
 func TestLogReporter_ReportSync_NilLogger(t *testing.T) {
 	reporter := NewLogReporter(nil)
 
-	report := &contract.ErrorReport{
+	report := &resiliencecontract.ErrorReport{
 		Error:   errors.New("test error"),
 		Message: "test message",
 	}
@@ -59,7 +60,7 @@ func TestLogReporter_ReportAsync(t *testing.T) {
 	logger := &mockLogger{}
 	reporter := NewLogReporter(logger)
 
-	report := &contract.ErrorReport{
+	report := &resiliencecontract.ErrorReport{
 		Error:   errors.New("test error"),
 		Message: "test message",
 	}
@@ -74,13 +75,13 @@ func TestLogReporter_Flush(t *testing.T) {
 }
 
 func TestSentryAdapter_Disabled(t *testing.T) {
-	cfg := contract.ErrorReporterConfig{
+	cfg := resiliencecontract.ErrorReporterConfig{
 		Enabled: false,
 		DSN:     "",
 	}
 	adapter := NewSentryAdapter(cfg)
 
-	report := &contract.ErrorReport{
+	report := &resiliencecontract.ErrorReport{
 		Error:   errors.New("test error"),
 		Message: "test message",
 	}
@@ -91,13 +92,13 @@ func TestSentryAdapter_Disabled(t *testing.T) {
 }
 
 func TestSentryAdapter_EnabledButNotImplemented(t *testing.T) {
-	cfg := contract.ErrorReporterConfig{
+	cfg := resiliencecontract.ErrorReporterConfig{
 		Enabled: true,
 		DSN:     "https://test@sentry.io/123",
 	}
 	adapter := NewSentryAdapter(cfg)
 
-	report := &contract.ErrorReport{
+	report := &resiliencecontract.ErrorReport{
 		Error:   errors.New("test error"),
 		Message: "test message",
 	}
@@ -109,13 +110,13 @@ func TestSentryAdapter_EnabledButNotImplemented(t *testing.T) {
 }
 
 func TestSentryAdapter_ReportAsync(t *testing.T) {
-	cfg := contract.ErrorReporterConfig{
+	cfg := resiliencecontract.ErrorReporterConfig{
 		Enabled: true,
 		DSN:     "https://test@sentry.io/123",
 	}
 	adapter := NewSentryAdapter(cfg)
 
-	report := &contract.ErrorReport{
+	report := &resiliencecontract.ErrorReport{
 		Error:   errors.New("test error"),
 		Message: "test message",
 	}
@@ -125,7 +126,7 @@ func TestSentryAdapter_ReportAsync(t *testing.T) {
 }
 
 func TestSentryAdapter_Flush(t *testing.T) {
-	adapter := NewSentryAdapter(contract.ErrorReporterConfig{})
+	adapter := NewSentryAdapter(resiliencecontract.ErrorReporterConfig{})
 	adapter.Flush() // 空操作
 }
 
@@ -152,8 +153,8 @@ func TestCaptureError_NilReporter(t *testing.T) {
 }
 
 func TestProvider_Name(t *testing.T) {
-	p := NewProvider(contract.ErrorReporterConfig{})
+	p := NewProvider(resiliencecontract.ErrorReporterConfig{})
 	assert.Equal(t, "error_reporter", p.Name())
 	assert.False(t, p.IsDefer())
-	assert.ElementsMatch(t, []string{contract.ErrorReporterKey}, p.Provides())
+	assert.ElementsMatch(t, []string{resiliencecontract.ErrorReporterKey}, p.Provides())
 }

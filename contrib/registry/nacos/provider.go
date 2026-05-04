@@ -14,7 +14,9 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
@@ -33,11 +35,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "registry.nacos" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.RPCRegistryKey}
+	return []string{transportcontract.RPCRegistryKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getDiscoveryConfig(c)
 		if err != nil {
 			return nil, err
@@ -48,7 +50,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
@@ -73,13 +75,13 @@ type DiscoveryConfig struct {
 }
 
 // getDiscoveryConfig 从容器获取服务发现配置。
-func getDiscoveryConfig(c contract.Container) (*DiscoveryConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("discovery: invalid config service")
 	}
@@ -331,7 +333,7 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 // - 使用 Nacos SelectInstances API；
 // - 只返回健康实例；
 // - 支持按权重负载均衡。
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	// 查询健康实例
 	instances, err := r.namingClient.SelectInstances(vo.SelectInstancesParam{
 		ServiceName: name,
@@ -343,7 +345,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 	}
 
 	// 转换为 ServiceInstance 列表
-	result := make([]contract.ServiceInstance, 0, len(instances))
+	result := make([]transportcontract.ServiceInstance, 0, len(instances))
 	for _, inst := range instances {
 		// 构建完整地址
 		fullAddr := fmt.Sprintf("%s:%d", inst.Ip, inst.Port)
@@ -358,7 +360,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 		}
 		meta["weight"] = fmt.Sprintf("%.1f", inst.Weight)
 
-		result = append(result, contract.ServiceInstance{
+		result = append(result, transportcontract.ServiceInstance{
 			ID:       serviceID,
 			Name:     name,
 			Address:  fullAddr,
@@ -412,7 +414,7 @@ func (r *Registry) Close() error {
 // 中文说明：
 // - weight：按权重选择（Nacos 默认）；
 // - random：随机选择。
-func (r *Registry) applyLoadBalance(instances []contract.ServiceInstance) []contract.ServiceInstance {
+func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstance) []transportcontract.ServiceInstance {
 	switch r.cfg.LoadBalance {
 	case "random":
 		// 随机打乱顺序

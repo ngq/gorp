@@ -1026,12 +1026,12 @@ func migrate(rt *bootstrap.HTTPServiceRuntime) error {
 
 func setup(rt *bootstrap.HTTPServiceRuntime) error {
     // 注册中间件
-    rt.Engine.Use(authMiddleware(rt.JWT))
+    rt.Router.Use(authMiddleware(rt.JWT))
 
     // 注册路由
     h := handler.NewUserHandler(rt.DB)
     glog.Info("register user api routes")
-    api := rt.Engine.Group("/api/v1")
+    api := rt.Router.Group("/api/v1")
     {
         api.GET("/users", h.List)
         api.GET("/users/:id", h.Get)
@@ -1062,7 +1062,7 @@ func setup(rt *bootstrap.HTTPServiceRuntime) error {
         glog.Info("Redis not configured, using in-memory cache")
     } else {
         // 使用 Redis
-        rt.Engine.Use(rateLimitMiddleware(redis))
+        rt.Router.Use(rateLimitMiddleware(redis))
     }
 
     // 可选：缓存
@@ -1071,7 +1071,7 @@ func setup(rt *bootstrap.HTTPServiceRuntime) error {
         glog.Info("Cache not configured")
     } else {
         // 使用缓存
-        rt.Engine.Use(cacheMiddleware(cache))
+        rt.Router.Use(cacheMiddleware(cache))
     }
 
     // 可选：分布式锁
@@ -1080,7 +1080,7 @@ func setup(rt *bootstrap.HTTPServiceRuntime) error {
         glog.Info("Distributed lock not configured")
     } else {
         // 使用分布式锁
-        rt.Engine.Use(idempotencyMiddleware(lock))
+        rt.Router.Use(idempotencyMiddleware(lock))
     }
 
     return nil

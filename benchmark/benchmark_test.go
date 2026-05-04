@@ -29,7 +29,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/ngq/gorp/framework/provider/selector/p2c"
 	"github.com/ngq/gorp/framework/provider/selector/random"
 	"github.com/ngq/gorp/framework/provider/selector/wrr"
@@ -81,7 +84,7 @@ func BenchmarkP2CSelector_Select(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				selected, done, _ := selector.Select(context.Background(), instances)
-				done(context.Background(), contract.DoneInfo{Err: nil})
+				done(context.Background(), discoverycontract.DoneInfo{Err: nil})
 				_ = selected
 			}
 		})
@@ -94,7 +97,7 @@ func BenchmarkP2CSelector_Select(b *testing.B) {
 // ============================================================
 
 func BenchmarkMetadata_Get(b *testing.B) {
-	md := contract.NewMetadata()
+	md := transportcontract.NewMetadata()
 	md.Set("x-request-id", "test-12345")
 	md.Set("x-trace-id", "trace-67890")
 
@@ -105,7 +108,7 @@ func BenchmarkMetadata_Get(b *testing.B) {
 }
 
 func BenchmarkMetadata_Set(b *testing.B) {
-	md := contract.NewMetadata()
+	md := transportcontract.NewMetadata()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -114,7 +117,7 @@ func BenchmarkMetadata_Set(b *testing.B) {
 }
 
 func BenchmarkMetadata_Clone(b *testing.B) {
-	md := contract.NewMetadata()
+	md := transportcontract.NewMetadata()
 	for i := 0; i < 10; i++ {
 		md.Set(fmt.Sprintf("x-key-%d", i), "value")
 	}
@@ -133,25 +136,25 @@ func BenchmarkMetadata_Clone(b *testing.B) {
 func BenchmarkNewError(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = contract.NewError(404, contract.ErrorReasonNotFound, "user not found")
+		_ = resiliencecontract.NewError(404, resiliencecontract.ErrorReasonNotFound, "user not found")
 	}
 }
 
 func BenchmarkError_WithCause(b *testing.B) {
-	cause := contract.NewError(500, contract.ErrorReasonInternal, "database error")
+	cause := resiliencecontract.NewError(500, resiliencecontract.ErrorReasonInternal, "database error")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = contract.NewError(404, contract.ErrorReasonNotFound, "user not found").WithCause(cause)
+		_ = resiliencecontract.NewError(404, resiliencecontract.ErrorReasonNotFound, "user not found").WithCause(cause)
 	}
 }
 
 func BenchmarkFromError(b *testing.B) {
-	err := contract.NewError(404, contract.ErrorReasonNotFound, "user not found")
+	err := resiliencecontract.NewError(404, resiliencecontract.ErrorReasonNotFound, "user not found")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = contract.FromError(err)
+		_ = resiliencecontract.FromError(err)
 	}
 }
 
@@ -161,7 +164,7 @@ func BenchmarkFromError(b *testing.B) {
 // ============================================================
 
 func BenchmarkCalculateDelay(b *testing.B) {
-	policy := contract.RetryPolicy{
+	policy := resiliencecontract.RetryPolicy{
 		InitialDelay: 100 * time.Millisecond,
 		MaxDelay:     10 * time.Second,
 		Multiplier:   2.0,
@@ -185,7 +188,7 @@ type BenchmarkUser struct {
 }
 
 func BenchmarkValidator_Validate_Valid(b *testing.B) {
-	cfg := &contract.ValidatorConfig{Locale: "zh"}
+	cfg := &datacontract.ValidatorConfig{Locale: "zh"}
 	svc, _ := validate.NewValidatorService(cfg)
 
 	user := &BenchmarkUser{
@@ -201,7 +204,7 @@ func BenchmarkValidator_Validate_Valid(b *testing.B) {
 }
 
 func BenchmarkValidator_Validate_Invalid(b *testing.B) {
-	cfg := &contract.ValidatorConfig{Locale: "zh"}
+	cfg := &datacontract.ValidatorConfig{Locale: "zh"}
 	svc, _ := validate.NewValidatorService(cfg)
 
 	user := &BenchmarkUser{
@@ -220,10 +223,10 @@ func BenchmarkValidator_Validate_Invalid(b *testing.B) {
 // 辅助函数
 // ============================================================
 
-func makeInstances(n int) []contract.ServiceInstance {
-	instances := make([]contract.ServiceInstance, n)
+func makeInstances(n int) []transportcontract.ServiceInstance {
+	instances := make([]transportcontract.ServiceInstance, n)
 	for i := 0; i < n; i++ {
-		instances[i] = contract.ServiceInstance{
+		instances[i] = transportcontract.ServiceInstance{
 			ID:      fmt.Sprintf("instance-%d", i),
 			Name:    "test-service",
 			Address: fmt.Sprintf("192.168.1.%d:8080", i%256),
@@ -233,10 +236,10 @@ func makeInstances(n int) []contract.ServiceInstance {
 	return instances
 }
 
-func makeInstancesWithWeight(n int) []contract.ServiceInstance {
-	instances := make([]contract.ServiceInstance, n)
+func makeInstancesWithWeight(n int) []transportcontract.ServiceInstance {
+	instances := make([]transportcontract.ServiceInstance, n)
 	for i := 0; i < n; i++ {
-		instances[i] = contract.ServiceInstance{
+		instances[i] = transportcontract.ServiceInstance{
 			ID:      fmt.Sprintf("instance-%d", i),
 			Name:    "test-service",
 			Address: fmt.Sprintf("192.168.1.%d:8080", i%256),

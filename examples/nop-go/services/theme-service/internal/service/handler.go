@@ -1,4 +1,4 @@
-// Package service 主题服务HTTP处理层
+﻿// Package service 涓婚鏈嶅姟HTTP澶勭悊灞?
 package service
 
 import (
@@ -9,25 +9,25 @@ import (
 	"nop-go/services/theme-service/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
-// ThemeService 主题HTTP服务
+// ThemeService 涓婚HTTP鏈嶅姟
 type ThemeService struct {
 	themeUC          *biz.ThemeUseCase
 	configUC         *biz.ThemeConfigurationUseCase
 	customerUC       *biz.CustomerThemeUseCase
 	fileUC           *biz.ThemeFileUseCase
-	jwtService       contract.JWTService
+	jwtService       securitycontract.JWTService
 }
 
-// NewThemeService 创建主题服务
+// NewThemeService 鍒涘缓涓婚鏈嶅姟
 func NewThemeService(
 	themeUC *biz.ThemeUseCase,
 	configUC *biz.ThemeConfigurationUseCase,
 	customerUC *biz.CustomerThemeUseCase,
 	fileUC *biz.ThemeFileUseCase,
-	jwtService contract.JWTService,
+	jwtService securitycontract.JWTService,
 ) *ThemeService {
 	return &ThemeService{
 		themeUC:    themeUC,
@@ -38,82 +38,82 @@ func NewThemeService(
 	}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *ThemeService) RegisterRoutes(r *gin.Engine) {
-	// 主题管理路由（需要认证）
+	// 涓婚绠＄悊璺敱锛堥渶瑕佽璇侊級
 	themes := r.Group("/api/themes")
 	themes.Use(s.authMiddleware())
 	{
-		themes.GET("", s.ListThemes)                // 主题列表
-		themes.GET("/active", s.ListActiveThemes)   // 激活的主题
-		themes.GET("/default", s.GetDefaultTheme)   // 默认主题
-		themes.POST("", s.CreateTheme)              // 创建主题
-		themes.GET("/:id", s.GetTheme)              // 主题详情
-		themes.GET("/:id/preview", s.GetThemePreview) // 主题预览（含变量）
-		themes.PUT("/:id", s.UpdateTheme)           // 更新主题
-		themes.DELETE("/:id", s.DeleteTheme)        // 删除主题
+		themes.GET("", s.ListThemes)                // 涓婚鍒楄〃
+		themes.GET("/active", s.ListActiveThemes)   // 婵€娲荤殑涓婚
+		themes.GET("/default", s.GetDefaultTheme)   // 榛樿涓婚
+		themes.POST("", s.CreateTheme)              // 鍒涘缓涓婚
+		themes.GET("/:id", s.GetTheme)              // 涓婚璇︽儏
+		themes.GET("/:id/preview", s.GetThemePreview) // 涓婚棰勮锛堝惈鍙橀噺锛?
+		themes.PUT("/:id", s.UpdateTheme)           // 鏇存柊涓婚
+		themes.DELETE("/:id", s.DeleteTheme)        // 鍒犻櫎涓婚
 	}
 
-	// 主题变量路由
+	// 涓婚鍙橀噺璺敱
 	variables := r.Group("/api/themes/:themeId/variables")
 	variables.Use(s.authMiddleware())
 	{
-		variables.GET("", s.GetVariables)           // 变量列表
-		variables.POST("", s.CreateVariable)        // 创建变量
-		variables.PUT("/:id", s.UpdateVariable)     // 更新变量
-		variables.DELETE("/:id", s.DeleteVariable)  // 删除变量
+		variables.GET("", s.GetVariables)           // 鍙橀噺鍒楄〃
+		variables.POST("", s.CreateVariable)        // 鍒涘缓鍙橀噺
+		variables.PUT("/:id", s.UpdateVariable)     // 鏇存柊鍙橀噺
+		variables.DELETE("/:id", s.DeleteVariable)  // 鍒犻櫎鍙橀噺
 	}
 
-	// 主题配置路由（店铺级别）
+	// 涓婚閰嶇疆璺敱锛堝簵閾虹骇鍒級
 	configs := r.Group("/api/themes/configurations")
 	configs.Use(s.authMiddleware())
 	{
-		configs.GET("/store/:storeId", s.GetStoreConfigurations) // 店铺配置列表
-		configs.GET("/:themeId/store/:storeId", s.GetThemeConfiguration) // 特定配置
-		configs.PUT("", s.UpdateConfiguration)                   // 更新配置
-		configs.DELETE("/:id", s.DeleteConfiguration)            // 删除配置
+		configs.GET("/store/:storeId", s.GetStoreConfigurations) // 搴楅摵閰嶇疆鍒楄〃
+		configs.GET("/:themeId/store/:storeId", s.GetThemeConfiguration) // 鐗瑰畾閰嶇疆
+		configs.PUT("", s.UpdateConfiguration)                   // 鏇存柊閰嶇疆
+		configs.DELETE("/:id", s.DeleteConfiguration)            // 鍒犻櫎閰嶇疆
 	}
 
-	// 客户主题设置路由
+	// 瀹㈡埛涓婚璁剧疆璺敱
 	customer := r.Group("/api/themes/customer")
 	customer.Use(s.authMiddleware())
 	{
-		customer.GET("/:customerId", s.GetCustomerTheme)       // 客户主题
-		customer.PUT("", s.SetCustomerTheme)                   // 设置客户主题
-		customer.DELETE("/:customerId", s.DeleteCustomerTheme) // 删除客户主题
+		customer.GET("/:customerId", s.GetCustomerTheme)       // 瀹㈡埛涓婚
+		customer.PUT("", s.SetCustomerTheme)                   // 璁剧疆瀹㈡埛涓婚
+		customer.DELETE("/:customerId", s.DeleteCustomerTheme) // 鍒犻櫎瀹㈡埛涓婚
 	}
 
-	// 主题文件路由
+	// 涓婚鏂囦欢璺敱
 	files := r.Group("/api/themes/:themeId/files")
 	files.Use(s.authMiddleware())
 	{
-		files.GET("", s.GetThemeFiles)            // 文件列表
-		files.GET("/:id", s.GetThemeFile)         // 文件详情
-		files.GET("/path", s.GetThemeFileByPath)  // 通过路径获取文件
-		files.POST("", s.CreateThemeFile)         // 创建文件
-		files.PUT("/:id", s.UpdateThemeFile)      // 更新文件
-		files.DELETE("/:id", s.DeleteThemeFile)   // 删除文件
+		files.GET("", s.GetThemeFiles)            // 鏂囦欢鍒楄〃
+		files.GET("/:id", s.GetThemeFile)         // 鏂囦欢璇︽儏
+		files.GET("/path", s.GetThemeFileByPath)  // 閫氳繃璺緞鑾峰彇鏂囦欢
+		files.POST("", s.CreateThemeFile)         // 鍒涘缓鏂囦欢
+		files.PUT("/:id", s.UpdateThemeFile)      // 鏇存柊鏂囦欢
+		files.DELETE("/:id", s.DeleteThemeFile)   // 鍒犻櫎鏂囦欢
 	}
 }
 
-// authMiddleware JWT认证中间件
+// authMiddleware JWT璁よ瘉涓棿浠?
 func (s *ThemeService) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := c.GetHeader("Authorization")
 		if tokenStr == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "缺少认证令牌"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "缂哄皯璁よ瘉浠ょ墝"})
 			c.Abort()
 			return
 		}
 
-		// 去除 Bearer 前缀
+		// 鍘婚櫎 Bearer 鍓嶇紑
 		if len(tokenStr) > 7 && tokenStr[:7] == "Bearer " {
 			tokenStr = tokenStr[7:]
 		}
 
 		claims, err := s.jwtService.Verify(tokenStr)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "令牌无效"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "浠ょ墝鏃犳晥"})
 			c.Abort()
 			return
 		}
@@ -124,9 +124,9 @@ func (s *ThemeService) authMiddleware() gin.HandlerFunc {
 	}
 }
 
-// ========== 主题管理 ==========
+// ========== 涓婚绠＄悊 ==========
 
-// ListThemes 主题列表
+// ListThemes 涓婚鍒楄〃
 func (s *ThemeService) ListThemes(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -145,7 +145,7 @@ func (s *ThemeService) ListThemes(c *gin.Context) {
 	})
 }
 
-// ListActiveThemes 激活的主题列表
+// ListActiveThemes 婵€娲荤殑涓婚鍒楄〃
 func (s *ThemeService) ListActiveThemes(c *gin.Context) {
 	themes, err := s.themeUC.ListActiveThemes(c.Request.Context())
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *ThemeService) ListActiveThemes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": themes})
 }
 
-// GetDefaultTheme 获取默认主题
+// GetDefaultTheme 鑾峰彇榛樿涓婚
 func (s *ThemeService) GetDefaultTheme(c *gin.Context) {
 	theme, err := s.themeUC.GetDefaultTheme(c.Request.Context())
 	if err != nil {
@@ -167,7 +167,7 @@ func (s *ThemeService) GetDefaultTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": theme})
 }
 
-// CreateTheme 创建主题
+// CreateTheme 鍒涘缓涓婚
 func (s *ThemeService) CreateTheme(c *gin.Context) {
 	var req models.ThemeCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -184,11 +184,11 @@ func (s *ThemeService) CreateTheme(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": theme})
 }
 
-// GetTheme 获取主题详情
+// GetTheme 鑾峰彇涓婚璇︽儏
 func (s *ThemeService) GetTheme(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -201,11 +201,11 @@ func (s *ThemeService) GetTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": theme})
 }
 
-// GetThemePreview 获取主题预览（含变量）
+// GetThemePreview 鑾峰彇涓婚棰勮锛堝惈鍙橀噺锛?
 func (s *ThemeService) GetThemePreview(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -218,11 +218,11 @@ func (s *ThemeService) GetThemePreview(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": preview})
 }
 
-// UpdateTheme 更新主题
+// UpdateTheme 鏇存柊涓婚
 func (s *ThemeService) UpdateTheme(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -241,11 +241,11 @@ func (s *ThemeService) UpdateTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": theme})
 }
 
-// DeleteTheme 删除主题
+// DeleteTheme 鍒犻櫎涓婚
 func (s *ThemeService) DeleteTheme(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -254,16 +254,16 @@ func (s *ThemeService) DeleteTheme(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "主题已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "涓婚宸插垹闄?})
 }
 
-// ========== 主题变量 ==========
+// ========== 涓婚鍙橀噺 ==========
 
-// GetVariables 获取主题变量列表
+// GetVariables 鑾峰彇涓婚鍙橀噺鍒楄〃
 func (s *ThemeService) GetVariables(c *gin.Context) {
 	themeId, err := strconv.ParseUint(c.Param("themeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -276,11 +276,11 @@ func (s *ThemeService) GetVariables(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": variables})
 }
 
-// CreateVariable 创建主题变量
+// CreateVariable 鍒涘缓涓婚鍙橀噺
 func (s *ThemeService) CreateVariable(c *gin.Context) {
 	themeId, err := strconv.ParseUint(c.Param("themeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -301,11 +301,11 @@ func (s *ThemeService) CreateVariable(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": variable})
 }
 
-// UpdateVariable 更新主题变量
+// UpdateVariable 鏇存柊涓婚鍙橀噺
 func (s *ThemeService) UpdateVariable(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的变量ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫彉閲廔D"})
 		return
 	}
 
@@ -324,11 +324,11 @@ func (s *ThemeService) UpdateVariable(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": variable})
 }
 
-// DeleteVariable 删除主题变量
+// DeleteVariable 鍒犻櫎涓婚鍙橀噺
 func (s *ThemeService) DeleteVariable(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的变量ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫彉閲廔D"})
 		return
 	}
 
@@ -337,16 +337,16 @@ func (s *ThemeService) DeleteVariable(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "变量已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "鍙橀噺宸插垹闄?})
 }
 
-// ========== 主题配置 ==========
+// ========== 涓婚閰嶇疆 ==========
 
-// GetStoreConfigurations 获取店铺的主题配置
+// GetStoreConfigurations 鑾峰彇搴楅摵鐨勪富棰橀厤缃?
 func (s *ThemeService) GetStoreConfigurations(c *gin.Context) {
 	storeId, err := strconv.ParseUint(c.Param("storeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的店铺ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫簵閾篒D"})
 		return
 	}
 
@@ -359,17 +359,17 @@ func (s *ThemeService) GetStoreConfigurations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": configs})
 }
 
-// GetThemeConfiguration 获取特定主题和店铺的配置
+// GetThemeConfiguration 鑾峰彇鐗瑰畾涓婚鍜屽簵閾虹殑閰嶇疆
 func (s *ThemeService) GetThemeConfiguration(c *gin.Context) {
 	themeId, err := strconv.ParseUint(c.Param("themeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
 	storeId, err := strconv.ParseUint(c.Param("storeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的店铺ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫簵閾篒D"})
 		return
 	}
 
@@ -382,7 +382,7 @@ func (s *ThemeService) GetThemeConfiguration(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": config})
 }
 
-// UpdateConfiguration 更新主题配置
+// UpdateConfiguration 鏇存柊涓婚閰嶇疆
 func (s *ThemeService) UpdateConfiguration(c *gin.Context) {
 	var req models.ThemeConfigurationUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -399,11 +399,11 @@ func (s *ThemeService) UpdateConfiguration(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": config})
 }
 
-// DeleteConfiguration 删除主题配置
+// DeleteConfiguration 鍒犻櫎涓婚閰嶇疆
 func (s *ThemeService) DeleteConfiguration(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勯厤缃甀D"})
 		return
 	}
 
@@ -412,16 +412,16 @@ func (s *ThemeService) DeleteConfiguration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "配置已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "閰嶇疆宸插垹闄?})
 }
 
-// ========== 客户主题设置 ==========
+// ========== 瀹㈡埛涓婚璁剧疆 ==========
 
-// GetCustomerTheme 获取客户主题设置
+// GetCustomerTheme 鑾峰彇瀹㈡埛涓婚璁剧疆
 func (s *ThemeService) GetCustomerTheme(c *gin.Context) {
 	customerId, err := strconv.ParseUint(c.Param("customerId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的客户ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫鎴稩D"})
 		return
 	}
 
@@ -434,7 +434,7 @@ func (s *ThemeService) GetCustomerTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": setting})
 }
 
-// SetCustomerTheme 设置客户主题
+// SetCustomerTheme 璁剧疆瀹㈡埛涓婚
 func (s *ThemeService) SetCustomerTheme(c *gin.Context) {
 	var req models.CustomerThemeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -451,11 +451,11 @@ func (s *ThemeService) SetCustomerTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": setting})
 }
 
-// DeleteCustomerTheme 删除客户主题设置
+// DeleteCustomerTheme 鍒犻櫎瀹㈡埛涓婚璁剧疆
 func (s *ThemeService) DeleteCustomerTheme(c *gin.Context) {
 	customerId, err := strconv.ParseUint(c.Param("customerId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的客户ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勫鎴稩D"})
 		return
 	}
 
@@ -464,16 +464,16 @@ func (s *ThemeService) DeleteCustomerTheme(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "客户主题设置已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "瀹㈡埛涓婚璁剧疆宸插垹闄?})
 }
 
-// ========== 主题文件 ==========
+// ========== 涓婚鏂囦欢 ==========
 
-// GetThemeFiles 获取主题文件列表
+// GetThemeFiles 鑾峰彇涓婚鏂囦欢鍒楄〃
 func (s *ThemeService) GetThemeFiles(c *gin.Context) {
 	themeId, err := strconv.ParseUint(c.Param("themeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -486,11 +486,11 @@ func (s *ThemeService) GetThemeFiles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": files})
 }
 
-// GetThemeFile 获取主题文件详情
+// GetThemeFile 鑾峰彇涓婚鏂囦欢璇︽儏
 func (s *ThemeService) GetThemeFile(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的文件ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勬枃浠禝D"})
 		return
 	}
 
@@ -503,17 +503,17 @@ func (s *ThemeService) GetThemeFile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": file})
 }
 
-// GetThemeFileByPath 通过路径获取主题文件
+// GetThemeFileByPath 閫氳繃璺緞鑾峰彇涓婚鏂囦欢
 func (s *ThemeService) GetThemeFileByPath(c *gin.Context) {
 	themeId, err := strconv.ParseUint(c.Param("themeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
 	filePath := c.Query("path")
 	if filePath == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少文件路径"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缂哄皯鏂囦欢璺緞"})
 		return
 	}
 
@@ -526,11 +526,11 @@ func (s *ThemeService) GetThemeFileByPath(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": file})
 }
 
-// CreateThemeFile 创建主题文件
+// CreateThemeFile 鍒涘缓涓婚鏂囦欢
 func (s *ThemeService) CreateThemeFile(c *gin.Context) {
 	themeId, err := strconv.ParseUint(c.Param("themeId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的主题ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勪富棰業D"})
 		return
 	}
 
@@ -550,11 +550,11 @@ func (s *ThemeService) CreateThemeFile(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": file})
 }
 
-// UpdateThemeFile 更新主题文件
+// UpdateThemeFile 鏇存柊涓婚鏂囦欢
 func (s *ThemeService) UpdateThemeFile(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的文件ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勬枃浠禝D"})
 		return
 	}
 
@@ -574,11 +574,11 @@ func (s *ThemeService) UpdateThemeFile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": file})
 }
 
-// DeleteThemeFile 删除主题文件
+// DeleteThemeFile 鍒犻櫎涓婚鏂囦欢
 func (s *ThemeService) DeleteThemeFile(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的文件ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "鏃犳晥鐨勬枃浠禝D"})
 		return
 	}
 
@@ -587,5 +587,5 @@ func (s *ThemeService) DeleteThemeFile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "文件已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "鏂囦欢宸插垹闄?})
 }

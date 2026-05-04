@@ -8,7 +8,7 @@ import (
 	"nop-go/services/affiliate-service/internal/service"
 	"nop-go/shared/bootstrap"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +34,7 @@ func affiliateConfigFromRuntime(rt *bootstrap.HTTPServiceRuntime) biz.AffiliateC
 	return config
 }
 
-func wireAffiliateService(db *gorm.DB, jwtSvc contract.JWTService, config biz.AffiliateConfig) (*service.AffiliateService, error) {
+func wireAffiliateService(db *gorm.DB, jwtSvc securitycontract.JWTService, config biz.AffiliateConfig) (*service.AffiliateService, error) {
 	affiliateRepo := data.NewAffiliateRepository(db)
 	orderRepo := data.NewAffiliateOrderRepository(db)
 	referralRepo := data.NewAffiliateReferralRepository(db)

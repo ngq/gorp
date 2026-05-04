@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	"github.com/spf13/viper"
 )
@@ -26,11 +27,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "configsource.local" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.ConfigSourceKey}
+	return []string{datacontract.ConfigSourceKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ConfigSourceKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
 		cfg, _ := getConfigSourceConfig(c)
 		return NewSource(cfg), nil
 	}, true)
@@ -38,28 +39,28 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
 // getConfigSourceConfig 从容器获取配置源配置。
-func getConfigSourceConfig(c contract.Container) (*contract.ConfigSourceConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getConfigSourceConfig(c runtimecontract.Container) (*datacontract.ConfigSourceConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
-		return &contract.ConfigSourceConfig{Type: contract.ConfigSourceLocal}, nil
+		return &datacontract.ConfigSourceConfig{Type: datacontract.ConfigSourceLocal}, nil
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return &contract.ConfigSourceConfig{Type: contract.ConfigSourceLocal}, nil
+		return &datacontract.ConfigSourceConfig{Type: datacontract.ConfigSourceLocal}, nil
 	}
 
-	sourceCfg := &contract.ConfigSourceConfig{Type: contract.ConfigSourceLocal}
+	sourceCfg := &datacontract.ConfigSourceConfig{Type: datacontract.ConfigSourceLocal}
 	if typ := configprovider.GetStringAny(cfg,
 		"configsource.type",
 		"config_source.type",
 	); typ != "" {
-		sourceCfg.Type = contract.ConfigSourceType(typ)
+		sourceCfg.Type = datacontract.ConfigSourceType(typ)
 	}
 
 	return sourceCfg, nil
@@ -71,12 +72,12 @@ func getConfigSourceConfig(c contract.Container) (*contract.ConfigSourceConfig, 
 // - 复用 framework/provider/config 的本地配置加载主链；
 // - 不支持 Watch 热更新。
 type Source struct {
-	cfg *contract.ConfigSourceConfig
+	cfg *datacontract.ConfigSourceConfig
 	env string
 }
 
 // NewSource 创建本地配置源。
-func NewSource(cfg *contract.ConfigSourceConfig) *Source {
+func NewSource(cfg *datacontract.ConfigSourceConfig) *Source {
 	env := configprovider.NormalizeEnv(os.Getenv("APP_ENV"))
 	if env == "" {
 		env = configprovider.EnvDev
@@ -129,7 +130,7 @@ func (s *Source) Set(ctx context.Context, key string, value any) error {
 }
 
 // Watch 监听配置变化。
-func (s *Source) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *Source) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	return nil, errors.New("configsource.local: Watch not supported, use Reload to update config")
 }
 

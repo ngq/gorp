@@ -1,4 +1,4 @@
-//go:build wireinject
+﻿//go:build wireinject
 
 package main
 
@@ -8,12 +8,12 @@ import (
 	"nop-go/services/seo-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-// wireSEOService 使用 Wire 生成 seo-service 的装配代码。
-func wireSEOService(db *gorm.DB, jwtSvc contract.JWTService, enabled, sitemapEnabled, canonicalUrlsEnabled, customMetaEnabled bool) (*service.SEOService, error) {
+// wireSEOService 浣跨敤 Wire 鐢熸垚 seo-service 鐨勮閰嶄唬鐮併€?
+func wireSEOService(db *gorm.DB, jwtSvc securitycontract.JWTService, enabled, sitemapEnabled, canonicalUrlsEnabled, customMetaEnabled bool) (*service.SEOService, error) {
 	panic(wire.Build(
 		data.NewUrlRecordRepository,
 		data.NewUrlRedirectRepository,

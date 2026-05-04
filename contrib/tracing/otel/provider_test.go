@@ -3,7 +3,7 @@ package otel
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -14,7 +14,7 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "tracing.otel", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.TracerKey, contract.TracerProviderKey}, p.Provides())
+	require.Equal(t, []string{observabilitycontract.TracerKey, observabilitycontract.TracerProviderKey}, p.Provides())
 }
 
 func TestTracerProviderUnderlyingAndAs(t *testing.T) {

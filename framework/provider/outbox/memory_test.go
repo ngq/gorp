@@ -5,16 +5,16 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 type senderStub struct {
-	err   error
-	sent  int
-	last  *contract.OutboxMessage
+	err  error
+	sent int
+	last *integrationcontract.OutboxMessage
 }
 
-func (s *senderStub) Send(_ context.Context, msg *contract.OutboxMessage) error {
+func (s *senderStub) Send(_ context.Context, msg *integrationcontract.OutboxMessage) error {
 	s.sent++
 	s.last = msg
 	return s.err
@@ -22,7 +22,7 @@ func (s *senderStub) Send(_ context.Context, msg *contract.OutboxMessage) error 
 
 func TestMemoryOutboxEmitSyncMarksSent(t *testing.T) {
 	sender := &senderStub{}
-	outbox := NewMemoryOutbox(sender, contract.OutboxConfig{RetryLimit: 3})
+	outbox := NewMemoryOutbox(sender, integrationcontract.OutboxConfig{RetryLimit: 3})
 
 	if err := outbox.EmitSync(context.Background(), "order.created", map[string]any{"id": 1}); err != nil {
 		t.Fatalf("EmitSync failed: %v", err)
@@ -34,7 +34,7 @@ func TestMemoryOutboxEmitSyncMarksSent(t *testing.T) {
 		t.Fatalf("expected last message to be captured")
 	}
 	msg := outbox.messages[sender.last.ID]
-	if msg.Status != contract.OutboxStatusSent {
+	if msg.Status != integrationcontract.OutboxStatusSent {
 		t.Fatalf("expected sent status, got %s", msg.Status)
 	}
 	if msg.SentAt == nil {
@@ -44,7 +44,7 @@ func TestMemoryOutboxEmitSyncMarksSent(t *testing.T) {
 
 func TestMemoryOutboxProcessMarksRetryingThenFailed(t *testing.T) {
 	sender := &senderStub{err: errors.New("boom")}
-	outbox := NewMemoryOutbox(sender, contract.OutboxConfig{RetryLimit: 1})
+	outbox := NewMemoryOutbox(sender, integrationcontract.OutboxConfig{RetryLimit: 1})
 
 	if err := outbox.EmitSync(context.Background(), "order.created", map[string]any{"id": 2}); err != nil {
 		t.Fatalf("EmitSync failed: %v", err)
@@ -53,7 +53,7 @@ func TestMemoryOutboxProcessMarksRetryingThenFailed(t *testing.T) {
 		t.Fatalf("expected last message to be captured")
 	}
 	msg := outbox.messages[sender.last.ID]
-	if msg.Status != contract.OutboxStatusFailed {
+	if msg.Status != integrationcontract.OutboxStatusFailed {
 		t.Fatalf("expected failed status, got %s", msg.Status)
 	}
 	if msg.RetryCount != 1 {
@@ -65,11 +65,11 @@ func TestMemoryOutboxProcessMarksRetryingThenFailed(t *testing.T) {
 }
 
 func TestMemoryOutboxProcessWithoutSenderFails(t *testing.T) {
-	outbox := NewMemoryOutbox(nil, contract.OutboxConfig{RetryLimit: 3})
-	outbox.messages["msg-1"] = &contract.OutboxMessage{
+	outbox := NewMemoryOutbox(nil, integrationcontract.OutboxConfig{RetryLimit: 3})
+	outbox.messages["msg-1"] = &integrationcontract.OutboxMessage{
 		ID:     "msg-1",
 		Topic:  "demo",
-		Status: contract.OutboxStatusPending,
+		Status: integrationcontract.OutboxStatusPending,
 	}
 
 	err := outbox.Process(context.Background())

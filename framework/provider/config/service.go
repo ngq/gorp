@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/spf13/viper"
 	"github.com/subosito/gotenv"
 )
@@ -25,7 +25,7 @@ import (
 type Service struct {
 	env    string
 	v      *viper.Viper
-	source contract.ConfigSource // 配置源（可选）
+	source datacontract.ConfigSource // 配置源（可选）
 }
 
 func NewService() *Service {
@@ -37,7 +37,7 @@ func NewService() *Service {
 // 中文说明：
 // - 支持远程配置源（Consul KV / etcd）；
 // - 本地文件优先，远程配置覆盖。
-func NewServiceWithSource(source contract.ConfigSource) *Service {
+func NewServiceWithSource(source datacontract.ConfigSource) *Service {
 	return &Service{
 		v:      viper.New(),
 		source: source,
@@ -297,7 +297,7 @@ func (s *Service) Unmarshal(key string, out any) error {
 // 中文说明：
 // - 如果配置源支持 Watch，返回 ConfigWatcher；
 // - 否则返回 nil（本地文件不支持热更新）。
-func (s *Service) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	if s.source != nil {
 		return s.source.Watch(ctx, key)
 	}

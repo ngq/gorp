@@ -4,114 +4,108 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Provider 提供 noop DTM 分布式事务实现。
-//
-// 中文说明：
-// - 单体项目默认使用此 provider；
-// - 不引入任何外部依赖；
-// - 所有分布式事务操作为空实现；
-// - 单体项目使用本地事务，不需要分布式事务。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string     { return "dtm.noop" }
-func (p *Provider) IsDefer() bool    { return true }
-func (p *Provider) Provides() []string {
-	return []string{contract.DTMKey}
-}
+func (p *Provider) Name() string { return "dtm.noop" }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.DTMKey, func(c contract.Container) (any, error) {
+func (p *Provider) IsDefer() bool { return true }
+
+func (p *Provider) Provides() []string { return []string{integrationcontract.DTMKey} }
+
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(integrationcontract.DTMKey, func(c runtimecontract.Container) (any, error) {
 		return &noopDTMClient{}, nil
 	}, true)
-
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error {
-	return nil
-}
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
-// ErrNoopDTM 表示 noop 模式不支持分布式事务。
 var ErrNoopDTM = errors.New("dtm: noop mode, distributed transaction not available in monolith")
 
-// noopDTMClient 是 DTMClient 的空实现。
 type noopDTMClient struct{}
 
-// SAGA 创建 SAGA 事务（返回空构建器）。
-func (c *noopDTMClient) SAGA(name string) contract.SAGABuilder {
+func (c *noopDTMClient) SAGA(name string) integrationcontract.SAGABuilder {
+	_ = name
 	return &noopSAGABuilder{}
 }
 
-// TCC 创建 TCC 事务（返回空构建器）。
-func (c *noopDTMClient) TCC(name string) contract.TCCBuilder {
+func (c *noopDTMClient) TCC(name string) integrationcontract.TCCBuilder {
+	_ = name
 	return &noopTCCBuilder{}
 }
 
-// XA 创建 XA 事务（返回空构建器）。
-func (c *noopDTMClient) XA(name string) contract.XABuilder {
+func (c *noopDTMClient) XA(name string) integrationcontract.XABuilder {
+	_ = name
 	return &noopXABuilder{}
 }
 
-// Barrier 创建 Barrier 事务（返回空处理器）。
-func (c *noopDTMClient) Barrier(transType, gid string) contract.BarrierHandler {
+func (c *noopDTMClient) Barrier(transType, gid string) integrationcontract.BarrierHandler {
+	_ = transType
+	_ = gid
 	return &noopBarrierHandler{}
 }
 
-// Query 查询事务状态（返回错误）。
-func (c *noopDTMClient) Query(ctx context.Context, gid string) (*contract.TransactionInfo, error) {
+func (c *noopDTMClient) Query(ctx context.Context, gid string) (*integrationcontract.TransactionInfo, error) {
+	_ = ctx
+	_ = gid
 	return nil, ErrNoopDTM
 }
 
-// noopSAGABuilder 是 SAGABuilder 的空实现。
 type noopSAGABuilder struct{}
 
-func (b *noopSAGABuilder) Add(action string, compensate string, payload any) contract.SAGABuilder {
+func (b *noopSAGABuilder) Add(action string, compensate string, payload any) integrationcontract.SAGABuilder {
+	_, _, _ = action, compensate, payload
 	return b
 }
 
-func (b *noopSAGABuilder) AddBranch(action string, compensate string, payload any, opts contract.BranchOptions) contract.SAGABuilder {
+func (b *noopSAGABuilder) AddBranch(action string, compensate string, payload any, opts integrationcontract.BranchOptions) integrationcontract.SAGABuilder {
+	_, _, _, _ = action, compensate, payload, opts
 	return b
 }
 
 func (b *noopSAGABuilder) Submit(ctx context.Context) error {
+	_ = ctx
 	return ErrNoopDTM
 }
 
-func (b *noopSAGABuilder) Build() (*contract.SAGATransaction, error) {
+func (b *noopSAGABuilder) Build() (*integrationcontract.SAGATransaction, error) {
 	return nil, ErrNoopDTM
 }
 
-// noopTCCBuilder 是 TCCBuilder 的空实现。
 type noopTCCBuilder struct{}
 
-func (b *noopTCCBuilder) Add(try string, confirm string, cancel string, payload any) contract.TCCBuilder {
+func (b *noopTCCBuilder) Add(try string, confirm string, cancel string, payload any) integrationcontract.TCCBuilder {
+	_, _, _, _ = try, confirm, cancel, payload
 	return b
 }
 
 func (b *noopTCCBuilder) Submit(ctx context.Context) error {
+	_ = ctx
 	return ErrNoopDTM
 }
 
-// noopXABuilder 是 XABuilder 的空实现。
 type noopXABuilder struct{}
 
-func (b *noopXABuilder) Add(url string, payload any) contract.XABuilder {
+func (b *noopXABuilder) Add(url string, payload any) integrationcontract.XABuilder {
+	_, _ = url, payload
 	return b
 }
 
 func (b *noopXABuilder) Submit(ctx context.Context) error {
+	_ = ctx
 	return ErrNoopDTM
 }
 
-// noopBarrierHandler 是 BarrierHandler 的空实现。
 type noopBarrierHandler struct{}
 
 func (h *noopBarrierHandler) Call(ctx context.Context, fn func(db any) error) error {
-	// 直接执行函数（无 Barrier 保护）
+	_ = ctx
 	return fn(nil)
 }

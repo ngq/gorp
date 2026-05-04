@@ -12,25 +12,31 @@ import (
 	serviceauthmtls "github.com/ngq/gorp/contrib/serviceauth/mtls"
 	serviceauthtoken "github.com/ngq/gorp/contrib/serviceauth/token"
 	tracingotel "github.com/ngq/gorp/contrib/tracing/otel"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
 func TestContribProvidersFollowProviderBoundary(t *testing.T) {
 	tests := []struct {
 		name        string
-		provider    contract.ServiceProvider
+		provider    runtimecontract.ServiceProvider
 		deferred    bool
 		providesKey []string
 	}{
-		{name: "registry.consul", provider: registryconsul.NewProvider(), deferred: true, providesKey: []string{contract.RPCRegistryKey}},
-		{name: "configsource.consul", provider: configsourceconsul.NewProvider(), deferred: true, providesKey: []string{contract.ConfigSourceKey}},
-		{name: "tracing.otel", provider: tracingotel.NewProvider(), deferred: true, providesKey: []string{contract.TracerKey, contract.TracerProviderKey}},
-		{name: "messagequeue.redis", provider: mqredis.NewProvider(), deferred: true, providesKey: []string{contract.MessageQueueKey, contract.MessagePublisherKey, contract.MessageSubscriberKey}},
-		{name: "dlock.redis", provider: dlockredis.NewProvider(), deferred: true, providesKey: []string{contract.DistributedLockKey}},
-		{name: "serviceauth.token", provider: serviceauthtoken.NewProvider(), deferred: true, providesKey: []string{contract.ServiceAuthKey, contract.ServiceIdentityKey}},
-		{name: "serviceauth.mtls", provider: serviceauthmtls.NewProvider(), deferred: true, providesKey: []string{contract.ServiceAuthKey, contract.ServiceIdentityKey}},
-		{name: "circuitbreaker.sentinel", provider: circuitbreakersentinel.NewProvider(), deferred: true, providesKey: []string{contract.CircuitBreakerKey, contract.RateLimiterKey}},
+		{name: "registry.consul", provider: registryconsul.NewProvider(), deferred: true, providesKey: []string{transportcontract.RPCRegistryKey}},
+		{name: "configsource.consul", provider: configsourceconsul.NewProvider(), deferred: true, providesKey: []string{datacontract.ConfigSourceKey}},
+		{name: "tracing.otel", provider: tracingotel.NewProvider(), deferred: true, providesKey: []string{observabilitycontract.TracerKey, observabilitycontract.TracerProviderKey}},
+		{name: "messagequeue.redis", provider: mqredis.NewProvider(), deferred: true, providesKey: []string{integrationcontract.MessageQueueKey, integrationcontract.MessagePublisherKey, integrationcontract.MessageSubscriberKey}},
+		{name: "dlock.redis", provider: dlockredis.NewProvider(), deferred: true, providesKey: []string{datacontract.DistributedLockKey}},
+		{name: "serviceauth.token", provider: serviceauthtoken.NewProvider(), deferred: true, providesKey: []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}},
+		{name: "serviceauth.mtls", provider: serviceauthmtls.NewProvider(), deferred: true, providesKey: []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}},
+		{name: "circuitbreaker.sentinel", provider: circuitbreakersentinel.NewProvider(), deferred: true, providesKey: []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}},
 	}
 
 	for _, tt := range tests {

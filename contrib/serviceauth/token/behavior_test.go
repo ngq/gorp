@@ -2,16 +2,16 @@ package token
 
 import (
 	"context"
-	"crypto/tls"
+	"crypto/x509"
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTokenAuthenticator_GenerateAndVerifyToken(t *testing.T) {
-	auth := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName:  "order-service",
 		TokenIssuer:  "order-service",
 		TokenSecret:  "test-secret",
@@ -32,7 +32,7 @@ func TestTokenAuthenticator_GenerateAndVerifyToken(t *testing.T) {
 }
 
 func TestTokenAuthenticator_VerifyTokenRejectsDisallowedService(t *testing.T) {
-	auth := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName:     "order-service",
 		TokenIssuer:     "order-service",
 		TokenSecret:     "test-secret",
@@ -49,7 +49,7 @@ func TestTokenAuthenticator_VerifyTokenRejectsDisallowedService(t *testing.T) {
 }
 
 func TestTokenAuthenticator_VerifyTokenRejectsExpiredToken(t *testing.T) {
-	auth := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName: "order-service",
 		TokenIssuer: "order-service",
 		TokenSecret: "test-secret",
@@ -65,7 +65,7 @@ func TestTokenAuthenticator_VerifyTokenRejectsExpiredToken(t *testing.T) {
 }
 
 func TestTokenAuthenticator_AuthenticateReadsBearerTokenFromContext(t *testing.T) {
-	auth := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName: "order-service",
 		TokenIssuer: "order-service",
 		TokenSecret: "test-secret",
@@ -81,11 +81,11 @@ func TestTokenAuthenticator_AuthenticateReadsBearerTokenFromContext(t *testing.T
 	require.Equal(t, "order-service", identity.ServiceName)
 }
 
-func TestTokenAuthenticator_AuthenticateWithCertRejectsCertificate(t *testing.T) {
-	auth := NewTokenAuthenticator(&contract.ServiceAuthConfig{})
-	_, err := auth.AuthenticateWithCert(context.Background(), &tls.Certificate{})
+func TestTokenAuthenticator_AuthenticatePeerCertificateRejectsCertificate(t *testing.T) {
+	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{})
+	_, err := auth.AuthenticatePeerCertificate(context.Background(), &x509.Certificate{})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "certificate authentication not supported")
+	require.Contains(t, err.Error(), "peer certificate authentication not supported")
 }
 
 func TestExtractTokenFromContext(t *testing.T) {
@@ -99,7 +99,7 @@ func TestExtractTokenFromContext(t *testing.T) {
 }
 
 func TestTokenAuthenticator_GetCurrentIdentity(t *testing.T) {
-	auth := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName: "order-service",
 		Namespace:   "prod",
 		Environment: "online",
@@ -112,13 +112,13 @@ func TestTokenAuthenticator_GetCurrentIdentity(t *testing.T) {
 }
 
 func TestTokenAuthenticator_VerifyTokenRejectsDifferentSecret(t *testing.T) {
-	issuer := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	issuer := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName: "order-service",
 		TokenIssuer: "order-service",
 		TokenSecret: "secret-a",
 		TokenExpiry: int64((1 * time.Minute).Seconds()),
 	})
-	verifier := NewTokenAuthenticator(&contract.ServiceAuthConfig{
+	verifier := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
 		ServiceName: "order-service",
 		TokenIssuer: "order-service",
 		TokenSecret: "secret-b",

@@ -3,10 +3,11 @@ package kubernetes
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -15,12 +16,12 @@ func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "registry.kubernetes", p.Name())
 	require.True(t, p.IsDefer())
-	require.Equal(t, []string{contract.RPCRegistryKey}, p.Provides())
+	require.Equal(t, []string{transportcontract.RPCRegistryKey}, p.Provides())
 }
 
 func TestRegistryDiscoverUsesDiscoveryClient(t *testing.T) {
 	client := &fakeDiscoveryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "svc-10.0.0.1:8080", Name: "svc", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -36,7 +37,7 @@ func TestRegistryDiscoverUsesDiscoveryClient(t *testing.T) {
 
 func TestRegistryWatchEmitsUpdatedInstances(t *testing.T) {
 	client := &fakeDiscoveryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "svc-10.0.0.1:8080", Name: "svc", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -54,7 +55,7 @@ func TestRegistryWatchEmitsUpdatedInstances(t *testing.T) {
 		t.Fatal("expected initial snapshot")
 	}
 
-	client.push([]contract.ServiceInstance{
+	client.push([]transportcontract.ServiceInstance{
 		{ID: "svc-10.0.0.2:8080", Name: "svc", Address: "10.0.0.2:8080", Healthy: true},
 	})
 
@@ -90,7 +91,7 @@ func TestRegistryDiscoverReturnsSourceError(t *testing.T) {
 
 func TestRegistryDiscoverUsesCacheAfterFirstFetch(t *testing.T) {
 	client := &fakeDiscoveryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "svc-10.0.0.1:8080", Name: "svc", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -101,7 +102,7 @@ func TestRegistryDiscoverUsesCacheAfterFirstFetch(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, first, 1)
 
-	client.discoverResult = []contract.ServiceInstance{
+	client.discoverResult = []transportcontract.ServiceInstance{
 		{ID: "svc-10.0.0.9:8080", Name: "svc", Address: "10.0.0.9:8080", Healthy: true},
 	}
 
@@ -124,7 +125,7 @@ func TestRegistryWatchAfterCloseFails(t *testing.T) {
 
 func TestRegistryWatchClosesChannelOnClose(t *testing.T) {
 	client := &fakeDiscoveryClient{
-		discoverResult: []contract.ServiceInstance{
+		discoverResult: []transportcontract.ServiceInstance{
 			{ID: "svc-10.0.0.1:8080", Name: "svc", Address: "10.0.0.1:8080", Healthy: true},
 		},
 	}
@@ -186,9 +187,10 @@ func TestRegistryAsProjectsNativeClient(t *testing.T) {
 }
 
 type fakeDiscoveryClient struct {
-	discoverResult []contract.ServiceInstance
+	discoverResult []transportcontract.ServiceInstance
 	discoverErr    error
-	updateCh       chan []contract.ServiceInstance
+	mu             sync.Mutex
+	updateCh       chan []transportcontract.ServiceInstance
 	discoverCalls  int
 }
 
@@ -201,34 +203,46 @@ func (f *fakeNativeDiscoveryClient) Underlying() any {
 	return f.native
 }
 
-func (f *fakeDiscoveryClient) Discover(ctx context.Context, namespace, name string) ([]contract.ServiceInstance, error) {
+func (f *fakeDiscoveryClient) Discover(ctx context.Context, namespace, name string) ([]transportcontract.ServiceInstance, error) {
+	f.mu.Lock()
 	f.discoverCalls++
-	if f.discoverErr != nil {
-		return nil, f.discoverErr
+	result := append([]transportcontract.ServiceInstance(nil), f.discoverResult...)
+	err := f.discoverErr
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
 	}
-	return append([]contract.ServiceInstance(nil), f.discoverResult...), nil
+	return result, nil
 }
 
-func (f *fakeDiscoveryClient) Watch(ctx context.Context, namespace, name string, onUpdate func([]contract.ServiceInstance)) error {
-	if f.updateCh == nil {
-		f.updateCh = make(chan []contract.ServiceInstance, 2)
-	}
+func (f *fakeDiscoveryClient) Watch(ctx context.Context, namespace, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
+	ch := f.ensureUpdateCh()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case update := <-f.updateCh:
-			if errors.Is(f.discoverErr, ErrServiceNotFound) {
+		case update := <-ch:
+			f.mu.Lock()
+			err := f.discoverErr
+			f.mu.Unlock()
+			if errors.Is(err, ErrServiceNotFound) {
 				continue
 			}
-			onUpdate(append([]contract.ServiceInstance(nil), update...))
+			onUpdate(append([]transportcontract.ServiceInstance(nil), update...))
 		}
 	}
 }
 
-func (f *fakeDiscoveryClient) push(update []contract.ServiceInstance) {
+func (f *fakeDiscoveryClient) push(update []transportcontract.ServiceInstance) {
+	ch := f.ensureUpdateCh()
+	ch <- append([]transportcontract.ServiceInstance(nil), update...)
+}
+
+func (f *fakeDiscoveryClient) ensureUpdateCh() chan []transportcontract.ServiceInstance {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.updateCh == nil {
-		f.updateCh = make(chan []contract.ServiceInstance, 2)
+		f.updateCh = make(chan []transportcontract.ServiceInstance, 2)
 	}
-	f.updateCh <- append([]contract.ServiceInstance(nil), update...)
+	return f.updateCh
 }

@@ -8,11 +8,11 @@ import (
 	"nop-go/services/admin-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireAdminService(db *gorm.DB, jwtSvc contract.JWTService) (*service.AdminService, error) {
+func wireAdminService(db *gorm.DB, jwtSvc securitycontract.JWTService) (*service.AdminService, error) {
 	panic(wire.Build(
 		data.NewAdminUserRepository,
 		data.NewAdminRoleRepository,

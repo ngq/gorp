@@ -1,4 +1,4 @@
-// Package service SEO服务HTTP层
+﻿// Package service SEO鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,29 +6,29 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/seo-service/internal/biz"
 	"nop-go/services/seo-service/internal/models"
 )
 
-// SEOService SEO服务
+// SEOService SEO鏈嶅姟
 type SEOService struct {
 	seoUC  *biz.SEOUseCase
-	jwtSvc contract.JWTService
+	jwtSvc securitycontract.JWTService
 }
 
-// NewSEOService 创建SEO服务
-func NewSEOService(seoUC *biz.SEOUseCase, jwtSvc contract.JWTService) *SEOService {
+// NewSEOService 鍒涘缓SEO鏈嶅姟
+func NewSEOService(seoUC *biz.SEOUseCase, jwtSvc securitycontract.JWTService) *SEOService {
 	return &SEOService{seoUC: seoUC, jwtSvc: jwtSvc}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *SEOService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1/seo")
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
-		// URL记录管理
+		// URL璁板綍绠＄悊
 		api.POST("/urls", adminAuth, s.CreateUrlRecord)
 		api.GET("/urls", adminAuth, s.ListUrlRecords)
 		api.GET("/urls/search", adminAuth, s.SearchUrlRecords)
@@ -38,7 +38,7 @@ func (s *SEOService) RegisterRoutes(r *gin.Engine) {
 		api.DELETE("/urls/:id", adminAuth, s.DeleteUrlRecord)
 		api.POST("/urls/generate-slug", s.GenerateSlug)
 
-		// URL重定向管理
+		// URL閲嶅畾鍚戠鐞?
 		api.POST("/redirects", adminAuth, s.CreateUrlRedirect)
 		api.GET("/redirects", adminAuth, s.ListUrlRedirects)
 		api.GET("/redirects/:id", s.GetUrlRedirect)
@@ -46,7 +46,7 @@ func (s *SEOService) RegisterRoutes(r *gin.Engine) {
 		api.PUT("/redirects/:id", adminAuth, s.UpdateUrlRedirect)
 		api.DELETE("/redirects/:id", adminAuth, s.DeleteUrlRedirect)
 
-		// 元信息管理
+		// 鍏冧俊鎭鐞?
 		api.POST("/meta", s.CreateMetaInfo)
 		api.GET("/meta", adminAuth, s.ListMetaInfo)
 		api.GET("/meta/:id", s.GetMetaInfo)
@@ -54,19 +54,19 @@ func (s *SEOService) RegisterRoutes(r *gin.Engine) {
 		api.PUT("/meta/:id", adminAuth, s.UpdateMetaInfo)
 		api.DELETE("/meta/:id", adminAuth, s.DeleteMetaInfo)
 
-		// Sitemap管理
+		// Sitemap绠＄悊
 		api.POST("/sitemap/nodes", adminAuth, s.AddSitemapNode)
 		api.GET("/sitemap/nodes", s.GetSitemapNodes)
 		api.DELETE("/sitemap/nodes/:id", adminAuth, s.DeleteSitemapNode)
 		api.DELETE("/sitemap/type/:entity_type", adminAuth, s.ClearSitemapByType)
 		api.GET("/sitemap/generate", s.GenerateSitemap)
 
-		// SEO分析
+		// SEO鍒嗘瀽
 		api.GET("/analyze/:entity_type/:entity_id", s.AnalyzeSEO)
 	}
 }
 
-// ========== URL记录接口 ==========
+// ========== URL璁板綍鎺ュ彛 ==========
 
 func (s *SEOService) CreateUrlRecord(c *gin.Context) {
 	var req models.UrlRecordCreateRequest
@@ -170,7 +170,7 @@ func (s *SEOService) GenerateSlug(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"slug": uniqueSlug})
 }
 
-// ========== URL重定向接口 ==========
+// ========== URL閲嶅畾鍚戞帴鍙?==========
 
 func (s *SEOService) CreateUrlRedirect(c *gin.Context) {
 	var req models.UrlRedirectCreateRequest
@@ -247,7 +247,7 @@ func (s *SEOService) DeleteUrlRedirect(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// ========== 元信息接口 ==========
+// ========== 鍏冧俊鎭帴鍙?==========
 
 func (s *SEOService) CreateMetaInfo(c *gin.Context) {
 	var req models.MetaInfoCreateRequest
@@ -327,7 +327,7 @@ func (s *SEOService) DeleteMetaInfo(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// ========== Sitemap接口 ==========
+// ========== Sitemap鎺ュ彛 ==========
 
 func (s *SEOService) AddSitemapNode(c *gin.Context) {
 	var node models.SitemapNode
@@ -383,14 +383,14 @@ func (s *SEOService) GenerateSitemap(c *gin.Context) {
 		return
 	}
 
-	// 返回XML内容
+	// 杩斿洖XML鍐呭
 	c.Data(http.StatusOK, "application/xml", []byte(xmlContent))
 
-	// 也可以返回JSON格式
+	// 涔熷彲浠ヨ繑鍥濲SON鏍煎紡
 	// c.JSON(http.StatusOK, gin.H{"xml": xmlContent, "result": result})
 }
 
-// ========== SEO分析接口 ==========
+// ========== SEO鍒嗘瀽鎺ュ彛 ==========
 
 func (s *SEOService) AnalyzeSEO(c *gin.Context) {
 	entityType := c.Param("entity_type")

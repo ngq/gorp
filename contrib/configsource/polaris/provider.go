@@ -12,7 +12,8 @@ import (
 	"time"
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	polarissdk "github.com/polarismesh/polaris-go"
 	polarismodel "github.com/polarismesh/polaris-go/pkg/model"
 	"gopkg.in/yaml.v3"
@@ -47,10 +48,10 @@ type Provider struct{}
 func NewProvider() *Provider           { return &Provider{} }
 func (p *Provider) Name() string       { return "configsource.polaris" }
 func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{contract.ConfigSourceKey} }
+func (p *Provider) Provides() []string { return []string{datacontract.ConfigSourceKey} }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ConfigSourceKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getPolarisConfig(c)
 		if err != nil {
 			return nil, err
@@ -60,7 +61,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 type PolarisConfig struct {
 	ServerAddress      string
@@ -72,12 +73,12 @@ type PolarisConfig struct {
 	WatchRetryInterval time.Duration
 }
 
-func getPolarisConfig(c contract.Container) (*PolarisConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("polaris: invalid config service")
 	}
@@ -207,7 +208,7 @@ func (s *ConfigSource) As(target any) bool {
 	return internalnative.As(s.Underlying(), target)
 }
 
-func (s *ConfigSource) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *ConfigSource) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
 	if s.closed {

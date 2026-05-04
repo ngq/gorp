@@ -1,13 +1,16 @@
 package goroutine
 
-import "github.com/ngq/gorp/framework/contract"
+import (
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+)
 
 // LoggerFromContainer tries to get framework logger.
-func LoggerFromContainer(c contract.Container) contract.Logger {
-	v, err := c.Make(contract.LogKey)
+func LoggerFromContainer(c runtimecontract.Container) observabilitycontract.Logger {
+	v, err := c.Make(observabilitycontract.LogKey)
 	if err != nil {
 		return nil
 	}
-	l, _ := v.(contract.Logger)
+	l, _ := v.(observabilitycontract.Logger)
 	return l
 }

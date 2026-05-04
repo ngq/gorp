@@ -11,7 +11,9 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
@@ -28,10 +30,10 @@ func NewProvider() *Provider { return &Provider{} }
 
 func (p *Provider) Name() string       { return "registry.consul" }
 func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{contract.RPCRegistryKey} }
+func (p *Provider) Provides() []string { return []string{transportcontract.RPCRegistryKey} }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getDiscoveryConfig(c)
 		if err != nil {
 			return nil, err
@@ -41,7 +43,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 // DiscoveryConfig 定义服务发现配置。
 type DiscoveryConfig struct {
@@ -60,12 +62,12 @@ type DiscoveryConfig struct {
 }
 
 // getDiscoveryConfig 从容器获取服务发现配置。
-func getDiscoveryConfig(c contract.Container) (*DiscoveryConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("discovery: invalid config service")
 	}
@@ -228,12 +230,12 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 }
 
 // Discover 发现服务实例。
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	services, _, err := r.client.Health().Service(name, "", true, nil)
 	if err != nil {
 		return nil, fmt.Errorf("discovery.consul: discover service failed: %w", err)
 	}
-	instances := make([]contract.ServiceInstance, 0, len(services))
+	instances := make([]transportcontract.ServiceInstance, 0, len(services))
 	for _, service := range services {
 		if service.Service == nil {
 			continue
@@ -252,7 +254,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 				break
 			}
 		}
-		instances = append(instances, contract.ServiceInstance{
+		instances = append(instances, transportcontract.ServiceInstance{
 			ID:       service.Service.ID,
 			Name:     service.Service.Service,
 			Address:  addr,
@@ -310,7 +312,7 @@ func (r *Registry) buildHealthCheck(serviceID, host string, port int) *api.Agent
 	return check
 }
 
-func (r *Registry) applyLoadBalance(instances []contract.ServiceInstance) []contract.ServiceInstance {
+func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstance) []transportcontract.ServiceInstance {
 	switch r.cfg.LoadBalance {
 	case "random":
 		rand.Shuffle(len(instances), func(i, j int) {

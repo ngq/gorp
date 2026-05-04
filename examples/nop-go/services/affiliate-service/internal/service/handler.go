@@ -1,4 +1,4 @@
-// Package service 联盟推广服务HTTP层
+// Package service 鑱旂洘鎺ㄥ箍鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,29 +6,29 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/affiliate-service/internal/biz"
 	"nop-go/services/affiliate-service/internal/models"
 )
 
-// AffiliateService 联盟推广服务
+// AffiliateService 鑱旂洘鎺ㄥ箍鏈嶅姟
 type AffiliateService struct {
 	affUC  *biz.AffiliateUseCase
-	jwtSvc contract.JWTService
+	jwtSvc securitycontract.JWTService
 }
 
-// NewAffiliateService 创建联盟推广服务
-func NewAffiliateService(affUC *biz.AffiliateUseCase, jwtSvc contract.JWTService) *AffiliateService {
+// NewAffiliateService 鍒涘缓鑱旂洘鎺ㄥ箍鏈嶅姟
+func NewAffiliateService(affUC *biz.AffiliateUseCase, jwtSvc securitycontract.JWTService) *AffiliateService {
 	return &AffiliateService{affUC: affUC, jwtSvc: jwtSvc}
 }
 
-// RegisterRoutes 注册路由
+// RegisterRoutes 娉ㄥ唽璺敱
 func (s *AffiliateService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1/affiliate")
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
-		// 联盟会员管理
+		// 鑱旂洘浼氬憳绠＄悊
 		api.POST("/affiliates", adminAuth, s.CreateAffiliate)
 		api.GET("/affiliates", adminAuth, s.ListAffiliates)
 		api.GET("/affiliates/search", adminAuth, s.SearchAffiliates)
@@ -38,32 +38,32 @@ func (s *AffiliateService) RegisterRoutes(r *gin.Engine) {
 		api.POST("/affiliates/:id/activate", adminAuth, s.ActivateAffiliate)
 		api.POST("/affiliates/:id/deactivate", adminAuth, s.DeactivateAffiliate)
 
-		// 联盟推荐追踪
+		// 鑱旂洘鎺ㄨ崘杩借釜
 		api.POST("/referrals/track", s.TrackReferral)
 		api.POST("/referrals/convert", s.ConvertReferral)
 		api.GET("/affiliates/:id/referrals", s.GetAffiliateReferrals)
 
-		// 联盟订单管理
+		// 鑱旂洘璁㈠崟绠＄悊
 		api.POST("/orders", s.CreateAffiliateOrder)
 		api.GET("/affiliates/:id/orders", s.GetAffiliateOrders)
 
-		// 佣金管理
+		// 浣ｉ噾绠＄悊
 		api.POST("/commissions/calculate", s.CalculateCommission)
 		api.GET("/affiliates/:id/commissions", s.GetAffiliateCommissions)
 		api.GET("/affiliates/:id/balance", s.GetPendingBalance)
 
-		// 支付管理
+		// 鏀粯绠＄悊
 		api.POST("/payouts", adminAuth, s.CreatePayout)
 		api.POST("/payouts/:id/process", adminAuth, s.ProcessPayout)
 		api.GET("/payouts/:id", s.GetPayout)
 		api.GET("/affiliates/:id/payouts", s.GetAffiliatePayouts)
 
-		// 统计信息
+		// 缁熻淇℃伅
 		api.GET("/affiliates/:id/stats", s.GetAffiliateStats)
 	}
 }
 
-// ========== 联盟会员接口 ==========
+// ========== 鑱旂洘浼氬憳鎺ュ彛 ==========
 
 func (s *AffiliateService) CreateAffiliate(c *gin.Context) {
 	var req models.AffiliateCreateRequest
@@ -162,7 +162,7 @@ func (s *AffiliateService) DeactivateAffiliate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "affiliate deactivated"})
 }
 
-// ========== 联盟推荐接口 ==========
+// ========== 鑱旂洘鎺ㄨ崘鎺ュ彛 ==========
 
 func (s *AffiliateService) TrackReferral(c *gin.Context) {
 	affiliateID, _ := strconv.ParseUint(c.Query("affiliate_id"), 10, 64)
@@ -210,7 +210,7 @@ func (s *AffiliateService) GetAffiliateReferrals(c *gin.Context) {
 	c.JSON(http.StatusOK, referrals)
 }
 
-// ========== 联盟订单接口 ==========
+// ========== 鑱旂洘璁㈠崟鎺ュ彛 ==========
 
 func (s *AffiliateService) CreateAffiliateOrder(c *gin.Context) {
 	var req models.AffiliateOrderCreateRequest
@@ -238,7 +238,7 @@ func (s *AffiliateService) GetAffiliateOrders(c *gin.Context) {
 	c.JSON(http.StatusOK, orders)
 }
 
-// ========== 佣金接口 ==========
+// ========== 浣ｉ噾鎺ュ彛 ==========
 
 func (s *AffiliateService) CalculateCommission(c *gin.Context) {
 	var req models.CommissionCalculateRequest
@@ -281,7 +281,7 @@ func (s *AffiliateService) GetPendingBalance(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"pending_balance": balance})
 }
 
-// ========== 支付接口 ==========
+// ========== 鏀粯鎺ュ彛 ==========
 
 func (s *AffiliateService) CreatePayout(c *gin.Context) {
 	var req models.PayoutCreateRequest
@@ -328,7 +328,7 @@ func (s *AffiliateService) GetAffiliatePayouts(c *gin.Context) {
 	c.JSON(http.StatusOK, payouts)
 }
 
-// ========== 统计接口 ==========
+// ========== 缁熻鎺ュ彛 ==========
 
 func (s *AffiliateService) GetAffiliateStats(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)

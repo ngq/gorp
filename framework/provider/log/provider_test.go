@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +33,7 @@ func (s *stubConfig) GetInt(key string) int       { v, _ := s.values[key].(int);
 func (s *stubConfig) GetBool(key string) bool     { v, _ := s.values[key].(bool); return v }
 func (s *stubConfig) GetFloat(string) float64     { return 0 }
 func (s *stubConfig) Unmarshal(string, any) error { return nil }
-func (s *stubConfig) Watch(_ context.Context, _ string) (contract.ConfigWatcher, error) {
+func (s *stubConfig) Watch(_ context.Context, _ string) (datacontract.ConfigWatcher, error) {
 	return nil, nil
 }
 func (s *stubConfig) Reload(_ context.Context) error { return nil }
@@ -40,45 +42,45 @@ func TestProviderMeta(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "log", p.Name())
 	require.False(t, p.IsDefer())
-	require.Equal(t, []string{contract.LogKey}, p.Provides())
+	require.Equal(t, []string{observabilitycontract.LogKey}, p.Provides())
 }
 
 func TestProviderUsesRootLogPathWhenRootExists(t *testing.T) {
 	c := container.New()
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]any{
 			"log.driver": "single",
 		}}, nil
 	}, true)
-	c.Bind(contract.RootKey, func(contract.Container) (any, error) {
+	c.Bind(runtimecontract.RootKey, func(runtimecontract.Container) (any, error) {
 		return stubRoot{log: "var/logs"}, nil
 	}, true)
 
 	require.NoError(t, c.RegisterProvider(NewProvider()))
-	v, err := c.Make(contract.LogKey)
+	v, err := c.Make(observabilitycontract.LogKey)
 	require.NoError(t, err)
-	_, ok := v.(contract.Logger)
+	_, ok := v.(observabilitycontract.Logger)
 	require.True(t, ok)
 }
 
 func TestProviderFallsBackToRelativeLogFileWithoutRoot(t *testing.T) {
 	c := container.New()
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]any{
 			"log.driver": "single",
 		}}, nil
 	}, true)
 
 	require.NoError(t, c.RegisterProvider(NewProvider()))
-	v, err := c.Make(contract.LogKey)
+	v, err := c.Make(observabilitycontract.LogKey)
 	require.NoError(t, err)
-	_, ok := v.(contract.Logger)
+	_, ok := v.(observabilitycontract.Logger)
 	require.True(t, ok)
 }
 
 func TestProviderBindLoggerWithBoolOverrides(t *testing.T) {
 	c := container.New()
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]any{
 			"log.driver":     "stdout",
 			"log.local_time": false,
@@ -87,8 +89,8 @@ func TestProviderBindLoggerWithBoolOverrides(t *testing.T) {
 	}, true)
 
 	require.NoError(t, c.RegisterProvider(NewProvider()))
-	v, err := c.Make(contract.LogKey)
+	v, err := c.Make(observabilitycontract.LogKey)
 	require.NoError(t, err)
-	_, ok := v.(contract.Logger)
+	_, ok := v.(observabilitycontract.Logger)
 	require.True(t, ok)
 }

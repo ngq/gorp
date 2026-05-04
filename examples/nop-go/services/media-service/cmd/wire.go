@@ -1,4 +1,4 @@
-//go:build wireinject
+﻿//go:build wireinject
 
 package main
 
@@ -8,12 +8,12 @@ import (
 	"nop-go/services/media-service/internal/service"
 
 	"github.com/google/wire"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-// wireMediaService 使用 Wire 生成 media-service 的装配代码。
-func wireMediaService(db *gorm.DB, jwtSvc contract.JWTService, localPath, urlPrefix, storageType string) (*service.MediaService, error) {
+// wireMediaService 浣跨敤 Wire 鐢熸垚 media-service 鐨勮閰嶄唬鐮併€?
+func wireMediaService(db *gorm.DB, jwtSvc securitycontract.JWTService, localPath, urlPrefix, storageType string) (*service.MediaService, error) {
 	panic(wire.Build(
 		data.NewPictureRepository,
 		data.NewProductPictureRepository,

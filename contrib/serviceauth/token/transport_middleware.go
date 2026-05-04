@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -18,33 +19,35 @@ import (
 // - 负责把 Authorization / X-Service-Token 写入 request context；
 // - 如果容器中存在 ServiceAuthenticator，则直接执行认证；
 // - 认证失败时立刻返回 401，避免请求进入业务处理层。
-func ServiceAuthHTTPMiddleware(authenticator contract.ServiceAuthenticator) contract.HTTPMiddleware {
-	return func(c contract.HTTPContext, next contract.HTTPNext) {
-		ctx := c.Context()
-		if auth := strings.TrimSpace(c.GetHeader("Authorization")); auth != "" {
-			ctx = context.WithValue(ctx, "authorization", auth)
-		}
-		if token := strings.TrimSpace(c.GetHeader("X-Service-Token")); token != "" {
-			ctx = context.WithValue(ctx, "x-service-token", token)
-		}
+func ServiceAuthHTTPMiddleware(authenticator securitycontract.ServiceAuthenticator) transportcontract.HTTPMiddleware {
+	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+		return func(c transportcontract.HTTPContext) {
+			ctx := c.Context()
+			if auth := strings.TrimSpace(c.GetHeader("Authorization")); auth != "" {
+				ctx = context.WithValue(ctx, "authorization", auth)
+			}
+			if token := strings.TrimSpace(c.GetHeader("X-Service-Token")); token != "" {
+				ctx = context.WithValue(ctx, "x-service-token", token)
+			}
 
-		if authenticator != nil {
-			hasServiceToken := strings.TrimSpace(c.GetHeader("X-Service-Token")) != "" || strings.TrimSpace(c.GetHeader("Authorization")) != ""
-			if hasServiceToken {
-				identity, err := authenticator.Authenticate(ctx)
-				if err != nil {
-					c.JSON(http.StatusUnauthorized, map[string]any{"error": "service authentication failed"})
-					return
-				}
-				if identity != nil {
-					ctx = context.WithValue(ctx, contract.ServiceIdentityKey, identity)
+			if authenticator != nil {
+				hasServiceToken := strings.TrimSpace(c.GetHeader("X-Service-Token")) != "" || strings.TrimSpace(c.GetHeader("Authorization")) != ""
+				if hasServiceToken {
+					identity, err := authenticator.Authenticate(ctx)
+					if err != nil {
+						c.JSON(http.StatusUnauthorized, map[string]any{"error": "service authentication failed"})
+						return
+					}
+					if identity != nil {
+						ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
+					}
 				}
 			}
-		}
 
-		c.SetContext(ctx)
-		if next != nil {
-			next()
+			c.SetContext(ctx)
+			if next != nil {
+				next(c)
+			}
 		}
 	}
 }
@@ -63,7 +66,7 @@ func ServiceAuthHeaderInjector(req *http.Request, token string) {
 }
 
 // UnaryServerInterceptor 把 gRPC metadata 中的服务认证信息提取到 context，并在可用时执行强校验。
-func UnaryServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(authenticator securitycontract.ServiceAuthenticator) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("authorization"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
@@ -80,7 +83,7 @@ func UnaryServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.Un
 				return nil, status.Error(codes.Unauthenticated, "service authentication failed")
 			}
 			if identity != nil {
-				ctx = context.WithValue(ctx, contract.ServiceIdentityKey, identity)
+				ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
 			}
 		}
 
@@ -89,7 +92,7 @@ func UnaryServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.Un
 }
 
 // StreamServerInterceptor 把 gRPC 流式请求中的服务认证信息提取到 context，并在可用时执行强校验。
-func StreamServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.StreamServerInterceptor {
+func StreamServerInterceptor(authenticator securitycontract.ServiceAuthenticator) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := ss.Context()
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
@@ -107,7 +110,7 @@ func StreamServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.S
 				return status.Error(codes.Unauthenticated, "service authentication failed")
 			}
 			if identity != nil {
-				ctx = context.WithValue(ctx, contract.ServiceIdentityKey, identity)
+				ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
 			}
 		}
 
@@ -122,10 +125,10 @@ func StreamServerInterceptor(authenticator contract.ServiceAuthenticator) grpc.S
 // - 基于目标服务名生成服务间认证 token；
 // - 把 token 写入 outgoing metadata 的 `x-service-token`；
 // - 这样 Proto-first 客户端无需手工拼接认证头。
-func UnaryClientInterceptor(authenticator contract.ServiceAuthenticator, targetService string) grpc.UnaryClientInterceptor {
+func UnaryClientInterceptor(tokenIssuer securitycontract.ServiceTokenIssuer, targetService string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		if authenticator != nil {
-			if token, err := authenticator.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
+		if tokenIssuer != nil {
+			if token, err := tokenIssuer.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
 				md, ok := metadata.FromOutgoingContext(ctx)
 				if !ok {
 					md = metadata.New(nil)
@@ -139,10 +142,10 @@ func UnaryClientInterceptor(authenticator contract.ServiceAuthenticator, targetS
 }
 
 // StreamClientInterceptor 在 gRPC 流式客户端调用前注入服务认证 token。
-func StreamClientInterceptor(authenticator contract.ServiceAuthenticator, targetService string) grpc.StreamClientInterceptor {
+func StreamClientInterceptor(tokenIssuer securitycontract.ServiceTokenIssuer, targetService string) grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-		if authenticator != nil {
-			if token, err := authenticator.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
+		if tokenIssuer != nil {
+			if token, err := tokenIssuer.GenerateToken(ctx, targetService); err == nil && strings.TrimSpace(token) != "" {
 				md, ok := metadata.FromOutgoingContext(ctx)
 				if !ok {
 					md = metadata.New(nil)

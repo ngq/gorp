@@ -7,11 +7,11 @@ import (
 	"nop-go/services/cart-service/internal/data"
 	"nop-go/services/cart-service/internal/service"
 
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"gorm.io/gorm"
 )
 
-func wireCartService(db *gorm.DB, jwtSvc contract.JWTService) (*service.CartService, error) {
+func wireCartService(db *gorm.DB, jwtSvc securitycontract.JWTService) (*service.CartService, error) {
 	cartRepo := data.NewShoppingCartRepository(db)
 	cartItemRepo := data.NewCartItemRepository(db)
 	wishlistRepo := data.NewWishlistRepository(db)

@@ -13,7 +13,9 @@ import (
 	"time"
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -33,11 +35,11 @@ func NewProvider() *Provider { return &Provider{} }
 func (p *Provider) Name() string  { return "registry.etcd" }
 func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
-	return []string{contract.RPCRegistryKey}
+	return []string{transportcontract.RPCRegistryKey}
 }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getDiscoveryConfig(c)
 		if err != nil {
 			return nil, err
@@ -48,7 +50,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 type DiscoveryConfig struct {
 	EtcdEndpoints []string
@@ -66,13 +68,13 @@ type DiscoveryConfig struct {
 	LoadBalance string
 }
 
-func getDiscoveryConfig(c contract.Container) (*DiscoveryConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("discovery: invalid config service")
 	}
@@ -339,7 +341,7 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	return nil
 }
 
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	if r.isClosed() {
 		return nil, ErrRegistryClosed
 	}
@@ -350,7 +352,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 		return nil, fmt.Errorf("discovery.etcd: get services failed: %w", err)
 	}
 
-	instances := make([]contract.ServiceInstance, 0, len(resp.Kvs))
+	instances := make([]transportcontract.ServiceInstance, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		var info map[string]any
 		if err := json.Unmarshal(kv.Value, &info); err != nil {
@@ -365,7 +367,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 		fullAddr := fmt.Sprintf("%s:%d", address, port)
 		serviceID := strings.TrimPrefix(string(kv.Key), servicePrefix)
 
-		instances = append(instances, contract.ServiceInstance{
+		instances = append(instances, transportcontract.ServiceInstance{
 			ID:       serviceID,
 			Name:     serviceName,
 			Address:  fullAddr,
@@ -479,7 +481,7 @@ func (r *Registry) isClosed() bool {
 	return r.closed
 }
 
-func (r *Registry) applyLoadBalance(instances []contract.ServiceInstance) []contract.ServiceInstance {
+func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstance) []transportcontract.ServiceInstance {
 	switch r.cfg.LoadBalance {
 	case "random":
 		rand.Shuffle(len(instances), func(i, j int) {

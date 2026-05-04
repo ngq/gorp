@@ -1,4 +1,4 @@
-// Package service 管理后台服务HTTP层
+// Package service 绠＄悊鍚庡彴鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	jwtmiddleware "github.com/ngq/gorp/framework/provider/auth/jwt"
 	"nop-go/services/admin-service/internal/biz"
 	"nop-go/services/admin-service/internal/models"
@@ -17,21 +17,21 @@ type AdminService struct {
 	roleUC    *biz.AdminRoleUseCase
 	settingUC *biz.SettingUseCase
 	logUC     *biz.ActivityLogUseCase
-	jwtSvc    contract.JWTService
+	jwtSvc    securitycontract.JWTService
 }
 
-// NewAdminService 创建管理后台服务。
+// NewAdminService 鍒涘缓绠＄悊鍚庡彴鏈嶅姟銆?
 //
-// 中文说明：
-// - 使用 framework 级 JWTService，替代项目层 jwtSecret；
-// - 中间件改用 framework 提供的 AuthMiddleware。
-func NewAdminService(userUC *biz.AdminUserUseCase, roleUC *biz.AdminRoleUseCase, settingUC *biz.SettingUseCase, logUC *biz.ActivityLogUseCase, jwtSvc contract.JWTService) *AdminService {
+// 涓枃璇存槑锛?
+// - 浣跨敤 framework 绾?JWTService锛屾浛浠ｉ」鐩眰 jwtSecret锛?
+// - 涓棿浠舵敼鐢?framework 鎻愪緵鐨?AuthMiddleware銆?
+func NewAdminService(userUC *biz.AdminUserUseCase, roleUC *biz.AdminRoleUseCase, settingUC *biz.SettingUseCase, logUC *biz.ActivityLogUseCase, jwtSvc securitycontract.JWTService) *AdminService {
 	return &AdminService{userUC: userUC, roleUC: roleUC, settingUC: settingUC, logUC: logUC, jwtSvc: jwtSvc}
 }
 
 func (s *AdminService) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1/admin")
-	// 使用 framework JWT middleware
+	// 浣跨敤 framework JWT middleware
 	adminAuth := jwtmiddleware.AuthMiddleware(s.jwtSvc, "admin")
 	{
 		api.POST("/login", s.Login)

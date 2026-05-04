@@ -10,7 +10,9 @@ import (
 
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/contrib/registry/internal/lifecycle"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 var (
@@ -36,10 +38,10 @@ type Provider struct{}
 func NewProvider() *Provider           { return &Provider{} }
 func (p *Provider) Name() string       { return "registry.servicecomb" }
 func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{contract.RPCRegistryKey} }
+func (p *Provider) Provides() []string { return []string{transportcontract.RPCRegistryKey} }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RPCRegistryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getServiceCombConfig(c)
 		if err != nil {
 			return nil, err
@@ -49,7 +51,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(c contract.Container) error { return nil }
+func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 type ServiceCombConfig struct {
 	ServerURI             string
@@ -66,12 +68,12 @@ type ServiceCombConfig struct {
 	WatchInterval         time.Duration
 }
 
-func getServiceCombConfig(c contract.Container) (*ServiceCombConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getServiceCombConfig(c runtimecontract.Container) (*ServiceCombConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("servicecomb: invalid config service")
 	}
@@ -119,7 +121,7 @@ type serviceCombClient interface {
 	Register(ctx context.Context, cfg *ServiceCombConfig, name, addr string, meta map[string]string) error
 	Deregister(ctx context.Context, cfg *ServiceCombConfig, name, addr string) error
 	Heartbeat(ctx context.Context, cfg *ServiceCombConfig, name, addr string) error
-	Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]contract.ServiceInstance, error)
+	Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]transportcontract.ServiceInstance, error)
 }
 
 type nativeClientProvider interface {
@@ -133,7 +135,7 @@ type Registry struct {
 	mu            sync.RWMutex
 	registered    map[string]map[string]string
 	renewals      map[string]context.CancelFunc
-	endpointCache map[string][]contract.ServiceInstance
+	endpointCache map[string][]transportcontract.ServiceInstance
 	watchCache    map[string]string
 	closed        bool
 	closeMu       sync.Mutex
@@ -159,7 +161,7 @@ func NewRegistryWithClient(cfg *ServiceCombConfig, client serviceCombClient) (*R
 		client:        client,
 		registered:    make(map[string]map[string]string),
 		renewals:      make(map[string]context.CancelFunc),
-		endpointCache: make(map[string][]contract.ServiceInstance),
+		endpointCache: make(map[string][]transportcontract.ServiceInstance),
 		watchCache:    make(map[string]string),
 	}, nil
 }
@@ -204,10 +206,10 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	return nil
 }
 
-func (r *Registry) Discover(ctx context.Context, name string) ([]contract.ServiceInstance, error) {
+func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	r.mu.RLock()
 	if instances, ok := r.endpointCache[name]; ok && len(instances) > 0 {
-		cached := append([]contract.ServiceInstance(nil), instances...)
+		cached := append([]transportcontract.ServiceInstance(nil), instances...)
 		r.mu.RUnlock()
 		return cached, nil
 	}
@@ -222,7 +224,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]contract.Servic
 	}
 	sortServiceInstances(instances)
 	r.mu.Lock()
-	r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+	r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 	r.mu.Unlock()
 	return instances, nil
 }
@@ -258,7 +260,7 @@ func (r *Registry) As(target any) bool {
 	return internalnative.As(r.Underlying(), target)
 }
 
-func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.ServiceInstance, error) {
+func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportcontract.ServiceInstance, error) {
 	r.closeMu.Lock()
 	defer r.closeMu.Unlock()
 
@@ -269,8 +271,8 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 	watchCtx, cancel := context.WithCancel(ctx)
 	r.watchCancels = append(r.watchCancels, cancel)
 
-	ch := make(chan []contract.ServiceInstance, 10)
-	emit := func(instances []contract.ServiceInstance) bool {
+	ch := make(chan []transportcontract.ServiceInstance, 10)
+	emit := func(instances []transportcontract.ServiceInstance) bool {
 		current := snapshotKey(instances)
 
 		r.mu.Lock()
@@ -283,12 +285,12 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []contract.Se
 		if len(instances) == 0 {
 			delete(r.endpointCache, name)
 		} else {
-			r.endpointCache[name] = append([]contract.ServiceInstance(nil), instances...)
+			r.endpointCache[name] = append([]transportcontract.ServiceInstance(nil), instances...)
 		}
 		r.mu.Unlock()
 
 		select {
-		case ch <- append([]contract.ServiceInstance(nil), instances...):
+		case ch <- append([]transportcontract.ServiceInstance(nil), instances...):
 			return true
 		case <-watchCtx.Done():
 			return false
@@ -376,7 +378,7 @@ func (r *Registry) recoverRegistration(name, addr string) error {
 
 type inMemoryServiceCombClient struct {
 	mu       sync.RWMutex
-	services map[string][]contract.ServiceInstance
+	services map[string][]transportcontract.ServiceInstance
 }
 
 func (c *inMemoryServiceCombClient) Underlying() any {
@@ -387,7 +389,7 @@ func (c *inMemoryServiceCombClient) Register(ctx context.Context, cfg *ServiceCo
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.services == nil {
-		c.services = make(map[string][]contract.ServiceInstance)
+		c.services = make(map[string][]transportcontract.ServiceInstance)
 	}
 	fullMeta := make(map[string]string)
 	for k, v := range cfg.ServiceMeta {
@@ -398,7 +400,7 @@ func (c *inMemoryServiceCombClient) Register(ctx context.Context, cfg *ServiceCo
 	}
 	fullMeta["version"] = cfg.Version
 	fullMeta["environment"] = cfg.Environment
-	instance := contract.ServiceInstance{
+	instance := transportcontract.ServiceInstance{
 		ID:       generateInstanceID(name, addr),
 		Name:     name,
 		Address:  addr,
@@ -426,14 +428,14 @@ func (c *inMemoryServiceCombClient) Heartbeat(ctx context.Context, cfg *ServiceC
 	return nil
 }
 
-func (c *inMemoryServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]contract.ServiceInstance, error) {
+func (c *inMemoryServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]transportcontract.ServiceInstance, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	instances := c.services[name]
 	if len(instances) == 0 {
 		return nil, ErrServiceNotFound
 	}
-	result := make([]contract.ServiceInstance, len(instances))
+	result := make([]transportcontract.ServiceInstance, len(instances))
 	copy(result, instances)
 	sortServiceInstances(result)
 	return result, nil
@@ -467,7 +469,7 @@ func (r *Registry) watchInterval() time.Duration {
 	return time.Second
 }
 
-func snapshotKey(instances []contract.ServiceInstance) string {
+func snapshotKey(instances []transportcontract.ServiceInstance) string {
 	if len(instances) == 0 {
 		return "<empty>"
 	}
@@ -483,7 +485,7 @@ func snapshotKey(instances []contract.ServiceInstance) string {
 	return result
 }
 
-func sortServiceInstances(instances []contract.ServiceInstance) {
+func sortServiceInstances(instances []transportcontract.ServiceInstance) {
 	sort.Slice(instances, func(i, j int) bool {
 		if instances[i].ID != instances[j].ID {
 			return instances[i].ID < instances[j].ID
