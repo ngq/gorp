@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/ngq/gorp/framework/provider/config"
 	"github.com/ngq/gorp/framework/provider/log"
 	"github.com/ngq/gorp/framework/provider/orm/gorm"
@@ -25,7 +26,7 @@ type cleanupFunc func()
 // - APP_ENV=testing
 // - sqlite in-memory
 // - miniredis
-func NewTestContainer(t *testing.T) (contract.Container, cleanupFunc) {
+func NewTestContainer(t *testing.T) (runtimecontract.Container, cleanupFunc) {
 	require.NoError(t, ChdirRepoRoot())
 
 	// Set test env
@@ -47,22 +48,22 @@ func NewTestContainer(t *testing.T) (contract.Container, cleanupFunc) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_, err := c.Make(contract.GormKey)
+	_, err := c.Make(datacontract.GormKey)
 	require.NoError(t, err)
-	_, err = c.Make(contract.SQLXKey)
+	_, err = c.Make(datacontract.SQLXKey)
 	require.NoError(t, err)
-	_, err = c.Make(contract.ORMBackendKey)
+	_, err = c.Make(datacontract.ORMBackendKey)
 	require.NoError(t, err)
-	_, err = c.Make(contract.DBRuntimeKey)
+	_, err = c.Make(datacontract.DBRuntimeKey)
 	require.NoError(t, err)
-	_, err = c.Make(contract.MigratorKey)
+	_, err = c.Make(datacontract.MigratorKey)
 	require.NoError(t, err)
-	_, err = c.Make(contract.SQLExecutorKey)
+	_, err = c.Make(datacontract.SQLExecutorKey)
 	require.NoError(t, err)
 
-	rAny, err := c.Make(contract.RedisKey)
+	rAny, err := c.Make(datacontract.RedisKey)
 	require.NoError(t, err)
-	require.NoError(t, rAny.(contract.Redis).Ping(ctx))
+	require.NoError(t, rAny.(datacontract.Redis).Ping(ctx))
 
 	return c, func() {
 		mr.Close()

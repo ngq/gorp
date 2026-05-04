@@ -3,31 +3,31 @@ package container
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 type deferredProvider struct {
-	name    string
-	keys    []string
-	loaded  *int
-	booted  *int
-	value   string
+	name   string
+	keys   []string
+	loaded *int
+	booted *int
+	value  string
 }
 
 func (p *deferredProvider) Name() string       { return p.name }
 func (p *deferredProvider) IsDefer() bool      { return true }
 func (p *deferredProvider) Provides() []string { return p.keys }
-func (p *deferredProvider) Register(c contract.Container) error {
+func (p *deferredProvider) Register(c runtimecontract.Container) error {
 	*p.loaded++
 	for _, key := range p.keys {
 		value := p.value
 		bindKey := key
-		c.Bind(bindKey, func(contract.Container) (any, error) { return value, nil }, true)
+		c.Bind(bindKey, func(runtimecontract.Container) (any, error) { return value, nil }, true)
 	}
 	return nil
 }
-func (p *deferredProvider) Boot(contract.Container) error {
+func (p *deferredProvider) Boot(runtimecontract.Container) error {
 	*p.booted++
 	return nil
 }

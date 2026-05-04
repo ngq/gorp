@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,12 +17,12 @@ type orderedProvider struct {
 func (p *orderedProvider) Name() string       { return p.name }
 func (p *orderedProvider) IsDefer() bool      { return false }
 func (p *orderedProvider) Provides() []string { return []string{p.name} }
-func (p *orderedProvider) Register(c contract.Container) error {
+func (p *orderedProvider) Register(c runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":register")
-	c.Bind(p.name, func(contract.Container) (any, error) { return p.name, nil }, true)
+	c.Bind(p.name, func(runtimecontract.Container) (any, error) { return p.name, nil }, true)
 	return nil
 }
-func (p *orderedProvider) Boot(contract.Container) error {
+func (p *orderedProvider) Boot(runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":boot")
 	return p.failBoot
 }

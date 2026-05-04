@@ -3,13 +3,13 @@ package container
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewContainerBindsContainerKey(t *testing.T) {
 	c := New()
-	v, err := c.Make(contract.ContainerKey)
+	v, err := c.Make(runtimecontract.ContainerKey)
 	require.NoError(t, err)
 	require.Equal(t, c, v)
 }
@@ -42,12 +42,12 @@ func TestRegisterProviderRejectsDuplicateName(t *testing.T) {
 }
 
 type namedProviderWrapper struct {
-	contract.ServiceProvider
+	runtimecontract.ServiceProvider
 	name string
 }
 
 func (p *namedProviderWrapper) Name() string { return p.name }
 
-func serviceProviderWithName(p contract.ServiceProvider, name string) contract.ServiceProvider {
+func serviceProviderWithName(p runtimecontract.ServiceProvider, name string) runtimecontract.ServiceProvider {
 	return &namedProviderWrapper{ServiceProvider: p, name: name}
 }

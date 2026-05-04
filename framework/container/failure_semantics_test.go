@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,11 +18,11 @@ type failingProvider struct {
 func (p *failingProvider) Name() string       { return "failing" }
 func (p *failingProvider) IsDefer() bool      { return false }
 func (p *failingProvider) Provides() []string { return nil }
-func (p *failingProvider) Register(contract.Container) error {
+func (p *failingProvider) Register(runtimecontract.Container) error {
 	*p.loaded++
 	return p.registerErr
 }
-func (p *failingProvider) Boot(contract.Container) error {
+func (p *failingProvider) Boot(runtimecontract.Container) error {
 	*p.booted++
 	return p.bootErr
 }

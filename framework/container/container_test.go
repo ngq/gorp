@@ -3,9 +3,8 @@ package container
 import (
 	"testing"
 
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ngq/gorp/framework/contract"
 )
 
 type testProvider struct {
@@ -18,15 +17,15 @@ type testProvider struct {
 func (p *testProvider) Name() string       { return "test" }
 func (p *testProvider) IsDefer() bool      { return p.deferLoad }
 func (p *testProvider) Provides() []string { return p.provide }
-func (p *testProvider) Register(c contract.Container) error {
+func (p *testProvider) Register(c runtimecontract.Container) error {
 	*p.loaded++
 	for _, k := range p.provide {
 		key := k
-		c.Bind(key, func(contract.Container) (any, error) { return "ok", nil }, true)
+		c.Bind(key, func(runtimecontract.Container) (any, error) { return "ok", nil }, true)
 	}
 	return nil
 }
-func (p *testProvider) Boot(contract.Container) error {
+func (p *testProvider) Boot(runtimecontract.Container) error {
 	*p.booted++
 	return nil
 }

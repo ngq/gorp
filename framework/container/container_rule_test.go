@@ -3,7 +3,7 @@ package container
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,7 +62,7 @@ func TestContainer_MustMakePanicsForUnknownKey(t *testing.T) {
 func TestContainer_BindNonSingletonCreatesFreshInstance(t *testing.T) {
 	c := New()
 	count := 0
-	c.Bind("transient.counter", func(contract.Container) (any, error) {
+	c.Bind("transient.counter", func(runtimecontract.Container) (any, error) {
 		count++
 		return count, nil
 	}, false)

@@ -6,7 +6,12 @@ import (
 	"testing"
 
 	"github.com/ngq/gorp/framework"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 type selectorConfigStub struct {
@@ -40,7 +45,7 @@ func (s *selectorConfigStub) GetFloat(key string) float64 {
 	return 0
 }
 func (s *selectorConfigStub) Unmarshal(key string, out any) error { return nil }
-func (s *selectorConfigStub) Watch(ctx context.Context, key string) (contract.ConfigWatcher, error) {
+func (s *selectorConfigStub) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	return nil, nil
 }
 func (s *selectorConfigStub) Reload(ctx context.Context) error { return nil }
@@ -214,21 +219,21 @@ func TestSelectDistributedLockProvider_AcceptsEnabledAndBackend(t *testing.T) {
 }
 
 type reloadingConfigStub struct {
-		selectorConfigStub
-		reloads int
-		valuesAfterReload map[string]any
-		reloadErr error
+	selectorConfigStub
+	reloads           int
+	valuesAfterReload map[string]any
+	reloadErr         error
 }
 
 func (s *reloadingConfigStub) Reload(ctx context.Context) error {
-		s.reloads++
-		if s.reloadErr != nil {
-			return s.reloadErr
-		}
-		for key, value := range s.valuesAfterReload {
-			s.values[key] = value
-		}
-		return nil
+	s.reloads++
+	if s.reloadErr != nil {
+		return s.reloadErr
+	}
+	for key, value := range s.valuesAfterReload {
+		s.values[key] = value
+	}
+	return nil
 }
 
 func TestRegisterSelectedMicroserviceProviders_SkipsWithoutConfigBinding(t *testing.T) {
@@ -254,7 +259,7 @@ func TestRegisterSelectedMicroserviceProviders_ReloadsRemoteConfigSourceBeforeSe
 			"distributed_lock.enabled": true,
 		},
 	}
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
 	}, true)
 
@@ -265,11 +270,11 @@ func TestRegisterSelectedMicroserviceProviders_ReloadsRemoteConfigSourceBeforeSe
 		t.Fatalf("expected reload once, got %d", cfg.reloads)
 	}
 
-	assertBoundKey(t, c, contract.RPCRegistryKey)
-	assertBoundKey(t, c, contract.TracerKey)
-	assertBoundKey(t, c, contract.ServiceAuthKey)
-	assertKeyRegistered(t, c, contract.MessagePublisherKey)
-	assertKeyRegistered(t, c, contract.DistributedLockKey)
+	assertBoundKey(t, c, transportcontract.RPCRegistryKey)
+	assertBoundKey(t, c, observabilitycontract.TracerKey)
+	assertBoundKey(t, c, securitycontract.ServiceAuthKey)
+	assertKeyRegistered(t, c, integrationcontract.MessagePublisherKey)
+	assertKeyRegistered(t, c, datacontract.DistributedLockKey)
 }
 
 func TestRegisterSelectedMicroserviceProviders_DoesNotReloadLocalOrNoopConfigSource(t *testing.T) {
@@ -279,7 +284,7 @@ func TestRegisterSelectedMicroserviceProviders_DoesNotReloadLocalOrNoopConfigSou
 		cfg := &reloadingConfigStub{selectorConfigStub: selectorConfigStub{values: map[string]any{
 			"configsource.backend": backend,
 		}}}
-		c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+		c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 			return cfg, nil
 		}, true)
 		if err := RegisterSelectedMicroserviceProviders(c); err != nil {
@@ -298,7 +303,7 @@ func TestRegisterSelectedMicroserviceProviders_PropagatesReloadError(t *testing.
 		selectorConfigStub: selectorConfigStub{values: map[string]any{"configsource.backend": "consul"}},
 		reloadErr:          errors.New("reload failed"),
 	}
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
 	}, true)
 
@@ -340,14 +345,14 @@ func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *tes
 	assertProviderName(t, providers[9], "dlock.noop")
 }
 
-func assertKeyRegistered(t *testing.T, c contract.Container, key string) {
+func assertKeyRegistered(t *testing.T, c runtimecontract.Container, key string) {
 	t.Helper()
 	if !c.IsBind(key) {
 		t.Fatalf("expected key %s to be registered", key)
 	}
 }
 
-func assertBoundKey(t *testing.T, c contract.Container, key string) {
+func assertBoundKey(t *testing.T, c runtimecontract.Container, key string) {
 	t.Helper()
 	if !c.IsBind(key) {
 		t.Fatalf("expected key %s to be bound", key)
@@ -357,7 +362,7 @@ func assertBoundKey(t *testing.T, c contract.Container, key string) {
 	}
 }
 
-func assertProviderName(t *testing.T, provider contract.ServiceProvider, expected string) {
+func assertProviderName(t *testing.T, provider runtimecontract.ServiceProvider, expected string) {
 	t.Helper()
 	if provider == nil {
 		t.Fatalf("expected provider %s, got nil", expected)

@@ -5,13 +5,19 @@ import (
 	"testing"
 
 	"github.com/ngq/gorp/framework"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
 type matrixReloadingConfigStub struct {
 	selectorConfigStub
-	reloads int
+	reloads           int
 	valuesAfterReload map[string]any
 }
 
@@ -39,16 +45,16 @@ func TestRegisterSelectedMicroserviceProviders_ProductionMainlineMatrix(t *testi
 			"circuit_breaker.backend":  "sentinel",
 		},
 	}
-	c.Bind(contract.ConfigKey, func(contract.Container) (any, error) {
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
 	}, true)
 
 	require.NoError(t, RegisterSelectedMicroserviceProviders(c))
 	require.Equal(t, 1, cfg.reloads)
-	require.True(t, c.IsBind(contract.RPCRegistryKey))
-	require.True(t, c.IsBind(contract.TracerKey))
-	require.True(t, c.IsBind(contract.ServiceAuthKey))
-	require.True(t, c.IsBind(contract.MessagePublisherKey))
-	require.True(t, c.IsBind(contract.DistributedLockKey))
-	require.True(t, c.IsBind(contract.CircuitBreakerKey))
+	require.True(t, c.IsBind(transportcontract.RPCRegistryKey))
+	require.True(t, c.IsBind(observabilitycontract.TracerKey))
+	require.True(t, c.IsBind(securitycontract.ServiceAuthKey))
+	require.True(t, c.IsBind(integrationcontract.MessagePublisherKey))
+	require.True(t, c.IsBind(datacontract.DistributedLockKey))
+	require.True(t, c.IsBind(resiliencecontract.CircuitBreakerKey))
 }

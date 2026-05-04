@@ -2,7 +2,7 @@ package framework
 
 import (
 	"github.com/ngq/gorp/framework/container"
-	"github.com/ngq/gorp/framework/contract"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Application 是框架运行时的最小持有者。
@@ -26,7 +26,7 @@ type Application struct {
 	// - 所有 provider 注册、服务解析，最终都围绕这个 container 展开。
 	// - 这里用接口类型而不是具体实现，是为了让 framework 包只依赖 contract，
 	//   保持上层调用面稳定。
-	container contract.Container
+	container runtimecontract.Container
 }
 
 // NewApplication 创建一个新的框架运行时实例。
@@ -46,6 +46,6 @@ func NewApplication() *Application {
 // 中文说明：
 // - 上层通常通过这个入口继续注册 provider 或解析服务。
 // - 这里不返回具体实现 `*container.Container`，是为了尽量让外部只依赖 contract。
-func (a *Application) Container() contract.Container {
+func (a *Application) Container() runtimecontract.Container {
 	return a.container
 }

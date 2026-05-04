@@ -4,227 +4,141 @@ import (
 	"database/sql"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	gormdb "gorm.io/gorm"
 )
 
-// MakeDBRuntime 获取统一数据库运行时实例。
-//
-// 中文说明：
-// - 优先使用 contract.DBRuntimeKey，屏蔽业务层直接感知多 backend 细节；
-// - 返回 any，由调用方根据需要做最小类型判断；
-// - 适合健康检查、通用探针、低层 runtime 诊断场景。
-func MakeDBRuntime(c contract.Container) (any, error) {
-	return c.Make(contract.DBRuntimeKey)
+func MakeDBRuntime(c runtimecontract.Container) (any, error) {
+	return c.Make(datacontract.DBRuntimeKey)
 }
 
-// MakeRedis 获取 Redis 服务，失败返回 error。
-//
-// 中文说明：
-// - 适用于业务确实需要 Redis 原生命令能力的场景；
-// - 如果只需要缓存语义，应优先使用 MakeCache。
-func MakeRedis(c contract.Container) (contract.Redis, error) {
-	v, err := c.Make(contract.RedisKey)
+func MakeRedis(c runtimecontract.Container) (datacontract.Redis, error) {
+	v, err := c.Make(datacontract.RedisKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Redis), nil
+	return v.(datacontract.Redis), nil
 }
 
-// MakeCache 获取统一缓存服务，失败返回 error。
-//
-// 中文说明：
-// - 优先暴露 contract.Cache，而不是让业务层自己决定 memory/redis driver；
-// - 适合作为 starter 默认缓存接入位；
-// - 与 MakeRedis 并存：需要 Redis 原语时拿 Redis，需要缓存语义时拿 Cache。
-func MakeCache(c contract.Container) (contract.Cache, error) {
-	v, err := c.Make(contract.CacheKey)
+func MakeCache(c runtimecontract.Container) (datacontract.Cache, error) {
+	v, err := c.Make(datacontract.CacheKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Cache), nil
+	return v.(datacontract.Cache), nil
 }
 
-// MakeGormDB 获取 GORM 实例，失败返回 error。
-//
-// 中文说明：
-// - 适用于业务明确依赖 GORM API 的路径；
-// - 如果只需要拿当前主数据库运行时，优先使用 MakeDBRuntime。
-func MakeGormDB(c contract.Container) (*gormdb.DB, error) {
-	v, err := c.Make(contract.GormKey)
+func MakeGormDB(c runtimecontract.Container) (*gormdb.DB, error) {
+	v, err := c.Make(datacontract.GormKey)
 	if err != nil {
 		return nil, err
 	}
 	return v.(*gormdb.DB), nil
 }
 
-// MakeSQLX 获取 SQLX 实例，失败返回 error。
-//
-// 中文说明：
-// - 适用于业务明确依赖 sqlx API 的路径；
-// - 如果只需要拿当前主数据库运行时，优先使用 MakeDBRuntime。
-func MakeSQLX(c contract.Container) (*sqlx.DB, error) {
-	v, err := c.Make(contract.SQLXKey)
+func MakeSQLX(c runtimecontract.Container) (*sqlx.DB, error) {
+	v, err := c.Make(datacontract.SQLXKey)
 	if err != nil {
 		return nil, err
 	}
 	return v.(*sqlx.DB), nil
 }
 
-// MakeMessagePublisher 获取消息发布者，失败返回 error。
-//
-// 中文说明：
-// - 用于业务侧最小接入消息发布能力；
-// - 让样板不需要直接记忆 `MessagePublisherKey`；
-// - 适合 starter / 模板作为默认 publish 入口。
-func MakeMessagePublisher(c contract.Container) (contract.MessagePublisher, error) {
-	v, err := c.Make(contract.MessagePublisherKey)
+func MakeMessagePublisher(c runtimecontract.Container) (integrationcontract.MessagePublisher, error) {
+	v, err := c.Make(integrationcontract.MessagePublisherKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.MessagePublisher), nil
+	return v.(integrationcontract.MessagePublisher), nil
 }
 
-// MakeMessageSubscriber 获取消息订阅者，失败返回 error。
-//
-// 中文说明：
-// - 用于业务侧最小接入消息消费能力；
-// - 让样板不需要直接记忆 `MessageSubscriberKey`；
-// - 适合 starter / 模板作为默认 consume 入口。
-func MakeMessageSubscriber(c contract.Container) (contract.MessageSubscriber, error) {
-	v, err := c.Make(contract.MessageSubscriberKey)
+func MakeMessageSubscriber(c runtimecontract.Container) (integrationcontract.MessageSubscriber, error) {
+	v, err := c.Make(integrationcontract.MessageSubscriberKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.MessageSubscriber), nil
+	return v.(integrationcontract.MessageSubscriber), nil
 }
 
-// MakeDistributedLock 获取分布式锁服务，失败返回 error。
-//
-// 中文说明：
-// - 用于业务侧最小接入分布式锁能力；
-// - 让样板不需要直接记忆 `DistributedLockKey`；
-// - 适合 starter / 模板作为默认锁语义入口。
-func MakeDistributedLock(c contract.Container) (contract.DistributedLock, error) {
-	v, err := c.Make(contract.DistributedLockKey)
+func MakeDistributedLock(c runtimecontract.Container) (datacontract.DistributedLock, error) {
+	v, err := c.Make(datacontract.DistributedLockKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.DistributedLock), nil
+	return v.(datacontract.DistributedLock), nil
 }
 
-// MakeGRPCConnFactory 获取 Proto-first gRPC 连接工厂，失败返回 error。
-//
-// 中文说明：
-// - 业务侧可通过它按服务名获取 framework 托管的 `*grpc.ClientConn`；
-// - 这是 Proto-first gRPC 客户端主线的标准入口；
-// - 与旧统一 `RPCClient` 相比，这里直接返回连接，便于继续使用 `pb.NewXxxClient(conn)`。
-func MakeGRPCConnFactory(c contract.Container) (contract.GRPCConnFactory, error) {
-	v, err := c.Make(contract.GRPCConnFactoryKey)
+func MakeGRPCConnFactory(c runtimecontract.Container) (transportcontract.GRPCConnFactory, error) {
+	v, err := c.Make(transportcontract.GRPCConnFactoryKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.GRPCConnFactory), nil
+	return v.(transportcontract.GRPCConnFactory), nil
 }
 
-// MakeGRPCServerRegistrar 获取 Proto-first gRPC 服务端注册器，失败返回 error。
-//
-// 中文说明：
-// - 业务侧可通过它把 `pb.RegisterXxxServer(...)` 挂到 framework 托管的 `grpc.Server`；
-// - 这是 Proto-first gRPC 服务端主线的标准入口；
-// - 与旧统一 `RPCServer` 相比，这里直接表达标准 gRPC register 心智。
-func MakeGRPCServerRegistrar(c contract.Container) (contract.GRPCServerRegistrar, error) {
-	v, err := c.Make(contract.GRPCServerRegistrarKey)
+func MakeGRPCServerRegistrar(c runtimecontract.Container) (transportcontract.GRPCServerRegistrar, error) {
+	v, err := c.Make(transportcontract.GRPCServerRegistrarKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.GRPCServerRegistrar), nil
+	return v.(transportcontract.GRPCServerRegistrar), nil
 }
 
-// MakeCron 获取 Cron 服务，失败返回 error。
-//
-// 中文说明：
-// - 适用于业务需要注册或控制定时任务的路径；
-// - 与 MustMakeCron 的差别在于这里保留 error 返回给外层处理。
-func MakeCron(c contract.Container) (contract.Cron, error) {
-	v, err := c.Make(contract.CronKey)
+func MakeCron(c runtimecontract.Container) (runtimecontract.Cron, error) {
+	v, err := c.Make(runtimecontract.CronKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Cron), nil
+	return v.(runtimecontract.Cron), nil
 }
 
-// MakeLogger 获取日志服务，失败返回 error。
-//
-// 中文说明：
-// - 适用于不希望在当前层直接 panic 的路径；
-// - 这是读取框架统一 logger 的标准 helper 入口。
-func MakeLogger(c contract.Container) (contract.Logger, error) {
-	v, err := c.Make(contract.LogKey)
+func MakeLogger(c runtimecontract.Container) (observabilitycontract.Logger, error) {
+	v, err := c.Make(observabilitycontract.LogKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Logger), nil
+	return v.(observabilitycontract.Logger), nil
 }
 
-// MakeValidator 获取验证器，失败返回 error。
-//
-// 中文说明：
-// - 用于业务层最小接入统一校验能力；
-// - 业务默认仍优先通过 gin.ValidateBody / ValidateQuery / ValidateForm 使用。
-func MakeValidator(c contract.Container) (contract.Validator, error) {
-	v, err := c.Make(contract.ValidatorKey)
+func MakeValidator(c runtimecontract.Container) (datacontract.Validator, error) {
+	v, err := c.Make(datacontract.ValidatorKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Validator), nil
+	return v.(datacontract.Validator), nil
 }
 
-// MakeRetry 获取重试服务，失败返回 error。
-//
-// 中文说明：
-// - 用于业务层最小接入统一重试能力；
-// - 业务默认仍优先通过 gin.DoWithRetry 使用。
-func MakeRetry(c contract.Container) (contract.Retry, error) {
-	v, err := c.Make(contract.RetryKey)
+func MakeRetry(c runtimecontract.Container) (resiliencecontract.Retry, error) {
+	v, err := c.Make(resiliencecontract.RetryKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Retry), nil
+	return v.(resiliencecontract.Retry), nil
 }
 
-// MakeHost 获取 Host 服务，失败返回 error。
-//
-// 中文说明：
-// - 用于获取框架级 Host 能力（生命周期管理）；
-// - 与 MustMakeHost 相比，失败时返回 error 而不 panic。
-func MakeHost(c contract.Container) (contract.Host, error) {
-	v, err := c.Make(contract.HostKey)
+func MakeHost(c runtimecontract.Container) (runtimecontract.Host, error) {
+	v, err := c.Make(runtimecontract.HostKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.Host), nil
+	return v.(runtimecontract.Host), nil
 }
 
-// MakeHTTP 获取 HTTP 服务，失败返回 error。
-//
-// 中文说明：
-// - 用于获取框架级 HTTP 能力（Gin 服务封装）；
-// - 与 MustMakeHTTP 相比，失败时返回 error 而不 panic。
-func MakeHTTP(c contract.Container) (contract.HTTP, error) {
-	v, err := c.Make(contract.HTTPKey)
+func MakeHTTP(c runtimecontract.Container) (transportcontract.HTTP, error) {
+	v, err := c.Make(transportcontract.HTTPKey)
 	if err != nil {
 		return nil, err
 	}
-	return v.(contract.HTTP), nil
+	return v.(transportcontract.HTTP), nil
 }
 
-// MakeHTTPRouter 获取 HTTPRouter，失败返回 error。
-//
-// 中文说明：
-// - 这是新的 HTTP 路由主入口 helper；
-// - 业务与模板默认应优先使用它，而不是直接获取 Gin Engine。
-func MakeHTTPRouter(c contract.Container) (contract.HTTPRouter, error) {
+func MakeHTTPRouter(c runtimecontract.Container) (transportcontract.HTTPRouter, error) {
 	httpSvc, err := MakeHTTP(c)
 	if err != nil {
 		return nil, err
@@ -232,141 +146,71 @@ func MakeHTTPRouter(c contract.Container) (contract.HTTPRouter, error) {
 	return httpSvc.Router(), nil
 }
 
-// MustMakeLogger 获取日志服务，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段，缺少日志说明配置有误；
-// - 封装 container.MustMake，便于业务调用。
-func MustMakeLogger(c contract.Container) contract.Logger {
-	v := c.MustMake(contract.LogKey)
-	return v.(contract.Logger)
+func MustMakeLogger(c runtimecontract.Container) observabilitycontract.Logger {
+	v := c.MustMake(observabilitycontract.LogKey)
+	return v.(observabilitycontract.Logger)
 }
 
-// MustMakeGorm 获取 GORM 实例，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段，缺少数据库说明配置有误；
-// - 封装 container.MustMake，便于业务调用。
-func MustMakeGorm(c contract.Container) *gormdb.DB {
-	v := c.MustMake(contract.GormKey)
+func MustMakeGorm(c runtimecontract.Container) *gormdb.DB {
+	v := c.MustMake(datacontract.GormKey)
 	return v.(*gormdb.DB)
 }
 
-// MustMakeHTTPRouter 获取 HTTPRouter，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段，缺少 Router 说明配置有误；
-// - 这是新的默认路由主入口 helper。
-func MustMakeHTTPRouter(c contract.Container) contract.HTTPRouter {
+func MustMakeHTTPRouter(c runtimecontract.Container) transportcontract.HTTPRouter {
 	httpSvc := MustMakeHTTP(c)
 	return httpSvc.Router()
 }
 
-// MustMakeHTTP 获取 HTTP 服务，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段，缺少 HTTP 说明配置有误；
-// - 供 Router 主入口等场景复用。
-func MustMakeHTTP(c contract.Container) contract.HTTP {
-	v := c.MustMake(contract.HTTPKey)
-	return v.(contract.HTTP)
+func MustMakeHTTP(c runtimecontract.Container) transportcontract.HTTP {
+	v := c.MustMake(transportcontract.HTTPKey)
+	return v.(transportcontract.HTTP)
 }
 
-// MustMakeMessagePublisher 获取消息发布者，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求 MQ 发布能力已接入的路径；
-// - 样板里推荐用它表达“当前服务具备发布能力”。
-func MustMakeMessagePublisher(c contract.Container) contract.MessagePublisher {
-	v := c.MustMake(contract.MessagePublisherKey)
-	return v.(contract.MessagePublisher)
+func MustMakeMessagePublisher(c runtimecontract.Container) integrationcontract.MessagePublisher {
+	v := c.MustMake(integrationcontract.MessagePublisherKey)
+	return v.(integrationcontract.MessagePublisher)
 }
 
-// MustMakeMessageSubscriber 获取消息订阅者，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求 MQ 消费能力已接入的路径；
-// - 样板里推荐用它表达“当前服务具备消费能力”。
-func MustMakeMessageSubscriber(c contract.Container) contract.MessageSubscriber {
-	v := c.MustMake(contract.MessageSubscriberKey)
-	return v.(contract.MessageSubscriber)
+func MustMakeMessageSubscriber(c runtimecontract.Container) integrationcontract.MessageSubscriber {
+	v := c.MustMake(integrationcontract.MessageSubscriberKey)
+	return v.(integrationcontract.MessageSubscriber)
 }
 
-// MustMakeDistributedLock 获取分布式锁服务，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求锁能力已接入的路径；
-// - 样板里推荐用它表达“当前服务具备锁语义能力”。
-func MustMakeDistributedLock(c contract.Container) contract.DistributedLock {
-	v := c.MustMake(contract.DistributedLockKey)
-	return v.(contract.DistributedLock)
+func MustMakeDistributedLock(c runtimecontract.Container) datacontract.DistributedLock {
+	v := c.MustMake(datacontract.DistributedLockKey)
+	return v.(datacontract.DistributedLock)
 }
 
-// MustMakeGRPCConnFactory 获取 Proto-first gRPC 连接工厂，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求 gRPC 主线能力已接入的路径；
-// - 拿到后可直接配合 `pb.NewXxxClient(conn)` 使用。
-func MustMakeGRPCConnFactory(c contract.Container) contract.GRPCConnFactory {
-	v := c.MustMake(contract.GRPCConnFactoryKey)
-	return v.(contract.GRPCConnFactory)
+func MustMakeGRPCConnFactory(c runtimecontract.Container) transportcontract.GRPCConnFactory {
+	v := c.MustMake(transportcontract.GRPCConnFactoryKey)
+	return v.(transportcontract.GRPCConnFactory)
 }
 
-// MustMakeGRPCServerRegistrar 获取 Proto-first gRPC 服务端注册器，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或项目明确要求 gRPC 服务注册能力已接入的路径；
-// - 业务注册应优先通过 `RegisterProto(...)` 完成。
-func MustMakeGRPCServerRegistrar(c contract.Container) contract.GRPCServerRegistrar {
-	v := c.MustMake(contract.GRPCServerRegistrarKey)
-	return v.(contract.GRPCServerRegistrar)
+func MustMakeGRPCServerRegistrar(c runtimecontract.Container) transportcontract.GRPCServerRegistrar {
+	v := c.MustMake(transportcontract.GRPCServerRegistrarKey)
+	return v.(transportcontract.GRPCServerRegistrar)
 }
 
-// MustMakeValidator 获取验证器，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求校验能力已接入的路径；
-// - 业务默认仍优先通过 gin.ValidateBody / ValidateQuery / ValidateForm 使用。
-func MustMakeValidator(c contract.Container) contract.Validator {
-	v := c.MustMake(contract.ValidatorKey)
-	return v.(contract.Validator)
+func MustMakeValidator(c runtimecontract.Container) datacontract.Validator {
+	v := c.MustMake(datacontract.ValidatorKey)
+	return v.(datacontract.Validator)
 }
 
-// MustMakeRetry 获取重试服务，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求重试能力已接入的路径；
-// - 业务默认仍优先通过 gin.DoWithRetry 使用。
-func MustMakeRetry(c contract.Container) contract.Retry {
-	v := c.MustMake(contract.RetryKey)
-	return v.(contract.Retry)
+func MustMakeRetry(c runtimecontract.Container) resiliencecontract.Retry {
+	v := c.MustMake(resiliencecontract.RetryKey)
+	return v.(resiliencecontract.Retry)
 }
 
-// MustMakeConfig 获取 Config，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段，缺少配置说明配置有误；
-// - 封装 container.MustMake，便于业务调用。
-func MustMakeConfig(c contract.Container) contract.Config {
-	v := c.MustMake(contract.ConfigKey)
-	return v.(contract.Config)
+func MustMakeConfig(c runtimecontract.Container) datacontract.Config {
+	v := c.MustMake(datacontract.ConfigKey)
+	return v.(datacontract.Config)
 }
 
-// MustMakeCache 获取统一缓存服务，失败 panic。
-//
-// 中文说明：
-// - 适用于启动阶段或明确要求 cache 已接入的业务路径；
-// - starter/project 若把 cache 作为默认起步能力，可直接复用。
-func MustMakeCache(c contract.Container) contract.Cache {
-	v := c.MustMake(contract.CacheKey)
-	return v.(contract.Cache)
+func MustMakeCache(c runtimecontract.Container) datacontract.Cache {
+	v := c.MustMake(datacontract.CacheKey)
+	return v.(datacontract.Cache)
 }
 
-// PingDBRuntime 对统一数据库运行时做最小 ping。
-//
-// 中文说明：
-// - 给 framework 探针与默认接入路径使用；
-// - 这样业务层不必自己到处复制相同的类型分支判断。
 func PingDBRuntime(dbAny any) error {
 	switch db := dbAny.(type) {
 	case *gormdb.DB:
@@ -382,4 +226,8 @@ func PingDBRuntime(dbAny any) error {
 	default:
 		return nil
 	}
+}
+
+func MustMakeJWT(c runtimecontract.Container) securitycontract.JWTService {
+	return MustMakeJWTService(c)
 }
