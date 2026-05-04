@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 func TestNoopSelector_Select_EmptyInstances(t *testing.T) {
@@ -13,7 +14,7 @@ func TestNoopSelector_Select_EmptyInstances(t *testing.T) {
 
 	// 无实例时返回 ErrNoAvailable
 	selected, done, err := selector.Select(ctx, nil)
-	if err != contract.ErrNoAvailable {
+	if err != discoverycontract.ErrNoAvailable {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 	if selected.Address != "" {
@@ -21,14 +22,14 @@ func TestNoopSelector_Select_EmptyInstances(t *testing.T) {
 	}
 
 	// 调用 done 不应 panic
-	done(ctx, contract.DoneInfo{})
+	done(ctx, discoverycontract.DoneInfo{})
 }
 
 func TestNoopSelector_Select_WithHealthyInstance(t *testing.T) {
 	selector := &noopSelector{}
 	ctx := context.Background()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{ID: "1", Name: "svc", Address: "192.168.1.1:8080", Healthy: true},
 		{ID: "2", Name: "svc", Address: "192.168.1.2:8080", Healthy: false},
 	}
@@ -42,18 +43,18 @@ func TestNoopSelector_Select_WithHealthyInstance(t *testing.T) {
 		t.Errorf("expected first healthy instance, got: %s", selected.Address)
 	}
 
-	done(ctx, contract.DoneInfo{})
+	done(ctx, discoverycontract.DoneInfo{})
 }
 
 func TestNoopSelector_Select_ForceInstance(t *testing.T) {
 	selector := &noopSelector{}
 	ctx := context.Background()
 
-	forced := contract.ServiceInstance{ID: "forced", Address: "forced:8080"}
+	forced := transportcontract.ServiceInstance{ID: "forced", Address: "forced:8080"}
 	selected, done, err := selector.Select(
 		ctx,
 		nil,
-		contract.WithForceInstance(forced),
+		discoverycontract.WithForceInstance(forced),
 	)
 
 	if err != nil {
@@ -63,7 +64,7 @@ func TestNoopSelector_Select_ForceInstance(t *testing.T) {
 		t.Errorf("expected forced instance, got: %s", selected.ID)
 	}
 
-	done(ctx, contract.DoneInfo{})
+	done(ctx, discoverycontract.DoneInfo{})
 }
 
 func TestNoopProvider_Register(t *testing.T) {

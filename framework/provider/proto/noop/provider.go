@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // ErrNoopProto noop 模式错误。
@@ -29,12 +30,12 @@ func (p *Provider) IsDefer() bool { return true }
 
 // Provides 返回提供的服务 key。
 func (p *Provider) Provides() []string {
-	return []string{contract.ProtoGeneratorKey}
+	return []string{integrationcontract.ProtoGeneratorKey}
 }
 
 // Register 注册 noop ProtoGenerator 服务。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ProtoGeneratorKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(integrationcontract.ProtoGeneratorKey, func(c runtimecontract.Container) (any, error) {
 		return &noopGenerator{}, nil
 	}, true)
 
@@ -42,7 +43,7 @@ func (p *Provider) Register(c contract.Container) error {
 }
 
 // Boot 启动 Provider。
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
@@ -50,7 +51,7 @@ func (p *Provider) Boot(c contract.Container) error {
 type noopGenerator struct{}
 
 // GenFromProto 返回错误（noop 模式不支持 protoc）。
-func (g *noopGenerator) GenFromProto(ctx context.Context, opts contract.ProtoGenOptions) error {
+func (g *noopGenerator) GenFromProto(ctx context.Context, opts integrationcontract.ProtoGenOptions) error {
 	return ErrNoopProto
 }
 
@@ -60,7 +61,7 @@ func (g *noopGenerator) GenFromProto(ctx context.Context, opts contract.ProtoGen
 // - 解析 Go AST 提取接口定义；
 // - 生成 proto 文本内容；
 // - 不执行 protoc 命令。
-func (g *noopGenerator) GenFromService(ctx context.Context, opts contract.ServiceToProtoOptions) error {
+func (g *noopGenerator) GenFromService(ctx context.Context, opts integrationcontract.ServiceToProtoOptions) error {
 	// noop 模式下支持文本生成
 	// 简化实现：生成基础 proto 模板
 	return generateProtoTemplate(opts)
@@ -72,20 +73,20 @@ func (g *noopGenerator) GenFromService(ctx context.Context, opts contract.Servic
 // - 解析 Gin 路由定义；
 // - 生成 proto 文本内容；
 // - 不执行 protoc 命令。
-func (g *noopGenerator) GenFromRoute(ctx context.Context, opts contract.RouteToProtoOptions) error {
+func (g *noopGenerator) GenFromRoute(ctx context.Context, opts integrationcontract.RouteToProtoOptions) error {
 	// noop 模式下支持文本生成
 	return generateProtoFromRouteTemplate(opts)
 }
 
 // generateProtoTemplate 生成基础 proto 模板。
-func generateProtoTemplate(opts contract.ServiceToProtoOptions) error {
+func generateProtoTemplate(opts integrationcontract.ServiceToProtoOptions) error {
 	// 这里可以生成一个基础的 proto 模板
 	// 简化实现，返回 nil
 	return nil
 }
 
 // generateProtoFromRouteTemplate 从路由生成 proto 模板。
-func generateProtoFromRouteTemplate(opts contract.RouteToProtoOptions) error {
+func generateProtoFromRouteTemplate(opts integrationcontract.RouteToProtoOptions) error {
 	// 简化实现，返回 nil
 	return nil
 }

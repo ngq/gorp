@@ -7,7 +7,7 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // HandlerParser Handler 解析器。
@@ -34,10 +34,10 @@ type HandlerTypeInfo struct {
 	HandlerName string
 
 	// RequestType 请求类型
-	RequestType *contract.TypeDef
+	RequestType *integrationcontract.TypeDef
 
 	// ResponseType 响应类型
-	ResponseType *contract.TypeDef
+	ResponseType *integrationcontract.TypeDef
 
 	// RequestTypeName 请求类型名称
 	RequestTypeName string
@@ -158,11 +158,12 @@ func (p *HandlerParser) extractHandlerTypeInfo(fnDecl *ast.FuncDecl) *HandlerTyp
 //
 // 中文说明：
 // - Gin Handler 的请求通常通过以下方式获取：
-//   1. ShouldBindJSON / BindJSON 等方法绑定到结构体
-//   2. Query / Param 等方法获取参数
+//  1. ShouldBindJSON / BindJSON 等方法绑定到结构体
+//  2. Query / Param 等方法获取参数
+//
 // - 这里主要分析 ShouldBindJSON 的目标类型。
-func (p *HandlerParser) extractRequestType(fnDecl *ast.FuncDecl) (*contract.TypeDef, string) {
-	var requestType *contract.TypeDef
+func (p *HandlerParser) extractRequestType(fnDecl *ast.FuncDecl) (*integrationcontract.TypeDef, string) {
+	var requestType *integrationcontract.TypeDef
 	var requestTypeName string
 
 	// 分析函数体，查找 ShouldBindJSON/Bind 等调用
@@ -180,7 +181,7 @@ func (p *HandlerParser) extractRequestType(fnDecl *ast.FuncDecl) (*contract.Type
 				typeName := p.extractVarType(callExpr.Args[0])
 				if typeName != "" {
 					requestTypeName = typeName
-					requestType = &contract.TypeDef{Name: typeName}
+					requestType = &integrationcontract.TypeDef{Name: typeName}
 					return false
 				}
 			}
@@ -197,8 +198,8 @@ func (p *HandlerParser) extractRequestType(fnDecl *ast.FuncDecl) (*contract.Type
 // 中文说明：
 // - 分析 c.JSON / c.XML 等响应调用；
 // - 提取响应数据的类型。
-func (p *HandlerParser) extractResponseType(fnDecl *ast.FuncDecl) (*contract.TypeDef, string) {
-	var responseType *contract.TypeDef
+func (p *HandlerParser) extractResponseType(fnDecl *ast.FuncDecl) (*integrationcontract.TypeDef, string) {
+	var responseType *integrationcontract.TypeDef
 	var responseTypeName string
 
 	ast.Inspect(fnDecl.Body, func(n ast.Node) bool {
@@ -215,7 +216,7 @@ func (p *HandlerParser) extractResponseType(fnDecl *ast.FuncDecl) (*contract.Typ
 				typeName := p.extractResponseTypeFromArg(callExpr.Args[1])
 				if typeName != "" {
 					responseTypeName = typeName
-					responseType = &contract.TypeDef{Name: typeName}
+					responseType = &integrationcontract.TypeDef{Name: typeName}
 					return false
 				}
 			}
@@ -308,7 +309,7 @@ func (p *HandlerParser) extractTypeNameFromComposite(lit *ast.CompositeLit) stri
 // - 分析 Handler 函数体；
 // - 查找 ShouldBindJSON 等调用；
 // - 提取绑定的结构体类型。
-func (p *HandlerParser) InferRequestTypeFromHandler(fnDecl *ast.FuncDecl, structDefs map[string][]contract.FieldDef) *contract.TypeDef {
+func (p *HandlerParser) InferRequestTypeFromHandler(fnDecl *ast.FuncDecl, structDefs map[string][]integrationcontract.FieldDef) *integrationcontract.TypeDef {
 	info := &HandlerTypeInfo{}
 	requestType, typeName := p.extractRequestType(fnDecl)
 	info.RequestType = requestType
@@ -320,7 +321,7 @@ func (p *HandlerParser) InferRequestTypeFromHandler(fnDecl *ast.FuncDecl, struct
 
 	// 如果类型在 structDefs 中，返回完整定义
 	if fields, exists := structDefs[typeName]; exists {
-		return &contract.TypeDef{
+		return &integrationcontract.TypeDef{
 			Name:   typeName,
 			Fields: fields,
 		}
@@ -359,7 +360,7 @@ func ExtractPathParams(path string) []string {
 // 中文说明：
 // - 从路径参数和 Handler 分析结果生成请求 message；
 // - 包含路径参数和请求体字段。
-func GenerateRequestMessageFromHandler(handlerName string, pathParams []string, requestType *contract.TypeDef) string {
+func GenerateRequestMessageFromHandler(handlerName string, pathParams []string, requestType *integrationcontract.TypeDef) string {
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("message %sRequest {\n", handlerName))
 

@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // Generator 实现 ProtoGenerator 接口。
@@ -24,11 +24,11 @@ import (
 // - Service-first：解析 Go AST 生成 Proto；
 // - Route-first：解析 Gin 路由生成 Proto。
 type Generator struct {
-	cfg *contract.ProtoGeneratorConfig
+	cfg *integrationcontract.ProtoGeneratorConfig
 }
 
 // NewGenerator 创建 Generator。
-func NewGenerator(cfg *contract.ProtoGeneratorConfig) (*Generator, error) {
+func NewGenerator(cfg *integrationcontract.ProtoGeneratorConfig) (*Generator, error) {
 	return &Generator{cfg: cfg}, nil
 }
 
@@ -38,7 +38,7 @@ func NewGenerator(cfg *contract.ProtoGeneratorConfig) (*Generator, error) {
 // - 调用 protoc 命令生成 Go 代码；
 // - 支持 --go_out 和 --go-grpc_out；
 // - 可选支持 --grpc-gateway_out（IncludeHTTP）。
-func (g *Generator) GenFromProto(ctx context.Context, opts contract.ProtoGenOptions) error {
+func (g *Generator) GenFromProto(ctx context.Context, opts integrationcontract.ProtoGenOptions) error {
 	// 设置默认值
 	if opts.ProtoDir == "" {
 		opts.ProtoDir = g.cfg.DefaultProtoDir
@@ -138,7 +138,7 @@ func (g *Generator) GenFromProto(ctx context.Context, opts contract.ProtoGenOpti
 // - 提取请求/响应类型的完整字段定义；
 // - 支持跨文件类型解析（当提供 ImportPaths 时）；
 // - 生成 proto service 和 messages。
-func (g *Generator) GenFromService(ctx context.Context, opts contract.ServiceToProtoOptions) error {
+func (g *Generator) GenFromService(ctx context.Context, opts integrationcontract.ServiceToProtoOptions) error {
 	// 解析 Go 文件
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, opts.ServicePath, nil, parser.ParseComments)
@@ -187,7 +187,7 @@ func (g *Generator) GenFromService(ctx context.Context, opts contract.ServiceToP
 	}
 
 	// 使用第一个服务（或匹配 ServiceName）
-	var svc *contract.ServiceDef
+	var svc *integrationcontract.ServiceDef
 	if opts.ServiceName != "" {
 		for i := range services {
 			if services[i].Name == opts.ServiceName {
@@ -222,7 +222,7 @@ func (g *Generator) GenFromService(ctx context.Context, opts contract.ServiceToP
 // - 解析 Gin 路由定义；
 // - 推断请求/响应类型；
 // - 自动添加 HTTP 注解。
-func (g *Generator) GenFromRoute(ctx context.Context, opts contract.RouteToProtoOptions) error {
+func (g *Generator) GenFromRoute(ctx context.Context, opts integrationcontract.RouteToProtoOptions) error {
 	// 解析路由文件
 	routes, err := g.parseGinRoutes(opts.RouteFile)
 	if err != nil {
@@ -270,8 +270,8 @@ func (g *Generator) scanProtoFiles(dir string) ([]string, error) {
 // - 解析文件中的所有 type StructName struct 定义；
 // - 提取每个结构体的字段信息和注释；
 // - 返回结构体名到类型定义的映射（包含字段和注释）。
-func (g *Generator) extractStructDefs(f *ast.File) map[string]*contract.TypeDef {
-	structDefs := make(map[string]*contract.TypeDef)
+func (g *Generator) extractStructDefs(f *ast.File) map[string]*integrationcontract.TypeDef {
+	structDefs := make(map[string]*integrationcontract.TypeDef)
 
 	for _, decl := range f.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
@@ -305,7 +305,7 @@ func (g *Generator) extractStructDefs(f *ast.File) map[string]*contract.TypeDef 
 			// 提取结构体字段
 			fields := g.extractStructFields(structType)
 
-			structDefs[typeSpec.Name.Name] = &contract.TypeDef{
+			structDefs[typeSpec.Name.Name] = &integrationcontract.TypeDef{
 				Name:     typeSpec.Name.Name,
 				Fields:   fields,
 				Comments: comments,
@@ -322,8 +322,8 @@ func (g *Generator) extractStructDefs(f *ast.File) map[string]*contract.TypeDef 
 // - 遍历结构体的所有字段；
 // - 解析字段名、类型和 tag；
 // - 生成 FieldDef 列表。
-func (g *Generator) extractStructFields(structType *ast.StructType) []contract.FieldDef {
-	var fields []contract.FieldDef
+func (g *Generator) extractStructFields(structType *ast.StructType) []integrationcontract.FieldDef {
+	var fields []integrationcontract.FieldDef
 
 	if structType.Fields == nil {
 		return fields
@@ -387,7 +387,7 @@ func (g *Generator) extractStructFields(structType *ast.StructType) []contract.F
 			}
 		}
 
-		fields = append(fields, contract.FieldDef{
+		fields = append(fields, integrationcontract.FieldDef{
 			Name:      fieldName,
 			JSONName:  jsonName,
 			ProtoName: protoName,
@@ -461,8 +461,8 @@ func (g *Generator) toSnakeCase(s string) string {
 // - 解析 Go 文件中的接口定义；
 // - 提取接口名称、注释和方法列表；
 // - 返回 ServiceDef 列表。
-func (g *Generator) extractServices(f *ast.File) []contract.ServiceDef {
-	var services []contract.ServiceDef
+func (g *Generator) extractServices(f *ast.File) []integrationcontract.ServiceDef {
+	var services []integrationcontract.ServiceDef
 
 	for _, decl := range f.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
@@ -481,7 +481,7 @@ func (g *Generator) extractServices(f *ast.File) []contract.ServiceDef {
 				continue
 			}
 
-			svc := contract.ServiceDef{
+			svc := integrationcontract.ServiceDef{
 				Name: typeSpec.Name.Name,
 			}
 
@@ -533,8 +533,8 @@ func (g *Generator) extractServices(f *ast.File) []contract.ServiceDef {
 // - 自动跳过 context.Context 参数和 error 返回值；
 // - 解析指针、切片等复合类型；
 // - 提取方法注释。
-func (g *Generator) extractMethod(fnType *ast.FuncType, name string, field *ast.Field) contract.MethodDef {
-	method := contract.MethodDef{
+func (g *Generator) extractMethod(fnType *ast.FuncType, name string, field *ast.Field) integrationcontract.MethodDef {
+	method := integrationcontract.MethodDef{
 		Name: name,
 	}
 
@@ -584,14 +584,14 @@ func (g *Generator) extractMethod(fnType *ast.FuncType, name string, field *ast.
 // - 支持简单类型、指针类型、切片类型、Map 类型；
 // - 支持跨包类型（如 time.Time）；
 // - Map 类型会提取 key 和 value 的完整类型信息。
-func (g *Generator) extractType(expr ast.Expr) *contract.TypeDef {
+func (g *Generator) extractType(expr ast.Expr) *integrationcontract.TypeDef {
 	switch t := expr.(type) {
 	case *ast.Ident:
-		return &contract.TypeDef{
+		return &integrationcontract.TypeDef{
 			Name: t.Name,
 		}
 	case *ast.SelectorExpr:
-		return &contract.TypeDef{
+		return &integrationcontract.TypeDef{
 			Name:    t.Sel.Name,
 			Package: g.getPackageName(t.X),
 		}
@@ -605,13 +605,13 @@ func (g *Generator) extractType(expr ast.Expr) *contract.TypeDef {
 		return inner
 	case *ast.MapType:
 		// 完整提取 Map 的 key 和 value 类型
-		return &contract.TypeDef{
+		return &integrationcontract.TypeDef{
 			IsMap:    true,
 			MapKey:   g.extractType(t.Key),
 			MapValue: g.extractType(t.Value),
 		}
 	default:
-		return &contract.TypeDef{
+		return &integrationcontract.TypeDef{
 			Name: "any",
 		}
 	}
@@ -661,7 +661,7 @@ func (g *Generator) isErrorType(expr ast.Expr) bool {
 // - 生成 proto 文件头部、message 定义和 service 定义；
 // - 使用 structDefs 填充 message 字段；
 // - 避免重复生成相同的 message。
-func (g *Generator) generateProtoContent(svc *contract.ServiceDef, opts contract.ServiceToProtoOptions, structDefs map[string]*contract.TypeDef) string {
+func (g *Generator) generateProtoContent(svc *integrationcontract.ServiceDef, opts integrationcontract.ServiceToProtoOptions, structDefs map[string]*integrationcontract.TypeDef) string {
 	var buf bytes.Buffer
 
 	// 头部
@@ -701,16 +701,16 @@ func (g *Generator) generateProtoContent(svc *contract.ServiceDef, opts contract
 	}
 
 	// Service
-		// 写入 Service 注释（如果有）
-		if len(svc.Comments) > 0 {
-			for _, c := range svc.Comments {
-				buf.WriteString(fmt.Sprintf("// %s\n", strings.TrimSpace(c)))
-			}
-		} else {
-			// 默认注释
-			buf.WriteString(fmt.Sprintf("// %s service definition.\n", svc.Name))
+	// 写入 Service 注释（如果有）
+	if len(svc.Comments) > 0 {
+		for _, c := range svc.Comments {
+			buf.WriteString(fmt.Sprintf("// %s\n", strings.TrimSpace(c)))
 		}
-		buf.WriteString(fmt.Sprintf("service %s {\n", svc.Name))
+	} else {
+		// 默认注释
+		buf.WriteString(fmt.Sprintf("// %s service definition.\n", svc.Name))
+	}
+	buf.WriteString(fmt.Sprintf("service %s {\n", svc.Name))
 	for _, method := range svc.Methods {
 		g.generateMethod(&buf, method, opts)
 	}
@@ -727,7 +727,7 @@ func (g *Generator) generateProtoContent(svc *contract.ServiceDef, opts contract
 // - 处理嵌套结构体（递归生成）；
 // - 正确处理 Map 类型和切片类型；
 // - 生成结构体注释（如果有）。
-func (g *Generator) generateMessage(buf *bytes.Buffer, typeDef *contract.TypeDef, name string, structDefs map[string]*contract.TypeDef, generatedMsgs map[string]bool) {
+func (g *Generator) generateMessage(buf *bytes.Buffer, typeDef *integrationcontract.TypeDef, name string, structDefs map[string]*integrationcontract.TypeDef, generatedMsgs map[string]bool) {
 	// 从 structDefs 获取类型定义
 	structDef, ok := structDefs[name]
 
@@ -809,7 +809,7 @@ func (g *Generator) generateMessage(buf *bytes.Buffer, typeDef *contract.TypeDef
 // - Map 类型生成 map<key, value> 语法；
 // - 自定义类型保持原名；
 // - 切片类型由调用方处理（使用 repeated）。
-func (g *Generator) goTypeToProtoType(typeDef *contract.TypeDef) string {
+func (g *Generator) goTypeToProtoType(typeDef *integrationcontract.TypeDef) string {
 	if typeDef == nil {
 		return "string"
 	}
@@ -880,7 +880,7 @@ func (g *Generator) isBuiltInType(typeName string) bool {
 // - 生成 rpc 方法定义；
 // - 包含方法注释（从 Go 代码提取）；
 // - 添加 HTTP 注解（如果配置）。
-func (g *Generator) generateMethod(buf *bytes.Buffer, method contract.MethodDef, opts contract.ServiceToProtoOptions) {
+func (g *Generator) generateMethod(buf *bytes.Buffer, method integrationcontract.MethodDef, opts integrationcontract.ServiceToProtoOptions) {
 	reqName := method.Name + "Request"
 	if method.RequestType != nil && method.RequestType.Name != "" {
 		reqName = method.RequestType.Name
@@ -930,6 +930,6 @@ func (g *Generator) formatProtoFile(path string) {
 }
 
 // GetConfig 获取当前配置。
-func (g *Generator) GetConfig() *contract.ProtoGeneratorConfig {
+func (g *Generator) GetConfig() *integrationcontract.ProtoGeneratorConfig {
 	return g.cfg
 }

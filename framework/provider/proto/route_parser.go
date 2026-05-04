@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // parseGinRoutes 解析 Gin 路由定义。
@@ -19,14 +19,14 @@ import (
 // - 支持 GET/POST/PUT/DELETE/PATCH 等方法；
 // - 支持分组路由（Group）；
 // - 自动提取路径参数（:id → {id}）。
-func (g *Generator) parseGinRoutes(filePath string) ([]contract.RouteDef, error) {
+func (g *Generator) parseGinRoutes(filePath string) ([]integrationcontract.RouteDef, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
 		return nil, fmt.Errorf("parse file: %w", err)
 	}
 
-	var routes []contract.RouteDef
+	var routes []integrationcontract.RouteDef
 	var currentGroup string
 
 	// 遍历 AST
@@ -52,7 +52,7 @@ func (g *Generator) parseGinRoutes(filePath string) ([]contract.RouteDef, error)
 }
 
 // extractRouteFromCall 从调用表达式中提取路由信息。
-func (g *Generator) extractRouteFromCall(call *ast.CallExpr, currentGroup string) *contract.RouteDef {
+func (g *Generator) extractRouteFromCall(call *ast.CallExpr, currentGroup string) *integrationcontract.RouteDef {
 	// 检查是否是方法调用
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
@@ -89,7 +89,7 @@ func (g *Generator) extractRouteFromCall(call *ast.CallExpr, currentGroup string
 	// 提取处理函数名
 	handlerName := g.extractHandlerName(call.Args[1])
 
-	return &contract.RouteDef{
+	return &integrationcontract.RouteDef{
 		Method:       method,
 		Path:         fullPath,
 		HandlerName:  handlerName,
@@ -158,7 +158,7 @@ func (g *Generator) convertPathParams(path string) string {
 // - 自动生成请求/响应 message；
 // - 添加 google.api.http 注解；
 // - 支持 Handler 类型推断（当提供 HandlerFile 时）。
-func (g *Generator) generateProtoFromRoutes(routes []contract.RouteDef, opts contract.RouteToProtoOptions) string {
+func (g *Generator) generateProtoFromRoutes(routes []integrationcontract.RouteDef, opts integrationcontract.RouteToProtoOptions) string {
 	var buf bytes.Buffer
 
 	// 解析 Handler 类型（如果提供了 HandlerFile）
@@ -220,7 +220,7 @@ func (g *Generator) generateProtoFromRoutes(routes []contract.RouteDef, opts con
 // - 包含路径参数；
 // - 从 Handler 推断的请求类型；
 // - 支持请求体字段。
-func (g *Generator) generateEnhancedRouteMessage(buf *bytes.Buffer, msgName string, route contract.RouteDef, handlerInfo *HandlerTypeInfo) {
+func (g *Generator) generateEnhancedRouteMessage(buf *bytes.Buffer, msgName string, route integrationcontract.RouteDef, handlerInfo *HandlerTypeInfo) {
 	buf.WriteString(fmt.Sprintf("message %s {\n", msgName))
 
 	fieldNum := 1
@@ -275,7 +275,7 @@ func (g *Generator) generateEnhancedResponseMessage(buf *bytes.Buffer, msgName s
 }
 
 // generateRouteMessage 生成路由消息定义。
-func (g *Generator) generateRouteMessage(buf *bytes.Buffer, msgName string, routes []contract.RouteDef) {
+func (g *Generator) generateRouteMessage(buf *bytes.Buffer, msgName string, routes []integrationcontract.RouteDef) {
 	buf.WriteString(fmt.Sprintf("message %s {\n", msgName))
 
 	// 根据消息类型生成不同字段
@@ -305,7 +305,7 @@ func (g *Generator) generateRouteMessage(buf *bytes.Buffer, msgName string, rout
 }
 
 // generateRouteMethod 生成路由方法定义。
-func (g *Generator) generateRouteMethod(buf *bytes.Buffer, route contract.RouteDef, opts contract.RouteToProtoOptions) {
+func (g *Generator) generateRouteMethod(buf *bytes.Buffer, route integrationcontract.RouteDef, opts integrationcontract.RouteToProtoOptions) {
 	methodName := g.toCamelCase(route.HandlerName)
 	reqName := methodName + "Request"
 	respName := methodName + "Response"

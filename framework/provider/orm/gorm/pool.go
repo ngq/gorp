@@ -5,16 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 )
 
-// applySQLDBPool 把框架统一配置写入 database/sql 连接池。
-//
-// 中文说明：
-// - GORM 最终仍然落在 *sql.DB 之上，因此连接池参数要配置到 sql.DB。
-// - 这里专门拆成独立函数，避免 provider.go 中驱动选择逻辑和连接池逻辑混在一起。
-// - 对 sqlite/mysql/postgres 等驱动都可以复用。
-func applySQLDBPool(sqlDB *sql.DB, dbc contract.DBConfig) error {
+func applySQLDBPool(sqlDB *sql.DB, dbc datacontract.DBConfig) error {
 	if sqlDB == nil {
 		return nil
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +36,7 @@ func TestNoopSpan(t *testing.T) {
 
 	// 测试 End
 	span.End()
-	span.End(contract.SpanEndOption(func(c *contract.SpanEndConfig) {}))
+	span.End(observabilitycontract.SpanEndOption(func(c *observabilitycontract.SpanEndConfig) {}))
 
 	// 测试 AddEvent
 	span.AddEvent("test-event", map[string]interface{}{"key": "value"})
@@ -51,11 +51,11 @@ func TestNoopSpan(t *testing.T) {
 	span.SetError(assert.AnError)
 
 	// 测试 SetStatus
-	span.SetStatus(contract.SpanStatusCodeError, "test error")
+	span.SetStatus(observabilitycontract.SpanStatusCodeError, "test error")
 
 	// 测试 SpanContext
 	sc := span.SpanContext()
-	assert.Equal(t, contract.SpanContext{}, sc)
+	assert.Equal(t, observabilitycontract.SpanContext{}, sc)
 
 	// 测试 IsRecording
 	assert.False(t, span.IsRecording())

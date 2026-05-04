@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
 // TestRetryService_Do_Success 测试成功执行。
@@ -14,8 +14,8 @@ import (
 // 中文说明：
 // - 函数第一次执行成功，无需重试。
 func TestRetryService_Do_Success(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
 			MaxAttempts:  3,
 			InitialDelay: 10 * time.Millisecond,
 			MaxDelay:     100 * time.Millisecond,
@@ -44,12 +44,12 @@ func TestRetryService_Do_Success(t *testing.T) {
 // 中文说明：
 // - 前两次失败，第三次成功。
 func TestRetryService_Do_RetrySuccess(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
-			MaxAttempts:  3,
-			InitialDelay: 10 * time.Millisecond,
-			MaxDelay:     100 * time.Millisecond,
-			Multiplier:   2.0,
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    3,
+			InitialDelay:   10 * time.Millisecond,
+			MaxDelay:       100 * time.Millisecond,
+			Multiplier:     2.0,
 			RetryableCodes: []int{503},
 		},
 	}
@@ -60,7 +60,7 @@ func TestRetryService_Do_RetrySuccess(t *testing.T) {
 	err := svc.Do(context.Background(), func() error {
 		callCount++
 		if callCount < 3 {
-			return contract.NewError(503, contract.ErrorReasonServiceUnavailable, "service unavailable")
+			return resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "service unavailable")
 		}
 		return nil
 	})
@@ -78,12 +78,12 @@ func TestRetryService_Do_RetrySuccess(t *testing.T) {
 // 中文说明：
 // - 所有尝试都失败，返回最后一个错误。
 func TestRetryService_Do_AllFail(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
-			MaxAttempts:  3,
-			InitialDelay: 10 * time.Millisecond,
-			MaxDelay:     100 * time.Millisecond,
-			Multiplier:   2.0,
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    3,
+			InitialDelay:   10 * time.Millisecond,
+			MaxDelay:       100 * time.Millisecond,
+			Multiplier:     2.0,
 			RetryableCodes: []int{503},
 		},
 	}
@@ -93,7 +93,7 @@ func TestRetryService_Do_AllFail(t *testing.T) {
 	callCount := 0
 	err := svc.Do(context.Background(), func() error {
 		callCount++
-		return contract.NewError(503, contract.ErrorReasonServiceUnavailable, "service unavailable")
+		return resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "service unavailable")
 	})
 
 	if err == nil {
@@ -109,12 +109,12 @@ func TestRetryService_Do_AllFail(t *testing.T) {
 // 中文说明：
 // - 遇到不可重试的错误，立即返回。
 func TestRetryService_Do_NonRetryable(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
-			MaxAttempts:  3,
-			InitialDelay: 10 * time.Millisecond,
-			MaxDelay:     100 * time.Millisecond,
-			Multiplier:   2.0,
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    3,
+			InitialDelay:   10 * time.Millisecond,
+			MaxDelay:       100 * time.Millisecond,
+			Multiplier:     2.0,
 			RetryableCodes: []int{503},
 		},
 	}
@@ -124,7 +124,7 @@ func TestRetryService_Do_NonRetryable(t *testing.T) {
 	callCount := 0
 	err := svc.Do(context.Background(), func() error {
 		callCount++
-		return contract.NewError(400, contract.ErrorReasonBadRequest, "bad request")
+		return resiliencecontract.NewError(400, resiliencecontract.ErrorReasonBadRequest, "bad request")
 	})
 
 	if err == nil {
@@ -140,12 +140,12 @@ func TestRetryService_Do_NonRetryable(t *testing.T) {
 // 中文说明：
 // - Context 取消时，应停止重试。
 func TestRetryService_Do_ContextCancel(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
-			MaxAttempts:  10,
-			InitialDelay: 200 * time.Millisecond,
-			MaxDelay:     1 * time.Second,
-			Multiplier:   2.0,
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    10,
+			InitialDelay:   200 * time.Millisecond,
+			MaxDelay:       1 * time.Second,
+			Multiplier:     2.0,
 			RetryableCodes: []int{503},
 		},
 	}
@@ -163,7 +163,7 @@ func TestRetryService_Do_ContextCancel(t *testing.T) {
 	callCount := 0
 	err := svc.Do(ctx, func() error {
 		callCount++
-		return contract.NewError(503, contract.ErrorReasonServiceUnavailable, "unavailable")
+		return resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "unavailable")
 	})
 
 	// 验证 context 被取消或重试次数减少
@@ -177,12 +177,12 @@ func TestRetryService_Do_ContextCancel(t *testing.T) {
 // 中文说明：
 // - 验证 DoWithResult 正确返回结果。
 func TestRetryService_DoWithResult(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
-			MaxAttempts:  3,
-			InitialDelay: 10 * time.Millisecond,
-			MaxDelay:     100 * time.Millisecond,
-			Multiplier:   2.0,
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    3,
+			InitialDelay:   10 * time.Millisecond,
+			MaxDelay:       100 * time.Millisecond,
+			Multiplier:     2.0,
 			RetryableCodes: []int{503},
 		},
 	}
@@ -193,7 +193,7 @@ func TestRetryService_DoWithResult(t *testing.T) {
 	result, err := svc.DoWithResult(context.Background(), func() (any, error) {
 		callCount++
 		if callCount < 2 {
-			return nil, contract.NewError(503, contract.ErrorReasonServiceUnavailable, "unavailable")
+			return nil, resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "unavailable")
 		}
 		return "success", nil
 	})
@@ -211,8 +211,8 @@ func TestRetryService_DoWithResult(t *testing.T) {
 // 中文说明：
 // - 验证各种错误类型的可重试判断。
 func TestRetryService_IsRetryable(t *testing.T) {
-	cfg := &contract.RetryConfig{
-		DefaultPolicy: contract.RetryPolicy{
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
 			RetryableCodes: []int{502, 503, 504},
 		},
 	}
@@ -231,12 +231,12 @@ func TestRetryService_IsRetryable(t *testing.T) {
 		},
 		{
 			name:      "503 AppError",
-			err:       contract.NewError(503, contract.ErrorReasonServiceUnavailable, "unavailable"),
+			err:       resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "unavailable"),
 			retryable: true,
 		},
 		{
 			name:      "400 AppError",
-			err:       contract.NewError(400, contract.ErrorReasonBadRequest, "bad request"),
+			err:       resiliencecontract.NewError(400, resiliencecontract.ErrorReasonBadRequest, "bad request"),
 			retryable: false,
 		},
 		{
@@ -261,7 +261,7 @@ func TestRetryService_IsRetryable(t *testing.T) {
 // 中文说明：
 // - 验证指数退避延迟计算正确。
 func TestRetryPolicy_CalculateDelay(t *testing.T) {
-	policy := contract.RetryPolicy{
+	policy := resiliencecontract.RetryPolicy{
 		InitialDelay: 100 * time.Millisecond,
 		MaxDelay:     10 * time.Second,
 		Multiplier:   2.0,

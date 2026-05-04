@@ -3,7 +3,8 @@ package noop
 import (
 	"context"
 
-	"github.com/ngq/gorp/framework/contract"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供 noop Retry 实现。
@@ -25,12 +26,12 @@ func (p *Provider) IsDefer() bool { return true }
 
 // Provides 返回提供的服务 key。
 func (p *Provider) Provides() []string {
-	return []string{contract.RetryKey}
+	return []string{resiliencecontract.RetryKey}
 }
 
 // Register 注册 noop Retry 服务。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.RetryKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(resiliencecontract.RetryKey, func(c runtimecontract.Container) (any, error) {
 		return &noopRetry{}, nil
 	}, true)
 
@@ -38,7 +39,7 @@ func (p *Provider) Register(c contract.Container) error {
 }
 
 // Boot 启动 Provider。
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 

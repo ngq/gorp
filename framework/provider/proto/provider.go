@@ -3,39 +3,23 @@ package proto
 import (
 	"errors"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Provider 提供 ProtoGenerator 实现。
-//
-// 中文说明：
-// - 支持三种工作流：Proto-first / Service-first / Route-first；
-// - Proto-first：标准 protoc 生成；
-// - Service-first：Go Service 接口 → Proto；
-// - Route-first：Gin 路由 → Proto。
 type Provider struct{}
 
-// NewProvider 创建 Proto Generator Provider。
 func NewProvider() *Provider { return &Provider{} }
 
-// Name 返回 Provider 名称。
-func (p *Provider) Name() string { return "proto.generator" }
-
-// IsDefer 返回是否延迟加载。
+func (p *Provider) Name() string  { return "proto.generator" }
 func (p *Provider) IsDefer() bool { return true }
-
-// Provides 返回提供的服务 key。
 func (p *Provider) Provides() []string {
-	return []string{contract.ProtoGeneratorKey}
+	return []string{integrationcontract.ProtoGeneratorKey}
 }
 
-// Register 注册 ProtoGenerator 服务。
-//
-// 中文说明：
-// - 从容器获取配置，创建 Generator；
-// - 配置格式见 ProtoGeneratorConfig 结构体。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ProtoGeneratorKey, func(c contract.Container) (any, error) {
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(integrationcontract.ProtoGeneratorKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getProtoConfig(c)
 		if err != nil {
 			return nil, err
@@ -46,21 +30,14 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-// Boot 启动 Provider。
-func (p *Provider) Boot(c contract.Container) error {
+func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
-// getProtoConfig 从容器获取 Proto 生成器配置。
-//
-// 中文说明：
-// - 配置路径：proto.enabled、proto.strategy 等；
-// - 未配置时使用默认值。
-func getProtoConfig(c contract.Container) (*contract.ProtoGeneratorConfig, error) {
-	cfgAny, err := c.Make(contract.ConfigKey)
+func getProtoConfig(c runtimecontract.Container) (*integrationcontract.ProtoGeneratorConfig, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
-		// 配置服务不可用时使用默认配置
-		return &contract.ProtoGeneratorConfig{
+		return &integrationcontract.ProtoGeneratorConfig{
 			Enabled:               true,
 			Strategy:              "protoc",
 			DefaultProtoDir:       "api/proto",
@@ -68,19 +45,18 @@ func getProtoConfig(c contract.Container) (*contract.ProtoGeneratorConfig, error
 		}, nil
 	}
 
-	cfg, ok := cfgAny.(contract.Config)
+	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
 		return nil, errors.New("proto: invalid config service")
 	}
 
-	protoCfg := &contract.ProtoGeneratorConfig{
+	protoCfg := &integrationcontract.ProtoGeneratorConfig{
 		Enabled:               true,
 		Strategy:              "protoc",
 		DefaultProtoDir:       "api/proto",
 		IncludeHTTPAnnotation: false,
 	}
 
-	// 读取配置项
 	if v := cfg.Get("proto.enabled"); v != nil {
 		protoCfg.Enabled = cfg.GetBool("proto.enabled")
 	}

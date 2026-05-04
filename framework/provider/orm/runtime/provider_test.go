@@ -3,7 +3,7 @@ package runtime
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,9 +12,9 @@ func TestProviderContract(t *testing.T) {
 	require.Equal(t, "orm.runtime", p.Name())
 	require.False(t, p.IsDefer())
 	require.ElementsMatch(t, []string{
-		contract.ORMBackendKey,
-		contract.DBRuntimeKey,
-		contract.MigratorKey,
-		contract.SQLExecutorKey,
+		datacontract.ORMBackendKey,
+		datacontract.DBRuntimeKey,
+		datacontract.MigratorKey,
+		datacontract.SQLExecutorKey,
 	}, p.Provides())
 }

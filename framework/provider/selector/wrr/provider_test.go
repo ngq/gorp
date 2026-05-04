@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 func TestWRRSelector_Select_EmptyInstances(t *testing.T) {
@@ -12,11 +13,11 @@ func TestWRRSelector_Select_EmptyInstances(t *testing.T) {
 	ctx := context.Background()
 
 	_, done, err := selector.Select(ctx, nil)
-	if err != contract.ErrNoAvailable {
+	if err != discoverycontract.ErrNoAvailable {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 
-	done(ctx, contract.DoneInfo{})
+	done(ctx, discoverycontract.DoneInfo{})
 }
 
 func TestWRRSelector_Select_WeightDistribution(t *testing.T) {
@@ -24,7 +25,7 @@ func TestWRRSelector_Select_WeightDistribution(t *testing.T) {
 	ctx := context.Background()
 
 	// 创建不同权重的实例
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true, Metadata: map[string]string{"weight": "100"}},
 		{ID: "2", Address: "inst2:8080", Healthy: true, Metadata: map[string]string{"weight": "50"}},
 		{ID: "3", Address: "inst3:8080", Healthy: true, Metadata: map[string]string{"weight": "50"}},
@@ -56,7 +57,7 @@ func TestWRRSelector_Select_AllSameWeight(t *testing.T) {
 	ctx := context.Background()
 
 	// 所有实例权重相同
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true},
 		{ID: "2", Address: "inst2:8080", Healthy: true},
 		{ID: "3", Address: "inst3:8080", Healthy: true},
@@ -84,16 +85,16 @@ func TestWRRSelector_Select_ForceInstance(t *testing.T) {
 	selector := NewWRRSelector()
 	ctx := context.Background()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true},
 		{ID: "2", Address: "inst2:8080", Healthy: true},
 	}
 
-	forced := contract.ServiceInstance{ID: "forced", Address: "forced:8080"}
+	forced := transportcontract.ServiceInstance{ID: "forced", Address: "forced:8080"}
 	selected, _, err := selector.Select(
 		ctx,
 		instances,
-		contract.WithForceInstance(forced),
+		discoverycontract.WithForceInstance(forced),
 	)
 
 	if err != nil {
@@ -109,7 +110,7 @@ func TestWRRSelector_CleanupStaleWeights(t *testing.T) {
 	ctx := context.Background()
 
 	// 先选择一些实例，建立权重状态
-	oldInstances := []contract.ServiceInstance{
+	oldInstances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true, Metadata: map[string]string{"weight": "100"}},
 		{ID: "2", Address: "inst2:8080", Healthy: true, Metadata: map[string]string{"weight": "50"}},
 	}
@@ -124,7 +125,7 @@ func TestWRRSelector_CleanupStaleWeights(t *testing.T) {
 	}
 
 	// 切换到新实例列表（不含 inst2）
-	newInstances := []contract.ServiceInstance{
+	newInstances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true, Metadata: map[string]string{"weight": "100"}},
 		{ID: "3", Address: "inst3:8080", Healthy: true, Metadata: map[string]string{"weight": "50"}},
 	}

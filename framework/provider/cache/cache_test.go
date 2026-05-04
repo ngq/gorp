@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	testinghelper "github.com/ngq/gorp/framework/testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,9 +20,9 @@ func TestCache_Memory_TTL_Del_MGet_Remember(t *testing.T) {
 	_ = os.Setenv("CACHE_DRIVER", "memory")
 	require.NoError(t, c.RegisterProvider(NewProvider()))
 
-	anySvc, err := c.Make(contract.CacheKey)
+	anySvc, err := c.Make(datacontract.CacheKey)
 	require.NoError(t, err)
-	svc := anySvc.(contract.Cache)
+	svc := anySvc.(datacontract.Cache)
 
 	ctx := context.Background()
 
@@ -34,13 +34,13 @@ func TestCache_Memory_TTL_Del_MGet_Remember(t *testing.T) {
 
 	time.Sleep(70 * time.Millisecond)
 	_, err = svc.Get(ctx, "k1")
-	require.ErrorIs(t, err, contract.ErrCacheMiss)
+	require.ErrorIs(t, err, datacontract.ErrCacheMiss)
 
 	// Del
 	require.NoError(t, svc.Set(ctx, "k2", "v2", 0))
 	require.NoError(t, svc.Del(ctx, "k2"))
 	_, err = svc.Get(ctx, "k2")
-	require.ErrorIs(t, err, contract.ErrCacheMiss)
+	require.ErrorIs(t, err, datacontract.ErrCacheMiss)
 
 	// MGet
 	require.NoError(t, svc.Set(ctx, "a", "1", 0))

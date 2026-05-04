@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 // TestRandomSelector_Select_EmptyInstances 测试空实例列表。
@@ -15,12 +16,12 @@ func TestRandomSelector_Select_EmptyInstances(t *testing.T) {
 	selector := NewRandomSelector()
 
 	_, _, err := selector.Select(context.Background(), nil)
-	if err != contract.ErrNoAvailable {
+	if err != discoverycontract.ErrNoAvailable {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 
-	_, _, err = selector.Select(context.Background(), []contract.ServiceInstance{})
-	if err != contract.ErrNoAvailable {
+	_, _, err = selector.Select(context.Background(), []transportcontract.ServiceInstance{})
+	if err != discoverycontract.ErrNoAvailable {
 		t.Errorf("expected ErrNoAvailable for empty slice, got: %v", err)
 	}
 }
@@ -32,7 +33,7 @@ func TestRandomSelector_Select_EmptyInstances(t *testing.T) {
 func TestRandomSelector_Select_SingleInstance(t *testing.T) {
 	selector := NewRandomSelector()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{Name: "test", Address: "localhost:8080", Healthy: true},
 	}
 
@@ -52,7 +53,7 @@ func TestRandomSelector_Select_SingleInstance(t *testing.T) {
 func TestRandomSelector_Select_MultipleInstances(t *testing.T) {
 	selector := NewRandomSelector()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{Name: "test", Address: "localhost:8080", Healthy: true},
 		{Name: "test", Address: "localhost:8081", Healthy: true},
 		{Name: "test", Address: "localhost:8082", Healthy: true},
@@ -82,7 +83,7 @@ func TestRandomSelector_Select_MultipleInstances(t *testing.T) {
 func TestRandomSelector_Select_UnhealthyInstances(t *testing.T) {
 	selector := NewRandomSelector()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{Name: "test", Address: "localhost:8080", Healthy: false},
 		{Name: "test", Address: "localhost:8081", Healthy: true},
 	}
@@ -103,13 +104,13 @@ func TestRandomSelector_Select_UnhealthyInstances(t *testing.T) {
 func TestRandomSelector_Select_AllUnhealthy(t *testing.T) {
 	selector := NewRandomSelector()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{Name: "test", Address: "localhost:8080", Healthy: false},
 		{Name: "test", Address: "localhost:8081", Healthy: false},
 	}
 
 	_, _, err := selector.Select(context.Background(), instances)
-	if err != contract.ErrNoAvailable {
+	if err != discoverycontract.ErrNoAvailable {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 }
@@ -121,15 +122,15 @@ func TestRandomSelector_Select_AllUnhealthy(t *testing.T) {
 func TestRandomSelector_Select_ForceInstance(t *testing.T) {
 	selector := NewRandomSelector()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{Name: "test", Address: "localhost:8080", Healthy: true},
 		{Name: "test", Address: "localhost:8081", Healthy: true},
 	}
 
-	forced := contract.ServiceInstance{Name: "test", Address: "forced:9999", Healthy: true}
+	forced := transportcontract.ServiceInstance{Name: "test", Address: "forced:9999", Healthy: true}
 
 	selected, _, err := selector.Select(context.Background(), instances,
-		contract.WithForceInstance(forced),
+		discoverycontract.WithForceInstance(forced),
 	)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -146,18 +147,18 @@ func TestRandomSelector_Select_ForceInstance(t *testing.T) {
 func TestRandomSelector_Select_WithFilter(t *testing.T) {
 	selector := NewRandomSelector()
 
-	instances := []contract.ServiceInstance{
+	instances := []transportcontract.ServiceInstance{
 		{Name: "test", Address: "localhost:8080", Healthy: true, Metadata: map[string]string{"zone": "a"}},
 		{Name: "test", Address: "localhost:8081", Healthy: true, Metadata: map[string]string{"zone": "b"}},
 	}
 
 	// 只选择 zone=a 的实例
-	filter := func(instance contract.ServiceInstance) bool {
+	filter := func(instance transportcontract.ServiceInstance) bool {
 		return instance.Metadata["zone"] == "a"
 	}
 
 	selected, _, err := selector.Select(context.Background(), instances,
-		contract.WithFilter(filter),
+		discoverycontract.WithFilter(filter),
 	)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -187,8 +188,8 @@ func TestRandomProvider_Register(t *testing.T) {
 		t.Errorf("expected 2 provided keys, got: %v", provides)
 	}
 	expected := map[string]bool{
-		contract.SelectorKey:        true,
-		contract.SelectorBuilderKey: true,
+		discoverycontract.SelectorKey:        true,
+		discoverycontract.SelectorBuilderKey: true,
 	}
 	for _, key := range provides {
 		if !expected[key] {

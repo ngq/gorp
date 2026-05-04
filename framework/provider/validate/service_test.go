@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
 // TestUser 用于测试的结构体。
@@ -20,7 +21,7 @@ type TestUser struct {
 // 中文说明：
 // - 有效的数据应通过验证。
 func TestValidatorService_Validate_Success(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "zh",
 	}
 
@@ -46,7 +47,7 @@ func TestValidatorService_Validate_Success(t *testing.T) {
 // 中文说明：
 // - 缺少必填字段应返回错误。
 func TestValidatorService_Validate_Required(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "zh",
 	}
 
@@ -72,7 +73,7 @@ func TestValidatorService_Validate_Required(t *testing.T) {
 // 中文说明：
 // - 无效邮箱应返回错误。
 func TestValidatorService_Validate_Email(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "zh",
 	}
 
@@ -98,7 +99,7 @@ func TestValidatorService_Validate_Email(t *testing.T) {
 // 中文说明：
 // - 超出范围的值应返回错误。
 func TestValidatorService_Validate_Range(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "zh",
 	}
 
@@ -124,7 +125,7 @@ func TestValidatorService_Validate_Range(t *testing.T) {
 // 中文说明：
 // - 单个变量验证应正确工作。
 func TestValidatorService_ValidateVar(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "zh",
 	}
 
@@ -151,7 +152,7 @@ func TestValidatorService_ValidateVar(t *testing.T) {
 // 中文说明：
 // - 切换语言后错误消息应使用新语言。
 func TestValidatorService_SetLocale(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "en",
 	}
 
@@ -178,7 +179,7 @@ func TestValidatorService_SetLocale(t *testing.T) {
 // 中文说明：
 // - 验证错误应被正确翻译。
 func TestValidatorService_TranslateError(t *testing.T) {
-	cfg := &contract.ValidatorConfig{
+	cfg := &datacontract.ValidatorConfig{
 		Locale: "zh",
 	}
 
@@ -199,7 +200,7 @@ func TestValidatorService_TranslateError(t *testing.T) {
 	}
 
 	// 验证是 AppError
-	appErr, ok := err.(contract.AppError)
+	appErr, ok := err.(resiliencecontract.AppError)
 	if !ok {
 		t.Error("expected AppError")
 		return

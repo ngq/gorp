@@ -5,27 +5,23 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 
 	"github.com/jmoiron/sqlx"
 )
 
-// Provider 把数据库结构探查器注册进容器。
-//
-// 中文说明：
-// - 该服务主要供 `gorp model test/gen/api` 这类脚手架命令使用。
-// - 当前实现底层依赖 SQLX，并根据 driver 提供表/列元信息读取能力。
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }
 
 func (p *Provider) Name() string       { return "orm.inspect" }
 func (p *Provider) IsDefer() bool      { return false }
-func (p *Provider) Provides() []string { return []string{contract.DBInspectorKey} }
+func (p *Provider) Provides() []string { return []string{datacontract.DBInspectorKey} }
 
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.DBInspectorKey, func(c contract.Container) (any, error) {
-		v, err := c.Make(contract.SQLXKey)
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.DBInspectorKey, func(c runtimecontract.Container) (any, error) {
+		v, err := c.Make(datacontract.SQLXKey)
 		if err != nil {
 			return nil, err
 		}
@@ -36,7 +32,7 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-func (p *Provider) Boot(contract.Container) error { return nil }
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
 type Service struct {
 	db     *sqlx.DB
@@ -47,7 +43,7 @@ func (s *Service) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
-func (s *Service) Tables(ctx context.Context) ([]contract.Table, error) {
+func (s *Service) Tables(ctx context.Context) ([]datacontract.Table, error) {
 	switch s.driver {
 	case "sqlite", "sqlite3":
 		var names []string
@@ -55,15 +51,12 @@ func (s *Service) Tables(ctx context.Context) ([]contract.Table, error) {
 		if err != nil {
 			return nil, err
 		}
-		out := make([]contract.Table, 0, len(names))
+		out := make([]datacontract.Table, 0, len(names))
 		for _, n := range names {
-			out = append(out, contract.Table{Name: n})
+			out = append(out, datacontract.Table{Name: n})
 		}
 		return out, nil
 	case "mysql":
-		// 中文说明：
-		// - MySQL 这里直接读取当前连接对应 schema（DATABASE()）下的基表。
-		// - 先过滤掉 VIEW，避免 `model gen/api` 把视图也误当成普通数据表。
 		var names []string
 		err := s.db.SelectContext(ctx, &names, `
 			SELECT table_name
@@ -75,15 +68,12 @@ func (s *Service) Tables(ctx context.Context) ([]contract.Table, error) {
 		if err != nil {
 			return nil, err
 		}
-		out := make([]contract.Table, 0, len(names))
+		out := make([]datacontract.Table, 0, len(names))
 		for _, n := range names {
-			out = append(out, contract.Table{Name: n})
+			out = append(out, datacontract.Table{Name: n})
 		}
 		return out, nil
 	case "pgx":
-		// 中文说明：
-		// - PostgreSQL 这里读取当前 search_path 对应 schema 中的普通表。
-		// - 默认采用 current_schema()，与大多数单 schema 项目一致，避免把系统 schema 混入结果。
 		var names []string
 		err := s.db.SelectContext(ctx, &names, `
 			SELECT table_name
@@ -95,9 +85,9 @@ func (s *Service) Tables(ctx context.Context) ([]contract.Table, error) {
 		if err != nil {
 			return nil, err
 		}
-		out := make([]contract.Table, 0, len(names))
+		out := make([]datacontract.Table, 0, len(names))
 		for _, n := range names {
-			out = append(out, contract.Table{Name: n})
+			out = append(out, datacontract.Table{Name: n})
 		}
 		return out, nil
 	default:
@@ -105,7 +95,7 @@ func (s *Service) Tables(ctx context.Context) ([]contract.Table, error) {
 	}
 }
 
-func (s *Service) Columns(ctx context.Context, table string) ([]contract.Column, error) {
+func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Column, error) {
 	switch s.driver {
 	case "sqlite", "sqlite3":
 		type row struct {
@@ -117,19 +107,18 @@ func (s *Service) Columns(ctx context.Context, table string) ([]contract.Column,
 			PK      int            `db:"pk"`
 		}
 		rows := make([]row, 0)
-		// NOTE: PRAGMA table_info doesn't support placeholders; quote the table name.
 		q := fmt.Sprintf("PRAGMA table_info(%s)", quoteSQLiteIdent(table))
 		if err := s.db.SelectContext(ctx, &rows, q); err != nil {
 			return nil, err
 		}
-		out := make([]contract.Column, 0, len(rows))
+		out := make([]datacontract.Column, 0, len(rows))
 		for _, r := range rows {
 			var d *string
 			if r.Dflt.Valid {
 				v := r.Dflt.String
 				d = &v
 			}
-			out = append(out, contract.Column{
+			out = append(out, datacontract.Column{
 				Name:       r.Name,
 				Type:       r.Type,
 				NotNull:    r.NotNull == 1,
@@ -140,13 +129,13 @@ func (s *Service) Columns(ctx context.Context, table string) ([]contract.Column,
 		return out, nil
 	case "mysql":
 		type row struct {
-			Name          string         `db:"column_name"`
-			Type          string         `db:"column_type"`
-			Nullable      string         `db:"is_nullable"`
-			Key           sql.NullString `db:"column_key"`
-			DefaultVal    sql.NullString `db:"column_default"`
-			Extra         sql.NullString `db:"extra"`
-			Ordinal       int            `db:"ordinal_position"`
+			Name       string         `db:"column_name"`
+			Type       string         `db:"column_type"`
+			Nullable   string         `db:"is_nullable"`
+			Key        sql.NullString `db:"column_key"`
+			DefaultVal sql.NullString `db:"column_default"`
+			Extra      sql.NullString `db:"extra"`
+			Ordinal    int            `db:"ordinal_position"`
 		}
 		rows := make([]row, 0)
 		if err := s.db.SelectContext(ctx, &rows, `
@@ -165,14 +154,14 @@ func (s *Service) Columns(ctx context.Context, table string) ([]contract.Column,
 		`, table); err != nil {
 			return nil, err
 		}
-		out := make([]contract.Column, 0, len(rows))
+		out := make([]datacontract.Column, 0, len(rows))
 		for _, r := range rows {
 			var d *string
 			if r.DefaultVal.Valid {
 				v := r.DefaultVal.String
 				d = &v
 			}
-			out = append(out, contract.Column{
+			out = append(out, datacontract.Column{
 				Name:       r.Name,
 				Type:       r.Type,
 				NotNull:    r.Nullable == "NO",
@@ -217,14 +206,14 @@ func (s *Service) Columns(ctx context.Context, table string) ([]contract.Column,
 		`, table); err != nil {
 			return nil, err
 		}
-		out := make([]contract.Column, 0, len(rows))
+		out := make([]datacontract.Column, 0, len(rows))
 		for _, r := range rows {
 			var d *string
 			if r.DefaultVal.Valid {
 				v := r.DefaultVal.String
 				d = &v
 			}
-			out = append(out, contract.Column{
+			out = append(out, datacontract.Column{
 				Name:       r.Name,
 				Type:       r.Type,
 				NotNull:    r.Nullable == "NO",
@@ -239,8 +228,6 @@ func (s *Service) Columns(ctx context.Context, table string) ([]contract.Column,
 }
 
 func quoteSQLiteIdent(name string) string {
-	// SQLite identifiers can be quoted with double quotes.
-	// We also escape embedded quotes.
 	escaped := ""
 	for _, r := range name {
 		if r == '"' {

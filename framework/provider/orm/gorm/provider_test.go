@@ -3,7 +3,7 @@ package gorm_test
 import (
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	testinghelper "github.com/ngq/gorp/framework/testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,7 +14,7 @@ func TestGormProvider_AppliesMaxOpenConns_AndLogger(t *testing.T) {
 	c, cleanup := testinghelper.NewTestContainer(t)
 	defer cleanup()
 
-	anyDB, err := c.Make(contract.GormKey)
+	anyDB, err := c.Make(datacontract.GormKey)
 	require.NoError(t, err)
 	db := anyDB.(*gorm.DB)
 

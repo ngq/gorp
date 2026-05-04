@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -13,39 +14,25 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Provider 把 SQLX 数据库连接注册进容器。
-//
-// 中文说明：
-// - 与 orm.gorm 并存，面向更适合手写 SQL 的场景。
-// - 对外暴露 contract.SQLXKey，供列表查询、报表查询等直接使用。
-// - 从 framework 抽离视角看，这里不再默认补 sqlite/demo.db；
-//   provider 只消费已经明确提供的 database 配置。
 type Provider struct{}
 
-// NewProvider 创建 sqlx provider。
 func NewProvider() *Provider { return &Provider{} }
 
-// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "orm.sqlx" }
 
-// IsDefer 表示 sqlx provider 不走延迟加载。
-func (p *Provider) IsDefer() bool {
-	return false
-}
+func (p *Provider) IsDefer() bool { return false }
 
-// Provides 返回 sqlx provider 暴露的能力 key。
-func (p *Provider) Provides() []string { return []string{contract.SQLXKey} }
+func (p *Provider) Provides() []string { return []string{datacontract.SQLXKey} }
 
-// Register 绑定统一 SQLX 数据库连接。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.SQLXKey, func(c contract.Container) (any, error) {
-		cfgAny, err := c.Make(contract.ConfigKey)
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.SQLXKey, func(c runtimecontract.Container) (any, error) {
+		cfgAny, err := c.Make(datacontract.ConfigKey)
 		if err != nil {
 			return nil, err
 		}
-		cfg := cfgAny.(contract.Config)
+		cfg := cfgAny.(datacontract.Config)
 
-		var dbc contract.DBConfig
+		var dbc datacontract.DBConfig
 		if err := cfg.Unmarshal("database", &dbc); err != nil {
 			return nil, err
 		}
@@ -101,14 +88,8 @@ func (p *Provider) Register(c contract.Container) error {
 	return nil
 }
 
-// Boot sqlx provider 无额外启动逻辑。
-func (p *Provider) Boot(contract.Container) error { return nil }
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
-// normalizeDriver 把配置中的 driver 名归一化为 sqlx.Open 可识别的 driver 名称。
-//
-// 中文说明：
-// - framework 对外沿用统一 database.driver 语义；
-// - 这里负责把业务更常见的 postgres/postgresql/pgsql 归一到 pgx。
 func normalizeDriver(driver string) (string, error) {
 	switch driver {
 	case "sqlite", "sqlite3":

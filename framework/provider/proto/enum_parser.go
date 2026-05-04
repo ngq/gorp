@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // EnumParser 枚举类型解析器。
@@ -34,7 +34,7 @@ type EnumInfo struct {
 	TypeName string
 
 	// Values 枚举值列表
-	Values []contract.EnumValue
+	Values []integrationcontract.EnumValue
 
 	// Comments 注释
 	Comments []string
@@ -174,7 +174,7 @@ func (p *EnumParser) parseConstBlock(decl *ast.GenDecl, enumMap map[string]*Enum
 				}
 			}
 
-			enum.Values = append(enum.Values, contract.EnumValue{
+			enum.Values = append(enum.Values, integrationcontract.EnumValue{
 				Name:     p.toProtoEnumName(name.Name, typeName),
 				Value:    value,
 				Comments: comments,

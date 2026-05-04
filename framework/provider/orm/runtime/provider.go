@@ -3,95 +3,75 @@ package runtime
 import (
 	"os"
 
-	"github.com/ngq/gorp/framework/contract"
+	datacontract "github.com/ngq/gorp/framework/contract/data"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Provider 提供 ORM runtime capability 绑定。
-//
-// 中文说明：
-// - 统一在 framework 层绑定 ORMBackendKey / DBRuntimeKey / MigratorKey / SQLExecutorKey；
-// - 这样 cmd 层不再重复做 capability 绑定，只负责注册 provider；
-// - 当前行为与历史实现保持一致：
-//  1. backend 默认回退 gorm
-//  2. ent backend 暂不提供 migrator（返回 os.ErrInvalid）
-//  3. SQL 执行能力统一走 sqlx。
 type Provider struct{}
 
-// NewProvider 创建 ORM runtime provider。
 func NewProvider() *Provider { return &Provider{} }
 
-// Name 返回 provider 名称。
 func (p *Provider) Name() string { return "orm.runtime" }
 
-// IsDefer 表示 ORM runtime 在应用启动期直接注册。
 func (p *Provider) IsDefer() bool { return false }
 
-// Provides 返回 ORM runtime 对外暴露的统一能力 key。
 func (p *Provider) Provides() []string {
 	return []string{
-		contract.ORMBackendKey,
-		contract.DBRuntimeKey,
-		contract.MigratorKey,
-		contract.SQLExecutorKey,
+		datacontract.ORMBackendKey,
+		datacontract.DBRuntimeKey,
+		datacontract.MigratorKey,
+		datacontract.SQLExecutorKey,
 	}
 }
 
-// Register 绑定 ORM runtime 统一能力。
-//
-// 中文说明：
-// - ORMBackendKey 负责根据 database.backend 解析当前主后端；
-// - DBRuntimeKey 负责把业务真正拿到的运行时对象收敛成一个入口；
-// - MigratorKey 与 SQLExecutorKey 则把迁移、执行 SQL 的常见入口统一成 capability；
-// - 这样业务和 starter 都不必再自己分支判断 gorm / sqlx / ent。
-func (p *Provider) Register(c contract.Container) error {
-	c.Bind(contract.ORMBackendKey, func(c contract.Container) (any, error) {
-		cfgAny, err := c.Make(contract.ConfigKey)
+func (p *Provider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ORMBackendKey, func(c runtimecontract.Container) (any, error) {
+		cfgAny, err := c.Make(datacontract.ConfigKey)
 		if err != nil {
-			return string(contract.RuntimeBackendGorm), nil
+			return string(datacontract.RuntimeBackendGorm), nil
 		}
-		cfg, ok := cfgAny.(contract.Config)
+		cfg, ok := cfgAny.(datacontract.Config)
 		if !ok {
-			return string(contract.RuntimeBackendGorm), nil
+			return string(datacontract.RuntimeBackendGorm), nil
 		}
 
-		var dbc contract.DBConfig
+		var dbc datacontract.DBConfig
 		if err := cfg.Unmarshal("database", &dbc); err != nil {
-			return string(contract.RuntimeBackendGorm), nil
+			return string(datacontract.RuntimeBackendGorm), nil
 		}
-		return string(contract.NormalizeBackendName(dbc.Backend)), nil
+		return string(datacontract.NormalizeBackendName(dbc.Backend)), nil
 	}, true)
 
-	c.Bind(contract.DBRuntimeKey, func(c contract.Container) (any, error) {
-		backendAny, err := c.Make(contract.ORMBackendKey)
+	c.Bind(datacontract.DBRuntimeKey, func(c runtimecontract.Container) (any, error) {
+		backendAny, err := c.Make(datacontract.ORMBackendKey)
 		if err != nil {
-			return c.Make(contract.GormKey)
+			return c.Make(datacontract.GormKey)
 		}
-		switch contract.NormalizeBackendName(backendAny.(string)) {
-		case contract.RuntimeBackendSQLX:
-			return c.Make(contract.SQLXKey)
-		case contract.RuntimeBackendEnt:
-			return c.Make(contract.EntClientKey)
-		case contract.RuntimeBackendGorm:
+		switch datacontract.NormalizeBackendName(backendAny.(string)) {
+		case datacontract.RuntimeBackendSQLX:
+			return c.Make(datacontract.SQLXKey)
+		case datacontract.RuntimeBackendEnt:
+			return c.Make(datacontract.EntClientKey)
+		case datacontract.RuntimeBackendGorm:
 			fallthrough
 		default:
-			return c.Make(contract.GormKey)
+			return c.Make(datacontract.GormKey)
 		}
 	}, true)
 
-	c.Bind(contract.MigratorKey, func(c contract.Container) (any, error) {
-		backendAny, err := c.Make(contract.ORMBackendKey)
-		if err == nil && contract.NormalizeBackendName(backendAny.(string)) == contract.RuntimeBackendEnt {
+	c.Bind(datacontract.MigratorKey, func(c runtimecontract.Container) (any, error) {
+		backendAny, err := c.Make(datacontract.ORMBackendKey)
+		if err == nil && datacontract.NormalizeBackendName(backendAny.(string)) == datacontract.RuntimeBackendEnt {
 			return nil, os.ErrInvalid
 		}
-		return c.Make(contract.GormKey)
+		return c.Make(datacontract.GormKey)
 	}, true)
 
-	c.Bind(contract.SQLExecutorKey, func(c contract.Container) (any, error) {
-		return c.Make(contract.SQLXKey)
+	c.Bind(datacontract.SQLExecutorKey, func(c runtimecontract.Container) (any, error) {
+		return c.Make(datacontract.SQLXKey)
 	}, true)
 
 	return nil
 }
 
-// Boot ORM runtime provider 无额外启动逻辑。
-func (p *Provider) Boot(contract.Container) error { return nil }
+func (p *Provider) Boot(runtimecontract.Container) error { return nil }

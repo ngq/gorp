@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // ValidationConverter 验证规则转换器。
@@ -33,8 +33,8 @@ func NewValidationConverter() *ValidationConverter {
 // - 解析 Go struct tag 中的验证规则；
 // - 转换为 proto 验证注解格式；
 // - 支持 binding 和 validate 两种 tag 格式。
-func (c *ValidationConverter) ConvertTag(tag string, fieldType string) []contract.ValidationRule {
-	var rules []contract.ValidationRule
+func (c *ValidationConverter) ConvertTag(tag string, fieldType string) []integrationcontract.ValidationRule {
+	var rules []integrationcontract.ValidationRule
 
 	// 解析 binding tag
 	bindingRules := c.parseBindingTag(tag)
@@ -52,8 +52,8 @@ func (c *ValidationConverter) ConvertTag(tag string, fieldType string) []contrac
 // 中文说明：
 // - Gin 的 binding tag 格式：`binding:"required,min=6,max=20"`;
 // - 支持常见规则：required, min, max, email, url 等。
-func (c *ValidationConverter) parseBindingTag(tag string) []contract.ValidationRule {
-	var rules []contract.ValidationRule
+func (c *ValidationConverter) parseBindingTag(tag string) []integrationcontract.ValidationRule {
+	var rules []integrationcontract.ValidationRule
 
 	bindingValue := c.extractTagValue(tag, "binding")
 	if bindingValue == "" {
@@ -78,7 +78,7 @@ func (c *ValidationConverter) parseBindingTag(tag string) []contract.ValidationR
 }
 
 // parseSingleBindingRule 解析单个 binding 规则。
-func (c *ValidationConverter) parseSingleBindingRule(part string) contract.ValidationRule {
+func (c *ValidationConverter) parseSingleBindingRule(part string) integrationcontract.ValidationRule {
 	// 处理 key=value 格式
 	if strings.Contains(part, "=") {
 		kv := strings.SplitN(part, "=", 2)
@@ -88,27 +88,27 @@ func (c *ValidationConverter) parseSingleBindingRule(part string) contract.Valid
 		switch key {
 		case "min":
 			if num, err := strconv.Atoi(value); err == nil {
-				return contract.ValidationRule{
+				return integrationcontract.ValidationRule{
 					Rule:  "min_len",
 					Value: num,
 				}
 			}
 		case "max":
 			if num, err := strconv.Atoi(value); err == nil {
-				return contract.ValidationRule{
+				return integrationcontract.ValidationRule{
 					Rule:  "max_len",
 					Value: num,
 				}
 			}
 		case "len":
 			if num, err := strconv.Atoi(value); err == nil {
-				return contract.ValidationRule{
+				return integrationcontract.ValidationRule{
 					Rule:  "len",
 					Value: num,
 				}
 			}
 		case "eqfield":
-			return contract.ValidationRule{
+			return integrationcontract.ValidationRule{
 				Rule:  "eq_field",
 				Value: value,
 			}
@@ -118,22 +118,22 @@ func (c *ValidationConverter) parseSingleBindingRule(part string) contract.Valid
 	// 处理无值规则
 	switch part {
 	case "required":
-		return contract.ValidationRule{Rule: "required", Value: true}
+		return integrationcontract.ValidationRule{Rule: "required", Value: true}
 	case "email":
-		return contract.ValidationRule{Rule: "email", Value: true}
+		return integrationcontract.ValidationRule{Rule: "email", Value: true}
 	case "url", "uri":
-		return contract.ValidationRule{Rule: "uri", Value: true}
+		return integrationcontract.ValidationRule{Rule: "uri", Value: true}
 	case "uuid":
-		return contract.ValidationRule{Rule: "uuid", Value: true}
+		return integrationcontract.ValidationRule{Rule: "uuid", Value: true}
 	case "alphanum":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z0-9]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z0-9]+$"}
 	case "numeric":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[0-9]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[0-9]+$"}
 	case "alpha":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z]+$"}
 	}
 
-	return contract.ValidationRule{}
+	return integrationcontract.ValidationRule{}
 }
 
 // parseValidateTag 解析 validate tag。
@@ -141,8 +141,8 @@ func (c *ValidationConverter) parseSingleBindingRule(part string) contract.Valid
 // 中文说明：
 // - 标准的 validator/v10 格式：`validate:"required,min=6,max=20"`;
 // - 支持更丰富的规则。
-func (c *ValidationConverter) parseValidateTag(tag string) []contract.ValidationRule {
-	var rules []contract.ValidationRule
+func (c *ValidationConverter) parseValidateTag(tag string) []integrationcontract.ValidationRule {
+	var rules []integrationcontract.ValidationRule
 
 	validateValue := c.extractTagValue(tag, "validate")
 	if validateValue == "" {
@@ -166,7 +166,7 @@ func (c *ValidationConverter) parseValidateTag(tag string) []contract.Validation
 }
 
 // parseSingleValidateRule 解析单个 validate 规则。
-func (c *ValidationConverter) parseSingleValidateRule(part string) contract.ValidationRule {
+func (c *ValidationConverter) parseSingleValidateRule(part string) integrationcontract.ValidationRule {
 	if strings.Contains(part, "=") {
 		kv := strings.SplitN(part, "=", 2)
 		key := strings.TrimSpace(kv[0])
@@ -175,98 +175,98 @@ func (c *ValidationConverter) parseSingleValidateRule(part string) contract.Vali
 		switch key {
 		case "min":
 			if num, err := strconv.Atoi(value); err == nil {
-				return contract.ValidationRule{Rule: "min_len", Value: num}
+				return integrationcontract.ValidationRule{Rule: "min_len", Value: num}
 			}
 		case "max":
 			if num, err := strconv.Atoi(value); err == nil {
-				return contract.ValidationRule{Rule: "max_len", Value: num}
+				return integrationcontract.ValidationRule{Rule: "max_len", Value: num}
 			}
 		case "len":
 			if num, err := strconv.Atoi(value); err == nil {
-				return contract.ValidationRule{Rule: "len", Value: num}
+				return integrationcontract.ValidationRule{Rule: "len", Value: num}
 			}
 		case "gte", "gtefield":
 			if num, err := strconv.ParseFloat(value, 64); err == nil {
-				return contract.ValidationRule{Rule: "gte", Value: num}
+				return integrationcontract.ValidationRule{Rule: "gte", Value: num}
 			}
 		case "lte", "ltefield":
 			if num, err := strconv.ParseFloat(value, 64); err == nil {
-				return contract.ValidationRule{Rule: "lte", Value: num}
+				return integrationcontract.ValidationRule{Rule: "lte", Value: num}
 			}
 		case "gt":
 			if num, err := strconv.ParseFloat(value, 64); err == nil {
-				return contract.ValidationRule{Rule: "gt", Value: num}
+				return integrationcontract.ValidationRule{Rule: "gt", Value: num}
 			}
 		case "lt":
 			if num, err := strconv.ParseFloat(value, 64); err == nil {
-				return contract.ValidationRule{Rule: "lt", Value: num}
+				return integrationcontract.ValidationRule{Rule: "lt", Value: num}
 			}
 		case "oneof":
-			return contract.ValidationRule{Rule: "in", Value: strings.Split(value, " ")}
+			return integrationcontract.ValidationRule{Rule: "in", Value: strings.Split(value, " ")}
 		case "excludesall":
-			return contract.ValidationRule{Rule: "not_in", Value: strings.Split(value, " ")}
+			return integrationcontract.ValidationRule{Rule: "not_in", Value: strings.Split(value, " ")}
 		case "unique":
-			return contract.ValidationRule{Rule: "unique", Value: true}
+			return integrationcontract.ValidationRule{Rule: "unique", Value: true}
 		case "contains":
-			return contract.ValidationRule{Rule: "contains", Value: value}
+			return integrationcontract.ValidationRule{Rule: "contains", Value: value}
 		case "excludes":
-			return contract.ValidationRule{Rule: "not_contains", Value: value}
+			return integrationcontract.ValidationRule{Rule: "not_contains", Value: value}
 		case "startswith":
-			return contract.ValidationRule{Rule: "prefix", Value: value}
+			return integrationcontract.ValidationRule{Rule: "prefix", Value: value}
 		case "endswith":
-			return contract.ValidationRule{Rule: "suffix", Value: value}
+			return integrationcontract.ValidationRule{Rule: "suffix", Value: value}
 		case "datetime":
-			return contract.ValidationRule{Rule: "pattern", Value: value}
+			return integrationcontract.ValidationRule{Rule: "pattern", Value: value}
 		}
 	}
 
 	// 无值规则
 	switch part {
 	case "required":
-		return contract.ValidationRule{Rule: "required", Value: true}
+		return integrationcontract.ValidationRule{Rule: "required", Value: true}
 	case "email":
-		return contract.ValidationRule{Rule: "email", Value: true}
+		return integrationcontract.ValidationRule{Rule: "email", Value: true}
 	case "url":
-		return contract.ValidationRule{Rule: "uri", Value: true}
+		return integrationcontract.ValidationRule{Rule: "uri", Value: true}
 	case "uuid":
-		return contract.ValidationRule{Rule: "uuid", Value: true}
+		return integrationcontract.ValidationRule{Rule: "uuid", Value: true}
 	case "uuid4":
-		return contract.ValidationRule{Rule: "uuid4", Value: true}
+		return integrationcontract.ValidationRule{Rule: "uuid4", Value: true}
 	case "uuid5":
-		return contract.ValidationRule{Rule: "uuid5", Value: true}
+		return integrationcontract.ValidationRule{Rule: "uuid5", Value: true}
 	case "ascii":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[\x00-\x7F]*$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[\x00-\x7F]*$"}
 	case "printascii":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[\x20-\x7E]*$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[\x20-\x7E]*$"}
 	case "alphanum":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z0-9]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z0-9]+$"}
 	case "alpha":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[a-zA-Z]+$"}
 	case "numeric":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[0-9]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[0-9]+$"}
 	case "number":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[0-9]+\\.?[0-9]*$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[0-9]+\\.?[0-9]*$"}
 	case "hexadecimal":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[0-9a-fA-F]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[0-9a-fA-F]+$"}
 	case "hexcolor":
-		return contract.ValidationRule{Rule: "pattern", Value: "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"}
 	case "rgb":
-		return contract.ValidationRule{Rule: "pattern", Value: "^rgb\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*\\)$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^rgb\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*\\)$"}
 	case "rgba":
-		return contract.ValidationRule{Rule: "pattern", Value: "^rgba\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*([01]\\.?\\d*?)\\s*\\)$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^rgba\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*([01]\\.?\\d*?)\\s*\\)$"}
 	case "hsl":
-		return contract.ValidationRule{Rule: "pattern", Value: "^hsl\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})%\\s*,\\s*(\\d{1,3})%\\s*\\)$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^hsl\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})%\\s*,\\s*(\\d{1,3})%\\s*\\)$"}
 	case "hsla":
-		return contract.ValidationRule{Rule: "pattern", Value: "^hsla\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})%\\s*,\\s*(\\d{1,3})%\\s*,\\s*([01]\\.?\\d*?)\\s*\\)$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^hsla\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})%\\s*,\\s*(\\d{1,3})%\\s*,\\s*([01]\\.?\\d*?)\\s*\\)$"}
 	case "json":
-		return contract.ValidationRule{Rule: "pattern", Value: "^\\s*([\\[\\{].*[\\]\\}])\\s*$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^\\s*([\\[\\{].*[\\]\\}])\\s*$"}
 	case "file":
-		return contract.ValidationRule{Rule: "pattern", Value: "^[^\\\\/:*?\"<>|]+$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^[^\\\\/:*?\"<>|]+$"}
 	case "base64":
-		return contract.ValidationRule{Rule: "pattern", Value: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"}
+		return integrationcontract.ValidationRule{Rule: "pattern", Value: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"}
 	}
 
-	return contract.ValidationRule{}
+	return integrationcontract.ValidationRule{}
 }
 
 // extractTagValue 提取 tag 值。
@@ -285,7 +285,7 @@ func (c *ValidationConverter) extractTagValue(tagStr, key string) string {
 // 中文说明：
 // - 根据验证规则生成 protoc-gen-validate 格式的注解；
 // - 例如：`[(validate.rules).string.min_len = 6]`。
-func GenerateProtoValidation(fieldType string, rules []contract.ValidationRule) string {
+func GenerateProtoValidation(fieldType string, rules []integrationcontract.ValidationRule) string {
 	if len(rules) == 0 {
 		return ""
 	}
@@ -307,7 +307,7 @@ func GenerateProtoValidation(fieldType string, rules []contract.ValidationRule) 
 }
 
 // ruleToProtoValidation 将单个规则转换为 proto 验证格式。
-func (c *ValidationConverter) ruleToProtoValidation(fieldType string, rule contract.ValidationRule) string {
+func (c *ValidationConverter) ruleToProtoValidation(fieldType string, rule integrationcontract.ValidationRule) string {
 	// 根据字段类型选择验证器
 	typePrefix := ""
 	switch fieldType {

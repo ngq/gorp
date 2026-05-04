@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // TypeResolver 类型解析器。
@@ -23,7 +23,7 @@ type TypeResolver struct {
 	importPaths []string
 
 	// cache 类型定义缓存（filePath -> typeName -> TypeDef）
-	cache map[string]map[string]*contract.TypeDef
+	cache map[string]map[string]*integrationcontract.TypeDef
 
 	// resolvedFiles 已解析的文件路径
 	resolvedFiles map[string]bool
@@ -36,9 +36,9 @@ type TypeResolver struct {
 // - 用于查找 import 的类型定义文件。
 func NewTypeResolver(importPaths []string) *TypeResolver {
 	return &TypeResolver{
-		importPaths:    importPaths,
-		cache:          make(map[string]map[string]*contract.TypeDef),
-		resolvedFiles:  make(map[string]bool),
+		importPaths:   importPaths,
+		cache:         make(map[string]map[string]*integrationcontract.TypeDef),
+		resolvedFiles: make(map[string]bool),
 	}
 }
 
@@ -99,7 +99,7 @@ func (r *TypeResolver) findImportFile(importPath, baseDir string) string {
 // - 从指定文件中解析类型定义；
 // - 支持递归解析嵌套类型；
 // - 返回类型定义和所有依赖的类型。
-func (r *TypeResolver) ResolveType(typeName, filePath string) (*contract.TypeDef, []string, error) {
+func (r *TypeResolver) ResolveType(typeName, filePath string) (*integrationcontract.TypeDef, []string, error) {
 	// 检查缓存
 	if cached, ok := r.cache[filePath]; ok {
 		if typeDef, exists := cached[typeName]; exists {
@@ -142,8 +142,8 @@ func (r *TypeResolver) ResolveType(typeName, filePath string) (*contract.TypeDef
 // 中文说明：
 // - 解析指定 import 路径下的类型；
 // - 返回所有解析到的类型定义。
-func (r *TypeResolver) ResolveTypesFromImport(importPath string, typeNames []string, baseDir string) (map[string]*contract.TypeDef, error) {
-	result := make(map[string]*contract.TypeDef)
+func (r *TypeResolver) ResolveTypesFromImport(importPath string, typeNames []string, baseDir string) (map[string]*integrationcontract.TypeDef, error) {
+	result := make(map[string]*integrationcontract.TypeDef)
 
 	// 查找 import 对应的目录
 	dir := r.findImportFile(importPath, baseDir)
@@ -194,8 +194,8 @@ func (r *TypeResolver) ResolveTypesFromImport(importPath string, typeNames []str
 // 中文说明：
 // - 遍历 AST 提取所有结构体定义；
 // - 返回类型名到类型定义的映射（包含字段和注释）。
-func (r *TypeResolver) extractStructDefs(f *ast.File) map[string]*contract.TypeDef {
-	structDefs := make(map[string]*contract.TypeDef)
+func (r *TypeResolver) extractStructDefs(f *ast.File) map[string]*integrationcontract.TypeDef {
+	structDefs := make(map[string]*integrationcontract.TypeDef)
 
 	for _, decl := range f.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
@@ -227,7 +227,7 @@ func (r *TypeResolver) extractStructDefs(f *ast.File) map[string]*contract.TypeD
 			}
 
 			fields := r.extractStructFields(structType)
-			structDefs[typeSpec.Name.Name] = &contract.TypeDef{
+			structDefs[typeSpec.Name.Name] = &integrationcontract.TypeDef{
 				Name:     typeSpec.Name.Name,
 				Fields:   fields,
 				Comments: comments,
@@ -239,8 +239,8 @@ func (r *TypeResolver) extractStructDefs(f *ast.File) map[string]*contract.TypeD
 }
 
 // extractStructFields 提取结构体字段。
-func (r *TypeResolver) extractStructFields(structType *ast.StructType) []contract.FieldDef {
-	var fields []contract.FieldDef
+func (r *TypeResolver) extractStructFields(structType *ast.StructType) []integrationcontract.FieldDef {
+	var fields []integrationcontract.FieldDef
 
 	if structType.Fields == nil {
 		return fields
@@ -283,7 +283,7 @@ func (r *TypeResolver) extractStructFields(structType *ast.StructType) []contrac
 			}
 		}
 
-		fields = append(fields, contract.FieldDef{
+		fields = append(fields, integrationcontract.FieldDef{
 			Name:      fieldName,
 			JSONName:  jsonName,
 			ProtoName: protoName,
@@ -319,8 +319,8 @@ func (r *TypeResolver) isBuiltInType(typeName string) bool {
 // - 从主文件开始，递归解析所有引用的类型；
 // - 返回所有解析到的类型定义；
 // - 支持跨 import 的类型解析。
-func (r *TypeResolver) ResolveAllTypes(mainFile string, initialTypes []string) (map[string]*contract.TypeDef, error) {
-	allTypes := make(map[string]*contract.TypeDef)
+func (r *TypeResolver) ResolveAllTypes(mainFile string, initialTypes []string) (map[string]*integrationcontract.TypeDef, error) {
+	allTypes := make(map[string]*integrationcontract.TypeDef)
 	toResolve := make(map[string]bool)
 
 	// 初始化待解析类型

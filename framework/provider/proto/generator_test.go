@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ngq/gorp/framework/contract"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // TestGenerator_GenFromService 测试从 Service 生成 Proto。
@@ -58,7 +58,7 @@ type CreateUserResponse struct {
 	}
 
 	// 创建 Generator
-	cfg := &contract.ProtoGeneratorConfig{
+	cfg := &integrationcontract.ProtoGeneratorConfig{
 		DefaultProtoDir: tmpDir,
 	}
 	gen, err := NewGenerator(cfg)
@@ -68,13 +68,13 @@ type CreateUserResponse struct {
 
 	// 生成 Proto
 	outputPath := filepath.Join(tmpDir, "user.proto")
-	opts := contract.ServiceToProtoOptions{
-		ServicePath:  servicePath,
-		ServiceName:  "UserService",
-		OutputPath:   outputPath,
-		Package:      "api.user.v1",
-		GoPackage:    "github.com/example/api/user/v1;v1",
-		IncludeHTTP:  true,
+	opts := integrationcontract.ServiceToProtoOptions{
+		ServicePath: servicePath,
+		ServiceName: "UserService",
+		OutputPath:  outputPath,
+		Package:     "api.user.v1",
+		GoPackage:   "github.com/example/api/user/v1;v1",
+		IncludeHTTP: true,
 	}
 
 	err = gen.GenFromService(context.Background(), opts)
@@ -132,7 +132,7 @@ type OrderService interface {
 		t.Fatalf("failed to write service file: %v", err)
 	}
 
-	cfg := &contract.ProtoGeneratorConfig{}
+	cfg := &integrationcontract.ProtoGeneratorConfig{}
 	gen, err := NewGenerator(cfg)
 	if err != nil {
 		t.Fatalf("failed to create generator: %v", err)
@@ -196,7 +196,7 @@ func TestGenerator_ScanProtoFiles(t *testing.T) {
 		}
 	}
 
-	cfg := &contract.ProtoGeneratorConfig{
+	cfg := &integrationcontract.ProtoGeneratorConfig{
 		DefaultProtoDir: tmpDir,
 	}
 	gen, err := NewGenerator(cfg)
@@ -220,8 +220,8 @@ func TestGenerator_ScanProtoFiles(t *testing.T) {
 // 中文说明：
 // - 验证 Generator 正确初始化。
 func TestNewGenerator(t *testing.T) {
-	cfg := &contract.ProtoGeneratorConfig{
-		DefaultProtoDir:      "./proto",
+	cfg := &integrationcontract.ProtoGeneratorConfig{
+		DefaultProtoDir:       "./proto",
 		IncludeHTTPAnnotation: true,
 		ThirdPartyPaths:       []string{"/usr/local/include"},
 	}
