@@ -2,36 +2,30 @@ package token
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 type middlewareAuthStub struct {
 	err error
 }
 
-func (s *middlewareAuthStub) Authenticate(ctx context.Context) (*contract.ServiceIdentity, error) {
+func (s *middlewareAuthStub) Authenticate(ctx context.Context) (*securitycontract.ServiceIdentity, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &contract.ServiceIdentity{ServiceName: "order-service"}, nil
-}
-func (s *middlewareAuthStub) AuthenticateWithToken(ctx context.Context, token string) (*contract.ServiceIdentity, error) {
-	return s.Authenticate(ctx)
-}
-func (s *middlewareAuthStub) AuthenticateWithCert(ctx context.Context, cert *tls.Certificate) (*contract.ServiceIdentity, error) {
-	return nil, errors.New("not implemented")
+	return &securitycontract.ServiceIdentity{ServiceName: "order-service"}, nil
 }
 func (s *middlewareAuthStub) GenerateToken(ctx context.Context, targetService string) (string, error) {
 	return "", nil
 }
-func (s *middlewareAuthStub) VerifyToken(ctx context.Context, tokenString string) (*contract.ServiceIdentity, error) {
+func (s *middlewareAuthStub) VerifyToken(ctx context.Context, tokenString string) (*securitycontract.ServiceIdentity, error) {
 	return s.Authenticate(ctx)
 }
 
@@ -39,13 +33,26 @@ func TestServiceAuthHTTPMiddleware_AllowsAnonymousHTTPRequests(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
 		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
-		ServiceAuthHTTPMiddleware(&middlewareAuthStub{err: errors.New("should not be called")})(httpCtx, func() {
-			c.Request = httpCtx.Request()
+		httpCtx.SetResponseFuncs(
+			c.JSON,
+			func(code int, body string) { c.String(code, body) },
+			c.XML,
+			c.Data,
+			c.Redirect,
+			c.Status,
+			func() int { return c.Writer.Status() },
+		)
+		wrapped := ServiceAuthHTTPMiddleware(&middlewareAuthStub{err: errors.New("should not be called")})(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
 			c.Next()
 		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
 	})
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -64,13 +71,26 @@ func TestServiceAuthHTTPMiddleware_RejectsInvalidServiceToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
 		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
-		ServiceAuthHTTPMiddleware(&middlewareAuthStub{err: errors.New("bad token")})(httpCtx, func() {
-			c.Request = httpCtx.Request()
+		httpCtx.SetResponseFuncs(
+			c.JSON,
+			func(code int, body string) { c.String(code, body) },
+			c.XML,
+			c.Data,
+			c.Redirect,
+			c.Status,
+			func() int { return c.Writer.Status() },
+		)
+		wrapped := ServiceAuthHTTPMiddleware(&middlewareAuthStub{err: errors.New("bad token")})(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
 			c.Next()
 		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
 	})
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})

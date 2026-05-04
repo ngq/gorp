@@ -5,18 +5,17 @@ import (
 	"os"
 
 	apphttp "{{.Module}}/app/http"
-	frameworkbootstrap "{{.FrameworkModule}}/framework/bootstrap"
+	"{{.FrameworkModule}}"
 )
 
-// main 是 starter 项目的默认入口。
 func main() {
-	if err := frameworkbootstrap.BootHTTPService("{{.Name}}", frameworkbootstrap.HTTPServiceOptions{}, nil, setup); err != nil {
+	if err := gorp.Run("{{.Name}}", gorp.HTTP(), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func setup(rt *frameworkbootstrap.HTTPServiceRuntime) error {
+func setup(rt *gorp.HTTPRuntime) error {
 	apphttp.RegisterRoutes(rt.Router)
 	return nil
 }

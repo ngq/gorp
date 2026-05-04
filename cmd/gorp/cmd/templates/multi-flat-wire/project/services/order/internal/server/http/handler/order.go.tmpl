@@ -24,7 +24,7 @@ func (h *OrderHandler) List(c gorp.HTTPContext) {
 
 	items, total, err := h.order.List(c.Context(), page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		gorp.Error(c, err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *OrderHandler) List(c gorp.HTTPContext) {
 		}
 	}
 
-	c.JSON(http.StatusOK, response.OrderList{
+	gorp.Success(c, response.OrderList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -54,7 +54,7 @@ func (h *OrderHandler) List(c gorp.HTTPContext) {
 func (h *OrderHandler) GetByID(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *OrderHandler) GetByID(c gorp.HTTPContext) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Order{
+	gorp.Success(c, response.Order{
 		ID:          order.ID,
 		UserID:      order.UserID,
 		ProductID:   order.ProductID,
@@ -80,7 +80,7 @@ func (h *OrderHandler) GetByID(c gorp.HTTPContext) {
 func (h *OrderHandler) Create(c gorp.HTTPContext) {
 	var req request.CreateOrder
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
+		gorp.BadRequest(c, err.Error())
 		return
 	}
 
@@ -92,11 +92,11 @@ func (h *OrderHandler) Create(c gorp.HTTPContext) {
 		TotalPrice:  req.TotalPrice,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		gorp.Error(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, response.Order{
+	gorp.SuccessWithStatus(c, http.StatusCreated, response.Order{
 		ID:          order.ID,
 		UserID:      order.UserID,
 		ProductID:   order.ProductID,
@@ -112,12 +112,12 @@ func (h *OrderHandler) Create(c gorp.HTTPContext) {
 func (h *OrderHandler) Delete(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.order.Delete(c.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		gorp.Error(c, err)
 		return
 	}
 
@@ -127,7 +127,7 @@ func (h *OrderHandler) Delete(c gorp.HTTPContext) {
 func (h *OrderHandler) GetOrderUser(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -137,7 +137,7 @@ func (h *OrderHandler) GetOrderUser(c gorp.HTTPContext) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.RemoteUser{
+	gorp.Success(c, response.RemoteUser{
 		ID:                resp.ID,
 		Username:          resp.Username,
 		Email:             resp.Email,
@@ -151,7 +151,7 @@ func (h *OrderHandler) GetOrderUser(c gorp.HTTPContext) {
 func (h *OrderHandler) LockOrderDemo(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -161,7 +161,7 @@ func (h *OrderHandler) LockOrderDemo(c gorp.HTTPContext) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.LockDemo{
+	gorp.Success(c, response.LockDemo{
 		Key:     resp.Key,
 		Success: resp.Success,
 	})

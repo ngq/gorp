@@ -175,7 +175,8 @@ func TestRenderMultiFlatWireTemplateIncludesTests(t *testing.T) {
 	for _, rel := range handlerFiles {
 		content, err := os.ReadFile(filepath.Join(projectDir, filepath.FromSlash(rel)))
 		require.NoError(t, err, rel)
-		require.Contains(t, string(content), "c.JSON(", rel)
+		require.Contains(t, string(content), "gorp.Success(", rel)
+		require.Contains(t, string(content), "gorp.Error(", rel)
 	}
 
 	structure, err := os.ReadFile(filepath.Join(projectDir, "docs", "structure.md"))

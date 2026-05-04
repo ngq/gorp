@@ -4,32 +4,27 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
-// Response 是统一的 API 响应结构。
-//
-// 中文说明：
-// - 所有 HTTP API 响应都应使用此结构；
-// - code=0 表示成功，非 0 表示业务错误；
-// - message 是人类可读的描述；
-// - data 是实际返回数据（成功时）或错误详情（失败时）；
-// - request_id 和 trace_id 通过响应头返回（X-Request-Id, X-Trace-Id）。
 type Response struct {
-	// Code 业务状态码，0=成功，非 0=业务错误
-	Code int `json:"code"`
-
-	// Message 人类可读的消息描述
+	Code    int    `json:"code"`
 	Message string `json:"message"`
-
-	// Data 实际数据或错误详情
-	Data any `json:"data,omitempty"`
+	Data    any    `json:"data,omitempty"`
 }
 
-// writeResponseHeaders 将链路追踪 ID 写入响应头。
-func writeResponseHeaders(c contract.HTTPContext) {
-	requestID, _ := contract.FromRequestIDContext(c.Context())
-	traceID, _ := contract.FromTraceIDContext(c.Context())
+type DefaultResponder struct{}
+
+var DefaultResponderInstance transportcontract.HTTPResponder = DefaultResponder{}
+
+func NewDefaultResponder() transportcontract.HTTPResponder {
+	return DefaultResponderInstance
+}
+
+func writeResponseHeaders(c transportcontract.HTTPContext) {
+	requestID, _ := supportcontract.FromRequestIDContext(c.Context())
+	traceID, _ := supportcontract.FromTraceIDContext(c.Context())
 
 	if requestID != "" {
 		c.Header("X-Request-Id", requestID)
@@ -39,12 +34,11 @@ func writeResponseHeaders(c contract.HTTPContext) {
 	}
 }
 
-// Success 返回成功响应。
-//
-// 中文说明：
-// - 用于 Handler 返回成功数据；
-// - request_id 和 trace_id 通过响应头返回。
-func Success(c contract.HTTPContext, data any) {
+func Success(c transportcontract.HTTPContext, data any) {
+	DefaultResponderInstance.Success(c, data)
+}
+
+func (DefaultResponder) Success(c transportcontract.HTTPContext, data any) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    0,
@@ -54,8 +48,11 @@ func Success(c contract.HTTPContext, data any) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// SuccessWithMessage 返回成功响应并自定义消息。
-func SuccessWithMessage(c contract.HTTPContext, message string, data any) {
+func SuccessWithMessage(c transportcontract.HTTPContext, message string, data any) {
+	DefaultResponderInstance.SuccessWithMessage(c, message, data)
+}
+
+func (DefaultResponder) SuccessWithMessage(c transportcontract.HTTPContext, message string, data any) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    0,
@@ -65,8 +62,11 @@ func SuccessWithMessage(c contract.HTTPContext, message string, data any) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// SuccessWithStatus 返回成功响应并自定义 HTTP 状态码。
-func SuccessWithStatus(c contract.HTTPContext, status int, data any) {
+func SuccessWithStatus(c transportcontract.HTTPContext, status int, data any) {
+	DefaultResponderInstance.SuccessWithStatus(c, status, data)
+}
+
+func (DefaultResponder) SuccessWithStatus(c transportcontract.HTTPContext, status int, data any) {
 	writeResponseHeaders(c)
 	resp := Response{
 		Code:    0,
@@ -76,13 +76,11 @@ func SuccessWithStatus(c contract.HTTPContext, status int, data any) {
 	c.JSON(status, resp)
 }
 
-// Error 返回业务错误响应。
-//
-// 中文说明：
-// - 用于 Handler 返回业务错误；
-// - 根据 Error 的 Code 自动选择 HTTP 状态码；
-// - request_id 和 trace_id 通过响应头返回。
-func Error(c contract.HTTPContext, err error) {
+func Error(c transportcontract.HTTPContext, err error) {
+	DefaultResponderInstance.Error(c, err)
+}
+
+func (DefaultResponder) Error(c transportcontract.HTTPContext, err error) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	httpStatus := codeToHTTPStatus(code)
@@ -95,8 +93,7 @@ func Error(c contract.HTTPContext, err error) {
 	c.JSON(httpStatus, resp)
 }
 
-// ErrorWithData 返回业务错误响应并附带数据。
-func ErrorWithData(c contract.HTTPContext, err error, data any) {
+func ErrorWithData(c transportcontract.HTTPContext, err error, data any) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	httpStatus := codeToHTTPStatus(code)
@@ -109,8 +106,7 @@ func ErrorWithData(c contract.HTTPContext, err error, data any) {
 	c.JSON(httpStatus, resp)
 }
 
-// ErrorWithStatus 返回业务错误响应并自定义 HTTP 状态码。
-func ErrorWithStatus(c contract.HTTPContext, status int, err error) {
+func ErrorWithStatus(c transportcontract.HTTPContext, status int, err error) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 
@@ -122,78 +118,52 @@ func ErrorWithStatus(c contract.HTTPContext, status int, err error) {
 	c.JSON(status, resp)
 }
 
-// BadRequest 返回 400 参数错误响应。
-func BadRequest(c contract.HTTPContext, message string) {
+func BadRequest(c transportcontract.HTTPContext, message string) {
+	DefaultResponderInstance.BadRequest(c, message)
+}
+
+func (DefaultResponder) BadRequest(c transportcontract.HTTPContext, message string) {
 	writeResponseHeaders(c)
-	resp := Response{
-		Code:    CodeBadRequest,
-		Message: message,
-		Data:    nil,
-	}
+	resp := Response{Code: CodeBadRequest, Message: message}
 	c.JSON(http.StatusBadRequest, resp)
 }
 
-// Unauthorized 返回 401 未认证响应。
-func Unauthorized(c contract.HTTPContext, message string) {
+func Unauthorized(c transportcontract.HTTPContext, message string) {
 	writeResponseHeaders(c)
-	resp := Response{
-		Code:    CodeUnauthorized,
-		Message: message,
-		Data:    nil,
-	}
+	resp := Response{Code: CodeUnauthorized, Message: message}
 	c.JSON(http.StatusUnauthorized, resp)
 }
 
-// Forbidden 返回 403 禁止访问响应。
-func Forbidden(c contract.HTTPContext, message string) {
+func Forbidden(c transportcontract.HTTPContext, message string) {
 	writeResponseHeaders(c)
-	resp := Response{
-		Code:    CodeForbidden,
-		Message: message,
-		Data:    nil,
-	}
+	resp := Response{Code: CodeForbidden, Message: message}
 	c.JSON(http.StatusForbidden, resp)
 }
 
-// NotFound 返回 404 未找到响应。
-func NotFound(c contract.HTTPContext, message string) {
+func NotFound(c transportcontract.HTTPContext, message string) {
 	writeResponseHeaders(c)
-	resp := Response{
-		Code:    CodeNotFound,
-		Message: message,
-		Data:    nil,
-	}
+	resp := Response{Code: CodeNotFound, Message: message}
 	c.JSON(http.StatusNotFound, resp)
 }
 
-// InternalError 返回 500 内部错误响应。
-func InternalError(c contract.HTTPContext, message string) {
+func InternalError(c transportcontract.HTTPContext, message string) {
+	DefaultResponderInstance.InternalError(c, message)
+}
+
+func (DefaultResponder) InternalError(c transportcontract.HTTPContext, message string) {
 	writeResponseHeaders(c)
-	resp := Response{
-		Code:    CodeInternalError,
-		Message: message,
-		Data:    nil,
-	}
+	resp := Response{Code: CodeInternalError, Message: message}
 	c.JSON(http.StatusInternalServerError, resp)
 }
 
-// PaginatedData 是分页数据结构。
 type PaginatedData struct {
-	// Items 数据列表
-	Items any `json:"items"`
-
-	// Total 总数量
-	Total int64 `json:"total"`
-
-	// Page 当前页码
-	Page int `json:"page"`
-
-	// PageSize 每页数量
-	PageSize int `json:"page_size"`
+	Items    any   `json:"items"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
 }
 
-// SuccessPaginated 返回分页成功响应。
-func SuccessPaginated(c contract.HTTPContext, items any, total int64, page, pageSize int) {
+func SuccessPaginated(c transportcontract.HTTPContext, items any, total int64, page, pageSize int) {
 	data := PaginatedData{
 		Items:    items,
 		Total:    total,
@@ -203,63 +173,40 @@ func SuccessPaginated(c contract.HTTPContext, items any, total int64, page, page
 	Success(c, data)
 }
 
-// --- 业务错误码定义 ---
-//
-// 中文说明：
-// - 错误码范围划分：
-//   - 0: 成功
-//   - 1-9999: 通用错误
-//   - 10000-19999: 用户模块错误
-//   - 20000-29999: 订单模块错误
-//   - 30000-39999: 商品模块错误
-//   - 40000-49999: 支付模块错误
-//   - 其他模块按需扩展
-
 const (
-	// 成功
 	CodeSuccess = 0
 
-	// 通用错误 (1-9999)
-	CodeBadRequest         = 1001 // 参数错误
-	CodeUnauthorized       = 1002 // 未认证
-	CodeForbidden          = 1003 // 禁止访问
-	CodeNotFound           = 1004 // 未找到
-	CodeInternalError      = 1005 // 内部错误
-	CodeServiceUnavailable = 1006 // 服务不可用
-	CodeTooManyRequests    = 1007 // 请求过多
-	CodeConflict           = 1008 // 资源冲突
-	CodeValidationFailed   = 1009 // 验证失败
+	CodeBadRequest         = 1001
+	CodeUnauthorized       = 1002
+	CodeForbidden          = 1003
+	CodeNotFound           = 1004
+	CodeInternalError      = 1005
+	CodeServiceUnavailable = 1006
+	CodeTooManyRequests    = 1007
+	CodeConflict           = 1008
+	CodeValidationFailed   = 1009
 
-	// 用户模块错误 (10000-19999)
-	CodeUserNotFound      = 10001 // 用户不存在
-	CodeUserAlreadyExists = 10002 // 用户已存在
-	CodeUserPasswordWrong = 10003 // 密码错误
-	CodeUserDisabled      = 10004 // 用户已禁用
-	CodeUserTokenExpired  = 10005 // Token 已过期
-	CodeUserTokenInvalid  = 10006 // Token 无效
+	CodeUserNotFound      = 10001
+	CodeUserAlreadyExists = 10002
+	CodeUserPasswordWrong = 10003
+	CodeUserDisabled      = 10004
+	CodeUserTokenExpired  = 10005
+	CodeUserTokenInvalid  = 10006
 
-	// 订单模块错误 (20000-29999)
-	CodeOrderNotFound      = 20001 // 订单不存在
-	CodeOrderStatusInvalid = 20002 // 订单状态无效
-	CodeOrderAlreadyPaid   = 20003 // 订单已支付
-	CodeOrderCanceled      = 20004 // 订单已取消
+	CodeOrderNotFound      = 20001
+	CodeOrderStatusInvalid = 20002
+	CodeOrderAlreadyPaid   = 20003
+	CodeOrderCanceled      = 20004
 
-	// 商品模块错误 (30000-39999)
-	CodeProductNotFound   = 30001 // 商品不存在
-	CodeProductOutOfStock = 30002 // 商品库存不足
-	CodeProductDisabled   = 30003 // 商品已下架
+	CodeProductNotFound   = 30001
+	CodeProductOutOfStock = 30002
+	CodeProductDisabled   = 30003
 
-	// 支付模块错误 (40000-49999)
-	CodePaymentFailed   = 40001 // 支付失败
-	CodePaymentTimeout  = 40002 // 支付超时
-	CodePaymentCanceled = 40003 // 支付已取消
+	CodePaymentFailed   = 40001
+	CodePaymentTimeout  = 40002
+	CodePaymentCanceled = 40003
 )
 
-// writeGinResponseHeaders 仅供 provider/gin 内部兼容路径使用。
-//
-// 中文说明：
-// - 某些仍未迁移到 framework HTTPContext 的 Gin-only 中间件/辅助函数会继续复用它；
-// - 它不是默认业务主线能力，只是 provider 内部收口过程中的实现细节。
 func writeGinResponseHeaders(c *gin.Context) {
 	if c == nil {
 		return
@@ -267,22 +214,18 @@ func writeGinResponseHeaders(c *gin.Context) {
 	writeResponseHeaders(newHTTPContext(c))
 }
 
-// --- 内部辅助函数 ---
 func parseError(err error) (int, string) {
 	if err == nil {
 		return CodeSuccess, "success"
 	}
 
-	// 尝试解析自定义错误类型
 	if bizErr, ok := err.(BusinessError); ok {
 		return bizErr.Code(), bizErr.Message()
 	}
 
-	// 默认返回内部错误
 	return CodeInternalError, err.Error()
 }
 
-// codeToHTTPStatus 将业务错误码映射到 HTTP 状态码
 func codeToHTTPStatus(code int) int {
 	switch code {
 	case CodeSuccess:
@@ -302,7 +245,6 @@ func codeToHTTPStatus(code int) int {
 	case CodeServiceUnavailable:
 		return http.StatusServiceUnavailable
 	default:
-		// 根据错误码范围判断
 		if code >= 1001 && code <= 9999 {
 			return http.StatusBadRequest
 		}
@@ -310,24 +252,17 @@ func codeToHTTPStatus(code int) int {
 	}
 }
 
-// BusinessError 是业务错误接口。
-//
-// 中文说明：
-// - 业务层应实现此接口返回自定义错误码和消息；
-// - 响应中间件会自动解析并转换为统一格式。
 type BusinessError interface {
 	error
 	Code() int
 	Message() string
 }
 
-// BizError 是简单的业务错误实现。
 type BizError struct {
 	code    int
 	message string
 }
 
-// NewBizError 创建业务错误。
 func NewBizError(code int, message string) *BizError {
 	return &BizError{code: code, message: message}
 }
@@ -336,53 +271,38 @@ func (e *BizError) Error() string   { return e.message }
 func (e *BizError) Code() int       { return e.code }
 func (e *BizError) Message() string { return e.message }
 
-// --- 常用错误创建函数 ---
-//
-// 中文说明：
-// - 提供快捷创建常见错误的方法；
-// - Handler 中可直接使用这些函数。
-
-// ErrBadRequest 创建参数错误
 func ErrBadRequest(message string) *BizError {
 	return NewBizError(CodeBadRequest, message)
 }
 
-// ErrUnauthorized 创建未认证错误
 func ErrUnauthorized(message string) *BizError {
 	return NewBizError(CodeUnauthorized, message)
 }
 
-// ErrForbidden 创建禁止访问错误
 func ErrForbidden(message string) *BizError {
 	return NewBizError(CodeForbidden, message)
 }
 
-// ErrNotFound 创建未找到错误
 func ErrNotFound(message string) *BizError {
 	return NewBizError(CodeNotFound, message)
 }
 
-// ErrInternal 创建内部错误
 func ErrInternal(message string) *BizError {
 	return NewBizError(CodeInternalError, message)
 }
 
-// ErrUserNotFound 创建用户不存在错误
 func ErrUserNotFound() *BizError {
 	return NewBizError(CodeUserNotFound, "用户不存在")
 }
 
-// ErrOrderNotFound 创建订单不存在错误
 func ErrOrderNotFound() *BizError {
 	return NewBizError(CodeOrderNotFound, "订单不存在")
 }
 
-// ErrProductNotFound 创建商品不存在错误
 func ErrProductNotFound() *BizError {
 	return NewBizError(CodeProductNotFound, "商品不存在")
 }
 
-// ErrOutOfStock 创建库存不足错误
 func ErrOutOfStock() *BizError {
 	return NewBizError(CodeProductOutOfStock, "商品库存不足")
 }

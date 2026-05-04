@@ -253,6 +253,37 @@ func TestReleaseGoLayoutTemplateRoutesDoNotDuplicateHealthz(t *testing.T) {
 	require.NotContains(t, text, `engine.GET("/healthz"`)
 }
 
+func TestReleaseProjectTemplateUsesFacadeRunEntrypoint(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "release-project-entry")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "release-project-entry",
+		Module:          "example.com/release-project-entry",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+	})
+
+	srcFS, srcRoot := releaseTemplateSource(starterTemplateBase)
+	require.NoError(t, renderTemplateProject(srcFS, srcRoot, projectDir, data))
+
+	mainFile := filepath.Join(projectDir, "cmd", "app", "main.go")
+	content, err := os.ReadFile(mainFile)
+	require.NoError(t, err)
+	text := string(content)
+
+	require.Contains(t, text, "gorp.Run(")
+	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithSetup(setup)")
+	require.NotContains(t, text, "frameworkbootstrap.BootHTTPService(")
+	require.NotContains(t, text, "frameworkbootstrap.")
+	require.Contains(t, text, `apphttp "example.com/release-project-entry/app/http"`)
+}
+
 func TestGoLayoutDockerfileRunsProjectBinaryDirectly(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 

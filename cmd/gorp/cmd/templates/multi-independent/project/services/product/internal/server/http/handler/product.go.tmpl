@@ -24,7 +24,7 @@ func (h *ProductHandler) List(c gorp.HTTPContext) {
 
 	items, total, err := h.product.List(c.Context(), page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		gorp.Error(c, err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *ProductHandler) List(c gorp.HTTPContext) {
 		}
 	}
 
-	c.JSON(http.StatusOK, response.ProductList{
+	gorp.Success(c, response.ProductList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -52,7 +52,7 @@ func (h *ProductHandler) List(c gorp.HTTPContext) {
 func (h *ProductHandler) GetByID(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *ProductHandler) GetByID(c gorp.HTTPContext) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Product{
+	gorp.Success(c, response.Product{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
@@ -76,7 +76,7 @@ func (h *ProductHandler) GetByID(c gorp.HTTPContext) {
 func (h *ProductHandler) Create(c gorp.HTTPContext) {
 	var req request.CreateProduct
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
+		gorp.BadRequest(c, err.Error())
 		return
 	}
 
@@ -87,11 +87,11 @@ func (h *ProductHandler) Create(c gorp.HTTPContext) {
 		Stock:       req.Stock,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		gorp.Error(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, response.Product{
+	gorp.SuccessWithStatus(c, http.StatusCreated, response.Product{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
@@ -105,12 +105,12 @@ func (h *ProductHandler) Create(c gorp.HTTPContext) {
 func (h *ProductHandler) Delete(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
+		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.product.Delete(c.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		gorp.Error(c, err)
 		return
 	}
 

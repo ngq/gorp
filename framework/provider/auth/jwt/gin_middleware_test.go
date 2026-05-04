@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ngq/gorp/framework/contract"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,24 +20,29 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := contract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
 		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, c.Status, func() int { return c.Writer.Status() })
-		AuthMiddleware(jwtSvc, "customer")(httpCtx, func() {
-			c.Request = httpCtx.Request()
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
 			c.Next()
 		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
 	})
 	r.GET("/me", func(c *gin.Context) {
-		gotClaims, ok := contract.FromJWTClaimsContext(c.Request.Context())
+		gotClaims, ok := securitycontract.FromJWTClaimsContext(c.Request.Context())
 		require.True(t, ok)
 		require.Equal(t, int64(7), gotClaims.SubjectID)
 
-		subjectID, ok := contract.FromSubjectIDContext(c.Request.Context())
+		subjectID, ok := securitycontract.FromSubjectIDContext(c.Request.Context())
 		require.True(t, ok)
 		require.Equal(t, int64(7), subjectID)
 
-		subjectType, ok := contract.FromSubjectTypeContext(c.Request.Context())
+		subjectType, ok := securitycontract.FromSubjectTypeContext(c.Request.Context())
 		require.True(t, ok)
 		require.Equal(t, "customer", subjectType)
 
@@ -52,14 +58,14 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 }
 
 func TestRequestContextHelpers(t *testing.T) {
-	claims := &contract.JWTClaims{
+	claims := &securitycontract.JWTClaims{
 		SubjectID:   9,
 		SubjectType: "admin",
 		SubjectName: "alice",
 	}
-	ctx := contract.NewJWTClaimsContext(t.Context(), claims)
-	ctx = contract.NewSubjectIDContext(ctx, claims.SubjectID)
-	ctx = contract.NewSubjectTypeContext(ctx, claims.SubjectType)
+	ctx := securitycontract.NewJWTClaimsContext(t.Context(), claims)
+	ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
+	ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
 
 	gotClaims, ok := ClaimsFromRequestContext(ctx)
 	require.True(t, ok)

@@ -8,27 +8,36 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 const (
-	// IdempotencyKeyHeader 是幂等 key 的请求头名称
 	IdempotencyKeyHeader = "X-Idempotency-Key"
 )
 
-// IdempotencyStore 幂等 key 存储接口。
 type IdempotencyStore interface {
 	Check(key string) (exists bool, response *IdempotencyResponse)
 	Set(key string, response *IdempotencyResponse, ttl time.Duration)
 }
 
-// IdempotencyResponse 幂等响应缓存。
 type IdempotencyResponse struct {
 	StatusCode int               `json:"status_code"`
 	Body       interface{}       `json:"body"`
 	Headers    map[string]string `json:"headers,omitempty"`
 }
 
-// MemoryIdempotencyStore 内存幂等 key 存储。
+type responseFuncConfigurer interface {
+	SetResponseFuncs(
+		json func(int, any),
+		str func(int, string),
+		xml func(int, any),
+		data func(int, string, []byte),
+		redirect func(int, string),
+		status func(int),
+		statusRead func() int,
+	)
+}
+
 type MemoryIdempotencyStore struct {
 	data sync.Map
 }
@@ -38,7 +47,6 @@ type idempotencyEntry struct {
 	expiresAt time.Time
 }
 
-// NewMemoryIdempotencyStore 创建内存幂等 key 存储。
 func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
 	store := &MemoryIdempotencyStore{}
 	go store.cleanup()
@@ -75,14 +83,6 @@ func (s *MemoryIdempotencyStore) cleanup() {
 	}
 }
 
-// IdempotencyMiddleware 创建幂等性中间件。
-//
-// 中文说明：
-// - 这是 Gin provider 扩展层中间件，不属于默认 framework 主线契约；
-// - 检查请求头中的 X-Idempotency-Key；
-// - 如果 key 已存在，直接返回之前的响应；
-// - 如果 key 不存在，执行请求并缓存响应；
-// - 默认 TTL 为 24 小时。
 func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.HandlerFunc {
 	if ttl == 0 {
 		ttl = 24 * time.Hour
@@ -119,14 +119,114 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 	}
 }
 
-// GenerateIdempotencyKey 生成幂等 key。
+func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HTTPMiddleware {
+	if ttl == 0 {
+		ttl = 24 * time.Hour
+	}
+
+	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+		return func(c transportcontract.HTTPContext) {
+			if store == nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			method := ""
+			if req := c.Request(); req != nil {
+				method = req.Method
+			}
+			if method != http.MethodPost && method != http.MethodPut && method != http.MethodPatch {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			key := c.GetHeader(IdempotencyKeyHeader)
+			if key == "" {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			exists, response := store.Check(key)
+			if exists && response != nil {
+				for k, v := range response.Headers {
+					c.Header(k, v)
+				}
+				if response.Body != nil {
+					c.JSON(response.StatusCode, response.Body)
+				} else {
+					c.Status(response.StatusCode)
+				}
+				if gc, ok := unwrapGinContext(c); ok {
+					gc.Abort()
+				}
+				return
+			}
+
+			var (
+				capturedStatus  int
+				capturedBody    any
+				capturedHeaders map[string]string
+			)
+			origJSON := c.JSON
+			origStatus := c.Status
+			if cfg, ok := c.(responseFuncConfigurer); ok {
+				statusReader := func() int {
+					if gc, ok := unwrapGinContext(c); ok {
+						return gc.Writer.Status()
+					}
+					if capturedStatus != 0 {
+						return capturedStatus
+					}
+					return 0
+				}
+				cfg.SetResponseFuncs(func(status int, body any) {
+					capturedStatus = status
+					capturedBody = body
+					origJSON(status, body)
+				}, c.String, c.XML, c.Data, c.Redirect, func(code int) {
+					capturedStatus = code
+					origStatus(code)
+				}, statusReader)
+			}
+
+			if next != nil {
+				next(c)
+			}
+
+			if capturedStatus == 0 {
+				capturedStatus = c.ResponseStatus()
+			}
+			if capturedStatus > 0 && capturedStatus < 400 {
+				if gc, ok := unwrapGinContext(c); ok {
+					capturedHeaders = make(map[string]string, len(gc.Writer.Header()))
+					for k, values := range gc.Writer.Header() {
+						if len(values) > 0 {
+							capturedHeaders[k] = values[0]
+						}
+					}
+				}
+				store.Set(key, &IdempotencyResponse{
+					StatusCode: capturedStatus,
+					Body:       capturedBody,
+					Headers:    capturedHeaders,
+				}, ttl)
+			}
+		}
+	}
+}
+
 func GenerateIdempotencyKey(userID string, operation string, params string) string {
 	data := userID + ":" + operation + ":" + params
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
 }
 
-// IdempotencyKeyFromRequest 从请求中提取或生成幂等 key。
 func IdempotencyKeyFromRequest(c *gin.Context, userID string) string {
 	if key := c.GetHeader(IdempotencyKeyHeader); key != "" {
 		return key
