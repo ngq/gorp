@@ -453,3 +453,19 @@ func wrapHTTPHandler(handler http.Handler) gin.HandlerFunc {
 		handler.ServeHTTP(ctx.Writer, ctx.Request)
 	}
 }
+
+// AdaptMiddleware 将框架抽象中间件转换为 gin.HandlerFunc。
+// 用于 native-gin 版本中使用框架中间件。
+func AdaptMiddleware(mw transportcontract.HTTPMiddleware) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 创建适配的 HTTPContext
+		adaptedCtx := &ginHTTPContext{
+			gin: c,
+		}
+		// 调用抽象中间件
+		handler := mw(func(ctx transportcontract.HTTPContext) {
+			c.Next()
+		})
+		handler(adaptedCtx)
+	}
+}

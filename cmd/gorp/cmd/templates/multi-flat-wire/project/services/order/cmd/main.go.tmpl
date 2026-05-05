@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"{{.FrameworkModule}}/framework/container"
 	orderdata "{{.ModuleName}}/services/order/internal/data"
 	orderhttp "{{.ModuleName}}/services/order/internal/server/http"
 	"{{.FrameworkModule}}"
@@ -28,6 +29,12 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("order-service requires gorm database")
 	}
+
+	// 添加全局 gin 中间件（可选）
+	// ginEngine, _ := container.MakeGinEngine(rt.Container)
+	// ginEngine.Use(gorp.GinRequestIDMiddleware())
+	// ginEngine.Use(gorp.GinTraceIDMiddleware())
+
 	connFactory, err := gorp.MakeGRPCConnFactory(rt.Container)
 	if err != nil {
 		return err
@@ -36,10 +43,10 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
-	services, err := wireOrderServices(rt.DB, connFactory, dlock)
+	services, handlers, err := wireOrderServices(rt.DB, connFactory, dlock)
 	if err != nil {
 		return err
 	}
-	orderhttp.RegisterRoutes(rt.GinRouter, services)
+	orderhttp.RegisterRoutes(rt.GinRouter, handlers)
 	return nil
 }

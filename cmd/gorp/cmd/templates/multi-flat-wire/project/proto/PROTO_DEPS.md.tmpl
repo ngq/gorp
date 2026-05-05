@@ -1,0 +1,44 @@
+# Proto 依赖说明
+
+## 已内置的依赖文件
+
+以下 proto 依赖文件已内置在项目中：
+
+```
+proto/
+├── google/
+│   ├── api/
+│   │   ├── annotations.proto  ← 已内置
+│   │   └── http.proto         ← 已内置
+│   └── protobuf/
+│   │   └── descriptor.proto   ← 已内置（官方完整版）
+```
+
+## 使用示例
+
+```bash
+# 生成带 HTTP 注解的 proto
+gorp proto from-service -s service.go -o proto/user.proto --include-http
+
+# 生成 Go 代码（指定 import paths）
+gorp proto gen -d proto/user/v1 -o proto/user/v1 --proto-files user.proto --import-paths proto
+```
+
+## 前置条件
+
+```bash
+# 安装 protoc
+# macOS: brew install protobuf
+# Linux: apt install protobuf-compiler
+# Windows: 从 https://github.com/protocolbuffers/protobuf/releases 下载
+
+# 安装 Go 插件
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+## 注意事项
+
+1. 所有 proto 依赖文件已内置，无需额外下载
+2. 使用 `--import-paths proto` 指定项目 proto 目录作为 import 路径
+3. 不需要 HTTP 注解时，可以不使用 `--include-http` 选项

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"{{.FrameworkModule}}/framework/container"
 	userdata "{{.ModuleName}}/services/user/internal/data"
 	usergrpc "{{.ModuleName}}/services/user/internal/server/grpc"
 	userhttp "{{.ModuleName}}/services/user/internal/server/http"
@@ -30,11 +31,18 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("user-service requires gorm database")
 	}
-	services, err := wireUserServices(rt.DB)
+
+	// 添加全局 gin 中间件（可选）
+	// ginEngine, _ := container.MakeGinEngine(rt.Container)
+	// ginEngine.Use(gorp.GinRequestIDMiddleware())
+	// ginEngine.Use(gorp.GinTraceIDMiddleware())
+	// ginEngine.Use(gorp.GinRecoveryMiddleware())
+
+	services, handlers, err := wireUserServices(rt.DB)
 	if err != nil {
 		return err
 	}
-	userhttp.RegisterRoutes(rt.GinRouter, services)
+	userhttp.RegisterRoutes(rt.GinRouter, handlers)
 
 	registrar, err := gorp.MakeGRPCServerRegistrar(rt.Container)
 	if err != nil {

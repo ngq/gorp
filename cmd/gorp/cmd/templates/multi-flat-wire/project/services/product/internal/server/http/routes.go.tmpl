@@ -3,19 +3,16 @@ package http
 import (
 	"github.com/gin-gonic/gin"
 	"{{.ModuleName}}/services/product/internal/server/http/handler"
-	"{{.ModuleName}}/services/product/internal/service"
 )
 
-func RegisterRoutes(r *gin.RouterGroup, services *service.Services) {
-	productHandler := handler.NewProductHandler(services.Product)
-
+func RegisterRoutes(r *gin.RouterGroup, handlers *handler.Handlers) {
 	api := r.Group("/api/v1/products")
 	{
-		api.GET("", productHandler.List)
-		api.GET("/:id", productHandler.GetByID)
-		api.POST("", productHandler.Create)
-		api.DELETE("/:id", productHandler.Delete)
-		api.POST("/:id/events/publish", productHandler.PublishStockChanged)
-		api.POST("/events/consume-once", productHandler.ConsumeStockChangedOnce)
+		api.GET("", handlers.Product.List)
+		api.GET("/:id", handlers.Product.GetByID)
+		api.POST("", handlers.Product.Create)
+		api.DELETE("/:id", handlers.Product.Delete)
+		api.POST("/:id/events/publish", handlers.Product.PublishStockChanged)
+		api.POST("/events/consume-once", handlers.Product.ConsumeStockChangedOnce)
 	}
 }

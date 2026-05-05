@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"{{.FrameworkModule}}/framework/container"
 	productdata "{{.ModuleName}}/services/product/internal/data"
 	producthttp "{{.ModuleName}}/services/product/internal/server/http"
 	"{{.FrameworkModule}}"
@@ -28,6 +29,12 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if rt.DB == nil {
 		return fmt.Errorf("product-service requires gorm database")
 	}
+
+	// 添加全局 gin 中间件（可选）
+	// ginEngine, _ := container.MakeGinEngine(rt.Container)
+	// ginEngine.Use(gorp.GinRequestIDMiddleware())
+	// ginEngine.Use(gorp.GinTraceIDMiddleware())
+
 	publisher, err := gorp.MakeMessagePublisher(rt.Container)
 	if err != nil {
 		return err
@@ -36,10 +43,10 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
-	services, err := wireProductServices(rt.DB, publisher, subscriber)
+	services, handlers, err := wireProductServices(rt.DB, publisher, subscriber)
 	if err != nil {
 		return err
 	}
-	producthttp.RegisterRoutes(rt.GinRouter, services)
+	producthttp.RegisterRoutes(rt.GinRouter, handlers)
 	return nil
 }

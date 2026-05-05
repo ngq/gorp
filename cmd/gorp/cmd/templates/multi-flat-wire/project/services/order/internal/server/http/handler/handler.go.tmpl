@@ -1,0 +1,17 @@
+package handler
+
+import (
+	"{{.ModuleName}}/services/order/internal/service"
+)
+
+// Handlers HTTP handler 聚合。
+type Handlers struct {
+	Order *OrderHandler
+}
+
+// NewHandlers 创建 HTTP handlers。
+func NewHandlers(services *service.Services) *Handlers {
+	return &Handlers{
+		Order: NewOrderHandler(services.Order),
+	}
+}

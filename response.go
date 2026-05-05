@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 )
@@ -101,4 +102,37 @@ func GinInternalError(c *gin.Context, message string) {
 		Message: message,
 		Data:    nil,
 	})
+}
+
+// ========== Gin 中间件适配 ==========
+
+// GinAdaptMiddleware 将框架抽象中间件转换为 gin.HandlerFunc。
+// 用于 native-gin 版本中使用框架中间件。
+func GinAdaptMiddleware(mw transportcontract.HTTPMiddleware) gin.HandlerFunc {
+	return ginprovider.AdaptMiddleware(mw)
+}
+
+// GinRequestIDMiddleware 返回 RequestID 中间件（gin 原生版本）。
+func GinRequestIDMiddleware() gin.HandlerFunc {
+	return ginprovider.AdaptMiddleware(ginprovider.RequestID())
+}
+
+// GinTraceIDMiddleware 返回 TraceID 中间件（gin 原生版本）。
+func GinTraceIDMiddleware() gin.HandlerFunc {
+	return ginprovider.AdaptMiddleware(ginprovider.TraceID())
+}
+
+// GinMetricsMiddleware 返回 Metrics 中间件（gin 原生版本）。
+func GinMetricsMiddleware() gin.HandlerFunc {
+	return ginprovider.AdaptMiddleware(ginprovider.MetricsMiddleware())
+}
+
+// GinRecoveryMiddleware 返回 Recovery 中间件（gin 原生版本）。
+func GinRecoveryMiddleware() gin.HandlerFunc {
+	return ginprovider.AdaptMiddleware(ginprovider.RecoveryMiddleware())
+}
+
+// GinLoggingMiddleware 返回 Logging 中间件（gin 原生版本，需要传入 logger）。
+func GinLoggingMiddleware(logger observabilitycontract.Logger) gin.HandlerFunc {
+	return ginprovider.AdaptMiddleware(ginprovider.LoggingMiddleware(logger))
 }

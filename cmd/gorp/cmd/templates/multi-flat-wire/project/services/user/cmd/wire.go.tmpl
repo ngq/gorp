@@ -3,14 +3,16 @@
 package main
 
 import (
+	"{{.ModuleName}}/services/user/internal/server/http/handler"
 	"{{.ModuleName}}/services/user/internal/service"
 
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )
 
-func wireUserServices(db *gorm.DB) (*service.Services, error) {
+func wireUserServices(db *gorm.DB) (*service.Services, *handler.Handlers, error) {
 	panic(wire.Build(
 		service.NewServices,
+		handler.NewHandlers,
 	))
 }

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package google.api;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "google.golang.org/genproto/googleapis/api;api";
+option java_package = "com.google.api";
+option java_outer_classname = "HttpProto";
+option java_multiple_files = true;
+option objc_class_prefix = "GAPI";
+
+message Http {
+  repeated HttpRule rules = 1;
+  bool fully_decode_reserved_expansion = 2;
+}
+
+message HttpRule {
+  string method = 1;
+  string path = 2;
+  string body = 3;
+  string response_body = 4;
+  repeated HttpRule additional_bindings = 5;
+
+  oneof pattern {
+    string get = 101;
+    string put = 102;
+    string post = 103;
+    string delete = 104;
+    string patch = 105;
+    CustomHttpPattern custom = 106;
+  }
+}
+
+message CustomHttpPattern {
+  string kind = 1;
+  string path = 2;
+}

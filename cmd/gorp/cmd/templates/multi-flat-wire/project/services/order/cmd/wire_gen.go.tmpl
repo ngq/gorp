@@ -6,11 +6,13 @@ package main
 
 import (
 	"{{.FrameworkModule}}"
+	"{{.ModuleName}}/services/order/internal/server/http/handler"
 	"{{.ModuleName}}/services/order/internal/service"
 	"gorm.io/gorm"
 )
 
-func wireOrderServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.DistributedLock) (*service.Services, error) {
+func wireOrderServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.DistributedLock) (*service.Services, *handler.Handlers, error) {
 	services := service.NewServices(db, userConnFactory, dlock)
-	return services, nil
+	handlers := handler.NewHandlers(services)
+	return services, handlers, nil
 }

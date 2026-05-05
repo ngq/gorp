@@ -1,0 +1,17 @@
+package handler
+
+import (
+	"{{.ModuleName}}/services/user/internal/service"
+)
+
+// Handlers HTTP handler 聚合。
+type Handlers struct {
+	User *UserHandler
+}
+
+// NewHandlers 创建 HTTP handlers。
+func NewHandlers(services *service.Services) *Handlers {
+	return &Handlers{
+		User: NewUserHandler(services.User),
+	}
+}

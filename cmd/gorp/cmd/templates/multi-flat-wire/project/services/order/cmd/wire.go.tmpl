@@ -4,14 +4,16 @@ package main
 
 import (
 	"{{.FrameworkModule}}"
+	"{{.ModuleName}}/services/order/internal/server/http/handler"
 	"{{.ModuleName}}/services/order/internal/service"
 
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )
 
-func wireOrderServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.DistributedLock) (*service.Services, error) {
+func wireOrderServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.DistributedLock) (*service.Services, *handler.Handlers, error) {
 	panic(wire.Build(
 		service.NewServices,
+		handler.NewHandlers,
 	))
 }

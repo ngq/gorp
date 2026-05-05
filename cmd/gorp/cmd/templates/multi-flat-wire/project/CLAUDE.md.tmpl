@@ -1,0 +1,235 @@
+# Claude 业务开发规则
+
+本项目使用 gorp 框架 + 原生 gin 开发微服务。
+
+## 项目结构
+
+```
+project/
+├── go.work                 # Go workspace 配置
+├── Makefile                # 构建命令
+├── proto/                  # gRPC 协议定义
+│   └── user/v1/
+├── services/               # 微服务目录
+│   ├── user/
+│   │   ├── cmd/
+│   │   │   ├── main.go     # 服务入口
+│   │   │   ├── wire.go     # 依赖注入（wireinject）
+│   │   │   └── wire_gen.go # wire 生成的代码
+│   │   ├── config/
+│   │   │   └── app.yaml    # 服务配置
+│   │   ├── internal/
+│   │   │   ├── data/       # 数据访问层（PO、Repo）
+│   │   │   ├── biz/        # 业务逻辑层（UseCase）
+│   │   │   ├── service/    # 服务层（聚合 Service）
+│   │   │   ├── server/
+│   │   │   │   ├── http/   # HTTP 层
+│   │   │   │   │   ├── handler/   # 处理器
+│   │   │   │   │   ├── request/   # 请求结构体
+│   │   │   │   │   ├── response/  # 响应结构体
+│   │   │   │   │   ├── routes.go  # 路由注册
+│   │   │   │   │   └── middleware/# 中间件
+│   │   │   │   └── grpc/   # gRPC 服务
+│   │   │   └── pkg/        # 服务私有包
+│   │   ├── docs/           # Swagger 文档
+│   │   └── go.mod
+│   ├── order/
+│   └── product/
+├── pkg/                    # 公共包
+└── deploy/                 # 部署配置
+```
+
+## 分层职责
+
+| 层级 | 目录 | 职责 | 依赖方向 |
+|------|------|------|----------|
+| **Handler** | `server/http/handler` | HTTP 请求处理、参数校验、响应封装 | → service |
+| **Service** | `service` | 业务聚合、DTO 转换 | → biz |
+| **Biz** | `biz` | 核心业务逻辑、领域模型 | → data |
+| **Data** | `data` | 数据访问、PO 定义、外部服务调用 | → DB/外部 |
+
+## 开发流程
+
+### 1. 添加新 API
+
+```
+1. 定义 request/response 结构体
+   → internal/server/http/request/xxx.go
+   → internal/server/http/response/xxx.go
+
+2. 添加 handler 方法
+   → internal/server/http/handler/xxx.go
+   → 使用 gin.Context 作为参数
+   → 使用 gorp.GinSuccess/GinError 响应
+
+3. 注册路由
+   → internal/server/http/routes.go
+   → 在 RegisterRoutes 中添加路由
+
+4. 在 handler.go 中添加 Handler 字段
+   → internal/server/http/handler/handler.go
+   → 在 NewHandlers 中初始化
+
+5. 更新 wire.go
+   → cmd/wire.go（无需修改，wire.Build 已包含）
+```
+
+### 2. 添加新业务逻辑
+
+```
+1. 定义领域模型
+   → internal/biz/xxx.go
+
+2. 实现业务逻辑
+   → internal/biz/xxx.go 中的 UseCase 方法
+
+3. 数据层实现
+   → internal/data/xxx.go 中的 Repo 方法
+
+4. 服务层聚合
+   → internal/service/service.go 中添加 Service
+```
+
+### 3. 添加新微服务
+
+```
+1. 复制现有服务目录结构
+2. 修改 cmd/main.go 服务名
+3. 修改 config/app.yaml 配置
+4. 在 Makefile 中添加运行命令
+5. 在 go.work 中添加服务模块
+```
+
+## Gin 使用规范
+
+### Handler 参数
+
+```go
+// 使用原生 gin.Context
+func (h *UserHandler) List(c *gin.Context) {
+    // 获取参数
+    page := c.DefaultQuery("page", "1")
+    id := c.Param("id")
+
+    // 获取请求体
+    var req request.CreateUser
+    c.ShouldBindJSON(&req)
+
+    // 获取 Context
+    ctx := c.Request.Context()
+
+    // 响应
+    gorp.GinSuccess(c, data)
+    gorp.GinError(c, err)
+    gorp.GinBadRequest(c, "invalid id")
+    gorp.GinInternalError(c, "server error")
+}
+```
+
+### 路由注册
+
+```go
+// routes.go
+func RegisterRoutes(r *gin.RouterGroup, handlers *handler.Handlers) {
+    api := r.Group("/api/v1/users")
+    {
+        api.GET("", handlers.User.List)
+        api.GET("/:id", handlers.User.GetByID)
+        api.POST("", handlers.User.Create)
+        api.DELETE("/:id", handlers.User.Delete)
+    }
+}
+```
+
+### 中间件使用
+
+```go
+// cmd/main.go setup 函数中添加全局中间件
+func setup(rt *gorp.HTTPRuntime) error {
+    // 获取 gin.Engine 添加全局中间件
+    ginEngine, _ := container.MakeGinEngine(rt.Container)
+
+    // 使用框架提供的 gin 中间件
+    ginEngine.Use(gorp.GinRequestIDMiddleware())   // RequestID
+    ginEngine.Use(gorp.GinTraceIDMiddleware())     // TraceID
+    ginEngine.Use(gorp.GinRecoveryMiddleware())    // 异常恢复
+    ginEngine.Use(gorp.GinMetricsMiddleware())     // 性能指标
+
+    // 需要传入 logger 的中间件
+    ginEngine.Use(gorp.GinLoggingMiddleware(rt.Logger))
+
+    // 自定义 gin 中间件
+    ginEngine.Use(func(c *gin.Context) {
+        // gin 原生写法
+        c.Next()
+    })
+
+    // 或适配框架抽象中间件
+    ginEngine.Use(gorp.GinAdaptMiddleware(someHTTPMiddleware))
+
+    userhttp.RegisterRoutes(rt.GinRouter, handlers)
+    return nil
+}
+```
+
+**框架提供的 Gin 中间件**：
+- `gorp.GinRequestIDMiddleware()` - 请求 ID
+- `gorp.GinTraceIDMiddleware()` - 追踪 ID
+- `gorp.GinMetricsMiddleware()` - 性能指标
+- `gorp.GinRecoveryMiddleware()` - 异常恢复
+- `gorp.GinLoggingMiddleware(logger)` - 日志记录
+- `gorp.GinAdaptMiddleware(mw)` - 适配任意框架中间件
+```
+
+## 常用命令
+
+```bash
+# 运行服务
+make run-user
+make run-order
+make run-product
+
+# 生成 wire 代码
+make generate
+
+# 生成 swagger 文档
+gorp swagger gen -g services/user/cmd/main.go -o services/user/docs
+
+# 运行测试
+make test
+
+# Docker 部署
+make deploy-local
+```
+
+## 框架能力
+
+通过 `gorp.HTTPRuntime` 获取：
+
+```go
+rt.DB          // Gorm 数据库
+rt.Redis       // Redis 客户端
+rt.GinRouter   // gin.RouterGroup
+rt.Container   // 服务容器
+rt.Logger      // 日志
+rt.Config      // 配置
+rt.JWT         // JWT 服务
+```
+
+通过容器获取：
+
+```go
+gorp.MakeGRPCConnFactory(rt.Container)    // gRPC 连接工厂
+gorp.MakeGRPCServerRegistrar(rt.Container) // gRPC 服务注册
+gorp.MakeDistributedLock(rt.Container)     // 分布式锁
+gorp.MakeMessagePublisher(rt.Container)    // 消息发布
+gorp.MakeMessageSubscriber(rt.Container)   // 消息订阅
+```
+
+## 注意事项
+
+1. **依赖注入统一在 cmd/wire.go 管理**
+2. **Handler 使用 gin.Context，不使用 gorp.HTTPContext**
+3. **业务逻辑放在 biz 层，不要在 handler 中直接操作数据**
+4. **跨服务调用通过 gRPC，定义在 proto 目录**
+5. **配置文件放在各服务的 config/app.yaml**
