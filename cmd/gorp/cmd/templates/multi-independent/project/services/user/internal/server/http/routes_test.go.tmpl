@@ -14,7 +14,7 @@ import (
 func TestRegisterRoutes_InvalidUserID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterRoutes(r, &service.Services{User: &service.UserService{}})
+	RegisterRoutes(&r.RouterGroup, &service.Services{User: &service.UserService{}})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/abc", nil)
 	resp := httptest.NewRecorder()
