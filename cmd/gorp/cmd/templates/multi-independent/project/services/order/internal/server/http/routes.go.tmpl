@@ -1,20 +1,19 @@
 package http
 
 import (
+	"github.com/gin-gonic/gin"
 	"{{.ModuleName}}/services/order/internal/server/http/handler"
 	"{{.ModuleName}}/services/order/internal/service"
-
-	gorp "{{.FrameworkModule}}"
 )
 
-func RegisterRoutes(r gorp.HTTPRouter, services *service.Services) {
+func RegisterRoutes(r *gin.RouterGroup, services *service.Services) {
 	orderHandler := handler.NewOrderHandler(services.Order)
 
 	api := r.Group("/api/v1/orders")
 	{
-	api.GET("", orderHandler.List)
-	api.GET("/:id", orderHandler.GetByID)
-	api.POST("", orderHandler.Create)
-	api.DELETE("/:id", orderHandler.Delete)
+		api.GET("", orderHandler.List)
+		api.GET("/:id", orderHandler.GetByID)
+		api.POST("", orderHandler.Create)
+		api.DELETE("/:id", orderHandler.Delete)
 	}
 }

@@ -1,13 +1,12 @@
 package http
 
 import (
+	"github.com/gin-gonic/gin"
 	"{{.ModuleName}}/services/user/internal/server/http/handler"
 	"{{.ModuleName}}/services/user/internal/service"
-
-	gorp "{{.FrameworkModule}}"
 )
 
-func RegisterRoutes(r gorp.HTTPRouter, services *service.Services) {
+func RegisterRoutes(r *gin.RouterGroup, services *service.Services) {
 	userHandler := handler.NewUserHandler(services.User)
 
 	api := r.Group("/api/v1/users")

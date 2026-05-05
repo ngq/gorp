@@ -34,7 +34,7 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
-	userhttp.RegisterRoutes(rt.Router, services)
+	userhttp.RegisterRoutes(rt.GinRouter, services)
 
 	registrar, err := gorp.MakeGRPCServerRegistrar(rt.Container)
 	if err != nil {

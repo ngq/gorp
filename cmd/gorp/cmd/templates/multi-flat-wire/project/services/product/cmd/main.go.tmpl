@@ -40,6 +40,6 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
-	producthttp.RegisterRoutes(rt.Router, services)
+	producthttp.RegisterRoutes(rt.GinRouter, services)
 	return nil
 }

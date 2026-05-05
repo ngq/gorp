@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/ngq/gorp/framework"
 	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -39,7 +40,8 @@ type HTTPServiceRuntime struct {
 	App         *framework.Application
 	Container   runtimecontract.Container
 	Logger      observabilitycontract.Logger
-	Router      transportcontract.HTTPRouter
+	Router      transportcontract.HTTPRouter // 抽象路由（保留兼容）
+	GinRouter   *gin.RouterGroup             // 原生 gin 路由组
 	DB          *gormpkg.DB
 	Redis       datacontract.Redis
 	JWT         securitycontract.JWTService
@@ -68,6 +70,12 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		JWT:         container.MustMakeJWTService(c),
 		ServiceName: serviceName,
 	}
+
+	// 获取原生 gin.Engine 并创建 RouterGroup
+	if ginEngine, err := container.MakeGinEngine(c); err == nil && ginEngine != nil {
+		rt.GinRouter = &ginEngine.RouterGroup
+	}
+
 	frameworklog.SetDefault(rt.Logger)
 
 	if !opts.DisableGorm {

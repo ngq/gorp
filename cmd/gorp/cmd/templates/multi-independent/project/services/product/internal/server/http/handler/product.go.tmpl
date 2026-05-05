@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	gorp "{{.FrameworkModule}}"
 	"{{.ModuleName}}/services/product/internal/server/http/request"
 	"{{.ModuleName}}/services/product/internal/server/http/response"
@@ -18,13 +19,13 @@ func NewProductHandler(product *service.ProductService) *ProductHandler {
 	return &ProductHandler{product: product}
 }
 
-func (h *ProductHandler) List(c gorp.HTTPContext) {
+func (h *ProductHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.product.List(c.Context(), page, size)
+	items, total, err := h.product.List(c.Request.Context(), page, size)
 	if err != nil {
-		gorp.Error(c, err)
+		gorp.GinError(c, err)
 		return
 	}
 
@@ -41,7 +42,7 @@ func (h *ProductHandler) List(c gorp.HTTPContext) {
 		}
 	}
 
-	gorp.Success(c, response.ProductList{
+	gorp.GinSuccess(c, response.ProductList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -49,20 +50,20 @@ func (h *ProductHandler) List(c gorp.HTTPContext) {
 	})
 }
 
-func (h *ProductHandler) GetByID(c gorp.HTTPContext) {
+func (h *ProductHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		gorp.GinBadRequest(c, "invalid id")
 		return
 	}
 
-	product, err := h.product.GetByID(c.Context(), uint(id))
+	product, err := h.product.GetByID(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, map[string]any{"error": "product not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 		return
 	}
 
-	gorp.Success(c, response.Product{
+	gorp.GinSuccess(c, response.Product{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
@@ -73,25 +74,25 @@ func (h *ProductHandler) GetByID(c gorp.HTTPContext) {
 	})
 }
 
-func (h *ProductHandler) Create(c gorp.HTTPContext) {
+func (h *ProductHandler) Create(c *gin.Context) {
 	var req request.CreateProduct
-	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+	if err := c.ShouldBindJSON(&req); err != nil {
+		gorp.GinBadRequest(c, err.Error())
 		return
 	}
 
-	product, err := h.product.Create(c.Context(), service.CreateProductRequest{
+	product, err := h.product.Create(c.Request.Context(), service.CreateProductRequest{
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
 		Stock:       req.Stock,
 	})
 	if err != nil {
-		gorp.Error(c, err)
+		gorp.GinError(c, err)
 		return
 	}
 
-	gorp.SuccessWithStatus(c, http.StatusCreated, response.Product{
+	gorp.GinSuccessWithStatus(c, http.StatusCreated, response.Product{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
@@ -102,15 +103,15 @@ func (h *ProductHandler) Create(c gorp.HTTPContext) {
 	})
 }
 
-func (h *ProductHandler) Delete(c gorp.HTTPContext) {
+func (h *ProductHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		gorp.GinBadRequest(c, "invalid id")
 		return
 	}
 
-	if err := h.product.Delete(c.Context(), uint(id)); err != nil {
-		gorp.Error(c, err)
+	if err := h.product.Delete(c.Request.Context(), uint(id)); err != nil {
+		gorp.GinError(c, err)
 		return
 	}
 

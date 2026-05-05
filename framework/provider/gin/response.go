@@ -226,6 +226,11 @@ func parseError(err error) (int, string) {
 	return CodeInternalError, err.Error()
 }
 
+// ParseError 公开版本，解析错误返回 code 和 message。
+func ParseError(err error) (int, string) {
+	return parseError(err)
+}
+
 func codeToHTTPStatus(code int) int {
 	switch code {
 	case CodeSuccess:
@@ -250,6 +255,11 @@ func codeToHTTPStatus(code int) int {
 		}
 		return http.StatusInternalServerError
 	}
+}
+
+// CodeToHTTPStatus 公开版本，将业务 code 转换为 HTTP status。
+func CodeToHTTPStatus(code int) int {
+	return codeToHTTPStatus(code)
 }
 
 type BusinessError interface {

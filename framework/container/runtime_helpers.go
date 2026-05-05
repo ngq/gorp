@@ -3,6 +3,7 @@ package container
 import (
 	"database/sql"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
@@ -13,6 +14,9 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	gormdb "gorm.io/gorm"
 )
+
+// ginEngineKey 是 gin.Engine 在容器中的 key。
+const ginEngineKey = "framework.http.engine"
 
 func MakeDBRuntime(c runtimecontract.Container) (any, error) {
 	return c.Make(datacontract.DBRuntimeKey)
@@ -144,6 +148,21 @@ func MakeHTTPRouter(c runtimecontract.Container) (transportcontract.HTTPRouter, 
 		return nil, err
 	}
 	return httpSvc.Router(), nil
+}
+
+// MakeGinEngine 获取原生 gin.Engine。
+func MakeGinEngine(c runtimecontract.Container) (*gin.Engine, error) {
+	v, err := c.Make(ginEngineKey)
+	if err != nil {
+		return nil, err
+	}
+	return v.(*gin.Engine), nil
+}
+
+// MustMakeGinEngine 获取原生 gin.Engine，如果失败则 panic。
+func MustMakeGinEngine(c runtimecontract.Container) *gin.Engine {
+	v := c.MustMake(ginEngineKey)
+	return v.(*gin.Engine)
 }
 
 func MustMakeLogger(c runtimecontract.Container) observabilitycontract.Logger {

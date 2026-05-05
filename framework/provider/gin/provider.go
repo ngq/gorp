@@ -21,6 +21,9 @@ import (
 
 const httpEngineKey = "framework.http.engine"
 
+// HTTPEngineKey 是 gin.Engine 在容器中的公开 key。
+const HTTPEngineKey = httpEngineKey
+
 type Provider struct{}
 
 func NewProvider() *Provider { return &Provider{} }

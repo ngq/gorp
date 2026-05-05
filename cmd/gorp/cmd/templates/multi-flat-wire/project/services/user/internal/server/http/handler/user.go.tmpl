@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	gorp "{{.FrameworkModule}}"
 	"{{.ModuleName}}/services/user/internal/server/http/request"
 	"{{.ModuleName}}/services/user/internal/server/http/response"
@@ -18,13 +19,13 @@ func NewUserHandler(user *service.UserService) *UserHandler {
 	return &UserHandler{user: user}
 }
 
-func (h *UserHandler) List(c gorp.HTTPContext) {
+func (h *UserHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.user.List(c.Context(), page, size)
+	items, total, err := h.user.List(c.Request.Context(), page, size)
 	if err != nil {
-		gorp.Error(c, err)
+		gorp.GinError(c, err)
 		return
 	}
 
@@ -33,7 +34,7 @@ func (h *UserHandler) List(c gorp.HTTPContext) {
 		respItems[i] = response.User{ID: item.ID, Username: item.Username, Email: item.Email}
 	}
 
-	gorp.Success(c, response.UserList{
+	gorp.GinSuccess(c, response.UserList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -41,50 +42,50 @@ func (h *UserHandler) List(c gorp.HTTPContext) {
 	})
 }
 
-func (h *UserHandler) GetByID(c gorp.HTTPContext) {
+func (h *UserHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		gorp.GinBadRequest(c, "invalid id")
 		return
 	}
 
-	user, err := h.user.GetByID(c.Context(), uint(id))
+	user, err := h.user.GetByID(c.Request.Context(), uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, map[string]any{"error": "user not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
-	gorp.Success(c, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
+	gorp.GinSuccess(c, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
 }
 
-func (h *UserHandler) Create(c gorp.HTTPContext) {
+func (h *UserHandler) Create(c *gin.Context) {
 	var req request.CreateUser
-	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+	if err := c.ShouldBindJSON(&req); err != nil {
+		gorp.GinBadRequest(c, err.Error())
 		return
 	}
 
-	user, err := h.user.Create(c.Context(), service.CreateUserRequest{
+	user, err := h.user.Create(c.Request.Context(), service.CreateUserRequest{
 		Username: req.Username,
 		Email:    req.Email,
 	})
 	if err != nil {
-		gorp.Error(c, err)
+		gorp.GinError(c, err)
 		return
 	}
 
-	gorp.SuccessWithStatus(c, http.StatusCreated, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
+	gorp.GinSuccessWithStatus(c, http.StatusCreated, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
 }
 
-func (h *UserHandler) Delete(c gorp.HTTPContext) {
+func (h *UserHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		gorp.GinBadRequest(c, "invalid id")
 		return
 	}
 
-	if err := h.user.Delete(c.Context(), uint(id)); err != nil {
-		gorp.Error(c, err)
+	if err := h.user.Delete(c.Request.Context(), uint(id)); err != nil {
+		gorp.GinError(c, err)
 		return
 	}
 

@@ -31,6 +31,6 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
-	orderhttp.RegisterRoutes(rt.Router, services)
+	orderhttp.RegisterRoutes(rt.GinRouter, services)
 	return nil
 }
