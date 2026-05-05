@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -19,6 +20,21 @@ type DefaultResponder struct{}
 var DefaultResponderInstance transportcontract.HTTPResponder = DefaultResponder{}
 
 func NewDefaultResponder() transportcontract.HTTPResponder {
+	return DefaultResponderInstance
+}
+
+func responderFor(c transportcontract.HTTPContext) transportcontract.HTTPResponder {
+	if c != nil && c.Context() != nil {
+		if containerAny, ok := supportcontract.FromContainerContext(c.Context()); ok {
+			if container, ok := containerAny.(runtimecontract.Container); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
+				if responderAny, err := container.Make(transportcontract.HTTPResponderKey); err == nil {
+					if responder, ok := responderAny.(transportcontract.HTTPResponder); ok && responder != nil {
+						return responder
+					}
+				}
+			}
+		}
+	}
 	return DefaultResponderInstance
 }
 

@@ -1,6 +1,7 @@
 package gin
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -21,21 +22,10 @@ type IdempotencyStore interface {
 }
 
 type IdempotencyResponse struct {
-	StatusCode int               `json:"status_code"`
-	Body       interface{}       `json:"body"`
-	Headers    map[string]string `json:"headers,omitempty"`
-}
-
-type responseFuncConfigurer interface {
-	SetResponseFuncs(
-		json func(int, any),
-		str func(int, string),
-		xml func(int, any),
-		data func(int, string, []byte),
-		redirect func(int, string),
-		status func(int),
-		statusRead func() int,
-	)
+	StatusCode  int               `json:"status_code"`
+	Body        []byte            `json:"body,omitempty"`
+	ContentType string            `json:"content_type,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
 }
 
 type MemoryIdempotencyStore struct {
@@ -45,6 +35,34 @@ type MemoryIdempotencyStore struct {
 type idempotencyEntry struct {
 	response  *IdempotencyResponse
 	expiresAt time.Time
+}
+
+type idempotencyResponseWriter struct {
+	gin.ResponseWriter
+	body       bytes.Buffer
+	statusCode int
+}
+
+func (w *idempotencyResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *idempotencyResponseWriter) Write(data []byte) (int, error) {
+	_, _ = w.body.Write(data)
+	return w.ResponseWriter.Write(data)
+}
+
+func (w *idempotencyResponseWriter) WriteString(s string) (int, error) {
+	_, _ = w.body.WriteString(s)
+	return w.ResponseWriter.WriteString(s)
+}
+
+func (w *idempotencyResponseWriter) Status() int {
+	if w.statusCode != 0 {
+		return w.statusCode
+	}
+	return w.ResponseWriter.Status()
 }
 
 func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
@@ -103,18 +121,18 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 
 		exists, response := store.Check(key)
 		if exists {
-			for k, v := range response.Headers {
-				c.Header(k, v)
-			}
-			c.JSON(response.StatusCode, response.Body)
+			writeCachedIdempotencyResponse(newHTTPContext(c), response)
 			c.Abort()
 			return
 		}
 
+		recorder := &idempotencyResponseWriter{ResponseWriter: c.Writer}
+		c.Writer = recorder
 		c.Next()
+		c.Writer = recorder.ResponseWriter
 
-		if c.Writer.Status() < 400 {
-			store.Set(key, &IdempotencyResponse{StatusCode: c.Writer.Status(), Body: nil}, ttl)
+		if recorder.Status() < 400 {
+			store.Set(key, captureIdempotencyResponse(c, recorder), ttl)
 		}
 	}
 }
@@ -154,70 +172,62 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HT
 
 			exists, response := store.Check(key)
 			if exists && response != nil {
-				for k, v := range response.Headers {
-					c.Header(k, v)
-				}
-				if response.Body != nil {
-					c.JSON(response.StatusCode, response.Body)
-				} else {
-					c.Status(response.StatusCode)
-				}
+				writeCachedIdempotencyResponse(c, response)
 				if gc, ok := unwrapGinContext(c); ok {
 					gc.Abort()
 				}
 				return
 			}
 
-			var (
-				capturedStatus  int
-				capturedBody    any
-				capturedHeaders map[string]string
-			)
-			origJSON := c.JSON
-			origStatus := c.Status
-			if cfg, ok := c.(responseFuncConfigurer); ok {
-				statusReader := func() int {
-					if gc, ok := unwrapGinContext(c); ok {
-						return gc.Writer.Status()
-					}
-					if capturedStatus != 0 {
-						return capturedStatus
-					}
-					return 0
+			if gc, ok := unwrapGinContext(c); ok {
+				recorder := &idempotencyResponseWriter{ResponseWriter: gc.Writer}
+				gc.Writer = recorder
+				if next != nil {
+					next(c)
 				}
-				cfg.SetResponseFuncs(func(status int, body any) {
-					capturedStatus = status
-					capturedBody = body
-					origJSON(status, body)
-				}, c.String, c.XML, c.Data, c.Redirect, func(code int) {
-					capturedStatus = code
-					origStatus(code)
-				}, statusReader)
+				gc.Writer = recorder.ResponseWriter
+				if recorder.Status() > 0 && recorder.Status() < 400 {
+					store.Set(key, captureIdempotencyResponse(gc, recorder), ttl)
+				}
+				return
 			}
 
 			if next != nil {
 				next(c)
 			}
-
-			if capturedStatus == 0 {
-				capturedStatus = c.ResponseStatus()
-			}
-			if capturedStatus > 0 && capturedStatus < 400 {
-				if gc, ok := unwrapGinContext(c); ok {
-					capturedHeaders = make(map[string]string, len(gc.Writer.Header()))
-					for k, values := range gc.Writer.Header() {
-						if len(values) > 0 {
-							capturedHeaders[k] = values[0]
-						}
-					}
-				}
-				store.Set(key, &IdempotencyResponse{
-					StatusCode: capturedStatus,
-					Body:       capturedBody,
-					Headers:    capturedHeaders,
-				}, ttl)
+			if status := c.ResponseStatus(); status > 0 && status < 400 {
+				store.Set(key, &IdempotencyResponse{StatusCode: status}, ttl)
 			}
 		}
+	}
+}
+
+func writeCachedIdempotencyResponse(c transportcontract.HTTPContext, response *IdempotencyResponse) {
+	if response == nil {
+		return
+	}
+	for k, v := range response.Headers {
+		c.Header(k, v)
+	}
+	if len(response.Body) > 0 {
+		c.Data(response.StatusCode, response.ContentType, response.Body)
+		return
+	}
+	c.Status(response.StatusCode)
+}
+
+func captureIdempotencyResponse(c *gin.Context, recorder *idempotencyResponseWriter) *IdempotencyResponse {
+	headers := make(map[string]string, len(c.Writer.Header()))
+	for k, values := range c.Writer.Header() {
+		if len(values) > 0 {
+			headers[k] = values[0]
+		}
+	}
+	return &IdempotencyResponse{
+		StatusCode:  recorder.Status(),
+		Body:        append([]byte(nil), recorder.body.Bytes()...),
+		ContentType: c.Writer.Header().Get("Content-Type"),
+		Headers:     headers,
 	}
 }
 

@@ -2,16 +2,22 @@ package gin
 
 import (
 	"bytes"
+	"bufio"
 	"context"
 	"io"
 	"math/rand"
 	"net/http"
+	"net"
+	"reflect"
 	"time"
+	"unsafe"
 
 	"github.com/gin-gonic/gin"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
+// RetryMiddleware is an advanced Gin-provider extension.
+// It is intentionally not part of the default HTTP middleware mainline.
 func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.RetryPolicy) gin.HandlerFunc {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -28,31 +34,32 @@ func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.R
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
-		writer := &retryResponseWriter{
-			ResponseWriter: c.Writer,
-			body:           &bytes.Buffer{},
-		}
 		baseWriter := c.Writer
-		c.Writer = writer
+		startIndex := ginContextIndex(c)
+		baseErrorsLen := len(c.Errors)
 
 		var lastErr error
 		var lastStatusCode int
 
 		for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
+			writer := newRetryResponseWriter(baseWriter)
 			if len(bodyBytes) > 0 {
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
+			c.Errors = c.Errors[:baseErrorsLen]
+			setGinContextIndex(c, startIndex)
 
-			writer.body.Reset()
-			writer.ResponseWriter = baseWriter
+			c.Writer = writer
 			c.Next()
 
 			statusCode := writer.Status()
 			lastStatusCode = statusCode
 			if statusCode < 500 {
+				writer.FlushTo(baseWriter)
 				return
 			}
 			if !isRetryableHTTPStatus(statusCode, policy.RetryableCodes) {
+				writer.FlushTo(baseWriter)
 				return
 			}
 
@@ -63,6 +70,7 @@ func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.R
 
 			select {
 			case <-c.Request.Context().Done():
+				c.Writer = baseWriter
 				writeGinResponseHeaders(c)
 				resp := Response{
 					Code:    CodeServiceUnavailable,
@@ -81,6 +89,7 @@ func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.R
 			delay := policy.CalculateDelay(attempt, jitter)
 			select {
 			case <-c.Request.Context().Done():
+				c.Writer = baseWriter
 				writeGinResponseHeaders(c)
 				resp := Response{
 					Code:    CodeServiceUnavailable,
@@ -96,6 +105,7 @@ func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.R
 			}
 		}
 
+		c.Writer = baseWriter
 		if lastErr != nil {
 			writeGinResponseHeaders(c)
 			resp := Response{
@@ -111,6 +121,8 @@ func RetryMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.R
 	}
 }
 
+// RetryAllMethodsMiddleware is a provider-specific escape hatch.
+// Use it only when the caller has already accepted the replay risk of non-idempotent requests.
 func RetryAllMethodsMiddleware(retry resiliencecontract.Retry, policy resiliencecontract.RetryPolicy) gin.HandlerFunc {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -121,31 +133,32 @@ func RetryAllMethodsMiddleware(retry resiliencecontract.Retry, policy resilience
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
-		writer := &retryResponseWriter{
-			ResponseWriter: c.Writer,
-			body:           &bytes.Buffer{},
-		}
 		baseWriter := c.Writer
-		c.Writer = writer
+		startIndex := ginContextIndex(c)
+		baseErrorsLen := len(c.Errors)
 
 		var lastErr error
 		var lastStatusCode int
 
 		for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
+			writer := newRetryResponseWriter(baseWriter)
 			if len(bodyBytes) > 0 {
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
+			c.Errors = c.Errors[:baseErrorsLen]
+			setGinContextIndex(c, startIndex)
 
-			writer.body.Reset()
-			writer.ResponseWriter = baseWriter
+			c.Writer = writer
 			c.Next()
 
 			statusCode := writer.Status()
 			lastStatusCode = statusCode
 			if statusCode < 500 {
+				writer.FlushTo(baseWriter)
 				return
 			}
 			if !isRetryableHTTPStatus(statusCode, policy.RetryableCodes) {
+				writer.FlushTo(baseWriter)
 				return
 			}
 
@@ -156,6 +169,7 @@ func RetryAllMethodsMiddleware(retry resiliencecontract.Retry, policy resilience
 
 			select {
 			case <-c.Request.Context().Done():
+				c.Writer = baseWriter
 				writeGinResponseHeaders(c)
 				resp := Response{
 					Code:    CodeServiceUnavailable,
@@ -174,6 +188,7 @@ func RetryAllMethodsMiddleware(retry resiliencecontract.Retry, policy resilience
 			delay := policy.CalculateDelay(attempt, jitter)
 			select {
 			case <-c.Request.Context().Done():
+				c.Writer = baseWriter
 				writeGinResponseHeaders(c)
 				resp := Response{
 					Code:    CodeServiceUnavailable,
@@ -189,6 +204,7 @@ func RetryAllMethodsMiddleware(retry resiliencecontract.Retry, policy resilience
 			}
 		}
 
+		c.Writer = baseWriter
 		if lastErr != nil {
 			writeGinResponseHeaders(c)
 			resp := Response{
@@ -224,34 +240,120 @@ func isRetryableHTTPStatus(status int, retryableCodes []int) bool {
 
 type retryResponseWriter struct {
 	gin.ResponseWriter
-	body       *bytes.Buffer
+	header     http.Header
+	body       bytes.Buffer
 	statusCode int
+	size       int
+}
+
+func newRetryResponseWriter(base gin.ResponseWriter) *retryResponseWriter {
+	return &retryResponseWriter{
+		ResponseWriter: base,
+		header:         make(http.Header),
+		statusCode:     http.StatusOK,
+		size:           -1,
+	}
+}
+
+func (w *retryResponseWriter) Header() http.Header {
+	return w.header
 }
 
 func (w *retryResponseWriter) Write(data []byte) (int, error) {
-	_, _ = w.body.Write(data)
-	return w.ResponseWriter.Write(data)
+	w.WriteHeaderNow()
+	n, err := w.body.Write(data)
+	w.size += n
+	return n, err
 }
 
 func (w *retryResponseWriter) WriteString(s string) (int, error) {
-	_, _ = w.body.WriteString(s)
-	return w.ResponseWriter.WriteString(s)
+	w.WriteHeaderNow()
+	n, err := w.body.WriteString(s)
+	w.size += n
+	return n, err
 }
 
 func (w *retryResponseWriter) WriteHeader(code int) {
-	w.statusCode = code
-	w.ResponseWriter.WriteHeader(code)
+	if code > 0 && w.statusCode != code {
+		w.statusCode = code
+	}
 }
 
 func (w *retryResponseWriter) Status() int {
-	if w.statusCode == 0 {
-		return http.StatusOK
-	}
 	return w.statusCode
+}
+
+func (w *retryResponseWriter) Size() int {
+	return w.size
+}
+
+func (w *retryResponseWriter) Written() bool {
+	return w.size != -1
+}
+
+func (w *retryResponseWriter) WriteHeaderNow() {
+	if !w.Written() {
+		w.size = 0
+	}
+}
+
+func (w *retryResponseWriter) Flush() {}
+
+func (w *retryResponseWriter) FlushTo(dst gin.ResponseWriter) {
+	if dst == nil {
+		return
+	}
+	copyHeaders(dst.Header(), w.header)
+	dst.WriteHeader(w.statusCode)
+	if w.body.Len() > 0 {
+		_, _ = dst.Write(w.body.Bytes())
+	}
+}
+
+func (w *retryResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := w.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+func (w *retryResponseWriter) CloseNotify() <-chan bool {
+	return w.ResponseWriter.CloseNotify()
+}
+
+func (w *retryResponseWriter) Pusher() http.Pusher {
+	return w.ResponseWriter.Pusher()
 }
 
 func DoWithRetry(c *gin.Context, retry resiliencecontract.Retry, fn func(ctx context.Context) (any, error)) (any, error) {
 	return retry.DoWithResult(c.Request.Context(), func() (any, error) {
 		return fn(c.Request.Context())
 	})
+}
+
+func copyHeaders(dst, src http.Header) {
+	for k := range dst {
+		dst.Del(k)
+	}
+	for k, values := range src {
+		for _, value := range values {
+			dst.Add(k, value)
+		}
+	}
+}
+
+func ginContextIndex(c *gin.Context) int8 {
+	if c == nil {
+		return -1
+	}
+	value := reflect.ValueOf(c).Elem().FieldByName("index")
+	return *(*int8)(unsafe.Pointer(value.UnsafeAddr()))
+}
+
+func setGinContextIndex(c *gin.Context, index int8) {
+	if c == nil {
+		return
+	}
+	value := reflect.ValueOf(c).Elem().FieldByName("index")
+	*(*int8)(unsafe.Pointer(value.UnsafeAddr())) = index
 }

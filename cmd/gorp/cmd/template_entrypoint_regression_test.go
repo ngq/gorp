@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGoLayoutTemplateUsesFacadeRunEntrypoint(t *testing.T) {
+func TestGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -154,7 +154,7 @@ func TestReleaseGoLayoutTemplateDoesNotExposeKernelImports(t *testing.T) {
 	}
 }
 
-func TestMultiFlatWireTemplateUsesFacadeEntrypointAndKeepsWireInCmdLayer(t *testing.T) {
+func TestMultiFlatWireTemplateUsesApplicationEntrypointAndKeepsWireInCmdLayer(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -192,7 +192,7 @@ func TestMultiFlatWireTemplateUsesFacadeEntrypointAndKeepsWireInCmdLayer(t *test
 	require.Contains(t, wireText, "func wireUserServices(db *gorm.DB)")
 }
 
-func TestReleaseGoLayoutTemplateUsesFacadeRunEntrypoint(t *testing.T) {
+func TestReleaseGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -253,7 +253,7 @@ func TestReleaseGoLayoutTemplateRoutesDoNotDuplicateHealthz(t *testing.T) {
 	require.NotContains(t, text, `engine.GET("/healthz"`)
 }
 
-func TestReleaseProjectTemplateUsesFacadeRunEntrypoint(t *testing.T) {
+func TestReleaseProjectTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -308,7 +308,7 @@ func TestGoLayoutDockerfileRunsProjectBinaryDirectly(t *testing.T) {
 	require.NotContains(t, text, `"./app", "app", "start"`)
 }
 
-func TestGoLayoutDocsAndDeployAssetsFollowFacadeAndProjectScopedNaming(t *testing.T) {
+func TestGoLayoutDocsAndDeployAssetsFollowApplicationAndProjectScopedNaming(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()
@@ -355,7 +355,7 @@ func TestGoLayoutDocsAndDeployAssetsFollowFacadeAndProjectScopedNaming(t *testin
 	require.NotContains(t, string(serviceDoc), "gorp-service")
 }
 
-func TestReleaseGoLayoutDocsAndDeployAssetsFollowFacadeAndProjectScopedNaming(t *testing.T) {
+func TestReleaseGoLayoutDocsAndDeployAssetsFollowApplicationAndProjectScopedNaming(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	root := t.TempDir()

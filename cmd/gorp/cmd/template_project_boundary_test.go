@@ -89,7 +89,7 @@ func TestProjectTemplateDocsDescribeSharedBaseBoundaries(t *testing.T) {
 
 	nextSteps := mustReadGeneratedFile(t, projectDir, "docs/next-steps.md")
 	require.Contains(t, nextSteps, "先稳定 `project` 共享基底")
-	require.Contains(t, nextSteps, "默认入口消费 facade 契约")
+	require.Contains(t, nextSteps, "默认入口消费 application 契约")
 
 	deploy := mustReadGeneratedFile(t, projectDir, "docs/deploy.md")
 	require.Contains(t, deploy, "共享交付片段")

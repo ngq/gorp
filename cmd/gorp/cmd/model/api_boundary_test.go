@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoutesTemplateUsesRootFacadeTypes(t *testing.T) {
+func TestRoutesTemplateUsesRootApplicationTypes(t *testing.T) {
 	require.Contains(t, routesTpl, `gorp "github.com/ngq/gorp"`)
 	require.Contains(t, routesTpl, "RegisterRoutes(r gorp.HTTPRouter)")
 	require.Contains(t, routesTpl, "container, ok := gorp.FromContainerContext(ctx)")
@@ -20,7 +20,7 @@ func TestRoutesTemplateUsesRootFacadeTypes(t *testing.T) {
 	require.NotContains(t, routesTpl, "contract.DBRuntimeKey")
 }
 
-func TestEntRoutesTemplateUsesRootFacadeTypes(t *testing.T) {
+func TestEntRoutesTemplateUsesRootApplicationTypes(t *testing.T) {
 	require.Contains(t, entRoutesTpl, `gorp "github.com/ngq/gorp"`)
 	require.Contains(t, entRoutesTpl, "RegisterRoutes(r gorp.HTTPRouter)")
 	require.Contains(t, entRoutesTpl, "container, ok := gorp.FromContainerContext(ctx)")
@@ -31,7 +31,7 @@ func TestEntRoutesTemplateUsesRootFacadeTypes(t *testing.T) {
 	require.NotContains(t, entRoutesTpl, "contract.DBRuntimeKey")
 }
 
-func TestCRUDTemplatesUseRootFacadeResponseHelpers(t *testing.T) {
+func TestCRUDTemplatesUseRootApplicationResponseHelpers(t *testing.T) {
 	templates := []string{
 		createTpl,
 		updateTpl,
@@ -53,7 +53,7 @@ func TestCRUDTemplatesUseRootFacadeResponseHelpers(t *testing.T) {
 		require.True(
 			t,
 			containsAny(tpl, "gorp.BadRequest(", "gorp.Success(", "gorp.SuccessWithMessage(", "gorp.SuccessWithStatus("),
-			"expected template to use root facade response helpers: %s",
+			"expected template to use root application response helpers: %s",
 			tpl,
 		)
 		require.True(

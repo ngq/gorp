@@ -1,47 +1,36 @@
-# {{.ProjectName}}
+﻿# {{.ProjectName}}
 
-默认单服务 Gin Web API starter。
-
-说明：
-- 这里描述的是项目模板主链与单服务入口。
-- 这不代表相关 `contrib` 后端已经进入“已完成”状态。
-
-## 启动
+榛樿鍗曟湇鍔?Gin Web API starter銆?
+璇存槑锛?- 杩欓噷鎻忚堪鐨勬槸椤圭洰妯℃澘涓婚摼涓庡崟鏈嶅姟鍏ュ彛銆?- 杩欎笉浠ｈ〃鐩稿叧 `contrib` 鍚庣宸茬粡杩涘叆鈥滃凡瀹屾垚鈥濈姸鎬併€?
+## 鍚姩
 
 ```bash
 go mod tidy
 go run ./cmd/app
 ```
 
-## 主要目录
+## 涓昏鐩綍
 
 ```text
-cmd/app/main.go          # 项目入口，消费 gorp facade
-app/http/                # Gin 路由、handler、request/response、项目级 middleware
-internal/biz/            # 业务规则与仓储接口
-internal/data/           # 仓储实现与数据访问
-internal/service/        # 业务编排
-config/app.yaml          # 应用配置
-docs/deploy.md           # 部署入口
-deploy/                  # Docker / Kubernetes 交付资产
+cmd/app/main.go          # 椤圭洰鍏ュ彛锛屾秷璐?gorp application
+app/http/                # Gin 璺敱銆乭andler銆乺equest/response銆侀」鐩骇 middleware
+internal/biz/            # 涓氬姟瑙勫垯涓庝粨鍌ㄦ帴鍙?internal/data/           # 浠撳偍瀹炵幇涓庢暟鎹闂?internal/service/        # 涓氬姟缂栨帓
+config/app.yaml          # 搴旂敤閰嶇疆
+docs/deploy.md           # 閮ㄧ讲鍏ュ彛
+deploy/                  # Docker / Kubernetes 浜や粯璧勪骇
 ```
 
-## 默认主线
+## 榛樿涓荤嚎
 
-- `cmd/app/main.go` 使用 `gorp.Run` 启动默认 HTTP 主线
-- `app/http/routes.go` 只注册业务路由
-- `/healthz` 与 `/metrics` 由 facade 默认主线注册
-- Demo CRUD 只是最小业务样板，可以直接替换
-- 部署资产与镜像命名说明见 `docs/deploy.md`
-- Kubernetes / 镜像默认使用项目级名称：`{{.KubernetesName}}`
-- 样板可直接替换，不代表 Kubernetes / configsource / registry contrib 已完成
-
-## 开发顺序
-
-1. 在 `internal/biz` 定义用例与仓储接口
-2. 在 `internal/data` 实现仓储
-3. 在 `internal/service` 组织业务编排
-4. 在 `app/http/handler` 接入 Gin handler
-5. 在 `app/http/routes.go` 挂路由
-
-复杂治理能力通过配置和 framework capability 接入，不在模板里按组件名堆目录。
+- `cmd/app/main.go` 浣跨敤 `gorp.Run` 鍚姩榛樿 HTTP 涓荤嚎
+- `app/http/routes.go` 鍙敞鍐屼笟鍔¤矾鐢?- `/healthz` 涓?`/metrics` 鐢?application ?榛樿涓荤嚎娉ㄥ唽
+- Demo CRUD 鍙槸鏈€灏忎笟鍔℃牱鏉匡紝鍙互鐩存帴鏇挎崲
+- 閮ㄧ讲璧勪骇涓庨暅鍍忓懡鍚嶈鏄庤 `docs/deploy.md`
+- Kubernetes / 闀滃儚榛樿浣跨敤椤圭洰绾у悕绉帮細`{{.KubernetesName}}`
+- 鏍锋澘鍙洿鎺ユ浛鎹紝涓嶄唬琛?Kubernetes / configsource / registry contrib 宸插畬鎴?
+## 寮€鍙戦『搴?
+1. 鍦?`internal/biz` 瀹氫箟鐢ㄤ緥涓庝粨鍌ㄦ帴鍙?2. 鍦?`internal/data` 瀹炵幇浠撳偍
+3. 鍦?`internal/service` 缁勭粐涓氬姟缂栨帓
+4. 鍦?`app/http/handler` 鎺ュ叆 Gin handler
+5. 鍦?`app/http/routes.go` 鎸傝矾鐢?
+澶嶆潅娌荤悊鑳藉姏閫氳繃閰嶇疆鍜?framework capability 鎺ュ叆锛屼笉鍦ㄦā鏉块噷鎸夌粍浠跺悕鍫嗙洰褰曘€?

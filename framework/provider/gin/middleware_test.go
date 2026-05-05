@@ -9,129 +9,79 @@ import (
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 )
 
-// TestRequestID 验证 RequestID 中间件是否正常工作。
-func TestRequestID(t *testing.T) {
+func TestRequestIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(adaptMiddleware(RequestID()))
+	r.Use(adaptMiddleware(RequestIdentity()))
 
 	r.GET("/test", func(c *gin.Context) {
 		rid := GetRequestID(c)
+		tid := GetTraceID(c)
 		ctxRID, ok := supportcontract.FromRequestIDContext(c.Request.Context())
 		if !ok || ctxRID == "" {
 			t.Fatal("expected request id in request context")
 		}
-		if ctxRID != rid {
-			t.Fatalf("request context id mismatch: expected %s, got %s", rid, ctxRID)
-		}
-		c.String(200, rid)
-	})
-
-	// 测试：没有请求头时自动生成
-	req := httptest.NewRequest("GET", "/test", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("expected status 200, got %d", w.Code)
-	}
-	rid := w.Body.String()
-	if len(rid) != 32 {
-		t.Errorf("expected request id length 32, got %d", len(rid))
-	}
-
-	// 验证响应头
-	headerRID := w.Header().Get("X-Request-Id")
-	if headerRID != rid {
-		t.Errorf("header request id mismatch: expected %s, got %s", rid, headerRID)
-	}
-}
-
-// TestRequestIDWithHeader 验证 RequestID 中间件能正确透传请求头中的 ID。
-func TestRequestIDWithHeader(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(adaptMiddleware(RequestID()))
-
-	r.GET("/test", func(c *gin.Context) {
-		rid := GetRequestID(c)
-		c.String(200, rid)
-	})
-
-	// 测试：有请求头时透传
-	req := httptest.NewRequest("GET", "/test", nil)
-	req.Header.Set("X-Request-Id", "test-request-id-12345")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("expected status 200, got %d", w.Code)
-	}
-	rid := w.Body.String()
-	if rid != "test-request-id-12345" {
-		t.Errorf("expected request id to be preserved, got %s", rid)
-	}
-}
-
-// TestTraceID 验证 TraceID 中间件是否正常工作。
-func TestTraceID(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(adaptMiddleware(RequestID()))
-
-	r.Use(adaptMiddleware(TraceID()))
-
-	r.GET("/test", func(c *gin.Context) {
-		tid := GetTraceID(c)
 		ctxTID, ok := supportcontract.FromTraceIDContext(c.Request.Context())
 		if !ok || ctxTID == "" {
 			t.Fatal("expected trace id in request context")
 		}
-		if ctxTID != tid {
-			t.Fatalf("trace context id mismatch: expected %s, got %s", tid, ctxTID)
+		if rid != ctxRID {
+			t.Fatalf("request id mismatch: expected %s, got %s", ctxRID, rid)
 		}
-		c.String(200, tid)
+		if tid != ctxTID {
+			t.Fatalf("trace id mismatch: expected %s, got %s", ctxTID, tid)
+		}
+		c.JSON(http.StatusOK, gin.H{"request_id": rid, "trace_id": tid})
 	})
 
-	// 测试：没有请求头时使用 request id
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != 200 {
-		t.Errorf("expected status 200, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
 	}
-	tid := w.Body.String()
-	if len(tid) != 32 {
-		t.Errorf("expected trace id length 32, got %d", len(tid))
+	rid := w.Header().Get("X-Request-Id")
+	tid := w.Header().Get("X-Trace-Id")
+	if len(rid) != 32 {
+		t.Fatalf("expected request id length 32, got %d", len(rid))
+	}
+	if tid != rid {
+		t.Fatalf("expected trace id to fall back to request id, got request_id=%s trace_id=%s", rid, tid)
 	}
 }
 
-// TestTraceIDWithHeader 验证 TraceID 中间件能正确透传请求头中的 ID。
-func TestTraceIDWithHeader(t *testing.T) {
+func TestRequestIdentityWithHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(adaptMiddleware(RequestID()))
-
-	r.Use(adaptMiddleware(TraceID()))
+	r.Use(adaptMiddleware(RequestIdentity()))
 
 	r.GET("/test", func(c *gin.Context) {
+		rid := GetRequestID(c)
 		tid := GetTraceID(c)
-		c.String(200, tid)
+		if rid != "test-request-id-12345" {
+			t.Fatalf("expected request id to be preserved, got %s", rid)
+		}
+		if tid != "test-trace-id-67890" {
+			t.Fatalf("expected trace id to be preserved, got %s", tid)
+		}
+		c.JSON(http.StatusOK, gin.H{"request_id": rid, "trace_id": tid})
 	})
 
-	// 测试：有请求头时透传
 	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("X-Request-Id", "test-request-id-12345")
 	req.Header.Set("X-Trace-Id", "test-trace-id-67890")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != 200 {
-		t.Errorf("expected status 200, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
 	}
-	tid := w.Body.String()
-	if tid != "test-trace-id-67890" {
-		t.Errorf("expected trace id to be preserved, got %s", tid)
+	if got := w.Header().Get("X-Request-Id"); got != "test-request-id-12345" {
+		t.Fatalf("expected request id header to be preserved, got %s", got)
+	}
+	if got := w.Header().Get("X-Trace-Id"); got != "test-trace-id-67890" {
+		t.Fatalf("expected trace id header to be preserved, got %s", got)
 	}
 }
 

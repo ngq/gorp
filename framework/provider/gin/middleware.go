@@ -1,6 +1,7 @@
 package gin
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 
@@ -15,43 +16,17 @@ const (
 	traceIDHeaderAlt = "X-Trace-Id"
 )
 
-func RequestID() transportcontract.HTTPMiddleware {
+func RequestIdentity() transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
-			rid := c.GetHeader(requestIDHeader)
-			if rid == "" {
-				buf := make([]byte, 16)
-				_, _ = rand.Read(buf)
-				rid = hex.EncodeToString(buf)
-			}
+			rid := resolveRequestID(c)
 			c.Header(requestIDHeader, rid)
 			ctx := supportcontract.NewRequestIDContext(c.Context(), rid)
-			c.SetContext(ctx)
-			if next != nil {
-				next(c)
-			}
-		}
-	}
-}
 
-func TraceID() transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
-			tid := c.GetHeader(traceIDHeader)
-			if tid == "" {
-				tid = c.GetHeader(traceIDHeaderAlt)
-			}
-			if tid == "" {
-				if rid, ok := supportcontract.FromRequestIDContext(c.Context()); ok && rid != "" {
-					tid = rid
-				} else {
-					buf := make([]byte, 16)
-					_, _ = rand.Read(buf)
-					tid = hex.EncodeToString(buf)
-				}
-			}
+			tid := resolveTraceID(c, ctx)
 			c.Header(traceIDHeader, tid)
-			ctx := supportcontract.NewTraceIDContext(c.Context(), tid)
+			ctx = supportcontract.NewTraceIDContext(ctx, tid)
+
 			c.SetContext(ctx)
 			if next != nil {
 				next(c)
@@ -76,4 +51,41 @@ func GetRequestID(c *gin.Context) string {
 		}
 	}
 	return ""
+}
+
+func resolveRequestID(c transportcontract.HTTPContext) string {
+	if c == nil {
+		return generateIdentityID()
+	}
+	rid := c.GetHeader(requestIDHeader)
+	if rid == "" {
+		rid = generateIdentityID()
+	}
+	return rid
+}
+
+func resolveTraceID(c transportcontract.HTTPContext, ctx any) string {
+	if c != nil {
+		tid := c.GetHeader(traceIDHeader)
+		if tid == "" {
+			tid = c.GetHeader(traceIDHeaderAlt)
+		}
+		if tid != "" {
+			return tid
+		}
+	}
+
+	if baseCtx, ok := ctx.(context.Context); ok {
+		if rid, ok := supportcontract.FromRequestIDContext(baseCtx); ok && rid != "" {
+			return rid
+		}
+	}
+
+	return generateIdentityID()
+}
+
+func generateIdentityID() string {
+	buf := make([]byte, 16)
+	_, _ = rand.Read(buf)
+	return hex.EncodeToString(buf)
 }

@@ -57,8 +57,7 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(httpEngineKey, func(c runtimecontract.Container) (any, error) {
 		engine := gin.New()
 		engine.Use(injectRequestContainer(c))
-		engine.Use(adaptMiddleware(RequestID()))
-		engine.Use(adaptMiddleware(TraceID()))
+		engine.Use(adaptMiddleware(RequestIdentity()))
 		engine.Use(adaptMiddleware(LoggingMiddleware(getLogger(c))))
 		engine.Use(adaptMiddleware(RecoveryMiddleware()))
 		attachHTTPTransportMiddleware(engine, c)

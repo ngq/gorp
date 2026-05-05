@@ -20,6 +20,7 @@ const (
 type JWTClaims = securitycontract.JWTClaims
 type JWTService = securitycontract.JWTService
 
+// Make returns the business JWT service from the container.
 // Make 从容器获取业务 JWT 服务。
 func Make(c runtimecontract.Container) (securitycontract.JWTService, error) {
 	v, err := c.Make(securitycontract.AuthJWTKey)
@@ -29,22 +30,30 @@ func Make(c runtimecontract.Container) (securitycontract.JWTService, error) {
 	return v.(securitycontract.JWTService), nil
 }
 
+// MustMake returns the business JWT service from the container and panics on failure.
 // MustMake 从容器获取业务 JWT 服务，失败 panic。
 func MustMake(c runtimecontract.Container) securitycontract.JWTService {
 	return frameworkjwt.MustMakeJWTService(c)
 }
 
+// NewService creates a business JWT service.
 // NewService 创建业务 JWT 服务。
 func NewService(secret, issuer, audience string) securitycontract.JWTService {
 	return frameworkjwt.NewJWTService(secret, issuer, audience)
 }
 
+// SecretFromConfig resolves the business JWT secret from config.
 // SecretFromConfig 统一从配置中解析业务 JWT secret。
 func SecretFromConfig(cfg datacontract.Config) string {
 	return frameworkjwt.JWTSecretFromConfig(cfg)
 }
 
+// AuthMiddleware creates a framework HTTP middleware based on business JWT verification.
 // AuthMiddleware 创建基于业务 JWT 的 framework HTTP 中间件。
+//
+// Example:
+//
+//	router.Use(jwt.AuthMiddleware(jwtSvc, "user"))
 func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType string) transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
@@ -84,21 +93,25 @@ func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType stri
 	}
 }
 
+// SubjectIDFromContext extracts the business subject id from context.
 // SubjectIDFromContext 从 request/framework context 中提取业务主体 ID。
 func SubjectIDFromContext(ctx context.Context) (int64, bool) {
 	return securitycontract.FromSubjectIDContext(ctx)
 }
 
+// ClaimsFromRequestContext extracts business JWT claims from request context.
 // ClaimsFromRequestContext 从 request context 提取业务 JWT claims。
 func ClaimsFromRequestContext(ctx context.Context) (*JWTClaims, bool) {
 	return securitycontract.FromJWTClaimsContext(ctx)
 }
 
+// SubjectIDFromRequestContext extracts the business subject id from request context.
 // SubjectIDFromRequestContext 从 request context 提取业务主体 ID。
 func SubjectIDFromRequestContext(ctx context.Context) (int64, bool) {
 	return securitycontract.FromSubjectIDContext(ctx)
 }
 
+// SubjectTypeFromRequestContext extracts the business subject type from request context.
 // SubjectTypeFromRequestContext 从 request context 提取业务主体类型。
 func SubjectTypeFromRequestContext(ctx context.Context) (string, bool) {
 	return securitycontract.FromSubjectTypeContext(ctx)

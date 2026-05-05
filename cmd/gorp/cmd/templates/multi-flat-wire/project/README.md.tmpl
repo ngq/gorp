@@ -85,7 +85,7 @@ make run-product
 说明：
 
 - 各服务统一由 `services/<service>/cmd/main.go` 启动
-- 默认优先通过 `gorp.Run(...)` + facade runtime 启动
+- 默认优先通过 `gorp.Run(...)` + application runtime 启动
 - HTTP 接线在 `internal/server/http`，gRPC 接线在 `internal/server/grpc`
 
 ### 4. 运行测试

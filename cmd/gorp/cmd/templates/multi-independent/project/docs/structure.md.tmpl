@@ -68,7 +68,7 @@ go.work
 职责：
 - 应用服务编排
 - 调用 biz / data / capability 之间的协作逻辑
-- 对接 facade 或必要 capability 的业务使用入口
+- 对接 application 或必要 capability 的业务使用入口
 
 ### 5. `services/<service>/internal/server/http/`
 
@@ -112,7 +112,7 @@ go.work
 - HTTP 接线放 `internal/server/http/`
 - gRPC 接线放 `internal/server/grpc/`
 
-其余基础设施接入细节，优先通过 framework capability / facade 解决。
+其余基础设施接入细节，优先通过 framework capability / application 解决。
 
 ## `docs/` 的作用
 
@@ -122,4 +122,4 @@ go.work
 
 ## 一句话总结
 
-`multi-independent` 固定五件事：服务独立 `go.mod`、`shared/` 稳定边界、`cmd/` 层 Wire 收口、facade-first 启动主线、`internal/server/http|grpc` 传输分层。
+`multi-independent` 固定五件事：服务独立 `go.mod`、`shared/` 稳定边界、`cmd/` 层 Wire 收口、application-first 启动主线、`internal/server/http|grpc` 传输分层。

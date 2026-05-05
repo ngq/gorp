@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	ginpkg "github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/container"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
@@ -66,11 +67,15 @@ func TestLoggingMiddlewareStoresRequestLoggerInContext(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	ctx, _ := ginpkg.CreateTestContext(rec)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/users/42", nil)
+	ctx.Params = ginpkg.Params{{Key: "id", Value: "42"}}
 	ctx.Request = ctx.Request.WithContext(supportcontract.NewTraceIDContext(ctx.Request.Context(), "trace-1"))
 	ctx.Request = ctx.Request.WithContext(supportcontract.NewRequestIDContext(ctx.Request.Context(), "req-1"))
 	httpCtx := newHTTPContext(ctx)
 	wrapped := mw(func(c transportcontract.HTTPContext) {
+		if gc, ok := unwrapGinContext(c); ok {
+			gc.FullPath()
+		}
 		c.Status(http.StatusNoContent)
 	})
 	require.NotNil(t, wrapped)
@@ -84,8 +89,11 @@ func TestLoggingMiddlewareStoresRequestLoggerInContext(t *testing.T) {
 		{Key: "request_id", Value: "req-1"},
 	}, stub.fields)
 	require.Equal(t, "http request", stub.infoMsg)
-	require.Contains(t, stub.infoFields, observabilitycontract.Field{Key: "path", Value: "/"})
+	require.Contains(t, stub.infoFields, observabilitycontract.Field{Key: "path", Value: "/users/42"})
+	require.Contains(t, stub.infoFields, observabilitycontract.Field{Key: "route", Value: ""})
 	require.Contains(t, stub.infoFields, observabilitycontract.Field{Key: "status", Value: http.StatusNoContent})
+	require.Contains(t, stub.infoFields, observabilitycontract.Field{Key: "request_id", Value: "req-1"})
+	require.Contains(t, stub.infoFields, observabilitycontract.Field{Key: "trace_id", Value: "trace-1"})
 }
 
 func TestRecoveryMiddlewareRecoversPanic(t *testing.T) {
@@ -103,4 +111,43 @@ func TestRecoveryMiddlewareRecoversPanic(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Contains(t, rec.Body.String(), "internal server error")
+}
+
+type recoveryResponderStub struct {
+	message string
+}
+
+func (r *recoveryResponderStub) Success(transportcontract.HTTPContext, any)                    {}
+func (r *recoveryResponderStub) SuccessWithMessage(transportcontract.HTTPContext, string, any) {}
+func (r *recoveryResponderStub) SuccessWithStatus(transportcontract.HTTPContext, int, any)     {}
+func (r *recoveryResponderStub) Error(transportcontract.HTTPContext, error)                    {}
+func (r *recoveryResponderStub) BadRequest(transportcontract.HTTPContext, string)              {}
+func (r *recoveryResponderStub) InternalError(c transportcontract.HTTPContext, message string) {
+	r.message = message
+	c.Status(http.StatusTeapot)
+}
+
+func TestRecoveryMiddlewareUsesCustomResponder(t *testing.T) {
+	rec := httptest.NewRecorder()
+	ctx, _ := ginpkg.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	c := container.New()
+	custom := &recoveryResponderStub{}
+	c.Bind(transportcontract.HTTPResponderKey, func(runtimecontract.Container) (any, error) {
+		return custom, nil
+	}, true)
+
+	httpCtx := newHTTPContext(ctx)
+	httpCtx.SetContext(supportcontract.NewContainerContext(httpCtx.Context(), c))
+	httpCtx.SetContext(frameworkbizlog.WithContext(httpCtx.Context(), &requestLoggerStub{}))
+
+	wrapped := RecoveryMiddleware()(func(transportcontract.HTTPContext) {
+		panic("boom")
+	})
+	require.NotNil(t, wrapped)
+	wrapped(httpCtx)
+
+	require.Equal(t, "internal server error", custom.message)
+	require.Equal(t, http.StatusTeapot, httpCtx.ResponseStatus())
 }

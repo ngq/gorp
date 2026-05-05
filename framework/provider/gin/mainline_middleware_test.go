@@ -132,6 +132,24 @@ func TestRateLimitMainlineMiddlewareUsesRoutePathAsResource(t *testing.T) {
 	}
 }
 
+func TestRateLimitMainlineMiddlewareFallsBackToMethodAndURLPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	limiter := &captureLimiter{}
+	r.Use(adaptMiddleware(RateLimit(limiter, "")))
+	r.NoRoute(func(c *gin.Context) {
+		c.Status(http.StatusNotFound)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/raw/path", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if limiter.resource != "GET /raw/path" {
+		t.Fatalf("expected method+url path fallback resource, got %q", limiter.resource)
+	}
+}
+
 func TestIdempotencyMainlineMiddlewareCachesStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -158,6 +176,42 @@ func TestIdempotencyMainlineMiddlewareCachesStatus(t *testing.T) {
 	}
 	if w2.Code != http.StatusCreated {
 		t.Fatalf("expected replay status 201, got %d", w2.Code)
+	}
+}
+
+func TestIdempotencyMainlineMiddlewareReplaysHeadersAndJSONBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	store := NewMemoryIdempotencyStore()
+	hits := 0
+	r.Use(adaptMiddleware(Idempotency(store, time.Minute)))
+	r.POST("/orders", func(c *gin.Context) {
+		hits++
+		c.Header("X-Order-Source", "cacheable")
+		c.JSON(http.StatusCreated, gin.H{"id": 1, "status": "created"})
+	})
+
+	req1 := httptest.NewRequest(http.MethodPost, "/orders", nil)
+	req1.Header.Set(IdempotencyKeyHeader, "dup-json")
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+
+	req2 := httptest.NewRequest(http.MethodPost, "/orders", nil)
+	req2.Header.Set(IdempotencyKeyHeader, "dup-json")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if hits != 1 {
+		t.Fatalf("expected handler hit once, got %d", hits)
+	}
+	if w2.Code != http.StatusCreated {
+		t.Fatalf("expected replay status 201, got %d", w2.Code)
+	}
+	if w2.Header().Get("X-Order-Source") != "cacheable" {
+		t.Fatalf("expected replay header, got %q", w2.Header().Get("X-Order-Source"))
+	}
+	if w2.Body.String() != w1.Body.String() {
+		t.Fatalf("expected replay body %q, got %q", w1.Body.String(), w2.Body.String())
 	}
 }
 
@@ -190,5 +244,37 @@ func TestIdempotencyMainlineMiddlewareDoesNotCacheFailedResponse(t *testing.T) {
 	}
 	if w2.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w2.Code)
+	}
+}
+
+func TestIdempotencyMainlineMiddlewareSkipsCacheForUnsupportedMethod(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	store := NewMemoryIdempotencyStore()
+	hits := 0
+	r.Use(adaptMiddleware(Idempotency(store, time.Minute)))
+	r.GET("/orders", func(c *gin.Context) {
+		hits++
+		c.JSON(http.StatusOK, gin.H{"ok": true, "hits": hits})
+	})
+
+	req1 := httptest.NewRequest(http.MethodGet, "/orders", nil)
+	req1.Header.Set(IdempotencyKeyHeader, "dup-get")
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+
+	req2 := httptest.NewRequest(http.MethodGet, "/orders", nil)
+	req2.Header.Set(IdempotencyKeyHeader, "dup-get")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if hits != 2 {
+		t.Fatalf("expected GET requests not cached, got handler hits %d", hits)
+	}
+	if exists, _ := store.Check("dup-get"); exists {
+		t.Fatal("expected GET response not stored")
+	}
+	if w1.Body.String() == w2.Body.String() {
+		t.Fatalf("expected fresh handler execution, got identical bodies %q", w1.Body.String())
 	}
 }

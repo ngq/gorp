@@ -69,7 +69,7 @@ docs/
 
 - 应用服务编排
 - 调用 biz / data / capability 之间的协作逻辑
-- 对接 facade 或必要 capability 的业务使用入口
+- 对接 application 或必要 capability 的业务使用入口
 
 这里可以出现“发消息”“调 RPC”“查缓存”的业务动作编排，但不应直接放底层 SDK 初始化细节。
 
@@ -115,7 +115,7 @@ docs/
 - HTTP 接线放 `internal/server/http/`
 - gRPC 接线放 `internal/server/grpc/`
 
-其余基础设施接入细节，优先通过 framework capability / facade 解决。
+其余基础设施接入细节，优先通过 framework capability / application 解决。
 
 ## `docs/` 目录的作用
 
@@ -125,4 +125,4 @@ docs/
 
 ## 一句话总结
 
-`multi-flat-wire` 固定四件事：服务目录、`cmd/` 层 Wire 收口、facade-first 启动主线、`internal/server/http|grpc` 传输分层。
+`multi-flat-wire` 固定四件事：服务目录、`cmd/` 层 Wire 收口、application-first 启动主线、`internal/server/http|grpc` 传输分层。

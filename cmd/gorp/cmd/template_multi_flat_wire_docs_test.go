@@ -61,7 +61,7 @@ func TestMultiFlatWireDocsLinkToDeployAssets(t *testing.T) {
 	require.NotContains(t, readmeText, "framework/bootstrap")
 	require.Contains(t, structureText, "`internal/server/http/`")
 	require.Contains(t, structureText, "`internal/server/grpc/`")
-	require.Contains(t, structureText, "framework capability / facade")
+	require.Contains(t, structureText, "framework capability / application")
 	require.NotContains(t, structureText, "shared/infrastructure")
 
 	require.Contains(t, componentTreeText, "`services/<service>/internal/server/http/`")

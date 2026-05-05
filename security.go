@@ -4,17 +4,17 @@ import (
 	"context"
 
 	"github.com/ngq/gorp/framework/contract/security"
-	"github.com/ngq/gorp/framework/facade"
+	"github.com/ngq/gorp/framework/application"
 )
 
 type ServiceIdentity = security.ServiceIdentity
 
 func WithServiceIdentity(ctx context.Context, identity *ServiceIdentity) context.Context {
-	return facade.WithServiceIdentity(ctx, identity)
+	return application.WithServiceIdentity(ctx, identity)
 }
 
 func FromServiceIdentity(ctx context.Context) (*ServiceIdentity, bool) {
-	return facade.FromServiceIdentity(ctx)
+	return application.FromServiceIdentity(ctx)
 }
 
 func FromJWTClaimsContext(ctx context.Context) (*security.JWTClaims, bool) {

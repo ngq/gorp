@@ -66,3 +66,38 @@ func TestWhenNotMatchedSkipsMiddleware(t *testing.T) {
 		t.Fatal("expected selector middleware to be skipped")
 	}
 }
+
+func TestSelectorCombinators(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	called := false
+
+	predicate := All(
+		MatchMethod(http.MethodGet),
+		Any(MatchPrefix("/api"), MatchPath("/healthz")),
+		Not(MatchPath("/api/private")),
+	)
+
+	r.Use(adaptMiddleware(When(predicate, func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+		return func(c transportcontract.HTTPContext) {
+			called = true
+			if next != nil {
+				next(c)
+			}
+		}
+	})))
+	r.GET("/api/orders", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/orders", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
+	if !called {
+		t.Fatal("expected composed selector predicate to match")
+	}
+}

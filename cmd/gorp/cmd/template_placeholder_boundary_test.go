@@ -77,7 +77,7 @@ func TestCurrentTemplateTreesDoNotKeepEmptyDirectories(t *testing.T) {
 	}
 }
 
-func TestReleaseProjectHandlerTemplatesUseRootFacadeHelpers(t *testing.T) {
+func TestReleaseProjectHandlerTemplatesUseRootApplicationHelpers(t *testing.T) {
 	require.NoError(t, frameworktesting.ChdirRepoRoot())
 
 	files := []string{

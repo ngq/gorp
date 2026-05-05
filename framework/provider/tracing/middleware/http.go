@@ -109,17 +109,6 @@ func WithAttributes(attrs map[string]any) observabilitycontract.SpanOption {
 	}
 }
 
-func TracingMiddlewareFromContainer(serviceName string) transportcontract.HTTPMiddleware {
-	_ = serviceName
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
-			if next != nil {
-				next(c)
-			}
-		}
-	}
-}
-
 func ParseTraceParent(traceparent string) (traceID, spanID string, flags string, ok bool) {
 	parts := strings.Split(traceparent, "-")
 	if len(parts) != 4 {

@@ -16,7 +16,7 @@ go run ./cmd/app
 ## 主要目录
 
 ```text
-cmd/app/main.go          # 项目入口，消费 gorp facade
+cmd/app/main.go          # 项目入口，消费 gorp application
 app/http/                # Gin 路由、handler、request/response、项目级 middleware
 internal/biz/            # 业务规则与仓储接口
 internal/data/           # 仓储实现与数据访问
@@ -30,7 +30,7 @@ deploy/                  # Docker / Kubernetes 交付资产
 
 - `cmd/app/main.go` 使用 `gorp.Run` 启动默认 HTTP 主线
 - `app/http/routes.go` 只注册业务路由
-- `/healthz` 与 `/metrics` 由 facade 默认主线注册
+- `/healthz` 与 `/metrics` 由 application 默认主线注册
 - Demo CRUD 只是最小业务样板，可以直接替换
 - 部署资产与镜像命名说明见 `docs/deploy.md`
 - Kubernetes / 镜像默认使用项目级名称：`{{.KubernetesName}}`
