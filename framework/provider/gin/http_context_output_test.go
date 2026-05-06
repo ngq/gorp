@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify that the Gin-backed HTTP context output helpers behave consistently.
+// - Guard the provider adapter against regressions in string, XML, data, and redirect output.
+// - Keep provider-level context output behavior stable while mainline abstractions evolve.
+//
+// 适用场景：
+// - 验证基于 Gin 的 HTTP context 输出助手行为一致。
+// - 防止字符串、XML、Data 和 Redirect 输出在 provider 适配层回归。
+// - 在主线抽象演进时，保持 provider 级上下文输出行为稳定。
 package gin
 
 import (
@@ -15,6 +24,9 @@ type xmlPayload struct {
 	Message string   `xml:"message"`
 }
 
+// TestHTTPContextString verifies string output through the Gin-backed HTTP context helper.
+//
+// TestHTTPContextString 验证基于 Gin 的 HTTP context 字符串输出助手。
 func TestHTTPContextString(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
@@ -28,6 +40,9 @@ func TestHTTPContextString(t *testing.T) {
 	require.Equal(t, "success", rec.Body.String())
 }
 
+// TestHTTPContextXML verifies XML output through the Gin-backed HTTP context helper.
+//
+// TestHTTPContextXML 验证基于 Gin 的 HTTP context XML 输出助手。
 func TestHTTPContextXML(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
@@ -42,6 +57,9 @@ func TestHTTPContextXML(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "<message>ok</message>")
 }
 
+// TestHTTPContextData verifies binary data output through the Gin-backed HTTP context helper.
+//
+// TestHTTPContextData 验证基于 Gin 的 HTTP context Data 输出助手。
 func TestHTTPContextData(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
@@ -56,6 +74,9 @@ func TestHTTPContextData(t *testing.T) {
 	require.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
 }
 
+// TestHTTPContextRedirect verifies redirect output through the Gin-backed HTTP context helper.
+//
+// TestHTTPContextRedirect 验证基于 Gin 的 HTTP context Redirect 输出助手。
 func TestHTTPContextRedirect(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()

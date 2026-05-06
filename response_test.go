@@ -11,7 +11,7 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
-	ginprovider "github.com/ngq/gorp/framework/provider/gin"
+	httpmiddleware "github.com/ngq/gorp/framework/http/middleware"
 	"github.com/stretchr/testify/require"
 )
 
@@ -108,7 +108,7 @@ func TestSuccessFallsBackToDefaultResponder(t *testing.T) {
 	Success(ctx, map[string]any{"ok": true})
 
 	require.Equal(t, http.StatusOK, captured.status)
-	resp, ok := captured.body.(ginprovider.Response)
+	resp, ok := captured.body.(httpmiddleware.Response)
 	require.True(t, ok)
 	require.Equal(t, 0, resp.Code)
 	require.Equal(t, "success", resp.Message)

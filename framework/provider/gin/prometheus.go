@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Expose a standard `/metrics` endpoint for Prometheus scraping.
+// - Register Go runtime metrics such as GC, memory, and goroutine statistics.
+// - Reuse `router.Mount()` with a plain `http.Handler` instead of binding Gin-specific handlers.
+//
+// 适用场景：
+// - 暴露标准 `/metrics` 端点供 Prometheus 抓取。
+// - 注册 Go 运行时指标，例如 GC、内存和 goroutine 统计。
+// - 通过普通 `http.Handler` 复用 `router.Mount()`，而不是绑定 Gin 专属 handler。
 package gin
 
 import (
@@ -10,25 +19,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// PrometheusHandler 返回标准 http.Handler，用于暴露 /metrics 端点。
+// PrometheusHandler returns a standard http.Handler for exposing Prometheus metrics.
 //
-// 中文说明：
-// - 默认主线不再直接暴露 Gin HandlerFunc；
-// - 通过标准 `http.Handler`，framework 可以统一走 `Mount(path, http.Handler)` 主线；
-// - provider 若仍基于 Gin，可在 provider 内部完成适配。
+// PrometheusHandler 返回一个用于暴露 Prometheus 指标的标准 http.Handler。
+//
+// Example:
+//
+//	router.Mount("/metrics", ginprovider.PrometheusHandler())
 func PrometheusHandler() http.Handler {
 	return promhttp.Handler()
 }
 
 var registerGoRuntimeMetricsOnce sync.Once
 
-// RegisterGoRuntimeMetrics 注册 Go runtime 指标到 Prometheus 默认注册器。
+// RegisterGoRuntimeMetrics registers Go runtime collectors into the default Prometheus registry.
 //
-// 中文说明：
-// - 包括 goroutine 数量、GC 暂停时间、内存分配等关键运行时指标；
-// - 这些指标对排查内存泄漏、goroutine 泄漏、GC 问题非常有帮助；
-// - 默认 registry 在部分运行场景下可能已经带有 GoCollector；
-// - 这里使用 once + AlreadyRegistered 容忍重复注册，避免真实启动时 panic。
+// RegisterGoRuntimeMetrics 将 Go 运行时采集器注册到默认 Prometheus 注册表。
 func RegisterGoRuntimeMetrics() {
 	registerGoRuntimeMetricsOnce.Do(func() {
 		collector := collectors.NewGoCollector()

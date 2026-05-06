@@ -1,0 +1,116 @@
+package middleware
+
+import (
+	"net/http"
+	"strconv"
+	"strings"
+
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+)
+
+// CORSOptions defines the CORS behavior of the HTTP middleware.
+//
+// CORSOptions 定义 HTTP 中间件的跨域行为。
+type CORSOptions struct {
+	AllowOrigins     []string
+	AllowMethods     []string
+	AllowHeaders     []string
+	ExposeHeaders    []string
+	AllowCredentials bool
+	MaxAgeSeconds    int
+}
+
+// DefaultCORSOptions returns the default CORS configuration.
+//
+// DefaultCORSOptions 返回默认的跨域配置。
+func DefaultCORSOptions() CORSOptions {
+	return CORSOptions{
+		AllowOrigins:  []string{"*"},
+		AllowMethods:  []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions, http.MethodHead},
+		AllowHeaders:  []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-Id", "X-Trace-Id", "X-Idempotency-Key"},
+		ExposeHeaders: []string{"Content-Length", "Content-Type", "X-Request-Id", "X-Trace-Id"},
+		MaxAgeSeconds: 600,
+	}
+}
+
+// CORS applies cross-origin resource sharing headers to the HTTP mainline.
+//
+// CORS 为 HTTP 主线应用跨域响应头。
+func CORS(opts CORSOptions) transportcontract.HTTPMiddleware {
+	if len(opts.AllowOrigins) == 0 {
+		opts = DefaultCORSOptions()
+	}
+
+	allowMethods := strings.Join(opts.AllowMethods, ", ")
+	allowHeaders := strings.Join(opts.AllowHeaders, ", ")
+	exposeHeaders := strings.Join(opts.ExposeHeaders, ", ")
+	maxAge := strconv.Itoa(opts.MaxAgeSeconds)
+
+	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+		return func(c transportcontract.HTTPContext) {
+			if c == nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			origin := c.GetHeader("Origin")
+			if origin == "" {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			if allowedOrigin, ok := resolveCORSOrigin(origin, opts.AllowOrigins); ok {
+				c.Header("Access-Control-Allow-Origin", allowedOrigin)
+				c.Header("Vary", "Origin")
+			}
+			if allowMethods != "" {
+				c.Header("Access-Control-Allow-Methods", allowMethods)
+			}
+			if allowHeaders != "" {
+				c.Header("Access-Control-Allow-Headers", allowHeaders)
+			}
+			if exposeHeaders != "" {
+				c.Header("Access-Control-Expose-Headers", exposeHeaders)
+			}
+			if opts.AllowCredentials {
+				c.Header("Access-Control-Allow-Credentials", "true")
+			}
+			if opts.MaxAgeSeconds > 0 {
+				c.Header("Access-Control-Max-Age", maxAge)
+			}
+
+			req := c.Request()
+			if req != nil && req.Method == http.MethodOptions {
+				c.Status(http.StatusNoContent)
+				if gc, ok := unwrapGinContext(c); ok {
+					gc.Abort()
+				}
+				return
+			}
+
+			if next != nil {
+				next(c)
+			}
+		}
+	}
+}
+
+func resolveCORSOrigin(origin string, allowOrigins []string) (string, bool) {
+	for _, allowed := range allowOrigins {
+		switch strings.TrimSpace(allowed) {
+		case "":
+			continue
+		case "*":
+			return "*", true
+		default:
+			if strings.EqualFold(strings.TrimSpace(allowed), origin) {
+				return origin, true
+			}
+		}
+	}
+	return "", false
+}

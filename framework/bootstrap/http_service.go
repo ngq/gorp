@@ -19,6 +19,7 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	httpmiddleware "github.com/ngq/gorp/framework/http/middleware"
 	frameworklog "github.com/ngq/gorp/framework/log"
 	gingin "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/ngq/gorp/framework/provider/host"
@@ -120,7 +121,7 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 	RegisterHealthCheck(rt.Router, serviceName)
 	if !opts.DisableMetrics {
 		RegisterMetricsEndpoint(rt.Router)
-		rt.Router.Use(gingin.MetricsMiddleware())
+		rt.Router.Use(httpmiddleware.MetricsMiddleware())
 	}
 	if opts.EnablePprof {
 		RegisterPprofEndpoints(rt.Router)

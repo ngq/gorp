@@ -1,4 +1,13 @@
-package gin
+// Application scenarios:
+// - Stop long-running HTTP requests from occupying request resources forever.
+// - Return a unified timeout response to upstream callers.
+// - Provide a request deadline source for downstream business code.
+//
+// 适用场景：
+// - 阻止长时间运行的 HTTP 请求长期占用请求资源。
+// - 为上游调用方返回统一的超时响应。
+// - 为下游业务代码提供请求 deadline 来源。
+package middleware
 
 import (
 	"context"
@@ -9,6 +18,9 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// Timeout enforces a request deadline on the transport-level HTTP middleware chain.
+//
+// Timeout 在 transport 层 HTTP 中间件链上施加请求超时约束。
 func Timeout(timeout time.Duration) transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
@@ -54,6 +66,9 @@ func Timeout(timeout time.Duration) transportcontract.HTTPMiddleware {
 	}
 }
 
+// TimeoutMiddleware is the native Gin timeout middleware form.
+//
+// TimeoutMiddleware 是超时中间件的原生 Gin 形态。
 func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
@@ -81,6 +96,9 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 	}
 }
 
+// TimeoutMiddlewareWithHandler applies a timeout and delegates timeout output to a custom callback.
+//
+// TimeoutMiddlewareWithHandler 应用超时控制，并把超时后的输出交给自定义回调处理。
 func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Context)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
@@ -112,6 +130,9 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 	}
 }
 
+// RequestTimeout returns the remaining timeout budget of the current request.
+//
+// RequestTimeout 返回当前请求剩余的超时预算。
 func RequestTimeout(c *gin.Context) time.Duration {
 	ctx := c.Request.Context()
 	deadline, ok := ctx.Deadline()
@@ -125,6 +146,9 @@ func RequestTimeout(c *gin.Context) time.Duration {
 	return remaining
 }
 
+// IsRequestCanceled reports whether the current request context has been canceled.
+//
+// IsRequestCanceled 判断当前请求上下文是否已经取消。
 func IsRequestCanceled(c *gin.Context) bool {
 	ctx := c.Request.Context()
 	select {

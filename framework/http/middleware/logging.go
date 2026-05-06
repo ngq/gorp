@@ -1,4 +1,13 @@
-package gin
+// Application scenarios:
+// - Record HTTP access logs with stable request fields.
+// - Reuse request-scoped logger context in downstream business code.
+// - Provide a default request logging baseline for production services.
+//
+// 适用场景：
+// - 记录带有稳定请求字段的 HTTP 访问日志。
+// - 在下游业务代码中复用请求级 logger 上下文。
+// - 为生产服务提供默认的请求日志基线。
+package middleware
 
 import (
 	"time"
@@ -9,6 +18,13 @@ import (
 	frameworkbizlog "github.com/ngq/gorp/framework/log"
 )
 
+// LoggingMiddleware writes a request-scoped access log and stores the derived logger in context.
+//
+// LoggingMiddleware 输出请求级访问日志，并把派生后的 logger 写回上下文。
+//
+// Example:
+//
+//	router.Use(httpmiddleware.LoggingMiddleware(logger))
 func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
@@ -51,11 +67,11 @@ func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.HTTP
 				status = 200
 			}
 			logFields := []observabilitycontract.Field{
-				observabilitycontract.Field{Key: "method", Value: method},
-				observabilitycontract.Field{Key: "path", Value: path},
-				observabilitycontract.Field{Key: "route", Value: route},
-				observabilitycontract.Field{Key: "status", Value: status},
-				observabilitycontract.Field{Key: "latency_ms", Value: time.Since(start).Milliseconds()},
+				{Key: "method", Value: method},
+				{Key: "path", Value: path},
+				{Key: "route", Value: route},
+				{Key: "status", Value: status},
+				{Key: "latency_ms", Value: time.Since(start).Milliseconds()},
 			}
 			if requestID != "" {
 				logFields = append(logFields, observabilitycontract.Field{Key: "request_id", Value: requestID})

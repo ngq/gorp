@@ -1,4 +1,13 @@
-package gin
+// Application scenarios:
+// - Protect external APIs from high-frequency bursts.
+// - Apply route-level or resource-level request quotas.
+// - Combine with identity or IP extraction to build access policies.
+//
+// 适用场景：
+// - 保护对外 API，避免高频突发流量冲击。
+// - 对路由级或资源级请求配额进行控制。
+// - 结合身份或 IP 提取逻辑构建访问策略。
+package middleware
 
 import (
 	"net/http"
@@ -10,10 +19,16 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// RateLimiter is the native Gin limiter contract used by RateLimitMiddleware.
+//
+// RateLimiter 是 RateLimitMiddleware 使用的原生 Gin 限流器契约。
 type RateLimiter interface {
 	Allow(key string) bool
 }
 
+// RateLimit applies a transport-level rate limiter and returns a unified 429 response when exceeded.
+//
+// RateLimit 应用 transport 层限流器，并在超限时返回统一的 429 响应。
 func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
@@ -55,6 +70,9 @@ func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transpor
 	}
 }
 
+// RateLimitMiddleware is the native Gin form of the rate-limiting middleware.
+//
+// RateLimitMiddleware 是限流中间件的原生 Gin 形态。
 func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := keyFunc(c)
@@ -73,6 +91,9 @@ func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string)
 	}
 }
 
+// IPKeyFunc extracts a client-IP-based rate-limit key from the request.
+//
+// IPKeyFunc 从请求中提取基于客户端 IP 的限流 key。
 func IPKeyFunc(c *gin.Context) string {
 	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
 		return xff
@@ -83,6 +104,9 @@ func IPKeyFunc(c *gin.Context) string {
 	return c.ClientIP()
 }
 
+// TokenBucketLimiter is an in-memory token-bucket limiter for lightweight HTTP protection.
+//
+// TokenBucketLimiter 是一个用于轻量 HTTP 保护的内存令牌桶限流器。
 type TokenBucketLimiter struct {
 	rate     float64
 	burst    int
@@ -91,6 +115,9 @@ type TokenBucketLimiter struct {
 	mu       sync.Mutex
 }
 
+// NewTokenBucketLimiter creates an in-memory token-bucket limiter.
+//
+// NewTokenBucketLimiter 创建一个内存令牌桶限流器。
 func NewTokenBucketLimiter(rate float64, burst int) *TokenBucketLimiter {
 	return &TokenBucketLimiter{
 		rate:     rate,
@@ -100,6 +127,9 @@ func NewTokenBucketLimiter(rate float64, burst int) *TokenBucketLimiter {
 	}
 }
 
+// Allow consumes one token when available and reports whether the request may proceed.
+//
+// Allow 在令牌可用时消耗一个令牌，并返回请求是否允许继续。
 func (l *TokenBucketLimiter) Allow(_ string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -118,6 +148,9 @@ func (l *TokenBucketLimiter) Allow(_ string) bool {
 	return false
 }
 
+// SlidingWindowLimiter is an in-memory sliding-window limiter.
+//
+// SlidingWindowLimiter 是一个内存滑动窗口限流器。
 type SlidingWindowLimiter struct {
 	limit  int
 	window time.Duration
@@ -129,6 +162,9 @@ type windowRecord struct {
 	timestamps []time.Time
 }
 
+// NewSlidingWindowLimiter creates an in-memory sliding-window limiter.
+//
+// NewSlidingWindowLimiter 创建一个内存滑动窗口限流器。
 func NewSlidingWindowLimiter(limit int, window time.Duration) *SlidingWindowLimiter {
 	return &SlidingWindowLimiter{
 		limit:  limit,
@@ -137,6 +173,9 @@ func NewSlidingWindowLimiter(limit int, window time.Duration) *SlidingWindowLimi
 	}
 }
 
+// Allow checks whether the key is still within the sliding-window quota.
+//
+// Allow 判断给定 key 是否仍在滑动窗口配额内。
 func (l *SlidingWindowLimiter) Allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -148,7 +187,7 @@ func (l *SlidingWindowLimiter) Allow(key string) bool {
 		l.counts[key] = &windowRecord{timestamps: []time.Time{now}}
 		return true
 	}
-	validIdx := 0
+	validIdx := len(record.timestamps)
 	for i, t := range record.timestamps {
 		if t.After(threshold) {
 			validIdx = i
@@ -163,6 +202,9 @@ func (l *SlidingWindowLimiter) Allow(key string) bool {
 	return true
 }
 
+// FixedWindowLimiter is an in-memory fixed-window limiter.
+//
+// FixedWindowLimiter 是一个内存固定窗口限流器。
 type FixedWindowLimiter struct {
 	limit   int
 	window  time.Duration
@@ -171,6 +213,9 @@ type FixedWindowLimiter struct {
 	mu      sync.Mutex
 }
 
+// NewFixedWindowLimiter creates an in-memory fixed-window limiter.
+//
+// NewFixedWindowLimiter 创建一个内存固定窗口限流器。
 func NewFixedWindowLimiter(limit int, window time.Duration) *FixedWindowLimiter {
 	return &FixedWindowLimiter{
 		limit:   limit,
@@ -180,6 +225,9 @@ func NewFixedWindowLimiter(limit int, window time.Duration) *FixedWindowLimiter 
 	}
 }
 
+// Allow checks whether the key is still within the fixed-window quota.
+//
+// Allow 判断给定 key 是否仍在固定窗口配额内。
 func (l *FixedWindowLimiter) Allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
