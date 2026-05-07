@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify context-based logger storage and retrieval behavior.
+// - Protect nil handling and context field derivation semantics from regressions.
+// - Document expected framework/log context helper behavior through focused tests.
+//
+// 适用场景：
+// - 验证基于 context 的 logger 存取行为。
+// - 防止 nil 处理和 context 字段派生语义回归。
+// - 通过聚焦型测试固化 framework/log context helper 的预期行为。
 package log
 
 import (

@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Expose the root-package transport contracts, middleware composition helpers, and HTTP middleware presets.
+// - Keep business-facing HTTP/gRPC metadata helpers available from a short public entrypoint.
+// - Re-export the stable transport surface without forcing callers into lower-level framework packages.
+//
+// 适用场景：
+// - 暴露根包层的 transport 契约、中间件组合 helper 和 HTTP 中间件预设入口。
+// - 通过简短的公共入口提供业务侧常用的 HTTP/gRPC metadata helper。
+// - 在不强迫调用方下沉到更底层 framework 包的前提下，重导出稳定 transport 能力。
 package gorp
 
 import (

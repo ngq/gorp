@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Provide recursive directory upload support for deploy workflows.
+// - Mirror local directory structures onto remote Unix-like paths through SFTP.
+// - Offer one simple helper for small and medium deployment artifact uploads.
+//
+// 适用场景：
+// - 为部署流程提供递归目录上传能力。
+// - 通过 SFTP 把本地目录结构镜像到远端 Unix 风格路径。
+// - 为中小规模部署产物上传提供一个简单 helper。
 package deploy
 
 import (
@@ -12,11 +21,13 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// UploadDir recursively uploads one local directory to the remote directory.
+//
 // UploadDir 递归把本地目录上传到远端目录。
 //
 // 中文说明：
-// - 它会遍历 localDir 下的全部子目录与文件，并在远端按相对路径重建目录树。
-// - 远端路径一律按 Unix 风格处理，避免受本地 Windows 路径分隔符影响。
+// - 它会遍历 localDir 下全部子目录和文件，并在远端按相对路径重建目录树。
+// - 远端路径统一按 Unix 风格处理，避免受到本地 Windows 分隔符影响。
 // - 当前实现适合 deploy 场景下的中小规模目录覆盖上传。
 func UploadDir(client *ssh.Client, localDir, remoteDir string) error {
 	sftpClient, err := sftp.NewClient(client)
@@ -50,7 +61,6 @@ func UploadDir(client *ssh.Client, localDir, remoteDir string) error {
 			return sftpClient.MkdirAll(remotePath)
 		}
 
-		// file
 		if err := sftpClient.MkdirAll(path.Dir(remotePath)); err != nil {
 			return err
 		}

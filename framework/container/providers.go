@@ -1,14 +1,24 @@
+// Application scenarios:
+// - Offer container-side helper methods for provider introspection and diagnostics.
+// - Support CLI or tooling queries without polluting the core runtime container contract.
+// - Keep provider registry visibility available to internal framework tooling.
+//
+// 适用场景：
+// - 为容器提供 provider 维度的辅助查询和诊断能力。
+// - 支持 CLI 或工具侧查询，而不污染核心运行时容器契约。
+// - 为框架内部工具保留 provider 注册表的可见性。
 package container
 
 import "sort"
 
-// ProviderNames 返回当前容器中已注册的 provider 名称列表（按字典序排序）。
+// ProviderNames returns the registered provider names in lexicographical order.
+//
+// ProviderNames 按字典序返回当前已注册的 provider 名称列表。
 //
 // 中文说明：
-// - 这是一个“仅供调试/脚手架命令使用”的辅助方法；
-// - 它刻意没有放进公共 `contract.Container` 接口中，避免把“列出所有 provider”
-//   这种偏管理侧的能力暴露成框架运行时的通用契约；
-// - 当前主要被 `gorp provider list` 这类命令使用。
+// - 这是一个仅供调试与框架命令使用的辅助方法。
+// - 它没有被放入公共 `contract.Container` 接口，避免把管理侧能力暴露成运行时通用契约。
+// - 当前主要服务于类似 `gorp provider list` 这类工具场景。
 func (c *Container) ProviderNames() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

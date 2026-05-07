@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Provide a safe default provider bundle for monolith-friendly deployments.
+// - Prefer noop/local implementations for capabilities that are optional in single-process apps.
+// - Let monolith assembly stay simple without losing contract completeness.
+//
+// 适用场景：
+// - 为单体友好部署提供安全的默认 provider 组合。
+// - 对单进程应用中可选的能力优先使用 noop/local 实现。
+// - 让 monolith 装配保持简单，同时不丢失契约完整性。
 package bootstrap
 
 import (
@@ -18,6 +27,9 @@ import (
 	validatenoop "github.com/ngq/gorp/framework/provider/validate/noop"
 )
 
+// MonolithFriendlyProviders returns the provider bundle tailored for monolith deployments.
+//
+// MonolithFriendlyProviders 返回面向单体部署的 provider 组合。
 func MonolithFriendlyProviders() []runtimecontract.ServiceProvider {
 	return []runtimecontract.ServiceProvider{
 		cfglocal.NewProvider(),

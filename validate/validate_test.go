@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify the top-level validate package exports and helper behavior.
+// - Protect validator aliasing and container-based validation helpers from regressions.
+// - Document expected usage through focused export tests.
+//
+// 适用场景：
+// - 验证顶层 validate 包的导出能力和 helper 行为。
+// - 防止校验器别名和基于容器的校验 helper 回归。
+// - 通过聚焦型导出测试固化预期用法。
 package validate
 
 import (

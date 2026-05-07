@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Manage the lifecycle of multiple host-managed services in one place.
+// - Provide a reusable startup/stop helper with priority ordering and lifecycle hooks.
+// - Support rollback on startup failure and reverse-order shutdown for framework-managed services.
+//
+// 适用场景：
+// - 在一个位置统一管理多个被 host 托管的服务生命周期。
+// - 提供带优先级排序和生命周期钩子的通用启动/停止 helper。
+// - 支持启动失败回滚，以及框架托管服务的逆序关闭。
 package lifecycle
 
 import (
@@ -7,12 +16,14 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
-// Manager 统一管理服务生命周期。
+// Manager manages service lifecycle transitions in one place.
+//
+// Manager 统一管理服务生命周期流转。
 //
 // 中文说明：
-// - 这是"lifecycle helper 更彻底统一"的核心实现；
-// - 统一管理服务的启动、停止、优雅关闭；
-// - 支持生命周期钩子（OnStarting/OnStarted/OnStopping/OnStopped）；
+// - 这是 “lifecycle helper 更彻底统一” 的核心实现。
+// - 统一管理服务的启动、停止、优雅关闭。
+// - 支持生命周期钩子：OnStarting、OnStarted、OnStopping、OnStopped。
 // - 可被 Host 或命令层直接使用。
 type Manager struct {
 	services []ServiceEntry
@@ -20,21 +31,25 @@ type Manager struct {
 	state    State
 }
 
+// ServiceEntry describes one registered service entry.
+//
 // ServiceEntry 表示一个已注册的服务条目。
 //
 // 中文说明：
-// - Name 用于生命周期日志、排障和服务列表展示；
-// - Service 是真正执行 Start/Stop 的运行对象；
-// - Hooks 用于在服务前后挂生命周期钩子；
+// - Name 用于生命周期日志、排障和服务列表展示。
+// - Service 是真正执行 Start/Stop 的运行对象。
+// - Hooks 用于在服务前后挂生命周期钩子。
 // - Priority 决定启动顺序和停止逆序。
 type ServiceEntry struct {
 	Name     string
 	Service  runtimecontract.Hostable
 	Hooks    runtimecontract.Lifecycle
-	Priority int // 启动优先级，数值小的先启动
+	Priority int // 启动优先级，数值小的先启动。
 }
 
-// State 表示生命周期状态。
+// State represents the current lifecycle state.
+//
+// State 表示当前生命周期状态。
 type State int
 
 const (
@@ -45,7 +60,9 @@ const (
 	StateStopped
 )
 
-// String 返回状态的字符串表示。
+// String returns the string form of the lifecycle state.
+//
+// String 返回生命周期状态的字符串表示。
 func (s State) String() string {
 	switch s {
 	case StateIdle:
@@ -63,10 +80,12 @@ func (s State) String() string {
 	}
 }
 
+// NewManager creates a lifecycle manager.
+//
 // NewManager 创建生命周期管理器。
 //
 // 中文说明：
-// - 初始状态为 StateIdle；
+// - 初始状态为 StateIdle。
 // - 默认不注册任何服务，等待 Host 或业务侧逐步填充。
 func NewManager() *Manager {
 	return &Manager{
@@ -75,12 +94,13 @@ func NewManager() *Manager {
 	}
 }
 
-// Register 注册服务。
+// Register registers one service into the lifecycle manager.
+//
+// Register 注册一个由生命周期管理器托管的服务。
 //
 // 中文说明：
-// - 注册一个可被生命周期管理的服务；
-// - priority 数值小的先启动，后停止；
-// - hooks 可以为 nil，如果服务不需要生命周期钩子。
+// - priority 数值小的先启动，后停止。
+// - hooks 可以为 nil，适用于不需要生命周期钩子的服务。
 func (m *Manager) Register(name string, service runtimecontract.Hostable, hooks runtimecontract.Lifecycle, priority int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -92,12 +112,14 @@ func (m *Manager) Register(name string, service runtimecontract.Hostable, hooks 
 	})
 }
 
-// Start 启动所有服务。
+// Start starts all registered services in priority order.
+//
+// Start 按优先级顺序启动所有已注册服务。
 //
 // 中文说明：
-// - 按 priority 从小到大启动服务；
-// - 触发 OnStarting 和 OnStarted 钩子；
-// - 如果某个服务启动失败，停止已启动的服务并返回错误。
+// - 按 priority 从小到大启动服务。
+// - 触发 OnStarting 和 OnStarted 钩子。
+// - 如果某个服务启动失败，会回滚已启动的服务。
 func (m *Manager) Start(ctx context.Context) error {
 	m.mu.Lock()
 	if m.state != StateIdle {
@@ -107,13 +129,10 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.state = StateStarting
 	m.mu.Unlock()
 
-	// 按 priority 排序（小的在前）
 	sorted := m.sortedServices()
-
-	// 按顺序启动
 	started := make([]ServiceEntry, 0)
+
 	for _, entry := range sorted {
-		// 触发 OnStarting 钩子
 		if entry.Hooks != nil {
 			if err := entry.Hooks.OnStarting(ctx); err != nil {
 				_ = m.stopReverse(ctx, started)
@@ -124,7 +143,6 @@ func (m *Manager) Start(ctx context.Context) error {
 			}
 		}
 
-		// 启动服务
 		if err := entry.Service.Start(ctx); err != nil {
 			_ = m.stopReverse(ctx, started)
 			m.mu.Lock()
@@ -133,7 +151,6 @@ func (m *Manager) Start(ctx context.Context) error {
 			return err
 		}
 
-		// 触发 OnStarted 钩子
 		if entry.Hooks != nil {
 			if err := entry.Hooks.OnStarted(ctx); err != nil {
 				_ = m.stopReverse(ctx, started)
@@ -153,11 +170,13 @@ func (m *Manager) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop 停止所有服务。
+// Stop stops all registered services in reverse priority order.
+//
+// Stop 按优先级逆序停止所有已注册服务。
 //
 // 中文说明：
-// - 按 priority 从大到小停止服务；
-// - 触发 OnStopping 和 OnStopped 钩子；
+// - 按 priority 从大到小停止服务。
+// - 触发 OnStopping 和 OnStopped 钩子。
 // - 即使某个服务停止失败，也继续停止其他服务。
 func (m *Manager) Stop(ctx context.Context) error {
 	m.mu.Lock()
@@ -171,23 +190,19 @@ func (m *Manager) Stop(ctx context.Context) error {
 	sorted := m.sortedServices()
 	var lastErr error
 
-	// 逆序停止
 	for i := len(sorted) - 1; i >= 0; i-- {
 		entry := sorted[i]
 
-		// 触发 OnStopping 钩子
 		if entry.Hooks != nil {
 			if err := entry.Hooks.OnStopping(ctx); err != nil {
 				lastErr = err
 			}
 		}
 
-		// 停止服务
 		if err := entry.Service.Stop(ctx); err != nil {
 			lastErr = err
 		}
 
-		// 触发 OnStopped 钩子
 		if entry.Hooks != nil {
 			if err := entry.Hooks.OnStopped(ctx); err != nil {
 				lastErr = err
@@ -201,10 +216,12 @@ func (m *Manager) Stop(ctx context.Context) error {
 	return lastErr
 }
 
-// State 返回当前状态。
+// State returns the current lifecycle state.
+//
+// State 返回当前生命周期状态。
 //
 // 中文说明：
-// - 这是 Host 和外层运行时观察生命周期进度的读取入口；
+// - 这是 Host 和外层运行时观察生命周期进度的读取入口。
 // - 仅读取当前状态，不改变任何生命周期行为。
 func (m *Manager) State() State {
 	m.mu.RLock()
@@ -212,10 +229,12 @@ func (m *Manager) State() State {
 	return m.state
 }
 
-// Services 返回所有已注册的服务名称。
+// Services returns the names of all registered services.
+//
+// Services 返回所有已注册服务的名称列表。
 //
 // 中文说明：
-// - 只返回注册名，不暴露内部 ServiceEntry 细节；
+// - 这里只返回注册名，不暴露内部 ServiceEntry 细节。
 // - 主要供 Host 查询当前托管了哪些服务。
 func (m *Manager) Services() []string {
 	m.mu.RLock()
@@ -227,10 +246,12 @@ func (m *Manager) Services() []string {
 	return names
 }
 
-// sortedServices 返回按 priority 排序的服务列表。
+// sortedServices returns a priority-sorted copy of the service list.
+//
+// sortedServices 返回按 priority 排序后的服务副本。
 //
 // 中文说明：
-// - 返回的是副本，不会改动原始注册顺序；
+// - 返回的是副本，不会改动原始注册顺序。
 // - 统一保证 Start 用正序、Stop 用逆序时看到的是同一套优先级结果。
 func (m *Manager) sortedServices() []ServiceEntry {
 	m.mu.RLock()
@@ -239,7 +260,8 @@ func (m *Manager) sortedServices() []ServiceEntry {
 	sorted := make([]ServiceEntry, len(m.services))
 	copy(sorted, m.services)
 
-	// 简单冒泡排序
+	// Keep ordering logic local and deterministic so startup/shutdown semantics stay stable.
+	// 把排序逻辑收口在这里，确保启动/停止语义始终稳定可预测。
 	for i := 0; i < len(sorted)-1; i++ {
 		for j := i + 1; j < len(sorted); j++ {
 			if sorted[i].Priority > sorted[j].Priority {
@@ -250,12 +272,14 @@ func (m *Manager) sortedServices() []ServiceEntry {
 	return sorted
 }
 
-// stopReverse 逆序停止服务。
+// stopReverse stops the already-started services in reverse order.
+//
+// stopReverse 按逆序停止已经成功启动过的服务。
 //
 // 中文说明：
-// - 这是启动失败后的回滚辅助；
-// - 只处理已经成功启动过的服务，避免把未启动服务也纳入停止流程；
-// - 即使中途有错误，也继续尽量把后续服务停掉。
+// - 这是启动失败后的回滚辅助函数。
+// - 只处理已经成功启动过的服务，避免把未启动服务也纳入停止流程。
+// - 即使中途出错，也继续尽量把后续服务停掉。
 func (m *Manager) stopReverse(ctx context.Context, services []ServiceEntry) error {
 	var lastErr error
 	for i := len(services) - 1; i >= 0; i-- {

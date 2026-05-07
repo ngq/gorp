@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify the top-level log package export helpers and context logger behavior.
+// - Protect field builders and default-logger wrappers from regressions.
+// - Document expected use through focused export tests.
+//
+// 适用场景：
+// - 验证顶层 log 包的导出 helper 和 context logger 行为。
+// - 防止字段构造器和默认 logger 包装器回归。
+// - 通过聚焦型导出测试固化预期用法。
 package log
 
 import (

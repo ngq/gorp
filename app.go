@@ -1,11 +1,20 @@
+// Application scenarios:
+// - Expose the root-package application startup surface and top-level aliases for runtime/app assembly.
+// - Keep business startup code on a short public path while delegating concrete behavior to framework/application.
+// - Re-export common startup options, callbacks, errors, and runtime access types.
+//
+// 适用场景：
+// - 暴露根包层的应用启动入口，以及 runtime/app 装配所需的顶层别名。
+// - 让业务启动代码使用更短的公共路径，同时把具体行为委托给 framework/application。
+// - 重导出常用启动选项、回调、错误和 runtime 访问类型。
 package gorp
 
 import (
 	"context"
 
+	"github.com/ngq/gorp/framework/application"
 	"github.com/ngq/gorp/framework/contract/data"
 	"github.com/ngq/gorp/framework/contract/runtime"
-	"github.com/ngq/gorp/framework/application"
 )
 
 // DBRuntimeKey is the container binding key of the DB runtime capability.

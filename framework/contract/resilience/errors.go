@@ -8,16 +8,16 @@ import (
 const (
 	ErrorsKey = "framework.errors"
 
-	ErrorCodeOK                   = 200
-	ErrorCodeBadRequest           = 400
-	ErrorCodeUnauthorized         = 401
-	ErrorCodeForbidden            = 403
-	ErrorCodeNotFound             = 404
-	ErrorCodeConflict             = 409
-	ErrorCodeTooManyRequests      = 429
-	ErrorCodeInternalServerError  = 500
-	ErrorCodeServiceUnavailable   = 503
-	ErrorCodeGatewayTimeout       = 504
+	ErrorCodeOK                  = 200
+	ErrorCodeBadRequest          = 400
+	ErrorCodeUnauthorized        = 401
+	ErrorCodeForbidden           = 403
+	ErrorCodeNotFound            = 404
+	ErrorCodeConflict            = 409
+	ErrorCodeTooManyRequests     = 429
+	ErrorCodeInternalServerError = 500
+	ErrorCodeServiceUnavailable  = 503
+	ErrorCodeGatewayTimeout      = 504
 )
 
 type ErrorReason string

@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify default logger behavior and field helper output.
+// - Protect context fallback and derived logger behavior from regressions.
+// - Document expected framework/log utility semantics through focused tests.
+//
+// 适用场景：
+// - 验证默认 logger 行为和字段 helper 输出。
+// - 防止 context 回退和派生 logger 行为回归。
+// - 通过聚焦型测试固化 framework/log 工具层的预期语义。
 package log
 
 import (

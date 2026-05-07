@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Provide the legacy direct SSH dial helper used by older deploy flows.
+// - Support key-based SSH connection setup with known_hosts verification.
+// - Keep this compatibility helper available while the provider-based SSH capability becomes the main path.
+//
+// 适用场景：
+// - 为旧部署流程提供直接 SSH 连接 helper。
+// - 支持基于私钥和 known_hosts 校验的 SSH 建连。
+// - 在 provider 化 SSH 能力成为主路径之前，保留这层兼容 helper。
 package deploy
 
 import (
@@ -14,9 +23,12 @@ import (
 //
 // 中文说明：
 // - 本文件提供的 DialSSH 是直接 SSH 连接能力。
-// - 目前已将 SSH 抽象为 Provider（支持 password/key 两种认证 + 连接复用）。
-// - 新代码应使用 framework/provider/ssh，本文件仅用于兼容过渡。
+// - 当前已将 SSH 抽象为 Provider，支持 password/key 两种认证以及连接复用。
+// - 新代码应优先使用 framework/provider/ssh；本文件仅用于兼容过渡。
 
+// SSHHost describes one SSH host entry.
+//
+// SSHHost 描述一条 SSH 主机配置。
 type SSHHost struct {
 	Host       string `mapstructure:"host"`
 	Port       int    `mapstructure:"port"`
@@ -25,16 +37,21 @@ type SSHHost struct {
 	KnownHosts string `mapstructure:"known_hosts"`
 }
 
-// SSHConfig 是旧版 deploy 时代的 SSH 配置结构。
+// SSHConfig is the legacy SSH config model used by deploy helpers.
+//
+// SSHConfig 是 deploy 旧路径使用的 SSH 配置结构。
 //
 // 中文说明：
-// - 新代码应优先使用 framework/provider/ssh 中的配置结构与服务。
+// - 新代码应优先使用 framework/provider/ssh 中的配置结构和服务。
 // - 这里仅用于兼容旧调用路径。
 type SSHConfig struct {
 	TimeoutSec int                `mapstructure:"timeout_sec"`
 	Hosts      map[string]SSHHost `mapstructure:"hosts"`
 }
 
+// DialSSH dials one SSH host with key-based authentication.
+//
+// DialSSH 使用私钥认证连接一个 SSH 主机。
 func DialSSH(h SSHHost, timeout time.Duration) (*ssh.Client, error) {
 	keyBytes, err := os.ReadFile(h.KeyPath)
 	if err != nil {
@@ -64,4 +81,3 @@ func DialSSH(h SSHHost, timeout time.Duration) (*ssh.Client, error) {
 	}
 	return c, nil
 }
-

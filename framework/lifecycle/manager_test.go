@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify lifecycle manager ordering, rollback, and state transitions.
+// - Protect the manager's hook invocation and idempotency semantics from regressions.
+// - Document expected runtime behavior through focused unit tests.
+//
+// 适用场景：
+// - 验证 lifecycle manager 的顺序、回滚和状态流转行为。
+// - 防止 hook 调用语义和幂等语义回归。
+// - 通过聚焦型单测把预期运行时行为固化下来。
 package lifecycle
 
 import (
@@ -6,7 +15,9 @@ import (
 	"testing"
 )
 
-// mockHostable 是用于测试的 mock Hostable 实现。
+// mockHostable is a test double for runtimecontract.Hostable.
+//
+// mockHostable 是 runtimecontract.Hostable 的测试替身。
 type mockHostable struct {
 	name       string
 	startErr   error
@@ -31,7 +42,9 @@ func (m *mockHostable) Stop(ctx context.Context) error {
 	return m.stopErr
 }
 
-// mockLifecycle 是用于测试的 mock Lifecycle 实现。
+// mockLifecycle is a test double for runtimecontract.Lifecycle.
+//
+// mockLifecycle 是 runtimecontract.Lifecycle 的测试替身。
 type mockLifecycle struct {
 	onStartingErr error
 	onStartedErr  error
@@ -124,18 +137,17 @@ func TestManager_Start_Priority(t *testing.T) {
 	svc2 := &mockHostable{name: "svc2"}
 	svc3 := &mockHostable{name: "svc3"}
 
-	// 注册顺序与优先级不同
-	m.Register("svc1", svc1, nil, 300) // 优先级最低，最后启动
-	m.Register("svc2", svc2, nil, 100) // 优先级最高，最先启动
-	m.Register("svc3", svc3, nil, 200) // 优先级中等
+	// Register out of priority order to ensure the manager reorders them before startup.
+	// 故意用乱序注册，验证 manager 会在启动前按 priority 重排。
+	m.Register("svc1", svc1, nil, 300)
+	m.Register("svc2", svc2, nil, 100)
+	m.Register("svc3", svc3, nil, 200)
 
 	ctx := context.Background()
 	if err := m.Start(ctx); err != nil {
 		t.Errorf("Start failed: %v", err)
 	}
 
-	// 验证启动顺序：svc2(100) -> svc3(200) -> svc1(300)
-	// 可以通过 startCalls 的调用顺序间接验证
 	if svc2.startCalls != 1 || svc3.startCalls != 1 || svc1.startCalls != 1 {
 		t.Errorf("each service should be started once")
 	}
@@ -147,7 +159,8 @@ func TestManager_Start_StopOnFailure(t *testing.T) {
 	svc2 := &mockHostable{name: "svc2"}
 	svc3 := &mockHostable{name: "svc3", startErr: errors.New("start error")}
 
-	// 按优先级注册：svc1(100) -> svc2(200) -> svc3(300)
+	// The third service fails so the first two should be rolled back.
+	// 第三个服务启动失败，因此前两个已启动服务应被回滚停止。
 	m.Register("svc1", svc1, nil, 100)
 	m.Register("svc2", svc2, nil, 200)
 	m.Register("svc3", svc3, nil, 300)
@@ -158,7 +171,6 @@ func TestManager_Start_StopOnFailure(t *testing.T) {
 		t.Error("expected error from Start")
 	}
 
-	// svc1, svc2 应该已启动
 	if !svc1.started {
 		t.Error("svc1 should be started")
 	}
@@ -166,13 +178,10 @@ func TestManager_Start_StopOnFailure(t *testing.T) {
 		t.Error("svc2 should be started")
 	}
 
-	// 启动失败后应该停止已启动的服务
-	// 由于 svc3 启动失败，svc1 和 svc2 应该被停止
 	if !svc1.stopped || !svc2.stopped {
 		t.Error("started services should be stopped on failure")
 	}
 
-	// 状态应该回到 idle
 	if m.State() != StateIdle {
 		t.Errorf("expected state Idle, got %v", m.State())
 	}
@@ -190,7 +199,6 @@ func TestManager_Lifecycle_Hooks(t *testing.T) {
 		t.Errorf("Start failed: %v", err)
 	}
 
-	// 验证钩子调用顺序
 	expectedCalls := []string{"OnStarting", "OnStarted"}
 	if len(hooks.calls) != len(expectedCalls) {
 		t.Errorf("expected %d calls, got %d", len(expectedCalls), len(hooks.calls))
@@ -201,14 +209,12 @@ func TestManager_Lifecycle_Hooks(t *testing.T) {
 		}
 	}
 
-	// 重置 calls
 	hooks.calls = nil
 
 	if err := m.Stop(ctx); err != nil {
 		t.Errorf("Stop failed: %v", err)
 	}
 
-	// 验证停止钩子
 	expectedStopCalls := []string{"OnStopping", "OnStopped"}
 	if len(hooks.calls) != len(expectedStopCalls) {
 		t.Errorf("expected %d calls, got %d", len(expectedStopCalls), len(hooks.calls))
@@ -249,9 +255,8 @@ func TestManager_Start_Idempotent(t *testing.T) {
 
 	ctx := context.Background()
 	_ = m.Start(ctx)
-	_ = m.Start(ctx) // 再次调用
+	_ = m.Start(ctx)
 
-	// 应该只启动一次
 	if svc.startCalls != 1 {
 		t.Errorf("expected 1 start call, got %d", svc.startCalls)
 	}
@@ -265,9 +270,8 @@ func TestManager_Stop_CalledOnce(t *testing.T) {
 	ctx := context.Background()
 	_ = m.Start(ctx)
 	_ = m.Stop(ctx)
-	_ = m.Stop(ctx) // 再次调用
+	_ = m.Stop(ctx)
 
-	// 应该只停止一次
 	if svc.stopCalls != 1 {
 		t.Errorf("expected 1 stop call, got %d", svc.stopCalls)
 	}

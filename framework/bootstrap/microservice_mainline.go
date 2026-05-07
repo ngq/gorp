@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Provide the full provider bundle used by microservice-oriented bootstrap paths.
+// - Collect discovery, selector, RPC, tracing, metadata, service-auth, and DTM capabilities in one place.
+// - Keep microservice mainline assembly explicit and reusable.
+//
+// 适用场景：
+// - 为微服务导向的 bootstrap 路径提供完整 provider 组合。
+// - 在一个位置集中 discovery、selector、RPC、tracing、metadata、service-auth 和 DTM 能力。
+// - 让微服务主线装配保持显式且可复用。
 package bootstrap
 
 import (
@@ -28,6 +37,9 @@ import (
 	tracingnoop "github.com/ngq/gorp/framework/provider/tracing/noop"
 )
 
+// MicroserviceMainlineProviders returns the provider bundle used by the microservice mainline.
+//
+// MicroserviceMainlineProviders 返回微服务主线使用的 provider 组合。
 func MicroserviceMainlineProviders() []runtimecontract.ServiceProvider {
 	return []runtimecontract.ServiceProvider{
 		configsourcelocal.NewProvider(),

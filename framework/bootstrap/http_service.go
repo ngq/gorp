@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Assemble and run the default HTTP service mainline used by the framework.
+// - Build one reusable runtime object that carries app, container, router, config, DB, Redis, and JWT capabilities.
+// - Centralize health checks, metrics, pprof, graceful shutdown, and host/direct run behavior.
+//
+// 适用场景：
+// - 装配并运行框架默认 HTTP 服务主线。
+// - 构建一个复用型 runtime 对象，统一承载 app、container、router、config、DB、Redis 和 JWT 能力。
+// - 集中管理健康检查、指标、pprof、优雅停机以及 host/direct 两种运行模式。
 package bootstrap
 
 import (
@@ -28,6 +37,9 @@ import (
 	gormpkg "gorm.io/gorm"
 )
 
+// HTTPServiceOptions describes the bootstrap options for the default HTTP mainline.
+//
+// HTTPServiceOptions 描述默认 HTTP 主线的 bootstrap 选项。
 type HTTPServiceOptions struct {
 	ExtraProviders []runtimecontract.ServiceProvider
 	DisableRedis   bool
@@ -36,6 +48,9 @@ type HTTPServiceOptions struct {
 	EnablePprof    bool
 }
 
+// HTTPServiceRuntime carries the assembled HTTP runtime state used during startup callbacks.
+//
+// HTTPServiceRuntime 承载启动回调阶段使用的 HTTP runtime 状态。
 type HTTPServiceRuntime struct {
 	App         *framework.Application
 	Container   runtimecontract.Container
@@ -48,6 +63,9 @@ type HTTPServiceRuntime struct {
 	ServiceName string
 }
 
+// NewHTTPServiceRuntime builds the default HTTP runtime without starting the server.
+//
+// NewHTTPServiceRuntime 构建默认 HTTP runtime，但不启动服务。
 func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPServiceRuntime, error) {
 	app := framework.NewApplication()
 	c := app.Container()
@@ -75,6 +93,8 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		rt.DB = container.MustMakeGorm(c)
 	}
 	if !opts.DisableRedis {
+		// Redis is optional in this mainline, so keep startup tolerant when the capability is absent.
+		// Redis 在这条主线里是可选能力，因此这里保持“缺失不阻断启动”的语义。
 		if redisSvc, err := container.MakeRedis(c); err == nil {
 			rt.Redis = redisSvc
 		}
@@ -83,6 +103,9 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	return rt, nil
 }
 
+// buildHTTPProviders assembles the provider list used by the default HTTP mainline.
+//
+// buildHTTPProviders 组装默认 HTTP 主线使用的 provider 列表。
 func buildHTTPProviders(opts HTTPServiceOptions) []runtimecontract.ServiceProvider {
 	providers := make([]runtimecontract.ServiceProvider, 0)
 	providers = append(providers, FoundationProviders()...)
@@ -97,6 +120,9 @@ func buildHTTPProviders(opts HTTPServiceOptions) []runtimecontract.ServiceProvid
 	return providers
 }
 
+// BootHTTPService assembles, configures, and runs the default HTTP service.
+//
+// BootHTTPService 装配、配置并运行默认 HTTP 服务。
 func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) error, setup func(*HTTPServiceRuntime) error) error {
 	rt, err := NewHTTPServiceRuntime(serviceName, opts)
 	if err != nil {
@@ -130,6 +156,9 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 	return RunHTTP(rt.Container, rt.Logger)
 }
 
+// AutoMigrateModels runs Gorm auto-migration when DB runtime is available.
+//
+// AutoMigrateModels 在 DB runtime 可用时执行 Gorm 自动迁移。
 func AutoMigrateModels(rt *HTTPServiceRuntime, models ...any) error {
 	if rt == nil || rt.DB == nil || len(models) == 0 {
 		return nil
@@ -137,6 +166,9 @@ func AutoMigrateModels(rt *HTTPServiceRuntime, models ...any) error {
 	return rt.DB.AutoMigrate(models...)
 }
 
+// RegisterHealthCheck registers the default health endpoint.
+//
+// RegisterHealthCheck 注册默认健康检查端点。
 func RegisterHealthCheck(router transportcontract.HTTPRouter, serviceName string) {
 	if router == nil {
 		return
@@ -150,6 +182,9 @@ func RegisterHealthCheck(router transportcontract.HTTPRouter, serviceName string
 	})
 }
 
+// RegisterMetricsEndpoint registers the default metrics endpoint.
+//
+// RegisterMetricsEndpoint 注册默认 metrics 端点。
 func RegisterMetricsEndpoint(router transportcontract.HTTPRouter) {
 	if router == nil {
 		return
@@ -158,6 +193,9 @@ func RegisterMetricsEndpoint(router transportcontract.HTTPRouter) {
 	router.Mount("/metrics", gingin.PrometheusHandler())
 }
 
+// RegisterPprofEndpoints registers the standard pprof endpoints.
+//
+// RegisterPprofEndpoints 注册标准 pprof 端点。
 func RegisterPprofEndpoints(router transportcontract.HTTPRouter) {
 	if router == nil {
 		return
@@ -169,9 +207,14 @@ func RegisterPprofEndpoints(router transportcontract.HTTPRouter) {
 	router.Mount("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 }
 
+// RunHTTP runs the HTTP service through the host capability when present.
+//
+// RunHTTP 优先通过 host 能力运行 HTTP 服务。
 func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) error {
 	hostSvc, err := container.MakeHost(c)
 	if err != nil {
+		// Fall back to direct HTTP run mode when host capability is unavailable.
+		// 当 host 能力不可用时，回退到 HTTP 直跑模式。
 		return runHTTPDirectly(c, logger)
 	}
 
@@ -211,6 +254,9 @@ func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) e
 	return nil
 }
 
+// runHTTPDirectly runs the HTTP service without the host abstraction.
+//
+// runHTTPDirectly 在不使用 host 抽象的情况下直接运行 HTTP 服务。
 func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.Logger) error {
 	httpSvc, err := container.MakeHTTP(c)
 	if err != nil {

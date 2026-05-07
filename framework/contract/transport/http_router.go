@@ -1,42 +1,19 @@
+// Application scenarios:
+// - Define the framework-agnostic HTTP router contract.
+// - Let provider adapters expose route registration and middleware composition through one shared shape.
+// - Keep business route declaration independent from Gin or other concrete router implementations.
+//
+// 适用场景：
+// - 定义与具体框架无关的 HTTP 路由契约。
+// - 让 provider 适配层通过统一形态暴露路由注册与中间件组合能力。
+// - 让业务路由声明不依赖 Gin 或其他具体路由实现。
 package transport
 
-import (
-	"context"
-	"net/http"
-)
+import "net/http"
 
-type HTTPContext interface {
-	Context() context.Context
-	SetContext(ctx context.Context)
-
-	Request() *http.Request
-	SetRequest(req *http.Request)
-
-	Param(key string) string
-	Query(key string) string
-	DefaultQuery(key, defaultValue string) string
-	GetHeader(key string) string
-	Header(key, value string)
-
-	BindJSON(obj any) error
-	BindQuery(obj any) error
-	Bind(obj any) error
-
-	JSON(status int, body any)
-	String(status int, body string)
-	XML(status int, body any)
-	Data(status int, contentType string, body []byte)
-	Redirect(status int, location string)
-	Status(code int)
-
-	RoutePath() string
-	ResponseStatus() int
-}
-
-type HTTPHandler func(HTTPContext)
-
-type HTTPMiddleware func(next HTTPHandler) HTTPHandler
-
+// HTTPRouter defines the transport-layer HTTP router abstraction.
+//
+// HTTPRouter 定义 transport 层 HTTP 路由抽象。
 type HTTPRouter interface {
 	Use(middleware ...HTTPMiddleware)
 	Group(prefix string, middleware ...HTTPMiddleware) HTTPRouter

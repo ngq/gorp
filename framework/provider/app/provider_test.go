@@ -1,3 +1,12 @@
+// Application scenarios:
+// - Verify the app provider's binding key and default path resolution behavior.
+// - Protect config-driven path overrides from regressions.
+// - Document expected path derivation semantics through focused unit tests.
+//
+// 适用场景：
+// - 验证 app provider 的绑定 key 和默认路径解析行为。
+// - 防止配置驱动的路径覆盖能力回归。
+// - 通过聚焦型单测固化路径推导语义。
 package app
 
 import (
