@@ -11,6 +11,7 @@ package governance
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
@@ -62,14 +63,46 @@ func TimeoutMiddleware(timeout time.Duration) transportcontract.RPCClientMiddlew
 //
 // RetryMiddleware 在可用时通过统一 Retry 能力重试出站调用。
 func RetryMiddleware(retry resiliencecontract.Retry) transportcontract.RPCClientMiddleware {
+	return RetryMiddlewareWithResource(retry, nil)
+}
+
+// RetryMiddlewareWithResource retries the outbound invocation with a normalized resource name.
+//
+// RetryMiddlewareWithResource 使用归一化资源名对出站调用执行重试。
+func RetryMiddlewareWithResource(retry resiliencecontract.Retry, resource func(service, method string) string) transportcontract.RPCClientMiddleware {
 	return func(next transportcontract.RPCInvoker) transportcontract.RPCInvoker {
 		if next == nil || retry == nil {
 			return next
 		}
 		return func(ctx context.Context, service, method string, req, resp any) error {
-			return retry.Do(ctx, func() error {
+			resourceName := normalizeRetryResource(service, method)
+			if resource != nil {
+				resourceName = resource(service, method)
+			}
+			return retry.DoForResource(ctx, resourceName, func() error {
 				return next(ctx, service, method, req, resp)
 			})
 		}
 	}
+}
+
+func normalizeRetryResource(service, method string) string {
+	parts := []string{"rpc"}
+	if service = sanitizeRetrySegment(service); service != "" {
+		parts = append(parts, service)
+	}
+	if method = sanitizeRetrySegment(method); method != "" {
+		parts = append(parts, method)
+	}
+	return strings.Join(parts, ".")
+}
+
+func sanitizeRetrySegment(segment string) string {
+	segment = strings.TrimSpace(segment)
+	segment = strings.Trim(segment, "/")
+	if segment == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer("/", ".", " ", "_", ":", ".")
+	return replacer.Replace(segment)
 }

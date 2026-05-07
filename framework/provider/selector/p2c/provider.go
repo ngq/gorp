@@ -48,11 +48,12 @@ type P2CSelector struct {
 }
 
 type InstanceStats struct {
-	pending      int64
-	successCount int64
-	failCount    int64
-	totalLatency int64
-	lastUpdate   time.Time
+	pending        int64
+	successCount   int64
+	failCount      int64
+	latencyEWMA    float64
+	latencySamples int64
+	lastUpdate     time.Time
 }
 
 func NewP2CSelector() *P2CSelector {
@@ -124,12 +125,7 @@ func (s *P2CSelector) calculateScore(instance transportcontract.ServiceInstance)
 		failRate = float64(stats.failCount) / float64(totalRequests)
 	}
 
-	avgLatency := 0.0
-	if stats.successCount > 0 {
-		avgLatency = float64(stats.totalLatency) / float64(stats.successCount)
-	}
-
-	return float64(stats.pending) + failRate*10 + avgLatency*0.1
+	return float64(stats.pending) + failRate*10 + stats.latencyEWMA*0.001
 }
 
 func (s *P2CSelector) incrementPending(address string) {
@@ -164,6 +160,16 @@ func (s *P2CSelector) createDoneFunc(instance transportcontract.ServiceInstance)
 			stats.failCount++
 		} else {
 			stats.successCount++
+		}
+		if info.Latency > 0 {
+			sample := float64(info.Latency.Milliseconds())
+			if stats.latencySamples == 0 {
+				stats.latencyEWMA = sample
+			} else {
+				const alpha = 0.2
+				stats.latencyEWMA = alpha*sample + (1-alpha)*stats.latencyEWMA
+			}
+			stats.latencySamples++
 		}
 
 		stats.lastUpdate = time.Now()

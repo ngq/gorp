@@ -182,9 +182,19 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 	if err != nil {
 		return fmt.Errorf("rpc: resolve address failed: %w", err)
 	}
+	startedAt := time.Now()
 	if done != nil {
 		defer func() {
-			done(ctx, discoverycontract.DoneInfo{Err: err, BytesSent: true, BytesReceived: err == nil})
+			latency := time.Since(startedAt)
+			if latency <= 0 {
+				latency = time.Nanosecond
+			}
+			done(ctx, discoverycontract.DoneInfo{
+				Err:           err,
+				BytesSent:     true,
+				BytesReceived: err == nil,
+				Latency:       latency,
+			})
 		}()
 	}
 
@@ -241,7 +251,7 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		return nil
 	},
 		rpcgovernance.TimeoutMiddleware(time.Duration(c.cfg.TimeoutMS)*time.Millisecond),
-		rpcgovernance.RetryMiddleware(c.retry),
+		rpcgovernance.RetryMiddlewareWithResource(c.retry, c.circuitBreakerResource),
 	)
 	err = c.doWithCircuitBreaker(ctx, service, method, func() error {
 		return invoker(ctx, service, method, req, resp)
@@ -258,9 +268,19 @@ func (c *Client) CallRaw(ctx context.Context, service, method string, data []byt
 	if err != nil {
 		return nil, err
 	}
+	startedAt := time.Now()
 	if done != nil {
 		defer func() {
-			done(ctx, discoverycontract.DoneInfo{Err: err, BytesSent: true, BytesReceived: err == nil})
+			latency := time.Since(startedAt)
+			if latency <= 0 {
+				latency = time.Nanosecond
+			}
+			done(ctx, discoverycontract.DoneInfo{
+				Err:           err,
+				BytesSent:     true,
+				BytesReceived: err == nil,
+				Latency:       latency,
+			})
 		}()
 	}
 

@@ -24,6 +24,7 @@ const RetryKey = "framework.retry"
 // Retry 定义重试执行契约。
 type Retry interface {
 	Do(ctx context.Context, fn func() error) error
+	DoForResource(ctx context.Context, resource string, fn func() error) error
 	DoWithResult(ctx context.Context, fn func() (any, error)) (any, error)
 	IsRetryable(err error) bool
 }

@@ -158,11 +158,12 @@ var (
 		"":            func() runtimecontract.ServiceProvider { return discoverynoop.NewProvider() },
 	}
 	selectorProviderFactories = providerFactoryRegistry{
-		"random": func() runtimecontract.ServiceProvider { return selectorrandom.NewProvider() },
-		"wrr":    func() runtimecontract.ServiceProvider { return selectorwrr.NewProvider() },
-		"p2c":    func() runtimecontract.ServiceProvider { return selectorp2c.NewProvider() },
-		"noop":   func() runtimecontract.ServiceProvider { return selectornoop.NewProvider() },
-		"":       func() runtimecontract.ServiceProvider { return selectornoop.NewProvider() },
+		"random":   func() runtimecontract.ServiceProvider { return selectorrandom.NewProvider() },
+		"wrr":      func() runtimecontract.ServiceProvider { return selectorwrr.NewProvider() },
+		"p2c":      func() runtimecontract.ServiceProvider { return selectorp2c.NewProvider() },
+		"p2c_ewma": func() runtimecontract.ServiceProvider { return selectorp2c.NewProvider() },
+		"noop":     func() runtimecontract.ServiceProvider { return selectornoop.NewProvider() },
+		"":         func() runtimecontract.ServiceProvider { return selectornoop.NewProvider() },
 	}
 	rpcProviderFactories = providerFactoryRegistry{
 		"http": func() runtimecontract.ServiceProvider { return rpchttp.NewProvider() },

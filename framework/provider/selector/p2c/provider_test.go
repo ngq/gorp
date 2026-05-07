@@ -4,209 +4,184 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
-func TestP2CSelector_Select_EmptyInstances(t *testing.T) {
+// TestP2CSelectorSelectEmptyInstances verifies the selector rejects empty instance sets.
+//
+// TestP2CSelectorSelectEmptyInstances 验证 selector 会拒绝空实例集合。
+func TestP2CSelectorSelectEmptyInstances(t *testing.T) {
 	selector := NewP2CSelector()
-	ctx := context.Background()
 
-	_, done, err := selector.Select(ctx, nil)
+	_, done, err := selector.Select(context.Background(), nil)
 	if err != discoverycontract.ErrNoAvailable {
-		t.Errorf("expected ErrNoAvailable, got: %v", err)
+		t.Fatalf("expected ErrNoAvailable, got %v", err)
 	}
 
-	done(ctx, discoverycontract.DoneInfo{})
+	done(context.Background(), discoverycontract.DoneInfo{})
 }
 
-func TestP2CSelector_Select_SingleInstance(t *testing.T) {
+// TestP2CSelectorSelectSingleInstance verifies the selector returns the only healthy instance.
+//
+// TestP2CSelectorSelectSingleInstance 验证 selector 会返回唯一健康实例。
+func TestP2CSelectorSelectSingleInstance(t *testing.T) {
 	selector := NewP2CSelector()
-	ctx := context.Background()
-
 	instances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true},
 	}
 
-	selected, done, err := selector.Select(ctx, instances)
+	selected, done, err := selector.Select(context.Background(), instances)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if selected.ID != "1" {
-		t.Errorf("expected instance 1, got: %s", selected.ID)
+		t.Fatalf("expected instance 1, got %s", selected.ID)
 	}
 
-	done(ctx, discoverycontract.DoneInfo{})
+	done(context.Background(), discoverycontract.DoneInfo{})
 }
 
-func TestP2CSelector_Select_DoneFuncUpdatesStats(t *testing.T) {
+// TestP2CSelectorDoneFuncUpdatesCounters verifies success and failure feedback update selector stats.
+//
+// TestP2CSelectorDoneFuncUpdatesCounters 验证成功与失败反馈会更新 selector 统计信息。
+func TestP2CSelectorDoneFuncUpdatesCounters(t *testing.T) {
 	selector := NewP2CSelector()
-	ctx := context.Background()
-
 	instances := []transportcontract.ServiceInstance{
 		{ID: "1", Address: "inst1:8080", Healthy: true},
 		{ID: "2", Address: "inst2:8080", Healthy: true},
 	}
 
-	// 选择实例
-	selected, done, err := selector.Select(ctx, instances)
+	selected, done, err := selector.Select(context.Background(), instances)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// 验证 pending 增加
 	stats := selector.instanceStats[selected.Address]
 	if stats == nil || stats.pending != 1 {
-		t.Errorf("expected pending=1, got: %v", stats)
+		t.Fatalf("expected pending=1, got %+v", stats)
 	}
 
-	// 调用 DoneFunc（成功）
-	done(ctx, discoverycontract.DoneInfo{Err: nil})
+	done(context.Background(), discoverycontract.DoneInfo{Latency: 20 * time.Millisecond})
 
-	// 验证 pending 减少，成功计数增加
 	stats = selector.instanceStats[selected.Address]
 	if stats.pending != 0 {
-		t.Errorf("expected pending=0, got: %d", stats.pending)
+		t.Fatalf("expected pending=0, got %d", stats.pending)
 	}
 	if stats.successCount != 1 {
-		t.Errorf("expected successCount=1, got: %d", stats.successCount)
+		t.Fatalf("expected successCount=1, got %d", stats.successCount)
 	}
-}
-
-func TestP2CSelector_Select_DoneFuncWithError(t *testing.T) {
-	selector := NewP2CSelector()
-	ctx := context.Background()
-
-	instances := []transportcontract.ServiceInstance{
-		{ID: "1", Address: "inst1:8080", Healthy: true},
-		{ID: "2", Address: "inst2:8080", Healthy: true},
+	if stats.latencyEWMA <= 0 {
+		t.Fatalf("expected latency EWMA to be updated, got %f", stats.latencyEWMA)
 	}
 
-	selected, done, err := selector.Select(ctx, instances)
+	selected, done, err = selector.Select(context.Background(), instances)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
+	done(context.Background(), discoverycontract.DoneInfo{Err: errors.New("connection failed")})
 
-	// 调用 DoneFunc（失败）
-	done(ctx, discoverycontract.DoneInfo{Err: errors.New("connection failed")})
-
-	// 验证失败计数增加
-	stats := selector.instanceStats[selected.Address]
+	stats = selector.instanceStats[selected.Address]
 	if stats.failCount != 1 {
-		t.Errorf("expected failCount=1, got: %d", stats.failCount)
+		t.Fatalf("expected failCount=1, got %d", stats.failCount)
 	}
 }
 
-func TestP2CSelector_Select_LowerLoadInstance(t *testing.T) {
+// TestP2CSelectorPrefersLowerLoad verifies the selector prefers lower-load instances over time.
+//
+// TestP2CSelectorPrefersLowerLoad 验证 selector 会逐步偏向低负载实例。
+func TestP2CSelectorPrefersLowerLoad(t *testing.T) {
 	selector := NewP2CSelector()
-	ctx := context.Background()
-
 	instances := []transportcontract.ServiceInstance{
 		{ID: "high", Address: "high:8080", Healthy: true},
 		{ID: "low", Address: "low:8080", Healthy: true},
 	}
 
-	// 手动设置负载：high 实例高负载
 	selector.mu.Lock()
 	selector.instanceStats["high:8080"] = &InstanceStats{
 		pending:      10,
 		successCount: 100,
-		failCount:    20, // 高失败率
+		failCount:    20,
+		latencyEWMA:  200,
 	}
-	selector.instanceStats["low:8080"] = &InstanceStats{
-		pending:      2,
-		successCount: 100,
-		failCount:    0, // 低失败率
-	}
-	selector.mu.Unlock()
-
-	// 多次选择，低负载实例应被选中更多
-	counts := make(map[string]int)
-	for i := 0; i < 100; i++ {
-		selected, done, err := selector.Select(ctx, instances)
-		if err != nil {
-			continue
-		}
-		counts[selected.ID]++
-		done(ctx, discoverycontract.DoneInfo{Err: nil})
-	}
-
-	// 低负载实例应被选中更多
-	if counts["low"] < counts["high"] {
-		t.Errorf("expected low-load instance selected more, got high=%d, low=%d", counts["high"], counts["low"])
-	}
-}
-
-func TestP2CSelector_Select_ForceInstance(t *testing.T) {
-	selector := NewP2CSelector()
-	ctx := context.Background()
-
-	instances := []transportcontract.ServiceInstance{
-		{ID: "1", Address: "inst1:8080", Healthy: true},
-	}
-
-	forced := transportcontract.ServiceInstance{ID: "forced", Address: "forced:8080"}
-	selected, done, err := selector.Select(
-		ctx,
-		instances,
-		discoverycontract.WithForceInstance(forced),
-	)
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if selected.ID != "forced" {
-		t.Errorf("expected forced instance, got: %s", selected.ID)
-	}
-
-	// 验证 pending 增加
-	stats := selector.instanceStats["forced:8080"]
-	if stats == nil || stats.pending != 1 {
-		t.Errorf("expected pending=1 for forced instance")
-	}
-
-	done(ctx, discoverycontract.DoneInfo{})
-}
-
-func TestP2CSelector_CalculateScore(t *testing.T) {
-	selector := NewP2CSelector()
-
-	// 测试无统计的实例（新实例）
-	inst := transportcontract.ServiceInstance{Address: "new:8080"}
-	score := selector.calculateScore(inst)
-	if score != 0.0 {
-		t.Errorf("expected score=0 for new instance, got: %f", score)
-	}
-
-	// 测试高负载实例
-	selector.mu.Lock()
-	selector.instanceStats["high:8080"] = &InstanceStats{
-		pending:      10,
-		successCount: 90,
-		failCount:    10,   // 10% 失败率
-		totalLatency: 9000, // 100ms 平均延迟
-	}
-	selector.mu.Unlock()
-
-	instHigh := transportcontract.ServiceInstance{Address: "high:8080"}
-	scoreHigh := selector.calculateScore(instHigh)
-
-	// 测试低负载实例
-	selector.mu.Lock()
 	selector.instanceStats["low:8080"] = &InstanceStats{
 		pending:      2,
 		successCount: 100,
 		failCount:    0,
-		totalLatency: 1000, // 10ms 平均延迟
+		latencyEWMA:  10,
 	}
 	selector.mu.Unlock()
 
-	instLow := transportcontract.ServiceInstance{Address: "low:8080"}
-	scoreLow := selector.calculateScore(instLow)
+	counts := make(map[string]int)
+	for i := 0; i < 100; i++ {
+		selected, done, err := selector.Select(context.Background(), instances)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		counts[selected.ID]++
+		done(context.Background(), discoverycontract.DoneInfo{Latency: 5 * time.Millisecond})
+	}
 
-	// 高负载实例评分应更高
-	if scoreHigh <= scoreLow {
-		t.Errorf("expected high-load score > low-load score, got high=%f, low=%f", scoreHigh, scoreLow)
+	if counts["low"] < counts["high"] {
+		t.Fatalf("expected low-load instance selected more often, got high=%d low=%d", counts["high"], counts["low"])
+	}
+}
+
+// TestP2CSelectorForceInstance verifies explicit force-routing still works.
+//
+// TestP2CSelectorForceInstance 验证显式强制路由仍然生效。
+func TestP2CSelectorForceInstance(t *testing.T) {
+	selector := NewP2CSelector()
+	forced := transportcontract.ServiceInstance{ID: "forced", Address: "forced:8080", Healthy: true}
+
+	selected, done, err := selector.Select(
+		context.Background(),
+		[]transportcontract.ServiceInstance{{ID: "1", Address: "inst1:8080", Healthy: true}},
+		discoverycontract.WithForceInstance(forced),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.ID != "forced" {
+		t.Fatalf("expected forced instance, got %s", selected.ID)
+	}
+
+	stats := selector.instanceStats["forced:8080"]
+	if stats == nil || stats.pending != 1 {
+		t.Fatalf("expected forced instance pending=1, got %+v", stats)
+	}
+
+	done(context.Background(), discoverycontract.DoneInfo{})
+}
+
+// TestP2CSelectorLatencyEWMAAffectsScore verifies slower instances accumulate worse scores.
+//
+// TestP2CSelectorLatencyEWMAAffectsScore 验证更慢实例会积累更差的评分。
+func TestP2CSelectorLatencyEWMAAffectsScore(t *testing.T) {
+	selector := NewP2CSelector()
+
+	selector.mu.Lock()
+	selector.instanceStats["slow:8080"] = &InstanceStats{
+		pending:        1,
+		successCount:   50,
+		failCount:      1,
+		latencyEWMA:    300,
+		latencySamples: 5,
+	}
+	selector.instanceStats["fast:8080"] = &InstanceStats{
+		pending:        1,
+		successCount:   50,
+		failCount:      1,
+		latencyEWMA:    20,
+		latencySamples: 5,
+	}
+	selector.mu.Unlock()
+
+	slowScore := selector.calculateScore(transportcontract.ServiceInstance{Address: "slow:8080"})
+	fastScore := selector.calculateScore(transportcontract.ServiceInstance{Address: "fast:8080"})
+	if slowScore <= fastScore {
+		t.Fatalf("expected slow instance score > fast instance score, got slow=%f fast=%f", slowScore, fastScore)
 	}
 }

@@ -138,7 +138,7 @@ func SelectSelectorProvider(cfg datacontract.Config) runtimecontract.ServiceProv
 func SelectSelectorProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
 	algorithm := getConfigString(cfg, "selector.backend", "selector.algorithm", "selector.type")
 	if algorithm == "" && IsMicroserviceMode(mode) {
-		algorithm = "p2c"
+		algorithm = "p2c_ewma"
 	}
 	return providerFromMap(selectorProviderFactories, algorithm, "noop")
 }

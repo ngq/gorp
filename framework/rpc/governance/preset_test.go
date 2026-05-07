@@ -5,8 +5,23 @@ import (
 	"testing"
 	"time"
 
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
+
+type captureRetry struct {
+	resource string
+}
+
+func (r *captureRetry) Do(ctx context.Context, fn func() error) error { return fn() }
+func (r *captureRetry) DoForResource(ctx context.Context, resource string, fn func() error) error {
+	r.resource = resource
+	return fn()
+}
+func (r *captureRetry) DoWithResult(ctx context.Context, fn func() (any, error)) (any, error) {
+	return fn()
+}
+func (r *captureRetry) IsRetryable(err error) bool { return false }
 
 // TestDefaultClientPresetOrderStable verifies the outbound RPC governance order remains stable.
 //
@@ -82,5 +97,22 @@ func TestTimeoutMiddlewareNoopWhenDisabled(t *testing.T) {
 	}
 	if err := wrapped(context.Background(), "svc", "method", nil, nil); err != nil {
 		t.Fatalf("unexpected invoke error: %v", err)
+	}
+}
+
+func TestRetryMiddlewareWithResourceUsesNormalizedResource(t *testing.T) {
+	var _ resiliencecontract.Retry = (*captureRetry)(nil)
+
+	retry := &captureRetry{}
+	invoker := RetryMiddlewareWithResource(retry, func(service, method string) string {
+		return "rpc.grpc." + service + "." + method
+	})(func(ctx context.Context, service, method string, req, resp any) error {
+		return nil
+	})
+	if err := invoker(context.Background(), "user-service", "GetUser", nil, nil); err != nil {
+		t.Fatalf("unexpected invoke error: %v", err)
+	}
+	if retry.resource != "rpc.grpc.user-service.GetUser" {
+		t.Fatalf("expected resource-aware retry key, got %q", retry.resource)
 	}
 }

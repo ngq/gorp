@@ -27,8 +27,10 @@ func NewRetryService(cfg *resiliencecontract.RetryConfig) *RetryService {
 }
 
 func (r *RetryService) Do(ctx context.Context, fn func() error) error {
-	policy := r.cfg.DefaultPolicy
+	return r.doWithPolicy(ctx, r.cfg.DefaultPolicy, fn)
+}
 
+func (r *RetryService) doWithPolicy(ctx context.Context, policy resiliencecontract.RetryPolicy, fn func() error) error {
 	var lastErr error
 	for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
 		err := fn()
@@ -179,12 +181,5 @@ func (r *RetryService) SetPolicy(resource string, policy resiliencecontract.Retr
 }
 
 func (r *RetryService) DoForResource(ctx context.Context, resource string, fn func() error) error {
-	originalPolicy := r.cfg.DefaultPolicy
-	if policy, ok := r.cfg.ResourcePolicies[resource]; ok {
-		r.cfg.DefaultPolicy = policy
-	}
-	defer func() {
-		r.cfg.DefaultPolicy = originalPolicy
-	}()
-	return r.Do(ctx, fn)
+	return r.doWithPolicy(ctx, r.cfg.GetPolicy(resource), fn)
 }

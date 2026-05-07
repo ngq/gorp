@@ -12,6 +12,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"time"
 
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -48,6 +49,7 @@ type DoneInfo struct {
 	ReplyMD       ReplyMetadata
 	BytesSent     bool
 	BytesReceived bool
+	Latency       time.Duration
 }
 
 // ReplyMetadata defines the metadata view exposed to selectors after one request.
@@ -90,10 +92,11 @@ type WeightedNode interface {
 type SelectorAlgorithm string
 
 const (
-	SelectorNoop   SelectorAlgorithm = "noop"
-	SelectorRandom SelectorAlgorithm = "random"
-	SelectorWRR    SelectorAlgorithm = "wrr"
-	SelectorP2C    SelectorAlgorithm = "p2c"
+	SelectorNoop    SelectorAlgorithm = "noop"
+	SelectorRandom  SelectorAlgorithm = "random"
+	SelectorWRR     SelectorAlgorithm = "wrr"
+	SelectorP2C     SelectorAlgorithm = "p2c"
+	SelectorP2CEWMA SelectorAlgorithm = "p2c_ewma"
 )
 
 // ErrNoAvailable indicates that no service instance is currently selectable.

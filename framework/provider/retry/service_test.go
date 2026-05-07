@@ -289,3 +289,43 @@ func TestRetryPolicy_CalculateDelay(t *testing.T) {
 		}
 	}
 }
+
+// TestRetryServiceDoForResourceUsesResourcePolicy verifies resource-specific retry policy overrides are honored.
+//
+// TestRetryServiceDoForResourceUsesResourcePolicy 验证资源级重试策略覆盖会生效。
+func TestRetryServiceDoForResourceUsesResourcePolicy(t *testing.T) {
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    1,
+			InitialDelay:   time.Millisecond,
+			MaxDelay:       time.Millisecond,
+			Multiplier:     1,
+			RetryableCodes: []int{503},
+		},
+		ResourcePolicies: map[string]resiliencecontract.RetryPolicy{
+			"rpc.user.get": {
+				MaxAttempts:    3,
+				InitialDelay:   time.Millisecond,
+				MaxDelay:       time.Millisecond,
+				Multiplier:     1,
+				RetryableCodes: []int{503},
+			},
+		},
+	}
+
+	svc := NewRetryService(cfg)
+	callCount := 0
+	err := svc.DoForResource(context.Background(), "rpc.user.get", func() error {
+		callCount++
+		if callCount < 3 {
+			return resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "retry me")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount != 3 {
+		t.Fatalf("expected 3 attempts from resource policy, got %d", callCount)
+	}
+}
