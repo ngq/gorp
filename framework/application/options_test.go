@@ -6,18 +6,22 @@ import (
 	"testing"
 
 	"github.com/ngq/gorp/framework/bootstrap"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 func TestHTTPOptionMapsToBootstrapOptions(t *testing.T) {
 	cfg := runConfig{}
-	HTTP(HTTPServiceOptions{DisableRedis: true, DisableGorm: true, DisableMetrics: true}).apply(&cfg)
+	HTTP(HTTPServiceOptions{DisableRedis: true, DisableGorm: true, DisableMetrics: true, GovernanceMode: resiliencecontract.GovernanceModeMicroservice}).apply(&cfg)
 	if !cfg.httpEnabled {
 		t.Fatalf("expected http enabled")
 	}
 	if !cfg.httpOpts.DisableRedis || !cfg.httpOpts.DisableGorm || !cfg.httpOpts.DisableMetrics {
 		t.Fatalf("expected HTTP options mapped to bootstrap options")
+	}
+	if cfg.httpOpts.GovernanceMode != "microservice" {
+		t.Fatalf("expected governance mode propagated, got %q", cfg.httpOpts.GovernanceMode)
 	}
 }
 
@@ -226,5 +230,52 @@ func TestHTTPOptionLastWins(t *testing.T) {
 	}
 	if cfg.httpOpts.DisableMetrics {
 		t.Fatalf("expected DisableMetrics from last HTTP option to be false")
+	}
+}
+
+func TestWithGovernanceModeOverridesStartupMode(t *testing.T) {
+	cfg, err := resolveRunConfig(
+		"demo",
+		HTTP(),
+		WithMicroserviceMode(),
+	)
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if cfg.httpOpts.GovernanceMode != "microservice" {
+		t.Fatalf("expected governance mode microservice, got %q", cfg.httpOpts.GovernanceMode)
+	}
+
+	WithMonolithMode().apply(&cfg)
+	if cfg.httpOpts.GovernanceMode != "monolith" {
+		t.Fatalf("expected governance mode monolith after override, got %q", cfg.httpOpts.GovernanceMode)
+	}
+}
+
+func TestHTTPOptionGovernanceModeLastWinsAcrossMultipleHTTPDeclarations(t *testing.T) {
+	cfg, err := resolveRunConfig(
+		"demo",
+		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMonolith}),
+		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMicroservice}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if cfg.httpOpts.GovernanceMode != "microservice" {
+		t.Fatalf("expected last HTTP governance mode to win, got %q", cfg.httpOpts.GovernanceMode)
+	}
+}
+
+func TestExplicitGovernanceModeOptionOverridesHTTPGovernanceMode(t *testing.T) {
+	cfg, err := resolveRunConfig(
+		"demo",
+		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMonolith}),
+		WithGovernanceMode(resiliencecontract.GovernanceModeMicroservice),
+	)
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if cfg.httpOpts.GovernanceMode != "microservice" {
+		t.Fatalf("expected explicit governance mode option to win, got %q", cfg.httpOpts.GovernanceMode)
 	}
 }

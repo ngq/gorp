@@ -21,6 +21,7 @@ import (
 	appgrpc "github.com/ngq/gorp/framework/provider/grpc"
 	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
 	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
+	rpcgovernance "github.com/ngq/gorp/framework/rpc/governance"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
@@ -106,8 +107,13 @@ func newClientFromContainer(c runtimecontract.Container, cfg *transportcontract.
 		cbAny, _ := c.Make(resiliencecontract.CircuitBreakerKey)
 		circuitBreaker, _ = cbAny.(resiliencecontract.CircuitBreaker)
 	}
+	var retry resiliencecontract.Retry
+	if c.IsBind(resiliencecontract.RetryKey) {
+		retryAny, _ := c.Make(resiliencecontract.RetryKey)
+		retry, _ = retryAny.(resiliencecontract.Retry)
+	}
 
-	return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker)
+	return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker, retry)
 }
 
 func getGRPCConfig(c runtimecontract.Container) (*transportcontract.RPCConfig, error) {
@@ -154,6 +160,7 @@ type Client struct {
 	serviceAuth        securitycontract.ServiceTokenIssuer
 	tracer             observabilitycontract.Tracer
 	circuitBreaker     resiliencecontract.CircuitBreaker
+	retry              resiliencecontract.Retry
 	connPool           sync.Map
 	mu                 sync.Mutex
 	closed             bool
@@ -167,6 +174,7 @@ func NewClient(
 	serviceAuth securitycontract.ServiceTokenIssuer,
 	tracer observabilitycontract.Tracer,
 	circuitBreaker resiliencecontract.CircuitBreaker,
+	retry resiliencecontract.Retry,
 ) *Client {
 	return &Client{
 		cfg:                cfg,
@@ -176,6 +184,7 @@ func NewClient(
 		serviceAuth:        serviceAuth,
 		tracer:             tracer,
 		circuitBreaker:     circuitBreaker,
+		retry:              retry,
 	}
 }
 
@@ -190,37 +199,37 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		}()
 	}
 
-	timeout := time.Duration(c.cfg.TimeoutMS) * time.Millisecond
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-
-	md, ok := metadata.FromOutgoingContext(ctx)
-	if !ok {
-		md = metadata.New(nil)
-	}
-
-	if c.metadataPropagator != nil {
-		carrier := newGRPCMetadataCarrier(md)
-		c.metadataPropagator.Inject(ctx, carrier)
-	}
-	if c.tracer != nil {
-		carrier := newGRPCMetadataCarrier(md)
-		_ = c.tracer.Inject(ctx, carrier)
-	}
-	if c.serviceAuth != nil {
-		if token, tokenErr := c.serviceAuth.GenerateToken(ctx, service); tokenErr == nil && token != "" {
-			md.Set("x-service-token", token)
+	invoker := rpcgovernance.Apply(func(callCtx context.Context, service, method string, req, resp any) error {
+		md, ok := metadata.FromOutgoingContext(callCtx)
+		if !ok {
+			md = metadata.New(nil)
 		}
-	}
-	if traceID, ok := supportcontract.FromTraceIDContext(ctx); ok {
-		md.Set("x-trace-id", traceID)
-	}
-	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	err = conn.Invoke(ctx, method, req, resp)
+		if c.metadataPropagator != nil {
+			carrier := newGRPCMetadataCarrier(md)
+			c.metadataPropagator.Inject(callCtx, carrier)
+		}
+		if c.tracer != nil {
+			carrier := newGRPCMetadataCarrier(md)
+			_ = c.tracer.Inject(callCtx, carrier)
+		}
+		if c.serviceAuth != nil {
+			if token, tokenErr := c.serviceAuth.GenerateToken(callCtx, service); tokenErr == nil && token != "" {
+				md.Set("x-service-token", token)
+			}
+		}
+		if traceID, ok := supportcontract.FromTraceIDContext(callCtx); ok {
+			md.Set("x-trace-id", traceID)
+		}
+		callCtx = metadata.NewOutgoingContext(callCtx, md)
+
+		return conn.Invoke(callCtx, method, req, resp)
+	},
+		rpcgovernance.TimeoutMiddleware(time.Duration(c.cfg.TimeoutMS)*time.Millisecond),
+		rpcgovernance.RetryMiddleware(c.retry),
+	)
+
+	err = invoker(ctx, service, method, req, resp)
 	if err != nil {
 		return fmt.Errorf("rpc: invoke failed: %w", err)
 	}

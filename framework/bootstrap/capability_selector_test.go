@@ -9,6 +9,7 @@ import (
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -343,6 +344,128 @@ func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *tes
 	assertProviderName(t, providers[7], "dtm.noop")
 	assertProviderName(t, providers[8], "messagequeue.noop")
 	assertProviderName(t, providers[9], "dlock.noop")
+}
+
+func TestDetectGovernanceModeDefaultsToMonolith(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{}}
+	if got := DetectGovernanceMode(cfg); got != resiliencecontract.GovernanceModeMonolith {
+		t.Fatalf("expected monolith mode, got %q", got)
+	}
+}
+
+func TestDetectGovernanceModeAcceptsLegacyServiceModeKey(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{"service.mode": "microservice"}}
+	if got := DetectGovernanceMode(cfg); got != resiliencecontract.GovernanceModeMicroservice {
+		t.Fatalf("expected microservice mode from service.mode, got %q", got)
+	}
+}
+
+func TestNormalizeGovernanceModeFallsBackToMonolith(t *testing.T) {
+	if got := NormalizeGovernanceMode(""); got != resiliencecontract.GovernanceModeMonolith {
+		t.Fatalf("expected empty mode to normalize to monolith, got %q", got)
+	}
+	if got := NormalizeGovernanceMode("unknown"); got != resiliencecontract.GovernanceModeMonolith {
+		t.Fatalf("expected unknown mode to normalize to monolith, got %q", got)
+	}
+}
+
+func TestModeAwareSelectionsPromoteMicroserviceDefaults(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
+
+	if got := SelectSelectorProvider(cfg).Name(); got != "selector.p2c" {
+		t.Fatalf("expected selector.p2c provider implementation, got %s", got)
+	}
+	if got := SelectTracingProvider(cfg).Name(); got != "tracing.otel" {
+		t.Fatalf("expected tracing.otel, got %s", got)
+	}
+	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.default" {
+		t.Fatalf("expected metadata.default, got %s", got)
+	}
+	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.token" {
+		t.Fatalf("expected serviceauth.token, got %s", got)
+	}
+	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.sentinel" {
+		t.Fatalf("expected circuitbreaker.sentinel, got %s", got)
+	}
+}
+
+func TestModeAwareSelectionsKeepMonolithDefaultsWithoutExplicitEnablement(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "monolith"}}
+
+	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
+		t.Fatalf("expected selector.noop, got %s", got)
+	}
+	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected tracing.noop, got %s", got)
+	}
+	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.noop" {
+		t.Fatalf("expected metadata.noop, got %s", got)
+	}
+	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected serviceauth.noop, got %s", got)
+	}
+	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
+		t.Fatalf("expected circuitbreaker.noop, got %s", got)
+	}
+}
+
+func TestModeAwareSelectionsRespectExplicitBackendsOverGovernanceDefaults(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{
+		"governance.mode":         "microservice",
+		"selector.backend":        "noop",
+		"tracing.backend":         "noop",
+		"metadata.backend":        "noop",
+		"service_auth.backend":    "noop",
+		"circuit_breaker.backend": "noop",
+	}}
+
+	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
+		t.Fatalf("expected explicit selector.noop, got %s", got)
+	}
+	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected explicit tracing.noop, got %s", got)
+	}
+	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.noop" {
+		t.Fatalf("expected explicit metadata.noop, got %s", got)
+	}
+	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected explicit serviceauth.noop, got %s", got)
+	}
+	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
+		t.Fatalf("expected explicit circuitbreaker.noop, got %s", got)
+	}
+}
+
+func TestSelectedMicroserviceProvidersPromoteMicroserviceDefaults(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
+	providers := SelectedMicroserviceProviders(cfg)
+	if len(providers) != 10 {
+		t.Fatalf("expected 10 selected providers, got %d", len(providers))
+	}
+	assertProviderName(t, providers[0], "discovery.noop")
+	assertProviderName(t, providers[1], "selector.p2c")
+	assertProviderName(t, providers[2], "rpc.noop")
+	assertProviderName(t, providers[3], "tracing.otel")
+	assertProviderName(t, providers[4], "metadata.default")
+	assertProviderName(t, providers[5], "serviceauth.token")
+	assertProviderName(t, providers[6], "circuitbreaker.sentinel")
+}
+
+func TestRegisterSelectedMicroserviceProvidersWithModeOverrideWinsOverConfig(t *testing.T) {
+	app := framework.NewApplication()
+	c := app.Container()
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "monolith"}}
+	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
+		return cfg, nil
+	}, true)
+
+	if err := RegisterSelectedMicroserviceProvidersWithMode(c, "microservice"); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	assertBoundKey(t, c, observabilitycontract.TracerKey)
+	assertBoundKey(t, c, securitycontract.ServiceAuthKey)
+	assertBoundKey(t, c, resiliencecontract.CircuitBreakerKey)
 }
 
 func assertKeyRegistered(t *testing.T, c runtimecontract.Container, key string) {

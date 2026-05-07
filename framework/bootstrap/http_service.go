@@ -46,6 +46,7 @@ type HTTPServiceOptions struct {
 	DisableGorm    bool
 	DisableMetrics bool
 	EnablePprof    bool
+	GovernanceMode string
 }
 
 // HTTPServiceRuntime carries the assembled HTTP runtime state used during startup callbacks.
@@ -74,7 +75,7 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	if err := c.RegisterProviders(providers...); err != nil {
 		return nil, fmt.Errorf("register providers: %w", err)
 	}
-	if err := RegisterSelectedMicroserviceProviders(c); err != nil {
+	if err := RegisterSelectedMicroserviceProvidersWithMode(c, opts.GovernanceMode); err != nil {
 		return nil, fmt.Errorf("register selected microservice providers: %w", err)
 	}
 

@@ -42,6 +42,7 @@ func TestCircuitBreakerUnaryInterceptor_UsesNormalizedResource(t *testing.T) {
 		nil,
 		nil,
 		cb,
+		nil,
 	)
 
 	interceptor := client.circuitBreakerUnaryInterceptor("user-service")

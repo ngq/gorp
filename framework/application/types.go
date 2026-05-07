@@ -11,6 +11,7 @@ package application
 
 import (
 	"github.com/ngq/gorp/framework/bootstrap"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -52,6 +53,7 @@ type HTTPServiceOptions struct {
 	DisableRedis   bool
 	DisableGorm    bool
 	DisableMetrics bool
+	GovernanceMode resiliencecontract.GovernanceMode
 }
 
 type runConfig struct {

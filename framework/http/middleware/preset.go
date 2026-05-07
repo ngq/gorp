@@ -6,13 +6,14 @@
 // 适用场景：
 // - 为对外、内网和管理 HTTP API 提供稳定的默认中间件组合。
 // - 让业务侧无需手工排序中间件，也能直接完成装配。
-// - 将推荐的中间件顺序与默认值集中收口在一个地方。
+// - 将推荐顺序与默认值集中维护在一个主线入口中。
 package middleware
 
 import (
 	"time"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -51,6 +52,18 @@ type AdminMiddlewareOptions struct {
 	DisableAuthorization bool
 	RequireAnyRoles      []string
 	RequireAllRoles      []string
+}
+
+// DefaultHTTPServiceGovernanceOptions controls the default HTTP service governance preset.
+//
+// DefaultHTTPServiceGovernanceOptions 用于控制默认 HTTP 服务治理预设。
+type DefaultHTTPServiceGovernanceOptions struct {
+	API                    RecommendedMiddlewareOptions
+	RateLimiter            resiliencecontract.RateLimiter
+	RateLimitResource      string
+	CircuitBreaker         resiliencecontract.CircuitBreaker
+	CircuitBreakerResource string
+	MaxConcurrent          int
 }
 
 // DefaultRecommendedMiddlewareOptions returns the default recommended API options.
@@ -94,6 +107,16 @@ func DefaultAdminMiddlewareOptions() AdminMiddlewareOptions {
 		API:                  internal.API,
 		EnableAudit:          true,
 		RequireAuthorization: true,
+	}
+}
+
+// DefaultHTTPServiceGovernanceDefaults returns the default HTTP service governance options.
+//
+// DefaultHTTPServiceGovernanceDefaults 返回默认 HTTP 服务治理选项。
+func DefaultHTTPServiceGovernanceDefaults() DefaultHTTPServiceGovernanceOptions {
+	return DefaultHTTPServiceGovernanceOptions{
+		API:           DefaultRecommendedMiddlewareOptions(),
+		MaxConcurrent: 0,
 	}
 }
 
@@ -296,6 +319,92 @@ func UseAdminAPIMiddleware(router transportcontract.HTTPRouter, base observabili
 	router.Use(AdminAPIMiddlewareSet(base, opts)...)
 }
 
+// DefaultHTTPServiceGovernancePreset returns the default HTTP service governance middleware preset.
+//
+// DefaultHTTPServiceGovernancePreset 返回默认 HTTP 服务治理中间件预设。
+func DefaultHTTPServiceGovernancePreset(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) transportcontract.HTTPMiddleware {
+	return Chain(DefaultHTTPServiceGovernanceSet(base, opts)...)
+}
+
+// DefaultHTTPServiceGovernanceSet returns the default HTTP service governance preset as an ordered slice.
+//
+// DefaultHTTPServiceGovernanceSet 以有序切片形式返回默认 HTTP 服务治理预设。
+//
+// Included middleware:
+// - DefaultMiddlewareSet
+// - CORS, when configured
+// - SecurityHeaders, when enabled
+// - Timeout, when configured
+// - LoadShedding, when MaxConcurrent > 0
+// - RateLimit, when a limiter is provided
+// - CircuitBreaker, when a breaker is provided
+// - BodyLimit, when configured
+// - Locale, when enabled
+// - MetricsMiddleware, when enabled
+// - Compression, when enabled
+//
+// 包含的中间件：
+// - DefaultMiddlewareSet
+// - 配置后追加 CORS
+// - 启用时追加 SecurityHeaders
+// - 配置后追加 Timeout
+// - MaxConcurrent 大于 0 时追加 LoadShedding
+// - 提供 limiter 时追加 RateLimit
+// - 提供 breaker 时追加 CircuitBreaker
+// - 配置后追加 BodyLimit
+// - 启用时追加 Locale
+// - 启用时追加 MetricsMiddleware
+// - 启用时追加 Compression
+func DefaultHTTPServiceGovernanceSet(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) []transportcontract.HTTPMiddleware {
+	opts = normalizeDefaultHTTPServiceGovernanceOptions(opts)
+
+	middleware := make([]transportcontract.HTTPMiddleware, 0, 12)
+	middleware = append(middleware, DefaultMiddlewareSet(base)...)
+
+	if opts.API.CORS != nil {
+		middleware = append(middleware, CORS(*opts.API.CORS))
+	}
+	if !opts.API.DisableSecurityHeaders && opts.API.SecurityHeaders != nil {
+		middleware = append(middleware, SecurityHeaders(*opts.API.SecurityHeaders))
+	}
+	if opts.API.Timeout > 0 {
+		middleware = append(middleware, Timeout(opts.API.Timeout))
+	}
+	if opts.MaxConcurrent > 0 {
+		middleware = append(middleware, LoadShedding(opts.MaxConcurrent))
+	}
+	if opts.RateLimiter != nil {
+		middleware = append(middleware, RateLimit(opts.RateLimiter, opts.RateLimitResource))
+	}
+	if opts.CircuitBreaker != nil {
+		middleware = append(middleware, CircuitBreaker(opts.CircuitBreaker, opts.CircuitBreakerResource))
+	}
+	if opts.API.BodyLimitBytes > 0 {
+		middleware = append(middleware, BodyLimit(opts.API.BodyLimitBytes))
+	}
+	if !opts.API.DisableLocale && opts.API.Locale != nil {
+		middleware = append(middleware, Locale(*opts.API.Locale))
+	}
+	if opts.API.EnableMetrics {
+		middleware = append(middleware, MetricsMiddleware())
+	}
+	if opts.API.EnableCompression {
+		middleware = append(middleware, Compression())
+	}
+
+	return middleware
+}
+
+// UseDefaultHTTPServiceGovernance applies the default HTTP service governance preset to the router.
+//
+// UseDefaultHTTPServiceGovernance 将默认 HTTP 服务治理预设装配到路由器。
+func UseDefaultHTTPServiceGovernance(router transportcontract.HTTPRouter, base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) {
+	if router == nil {
+		return
+	}
+	router.Use(DefaultHTTPServiceGovernanceSet(base, opts)...)
+}
+
 // normalizeRecommendedMiddlewareOptions fills missing recommended middleware options with defaults.
 //
 // normalizeRecommendedMiddlewareOptions 用默认值补齐推荐中间件选项。
@@ -315,6 +424,21 @@ func normalizeRecommendedMiddlewareOptions(opts RecommendedMiddlewareOptions) Re
 	}
 	if !opts.DisableLocale && opts.Locale == nil {
 		opts.Locale = defaults.Locale
+	}
+	return opts
+}
+
+// normalizeDefaultHTTPServiceGovernanceOptions fills missing HTTP governance preset options with defaults.
+//
+// normalizeDefaultHTTPServiceGovernanceOptions 用默认值补齐 HTTP 治理预设选项。
+func normalizeDefaultHTTPServiceGovernanceOptions(opts DefaultHTTPServiceGovernanceOptions) DefaultHTTPServiceGovernanceOptions {
+	defaults := DefaultHTTPServiceGovernanceDefaults()
+	if opts == (DefaultHTTPServiceGovernanceOptions{}) {
+		return defaults
+	}
+	opts.API = normalizeRecommendedMiddlewareOptions(opts.API)
+	if opts.MaxConcurrent == 0 {
+		opts.MaxConcurrent = defaults.MaxConcurrent
 	}
 	return opts
 }

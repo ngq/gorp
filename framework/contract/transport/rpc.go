@@ -42,6 +42,16 @@ type RPCClient interface {
 	Close() error
 }
 
+// RPCInvoker defines one outbound RPC invocation function.
+//
+// RPCInvoker 定义一次出站 RPC 调用函数。
+type RPCInvoker func(ctx context.Context, service, method string, req, resp any) error
+
+// RPCClientMiddleware defines one outbound RPC governance middleware.
+//
+// RPCClientMiddleware 定义一个出站 RPC 治理中间件。
+type RPCClientMiddleware func(next RPCInvoker) RPCInvoker
+
 // RPCServer defines the inbound RPC server contract.
 //
 // RPCServer 定义入站 RPC 服务端契约。

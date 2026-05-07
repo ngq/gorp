@@ -19,6 +19,9 @@ import (
 	httpmiddleware "github.com/ngq/gorp/framework/http/middleware"
 )
 
+// Container is the top-level alias of the runtime container contract.
+//
+// Container 是 runtime 容器契约的顶层别名。
 type Container = runtime.Container
 
 // HTTPRouter is the top-level alias of the transport HTTP router contract.
@@ -75,8 +78,25 @@ type InternalHTTPMiddlewareOptions = httpmiddleware.InternalMiddlewareOptions
 //
 // AdminHTTPMiddlewareOptions 是管理 HTTP 预设选项的顶层别名。
 type AdminHTTPMiddlewareOptions = httpmiddleware.AdminMiddlewareOptions
+
+// DefaultHTTPServiceGovernanceOptions is the top-level alias of the HTTP service governance preset options.
+//
+// DefaultHTTPServiceGovernanceOptions 是 HTTP 服务治理预设选项的顶层别名。
+type DefaultHTTPServiceGovernanceOptions = httpmiddleware.DefaultHTTPServiceGovernanceOptions
+
+// TenantOptions is the top-level alias of tenant middleware options.
+//
+// TenantOptions 是租户中间件选项的顶层别名。
 type TenantOptions = httpmiddleware.TenantOptions
+
+// BodyDumpOptions is the top-level alias of request/response capture middleware options.
+//
+// BodyDumpOptions 是请求响应抓取中间件选项的顶层别名。
 type BodyDumpOptions = httpmiddleware.BodyDumpOptions
+
+// HTTPExchangeCapture is the top-level alias of the request/response capture result.
+//
+// HTTPExchangeCapture 是请求响应抓取结果的顶层别名。
 type HTTPExchangeCapture = httpmiddleware.HTTPExchangeCapture
 
 // Chain combines multiple HTTP middlewares into one middleware.
@@ -86,9 +106,9 @@ type HTTPExchangeCapture = httpmiddleware.HTTPExchangeCapture
 // Example:
 //
 //	apiMiddleware := gorp.Chain(
-//	    RequestIdentity(),
-//	    LoggingMiddleware(logger),
-//	    RecoveryMiddleware(),
+//	    gorp.RequestIdentity(),
+//	    gorp.LoggingMiddleware(logger),
+//	    gorp.RecoveryMiddleware(),
 //	)
 //
 //	router.Use(apiMiddleware)
@@ -152,6 +172,16 @@ func DefaultAdminHTTPMiddlewareOptions() AdminHTTPMiddlewareOptions {
 	return httpmiddleware.DefaultAdminMiddlewareOptions()
 }
 
+// DefaultHTTPServiceGovernanceDefaults returns the default HTTP service governance preset options.
+//
+// DefaultHTTPServiceGovernanceDefaults 返回默认 HTTP 服务治理预设选项。
+func DefaultHTTPServiceGovernanceDefaults() DefaultHTTPServiceGovernanceOptions {
+	return httpmiddleware.DefaultHTTPServiceGovernanceDefaults()
+}
+
+// DefaultTenantOptions returns the default tenant middleware options.
+//
+// DefaultTenantOptions 返回默认租户中间件选项。
 func DefaultTenantOptions() TenantOptions {
 	return httpmiddleware.DefaultTenantOptions()
 }
@@ -212,6 +242,20 @@ func AdminHTTPAPIMiddlewareSet(base observabilitycontract.Logger, opts AdminHTTP
 	return httpmiddleware.AdminAPIMiddlewareSet(base, opts)
 }
 
+// DefaultHTTPServiceGovernancePreset returns the default HTTP service governance middleware preset.
+//
+// DefaultHTTPServiceGovernancePreset 返回默认 HTTP 服务治理中间件预设。
+func DefaultHTTPServiceGovernancePreset(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) HTTPMiddleware {
+	return httpmiddleware.DefaultHTTPServiceGovernancePreset(base, opts)
+}
+
+// DefaultHTTPServiceGovernanceSet returns the default HTTP service governance preset as an ordered slice.
+//
+// DefaultHTTPServiceGovernanceSet 以有序切片形式返回默认 HTTP 服务治理预设。
+func DefaultHTTPServiceGovernanceSet(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) []HTTPMiddleware {
+	return httpmiddleware.DefaultHTTPServiceGovernanceSet(base, opts)
+}
+
 // UseDefaultHTTPMiddleware applies the default HTTP middleware baseline to the router.
 //
 // UseDefaultHTTPMiddleware 将默认 HTTP 中间件基线装配到路由器。
@@ -240,10 +284,23 @@ func UseAdminHTTPAPIMiddleware(router HTTPRouter, base observabilitycontract.Log
 	httpmiddleware.UseAdminAPIMiddleware(router, base, opts)
 }
 
+// UseDefaultHTTPServiceGovernance applies the default HTTP service governance preset to the router.
+//
+// UseDefaultHTTPServiceGovernance 将默认 HTTP 服务治理预设装配到路由器。
+func UseDefaultHTTPServiceGovernance(router HTTPRouter, base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) {
+	httpmiddleware.UseDefaultHTTPServiceGovernance(router, base, opts)
+}
+
+// Tenant returns the tenant middleware from the mainline HTTP middleware package.
+//
+// Tenant 返回主线 HTTP 中间件中的租户中间件。
 func Tenant(opts TenantOptions) HTTPMiddleware {
 	return httpmiddleware.Tenant(opts)
 }
 
+// BodyDump returns the request/response capture middleware from the mainline HTTP middleware package.
+//
+// BodyDump 返回主线 HTTP 中间件中的请求响应抓取中间件。
 func BodyDump(opts BodyDumpOptions) HTTPMiddleware {
 	return httpmiddleware.BodyDump(opts)
 }

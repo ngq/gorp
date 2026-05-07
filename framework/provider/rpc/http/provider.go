@@ -21,6 +21,7 @@ import (
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
+	rpcgovernance "github.com/ngq/gorp/framework/rpc/governance"
 )
 
 type Provider struct{}
@@ -73,7 +74,13 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			circuitBreaker, _ = cbAny.(resiliencecontract.CircuitBreaker)
 		}
 
-		return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker), nil
+		var retry resiliencecontract.Retry
+		if c.IsBind(resiliencecontract.RetryKey) {
+			retryAny, _ := c.Make(resiliencecontract.RetryKey)
+			retry, _ = retryAny.(resiliencecontract.Retry)
+		}
+
+		return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker, retry), nil
 	}, true)
 
 	c.Bind(transportcontract.RPCServerKey, func(c runtimecontract.Container) (any, error) {
@@ -125,6 +132,7 @@ type Client struct {
 	serviceAuth        securitycontract.ServiceTokenIssuer
 	tracer             observabilitycontract.Tracer
 	circuitBreaker     resiliencecontract.CircuitBreaker
+	retry              resiliencecontract.Retry
 	httpCli            *http.Client
 	serviceCache       sync.Map
 }
@@ -142,6 +150,7 @@ func NewClient(
 	serviceAuth securitycontract.ServiceTokenIssuer,
 	tracer observabilitycontract.Tracer,
 	circuitBreaker resiliencecontract.CircuitBreaker,
+	retry resiliencecontract.Retry,
 ) *Client {
 	timeout := time.Duration(cfg.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {
@@ -156,6 +165,7 @@ func NewClient(
 		serviceAuth:        serviceAuth,
 		tracer:             tracer,
 		circuitBreaker:     circuitBreaker,
+		retry:              retry,
 		httpCli: &http.Client{
 			Timeout: timeout,
 		},
@@ -178,10 +188,10 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		}()
 	}
 
-	err = c.doWithCircuitBreaker(ctx, service, method, func() error {
+	invoker := rpcgovernance.Apply(func(callCtx context.Context, service, method string, req, resp any) error {
 		fullURL := c.buildURL(addr, method)
 
-		httpReq, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(reqBody))
+		httpReq, reqErr := http.NewRequestWithContext(callCtx, http.MethodPost, fullURL, bytes.NewReader(reqBody))
 		if reqErr != nil {
 			return fmt.Errorf("rpc: create request failed: %w", reqErr)
 		}
@@ -189,21 +199,21 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 
 		if c.metadataPropagator != nil {
 			carrier := &headerCarrier{header: httpReq.Header}
-			c.metadataPropagator.Inject(ctx, carrier)
+			c.metadataPropagator.Inject(callCtx, carrier)
 		}
 
 		if c.tracer != nil {
 			carrier := &headerCarrier{header: httpReq.Header}
-			_ = c.tracer.Inject(ctx, carrier)
+			_ = c.tracer.Inject(callCtx, carrier)
 		}
 
 		if c.serviceAuth != nil {
-			if token, tokenErr := c.serviceAuth.GenerateToken(ctx, service); tokenErr == nil && strings.TrimSpace(token) != "" {
+			if token, tokenErr := c.serviceAuth.GenerateToken(callCtx, service); tokenErr == nil && strings.TrimSpace(token) != "" {
 				httpReq.Header.Set("X-Service-Token", token)
 			}
 		}
 
-		if traceID, ok := supportcontract.FromTraceIDContext(ctx); ok {
+		if traceID, ok := supportcontract.FromTraceIDContext(callCtx); ok {
 			httpReq.Header.Set("X-Trace-ID", traceID)
 		}
 
@@ -229,6 +239,12 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 		}
 
 		return nil
+	},
+		rpcgovernance.TimeoutMiddleware(time.Duration(c.cfg.TimeoutMS)*time.Millisecond),
+		rpcgovernance.RetryMiddleware(c.retry),
+	)
+	err = c.doWithCircuitBreaker(ctx, service, method, func() error {
+		return invoker(ctx, service, method, req, resp)
 	})
 	if err != nil {
 		return err

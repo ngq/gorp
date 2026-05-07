@@ -9,7 +9,11 @@
 // - 在保持选项组合语义稳定的前提下，支持 setup 与路由钩子逐步扩展。
 package application
 
-import "errors"
+import (
+	"errors"
+
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+)
 
 // HTTP declares that the default HTTP mainline should be used.
 //
@@ -30,6 +34,9 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 		cfg.httpOpts.DisableRedis = h.DisableRedis
 		cfg.httpOpts.DisableGorm = h.DisableGorm
 		cfg.httpOpts.DisableMetrics = h.DisableMetrics
+		if h.GovernanceMode != "" {
+			cfg.httpOpts.GovernanceMode = string(h.GovernanceMode)
+		}
 	})
 }
 
@@ -180,4 +187,30 @@ func WithHTTPRoutes(register HTTPRouteRegistrar) Option {
 		}
 		return nil
 	})
+}
+
+// WithGovernanceMode declares the startup governance mode explicitly.
+//
+// WithGovernanceMode 显式声明启动治理模式。
+func WithGovernanceMode(mode resiliencecontract.GovernanceMode) Option {
+	return optionFunc(func(cfg *runConfig) {
+		if mode == "" {
+			return
+		}
+		cfg.httpOpts.GovernanceMode = string(mode)
+	})
+}
+
+// WithMicroserviceMode selects the default microservice governance mainline.
+//
+// WithMicroserviceMode 选择默认微服务治理主线。
+func WithMicroserviceMode() Option {
+	return WithGovernanceMode(resiliencecontract.GovernanceModeMicroservice)
+}
+
+// WithMonolithMode selects the lightweight monolith governance mode.
+//
+// WithMonolithMode 选择轻量单体治理模式。
+func WithMonolithMode() Option {
+	return WithGovernanceMode(resiliencecontract.GovernanceModeMonolith)
 }

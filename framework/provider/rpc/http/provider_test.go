@@ -50,6 +50,7 @@ func TestClientCall_UsesCircuitBreaker(t *testing.T) {
 		nil,
 		nil,
 		cb,
+		nil,
 	)
 
 	var resp map[string]bool
@@ -78,6 +79,7 @@ func TestClientCall_PropagatesTraceIDFromContext(t *testing.T) {
 
 	client := NewClient(
 		&transportcontract.RPCConfig{Mode: "http", BaseURL: server.URL, TimeoutMS: 1000},
+		nil,
 		nil,
 		nil,
 		nil,
