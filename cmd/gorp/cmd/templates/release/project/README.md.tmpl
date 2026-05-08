@@ -47,6 +47,13 @@ go run ./cmd/app
 4. `config/app.yaml`
 5. `docs/structure.md`
 
+## 默认治理入口
+
+- `cmd/app/main.go` 默认通过 `gorp.Run(...) + gorp.WithMicroserviceMode()` 启动
+- 如果业务明确要保持轻量单体模式，再切到 `gorp.WithMonolithMode()`
+- 默认治理按模式隐式提供；如果需要显式关闭或替换，优先在 `config/app.yaml` 的 `governance` 段落中声明
+- `governance.disable` 用于关闭默认治理件，`governance.providers.*` 用于替换默认 provider backend
+
 ## release starter 的特点
 
 - 不依赖本地框架源码路径

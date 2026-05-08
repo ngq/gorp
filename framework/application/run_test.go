@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ngq/gorp/framework/bootstrap"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
 func TestRunReturnsStableRunFailureError(t *testing.T) {
@@ -295,6 +296,44 @@ func TestRunContextUsesTrimmedServiceName(t *testing.T) {
 	}
 	if got != "demo-service" {
 		t.Fatalf("expected trimmed serviceName demo-service, got %q", got)
+	}
+}
+
+func TestRunContextLeavesGovernanceOverrideEmptyByDefault(t *testing.T) {
+	origin := bootHTTPService
+	defer func() { bootHTTPService = origin }()
+
+	gotMode := "<unset>"
+	bootHTTPService = func(serviceName string, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+		gotMode = opts.GovernanceMode
+		return nil
+	}
+
+	err := RunContext(context.Background(), "demo", HTTP())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMode != "" {
+		t.Fatalf("expected default governance override to be empty, got %q", gotMode)
+	}
+}
+
+func TestRunContextForwardsMicroserviceGovernanceMode(t *testing.T) {
+	origin := bootHTTPService
+	defer func() { bootHTTPService = origin }()
+
+	gotMode := ""
+	bootHTTPService = func(serviceName string, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+		gotMode = opts.GovernanceMode
+		return nil
+	}
+
+	err := RunContext(context.Background(), "demo", HTTP(), WithMicroserviceMode())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMode != string(resiliencecontract.GovernanceModeMicroservice) {
+		t.Fatalf("expected governance mode microservice, got %q", gotMode)
 	}
 }
 

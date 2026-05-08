@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	if err := gorp.Run("order-service", gorp.HTTP(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
+	if err := gorp.Run("order-service", gorp.HTTP(), gorp.WithMicroserviceMode(), gorp.WithMigrate(migrate), gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

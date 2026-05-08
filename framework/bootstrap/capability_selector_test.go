@@ -328,6 +328,29 @@ func TestRegistryFactories_ProvideExpectedFallbacks(t *testing.T) {
 	assertProviderName(t, providerFromMap(distributedLockProviderFactories, "", "noop"), "dlock.noop")
 }
 
+func TestDefaultGovernanceProviderDefaultsRemainStable(t *testing.T) {
+	monolith := DefaultGovernanceProviderDefaults(resiliencecontract.GovernanceModeMonolith)
+	if monolith.ConfigSource != "local" || monolith.Discovery != "noop" || monolith.Selector != "noop" {
+		t.Fatalf("unexpected monolith defaults: %+v", monolith)
+	}
+	if monolith.Tracing != "noop" || monolith.Metadata != "noop" || monolith.ServiceAuth != "noop" || monolith.CircuitBreaker != "noop" {
+		t.Fatalf("unexpected monolith governance protection defaults: %+v", monolith)
+	}
+
+	ginFirst := DefaultGovernanceProviderDefaults(resiliencecontract.GovernanceModeGinFirst)
+	if ginFirst != monolith {
+		t.Fatalf("expected gin-first defaults to match monolith for now, got %+v vs %+v", ginFirst, monolith)
+	}
+
+	microservice := DefaultGovernanceProviderDefaults(resiliencecontract.GovernanceModeMicroservice)
+	if microservice.ConfigSource != "local" || microservice.Discovery != "noop" || microservice.RPC != "noop" {
+		t.Fatalf("unexpected microservice transport defaults: %+v", microservice)
+	}
+	if microservice.Selector != "p2c_ewma" || microservice.Tracing != "otel" || microservice.Metadata != "default" || microservice.ServiceAuth != "token" || microservice.CircuitBreaker != "sentinel" {
+		t.Fatalf("unexpected microservice governance defaults: %+v", microservice)
+	}
+}
+
 func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{}}
 	providers := SelectedMicroserviceProviders(cfg)
@@ -360,12 +383,31 @@ func TestDetectGovernanceModeAcceptsLegacyServiceModeKey(t *testing.T) {
 	}
 }
 
+func TestDetectGovernanceModeAcceptsGinFirst(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "gin-first"}}
+	if got := DetectGovernanceMode(cfg); got != resiliencecontract.GovernanceModeGinFirst {
+		t.Fatalf("expected gin-first mode from governance.mode, got %q", got)
+	}
+}
+
 func TestNormalizeGovernanceModeFallsBackToMonolith(t *testing.T) {
 	if got := NormalizeGovernanceMode(""); got != resiliencecontract.GovernanceModeMonolith {
 		t.Fatalf("expected empty mode to normalize to monolith, got %q", got)
 	}
 	if got := NormalizeGovernanceMode("unknown"); got != resiliencecontract.GovernanceModeMonolith {
 		t.Fatalf("expected unknown mode to normalize to monolith, got %q", got)
+	}
+}
+
+func TestNormalizeGovernanceModePreservesGinFirst(t *testing.T) {
+	if got := NormalizeGovernanceMode(resiliencecontract.GovernanceModeGinFirst); got != resiliencecontract.GovernanceModeGinFirst {
+		t.Fatalf("expected gin-first mode preserved, got %q", got)
+	}
+	if !IsGinFirstMode(resiliencecontract.GovernanceModeGinFirst) {
+		t.Fatal("expected IsGinFirstMode to report true for gin-first")
+	}
+	if IsMicroserviceMode(resiliencecontract.GovernanceModeGinFirst) {
+		t.Fatal("expected gin-first not to be treated as microservice mode")
 	}
 }
 
@@ -409,6 +451,26 @@ func TestModeAwareSelectionsKeepMonolithDefaultsWithoutExplicitEnablement(t *tes
 	}
 }
 
+func TestModeAwareSelectionsKeepGinFirstOnLightweightDefaults(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "gin-first"}}
+
+	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
+		t.Fatalf("expected selector.noop, got %s", got)
+	}
+	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected tracing.noop, got %s", got)
+	}
+	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.noop" {
+		t.Fatalf("expected metadata.noop, got %s", got)
+	}
+	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected serviceauth.noop, got %s", got)
+	}
+	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
+		t.Fatalf("expected circuitbreaker.noop, got %s", got)
+	}
+}
+
 func TestModeAwareSelectionsRespectExplicitBackendsOverGovernanceDefaults(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{
 		"governance.mode":         "microservice",
@@ -433,6 +495,52 @@ func TestModeAwareSelectionsRespectExplicitBackendsOverGovernanceDefaults(t *tes
 	}
 	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
 		t.Fatalf("expected explicit circuitbreaker.noop, got %s", got)
+	}
+}
+
+func TestModeAwareSelectionsRespectGovernanceProviderOverrides(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{
+		"governance.mode":                  "microservice",
+		"governance.providers.selector":    "noop",
+		"governance.providers.tracing":     "noop",
+		"governance.providers.metadata":    "noop",
+		"governance.providers.serviceauth": "noop",
+	}}
+
+	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
+		t.Fatalf("expected governance override selector.noop, got %s", got)
+	}
+	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected governance override tracing.noop, got %s", got)
+	}
+	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.noop" {
+		t.Fatalf("expected governance override metadata.noop, got %s", got)
+	}
+	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected governance override serviceauth.noop, got %s", got)
+	}
+}
+
+func TestModeAwareSelectionsRespectGovernanceDisableList(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{
+		"governance.mode":    "microservice",
+		"governance.disable": []string{"tracing", "selector", "metadata", "serviceauth", "circuitbreaker"},
+	}}
+
+	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
+		t.Fatalf("expected disabled selector to fall back to noop, got %s", got)
+	}
+	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected disabled tracing to fall back to noop, got %s", got)
+	}
+	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.noop" {
+		t.Fatalf("expected disabled metadata to fall back to noop, got %s", got)
+	}
+	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected disabled serviceauth to fall back to noop, got %s", got)
+	}
+	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
+		t.Fatalf("expected disabled circuit breaker to fall back to noop, got %s", got)
 	}
 }
 

@@ -75,7 +75,7 @@ services:
   user_service:
     name: "http://localhost:8081"
     timeout: 10s
-    retry: 3
+    # retry: 3  # 如需 client 侧重试，再按资源调用显式开启
 
 # 如需服务发现，可再开启
 # discovery:

@@ -37,6 +37,12 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 		if h.GovernanceMode != "" {
 			cfg.httpOpts.GovernanceMode = string(h.GovernanceMode)
 		}
+		if len(h.GovernanceDisable) > 0 {
+			cfg.httpOpts.GovernanceDisable = append([]string(nil), h.GovernanceDisable...)
+		}
+		if len(h.GovernanceProviders) > 0 {
+			cfg.httpOpts.GovernanceProviders = cloneGovernanceProviders(h.GovernanceProviders)
+		}
 	})
 }
 
@@ -201,6 +207,33 @@ func WithGovernanceMode(mode resiliencecontract.GovernanceMode) Option {
 	})
 }
 
+// WithGovernanceDisabled explicitly disables one or more default governance capabilities.
+//
+// WithGovernanceDisabled 显式关闭一个或多个默认治理能力。
+func WithGovernanceDisabled(names ...string) Option {
+	return optionFunc(func(cfg *runConfig) {
+		if len(names) == 0 {
+			return
+		}
+		cfg.httpOpts.GovernanceDisable = append(cfg.httpOpts.GovernanceDisable, names...)
+	})
+}
+
+// WithGovernanceProvider explicitly overrides one governance provider backend.
+//
+// WithGovernanceProvider 显式覆盖一个治理 provider backend。
+func WithGovernanceProvider(name, backend string) Option {
+	return optionFunc(func(cfg *runConfig) {
+		if name == "" || backend == "" {
+			return
+		}
+		if cfg.httpOpts.GovernanceProviders == nil {
+			cfg.httpOpts.GovernanceProviders = make(map[string]string)
+		}
+		cfg.httpOpts.GovernanceProviders[name] = backend
+	})
+}
+
 // WithMicroserviceMode selects the default microservice governance mainline.
 //
 // WithMicroserviceMode 选择默认微服务治理主线。
@@ -213,4 +246,22 @@ func WithMicroserviceMode() Option {
 // WithMonolithMode 选择轻量单体治理模式。
 func WithMonolithMode() Option {
 	return WithGovernanceMode(resiliencecontract.GovernanceModeMonolith)
+}
+
+// WithGinFirstMode selects the Gin-first governance mode.
+//
+// WithGinFirstMode 选择 Gin-first 治理模式。
+func WithGinFirstMode() Option {
+	return WithGovernanceMode(resiliencecontract.GovernanceModeGinFirst)
+}
+
+func cloneGovernanceProviders(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(src))
+	for key, value := range src {
+		cloned[key] = value
+	}
+	return cloned
 }

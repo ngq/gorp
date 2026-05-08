@@ -1,15 +1,103 @@
 package bootstrap
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewHTTPServiceRuntimeLeavesGovernanceOverrideEmptyByDefault(t *testing.T) {
+	originProviders := buildHTTPProvidersFunc
+	origin := registerSelectedMicroserviceProvidersWithMode
+	originWithOptions := registerSelectedMicroserviceProvidersWithOptionsFunc
+	defer func() {
+		buildHTTPProvidersFunc = originProviders
+		registerSelectedMicroserviceProvidersWithMode = origin
+		registerSelectedMicroserviceProvidersWithOptionsFunc = originWithOptions
+	}()
+
+	var gotMode string
+	sentinel := errors.New("stop after capture")
+	buildHTTPProvidersFunc = func(opts HTTPServiceOptions) []runtimecontract.ServiceProvider {
+		return nil
+	}
+	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, providers map[string]string) error {
+		gotMode = modeOverride
+		return sentinel
+	}
+
+	_, err := NewHTTPServiceRuntime("demo", HTTPServiceOptions{})
+	require.Error(t, err)
+	require.ErrorIs(t, err, sentinel)
+	require.Empty(t, gotMode)
+}
+
+func TestNewHTTPServiceRuntimeForwardsMicroserviceGovernanceOverride(t *testing.T) {
+	originProviders := buildHTTPProvidersFunc
+	origin := registerSelectedMicroserviceProvidersWithMode
+	originWithOptions := registerSelectedMicroserviceProvidersWithOptionsFunc
+	defer func() {
+		buildHTTPProvidersFunc = originProviders
+		registerSelectedMicroserviceProvidersWithMode = origin
+		registerSelectedMicroserviceProvidersWithOptionsFunc = originWithOptions
+	}()
+
+	var gotMode string
+	sentinel := errors.New("stop after capture")
+	buildHTTPProvidersFunc = func(opts HTTPServiceOptions) []runtimecontract.ServiceProvider {
+		return nil
+	}
+	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, providers map[string]string) error {
+		gotMode = modeOverride
+		return sentinel
+	}
+
+	_, err := NewHTTPServiceRuntime("demo", HTTPServiceOptions{
+		GovernanceMode: string(resiliencecontract.GovernanceModeMicroservice),
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, sentinel)
+	require.Equal(t, string(resiliencecontract.GovernanceModeMicroservice), gotMode)
+}
+
+func TestNewHTTPServiceRuntimeForwardsGovernanceDisableAndProviderOverrides(t *testing.T) {
+	originProviders := buildHTTPProvidersFunc
+	originWithOptions := registerSelectedMicroserviceProvidersWithOptionsFunc
+	defer func() {
+		buildHTTPProvidersFunc = originProviders
+		registerSelectedMicroserviceProvidersWithOptionsFunc = originWithOptions
+	}()
+
+	var (
+		gotDisabled []string
+		gotProviders map[string]string
+	)
+	sentinel := errors.New("stop after capture")
+	buildHTTPProvidersFunc = func(opts HTTPServiceOptions) []runtimecontract.ServiceProvider { return nil }
+	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, providers map[string]string) error {
+		gotDisabled = append([]string(nil), disabled...)
+		gotProviders = providers
+		return sentinel
+	}
+
+	_, err := NewHTTPServiceRuntime("demo", HTTPServiceOptions{
+		GovernanceDisable:  []string{"tracing"},
+		GovernanceProviders: map[string]string{"serviceauth": "mtls"},
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, sentinel)
+	require.Equal(t, []string{"tracing"}, gotDisabled)
+	require.Equal(t, "mtls", gotProviders["serviceauth"])
+}
 
 func TestAutoMigrateModelsNilRuntime(t *testing.T) {
 	require.NoError(t, AutoMigrateModels(nil, struct{}{}))
@@ -61,8 +149,428 @@ func TestRegisterPprofEndpointsRejectsPost(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestRegisterGovernanceInspectEndpointsUsesGET(t *testing.T) {
+	router := &recordingRouter{}
+	summary := GovernanceSummary{
+		Mode:            resiliencecontract.GovernanceModeMicroservice,
+		EnabledFeatures: []string{"logging", "metrics"},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	require.Contains(t, router.gets, "/debug/governance")
+	require.Contains(t, router.gets, "/doctor/governance")
+}
+
+func TestRegisterGovernanceInspectEndpointsServesSummaryJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		EnabledFeatures:    []string{"logging", "metrics", "serviceauth"},
+		DisabledByOverride: []string{"tracing"},
+		ProviderBackends: map[string]string{
+			"serviceauth": "mtls",
+			"selector":    "p2c_ewma",
+		},
+		ResolutionOrder: []string{"code_explicit_override", "config_explicit_override", "mode_defaults", "provider_fallback"},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/debug/governance", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var got GovernanceSummary
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	require.Equal(t, summary.Mode, got.Mode)
+	require.Equal(t, summary.EnabledFeatures, got.EnabledFeatures)
+	require.Equal(t, summary.DisabledByOverride, got.DisabledByOverride)
+	require.Equal(t, summary.ProviderBackends, got.ProviderBackends)
+	require.Equal(t, summary.ResolutionOrder, got.ResolutionOrder)
+}
+
+func TestRegisterGovernanceInspectEndpointsServesDiagnosticText(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode:                resiliencecontract.GovernanceModeMicroservice,
+		ModeSource:          "code_override",
+		ModeReason:          "mode selected by startup option",
+		EnabledFeatures:     []string{"logging", "metrics", "serviceauth"},
+		ResolutionOrder:     []string{"code_explicit_override", "config_explicit_override", "mode_defaults", "provider_fallback"},
+		FeatureDecisions: map[string]GovernanceFeatureDecision{
+			"logging": {Enabled: true, Source: "mode_default", Reason: "logging is enabled by the current governance mode defaults"},
+			"retry":   {Enabled: false, Source: "mode_default", Reason: "retry is not part of the current governance mode defaults"},
+		},
+		ProviderDecisions: map[string]GovernanceProviderDecision{
+			"serviceauth": {
+				Backend:          "mtls",
+				Source:           "code_override",
+				Reason:           "provider backend came from startup option governance.providers.serviceauth",
+				RequestedBackend: "mtls",
+			},
+			"selector": {
+				Backend:          "noop",
+				Source:           "config_override",
+				Reason:           "provider backend came from config key governance.providers.selector; requested backend unknown was unavailable and fell back to noop",
+				RequestedBackend: "unknown",
+				FallbackBackend:  "noop",
+				ConfigKey:        "governance.providers.selector",
+			},
+		},
+		ConfigSnapshot: map[string]any{
+			"governance.mode":                "microservice",
+			"startup.governance_mode_override": "microservice",
+			"governance.providers":           map[string]string{"selector": "unknown"},
+		},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/doctor/governance?format=text", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "text/plain; charset=utf-8", w.Header().Get("Content-Type"))
+	require.Contains(t, w.Body.String(), "Governance Summary")
+	require.Contains(t, w.Body.String(), "Features")
+	require.Contains(t, w.Body.String(), "- logging: enabled")
+	require.Contains(t, w.Body.String(), "- retry: disabled")
+	require.Contains(t, w.Body.String(), "Providers")
+	require.Contains(t, w.Body.String(), "- serviceauth: mtls")
+	require.Contains(t, w.Body.String(), "requested=unknown")
+	require.Contains(t, w.Body.String(), "fallback=noop")
+	require.Contains(t, w.Body.String(), "Config Snapshot")
+	require.Contains(t, w.Body.String(), "governance.mode: microservice")
+}
+
+func TestRegisterGovernanceInspectEndpointsSupportsBriefView(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		ModeSource:         "code_override",
+		ModeReason:         "mode selected by startup option",
+		EnabledFeatures:    []string{"logging", "metrics"},
+		DisabledByOverride: []string{"tracing"},
+		ProviderBackends: map[string]string{
+			"serviceauth": "mtls",
+			"selector":    "noop",
+		},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/doctor/governance?view=brief", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "text/plain; charset=utf-8", w.Header().Get("Content-Type"))
+	require.Contains(t, w.Body.String(), "Governance Brief")
+	require.Contains(t, w.Body.String(), "Enabled Features: logging, metrics")
+	require.Contains(t, w.Body.String(), "Providers: selector=noop, serviceauth=mtls")
+	require.NotContains(t, w.Body.String(), "Config Snapshot")
+}
+
+func TestRegisterGovernanceInspectEndpointsSupportsProvidersView(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode: resiliencecontract.GovernanceModeMicroservice,
+		ProviderDecisions: map[string]GovernanceProviderDecision{
+			"selector": {
+				Backend:          "noop",
+				Source:           "config_override",
+				Reason:           "provider backend came from config key governance.providers.selector; requested backend unknown was unavailable and fell back to noop",
+				RequestedBackend: "unknown",
+				FallbackBackend:  "noop",
+				ConfigKey:        "governance.providers.selector",
+			},
+		},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/doctor/governance?view=providers", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "Governance Providers")
+	require.Contains(t, w.Body.String(), "- selector: noop")
+	require.Contains(t, w.Body.String(), "requested=unknown")
+	require.Contains(t, w.Body.String(), "fallback=noop")
+	require.NotContains(t, w.Body.String(), "Features")
+}
+
+func TestRegisterGovernanceInspectEndpointsSupportsFeaturesView(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode: resiliencecontract.GovernanceModeMonolith,
+		FeatureDecisions: map[string]GovernanceFeatureDecision{
+			"logging": {Enabled: true, Source: "mode_default", Reason: "logging is enabled by the current governance mode defaults"},
+			"retry":   {Enabled: false, Source: "mode_default", Reason: "retry is not part of the current governance mode defaults"},
+		},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/doctor/governance?view=features", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "Governance Features")
+	require.Contains(t, w.Body.String(), "- logging: enabled")
+	require.Contains(t, w.Body.String(), "- retry: disabled")
+	require.NotContains(t, w.Body.String(), "Providers")
+}
+
+func TestRegisterGovernanceInspectEndpointsSupportsConfigView(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode:       resiliencecontract.GovernanceModeMicroservice,
+		ModeSource: "config_override",
+		ConfigSnapshot: map[string]any{
+			"governance.mode":      "microservice",
+			"governance.disable":   []string{"tracing"},
+			"governance.providers": map[string]string{"serviceauth": "mtls"},
+		},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/doctor/governance?view=config", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "Governance Config Snapshot")
+	require.Contains(t, w.Body.String(), "- governance.mode: microservice")
+	require.Contains(t, w.Body.String(), "- governance.disable: [tracing]")
+	require.Contains(t, w.Body.String(), "- governance.providers: {serviceauth=mtls}")
+	require.NotContains(t, w.Body.String(), "Providers")
+	require.NotContains(t, w.Body.String(), "Features")
+}
+
+func TestRegisterGovernanceInspectEndpointsSupportsFullView(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := &ginTestRouter{engine: engine}
+	summary := GovernanceSummary{
+		Mode:            resiliencecontract.GovernanceModeMicroservice,
+		ModeSource:      "code_override",
+		ModeReason:      "mode selected by startup option",
+		ResolutionOrder: []string{"code_explicit_override", "config_explicit_override", "mode_defaults", "provider_fallback"},
+		FeatureDecisions: map[string]GovernanceFeatureDecision{
+			"logging": {Enabled: true, Source: "mode_default", Reason: "logging is enabled by the current governance mode defaults"},
+		},
+		ProviderDecisions: map[string]GovernanceProviderDecision{
+			"selector": {Backend: "noop", Source: "provider_fallback", Reason: "provider backend fell back to noop selector"},
+		},
+		ConfigSnapshot: map[string]any{
+			"governance.mode": "microservice",
+		},
+	}
+
+	RegisterGovernanceInspectEndpoints(router, summary)
+
+	req := httptest.NewRequest(http.MethodGet, "/doctor/governance?view=full", nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "Governance Summary")
+	require.Contains(t, w.Body.String(), "Features")
+	require.Contains(t, w.Body.String(), "Providers")
+	require.Contains(t, w.Body.String(), "Config Snapshot")
+}
+
+func TestBuildGovernanceSummaryReportsOverridesAndProviders(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{
+		"governance.mode":                  "microservice",
+		"governance.disable":               []string{"tracing", "selector"},
+		"governance.providers.serviceauth": "mtls",
+	}}
+
+	summary := BuildGovernanceSummary(cfg, resiliencecontract.GovernanceModeMicroservice)
+	require.Equal(t, resiliencecontract.GovernanceModeMicroservice, summary.Mode)
+	require.Equal(t, "config_override", summary.ModeSource)
+	require.Contains(t, summary.DisabledByOverride, "selector")
+	require.Contains(t, summary.DisabledByOverride, "tracing")
+	require.Contains(t, summary.DisabledByConfig, "selector")
+	require.Contains(t, summary.DisabledByConfig, "tracing")
+	require.Contains(t, summary.EnabledFeatures, "serviceauth")
+	require.False(t, summary.FeatureDecisions["selector"].Enabled)
+	require.Equal(t, "config_override", summary.FeatureDecisions["selector"].Source)
+	require.Contains(t, summary.FeatureDecisions["retry"].Reason, "not part of the current governance mode defaults")
+	require.Equal(t, "mtls", summary.ProviderBackends["serviceauth"])
+	require.Equal(t, "noop", summary.ProviderBackends["selector"])
+	require.Equal(t, "config_override", summary.ProviderDecisions["serviceauth"].Source)
+	require.Contains(t, summary.ProviderDecisions["serviceauth"].Reason, "governance.providers.serviceauth")
+	require.Equal(t, "governance.providers.serviceauth", summary.ProviderDecisions["serviceauth"].ConfigKey)
+	require.Contains(t, summary.ConfigSnapshot, "governance.mode")
+	require.Contains(t, summary.ConfigSnapshot, "governance.providers")
+}
+
+func TestFormatGovernanceSummaryIncludesModeEnabledAndDisabled(t *testing.T) {
+	summary := GovernanceSummary{
+		Mode:                resiliencecontract.GovernanceModeMicroservice,
+		EnabledFeatures:     []string{"logging", "metrics", "serviceauth"},
+		DisabledByOverride:  []string{"selector", "tracing"},
+		ProviderBackends: map[string]string{
+			"selector":    "noop",
+			"serviceauth": "token",
+		},
+	}
+
+	formatted := FormatGovernanceSummary(summary)
+	require.Contains(t, formatted, "mode=microservice")
+	require.Contains(t, formatted, "enabled=[logging, metrics, serviceauth]")
+	require.Contains(t, formatted, "disabled_by_override=[selector, tracing]")
+	require.Contains(t, formatted, "selector=noop")
+	require.Contains(t, formatted, "serviceauth=token")
+}
+
+func TestFormatGovernanceDiagnosticGroupsFeaturesProvidersAndSnapshot(t *testing.T) {
+	summary := GovernanceSummary{
+		Mode:            resiliencecontract.GovernanceModeMonolith,
+		ModeSource:      "implicit_default",
+		ModeReason:      "mode fell back to monolith because no config key was set",
+		ResolutionOrder: []string{"code_explicit_override", "config_explicit_override", "mode_defaults", "provider_fallback"},
+		FeatureDecisions: map[string]GovernanceFeatureDecision{
+			"logging": {Enabled: true, Source: "mode_default", Reason: "logging is enabled by the current governance mode defaults"},
+			"tracing": {Enabled: false, Source: "mode_default", Reason: "tracing is not part of the current governance mode defaults"},
+		},
+		ProviderDecisions: map[string]GovernanceProviderDecision{
+			"tracing": {
+				Backend:          "noop",
+				Source:           "provider_fallback",
+				Reason:           "provider backend fell back to noop tracing",
+				FallbackBackend:  "noop",
+			},
+		},
+		ConfigSnapshot: map[string]any{
+			"governance.mode": "monolith",
+		},
+	}
+
+	diagnostic := FormatGovernanceDiagnostic(summary)
+	require.Contains(t, diagnostic, "Governance Summary")
+	require.Contains(t, diagnostic, "Features")
+	require.Contains(t, diagnostic, "- logging: enabled")
+	require.Contains(t, diagnostic, "- tracing: disabled")
+	require.Contains(t, diagnostic, "Providers")
+	require.Contains(t, diagnostic, "- tracing: noop")
+	require.Contains(t, diagnostic, "Config Snapshot")
+	require.Contains(t, diagnostic, "- governance.mode: monolith")
+}
+
+func TestFormatGovernanceDiagnosticViewSupportsBriefProvidersAndFeatures(t *testing.T) {
+	summary := GovernanceSummary{
+		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		ModeSource:         "config_override",
+		ModeReason:         "mode selected from config key governance.mode",
+		EnabledFeatures:    []string{"logging"},
+		DisabledByOverride: []string{"tracing"},
+		FeatureDecisions: map[string]GovernanceFeatureDecision{
+			"logging": {Enabled: true, Source: "mode_default", Reason: "logging is enabled by the current governance mode defaults"},
+		},
+		ProviderBackends: map[string]string{
+			"selector": "noop",
+		},
+		ProviderDecisions: map[string]GovernanceProviderDecision{
+			"selector": {Backend: "noop", Source: "provider_fallback", Reason: "provider backend fell back to noop selector"},
+		},
+	}
+
+	brief := FormatGovernanceDiagnosticView(summary, "brief")
+	require.Contains(t, brief, "Governance Brief")
+	require.NotContains(t, brief, "Config Snapshot")
+
+	providers := FormatGovernanceDiagnosticView(summary, "providers")
+	require.Contains(t, providers, "Governance Providers")
+	require.NotContains(t, providers, "Features")
+
+	features := FormatGovernanceDiagnosticView(summary, "features")
+	require.Contains(t, features, "Governance Features")
+	require.NotContains(t, features, "Providers")
+
+	config := FormatGovernanceDiagnosticView(summary, "config")
+	require.Contains(t, config, "Governance Config Snapshot")
+
+	full := FormatGovernanceDiagnosticView(summary, "full")
+	require.Contains(t, full, "Governance Summary")
+}
+
+func TestBuildGovernanceSummaryWithModeOverrideReportsCodeAndConfigSources(t *testing.T) {
+	cfg := overlayGovernanceConfig(
+		&selectorConfigStub{values: map[string]any{
+			"governance.mode":                "monolith",
+			"governance.disable":             []string{"tracing"},
+			"governance.providers.selector":  "random",
+			"tracing.enabled":               true,
+			"service_auth.enabled":          true,
+			"message_queue.enabled":         true,
+			"distributed_lock.enabled":      true,
+			"circuit_breaker.enabled":       true,
+		}},
+		[]string{"selector"},
+		map[string]string{"serviceauth": "mtls"},
+	)
+
+	summary := BuildGovernanceSummaryWithModeOverride(cfg, resiliencecontract.GovernanceModeMicroservice, "microservice")
+	require.Equal(t, "code_override", summary.ModeSource)
+	require.Contains(t, summary.DisabledByConfig, "tracing")
+	require.Contains(t, summary.DisabledByCode, "selector")
+	require.Equal(t, "mtls", summary.ProviderBackends["serviceauth"])
+	require.Equal(t, "code_override", summary.ProviderDecisions["serviceauth"].Source)
+	require.Contains(t, summary.ProviderDecisions["serviceauth"].Reason, "startup option")
+	require.Equal(t, "noop", summary.ProviderBackends["selector"])
+	require.Equal(t, "code_override", summary.ProviderDecisions["selector"].Source)
+	require.Contains(t, summary.ProviderDecisions["selector"].Reason, "disabled by startup option")
+	require.Equal(t, "noop", summary.ProviderBackends["tracing"])
+	require.Equal(t, "config_override", summary.ProviderDecisions["tracing"].Source)
+	require.Contains(t, summary.ProviderDecisions["tracing"].Reason, "governance.disable")
+	require.Equal(t, "redis", summary.ProviderBackends["message_queue"])
+	require.Equal(t, "config_override", summary.ProviderDecisions["message_queue"].Source)
+	require.Contains(t, summary.ProviderDecisions["message_queue"].Reason, "message_queue.enabled")
+	require.Contains(t, summary.ConfigSnapshot, "startup.governance_mode_override")
+	require.Contains(t, summary.ConfigSnapshot, "startup.governance_disable")
+	require.Contains(t, summary.ConfigSnapshot, "startup.governance_providers")
+}
+
+func TestBuildGovernanceSummaryProviderDecisionFallsBackWhenRequestedBackendUnknown(t *testing.T) {
+	cfg := &selectorConfigStub{values: map[string]any{
+		"governance.providers.selector": "unknown",
+	}}
+
+	summary := BuildGovernanceSummary(cfg, resiliencecontract.GovernanceModeMicroservice)
+	require.Equal(t, "noop", summary.ProviderBackends["selector"])
+	require.Equal(t, "config_override", summary.ProviderDecisions["selector"].Source)
+	require.Contains(t, summary.ProviderDecisions["selector"].Reason, "requested backend unknown was unavailable")
+	require.Equal(t, "unknown", summary.ProviderDecisions["selector"].RequestedBackend)
+	require.Equal(t, "noop", summary.ProviderDecisions["selector"].FallbackBackend)
+}
+
+
 type recordingRouter struct {
 	mounted []string
+	gets    []string
 }
 
 func (r *recordingRouter) Use(middleware ...transportcontract.HTTPMiddleware) {}
@@ -72,7 +580,9 @@ func (r *recordingRouter) Group(prefix string, middleware ...transportcontract.H
 func (r *recordingRouter) Handle(method, path string, handler transportcontract.HTTPHandler) {}
 func (r *recordingRouter) HandleFunc(method, path string, handlerFunc transportcontract.HTTPHandler) {
 }
-func (r *recordingRouter) GET(path string, handler transportcontract.HTTPHandler)    {}
+func (r *recordingRouter) GET(path string, handler transportcontract.HTTPHandler) {
+	r.gets = append(r.gets, path)
+}
 func (r *recordingRouter) POST(path string, handler transportcontract.HTTPHandler)   {}
 func (r *recordingRouter) PUT(path string, handler transportcontract.HTTPHandler)    {}
 func (r *recordingRouter) DELETE(path string, handler transportcontract.HTTPHandler) {}

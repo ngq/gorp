@@ -77,6 +77,21 @@ type HTTPServiceOptions = application.HTTPServiceOptions
 // GovernanceMode 是运行时治理模式的顶层别名。
 type GovernanceMode = resiliencecontract.GovernanceMode
 
+const (
+	// GovernanceModeMonolith keeps the runtime on the lightweight monolith governance mainline.
+	//
+	// GovernanceModeMonolith 表示继续使用轻量、单体优先的默认治理主线。
+	GovernanceModeMonolith = resiliencecontract.GovernanceModeMonolith
+	// GovernanceModeGinFirst keeps Gin-native development ergonomics on the shared governance mainline.
+	//
+	// GovernanceModeGinFirst 表示在共享治理主线下优先保留 Gin 原生开发体验。
+	GovernanceModeGinFirst = resiliencecontract.GovernanceModeGinFirst
+	// GovernanceModeMicroservice enables the default microservice governance mainline.
+	//
+	// GovernanceModeMicroservice 表示启用默认微服务治理主线。
+	GovernanceModeMicroservice = resiliencecontract.GovernanceModeMicroservice
+)
+
 // ServiceProvider is the top-level alias of the runtime service provider contract.
 //
 // ServiceProvider 是 runtime service provider 契约的顶层别名。
@@ -218,6 +233,20 @@ func WithGovernanceMode(mode GovernanceMode) Option {
 	return application.WithGovernanceMode(mode)
 }
 
+// WithGovernanceDisabled explicitly disables one or more default governance capabilities.
+//
+// WithGovernanceDisabled 显式关闭一个或多个默认治理能力。
+func WithGovernanceDisabled(names ...string) Option {
+	return application.WithGovernanceDisabled(names...)
+}
+
+// WithGovernanceProvider explicitly overrides one governance provider backend.
+//
+// WithGovernanceProvider 显式覆盖一个治理 provider backend。
+func WithGovernanceProvider(name, backend string) Option {
+	return application.WithGovernanceProvider(name, backend)
+}
+
 // WithMicroserviceMode selects the default microservice governance mainline.
 //
 // WithMicroserviceMode 选择默认微服务治理主线。
@@ -230,4 +259,11 @@ func WithMicroserviceMode() Option {
 // WithMonolithMode 选择默认单体治理主线。
 func WithMonolithMode() Option {
 	return application.WithMonolithMode()
+}
+
+// WithGinFirstMode selects the Gin-first governance mainline.
+//
+// WithGinFirstMode 选择 Gin-first 治理主线。
+func WithGinFirstMode() Option {
+	return application.WithGinFirstMode()
 }

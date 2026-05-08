@@ -47,6 +47,10 @@ func RegisterSelectedMicroserviceProviders(c runtimecontract.Container) error {
 //
 // RegisterSelectedMicroserviceProvidersWithMode 在显式 mode 覆盖下解析并注册微服务 provider。
 func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, modeOverride string) error {
+	return registerSelectedMicroserviceProvidersWithOptions(c, modeOverride, nil, nil)
+}
+
+func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Container, modeOverride string, disabled []string, providerOverrides map[string]string) error {
 	if c == nil || !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}
@@ -55,6 +59,7 @@ func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, 
 		return err
 	}
 	cfg, _ := cfgAny.(datacontract.Config)
+	cfg = overlayGovernanceConfig(cfg, disabled, providerOverrides)
 
 	configSourceProvider := SelectConfigSourceProvider(cfg)
 	if configSourceProvider != nil {
@@ -69,7 +74,7 @@ func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, 
 				if err := cfgSvc.Reload(context.Background()); err != nil {
 					return err
 				}
-				cfg = cfgSvc
+				cfg = overlayGovernanceConfig(cfgSvc, disabled, providerOverrides)
 			}
 		}
 	}
@@ -79,7 +84,7 @@ func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, 
 		mode = NormalizeGovernanceMode(resiliencecontract.GovernanceMode(modeOverride))
 	}
 
-	providers := []runtimecontract.ServiceProvider{
+	selectedProviders := []runtimecontract.ServiceProvider{
 		SelectDiscoveryProviderWithMode(cfg, mode),
 		SelectSelectorProviderWithMode(cfg, mode),
 		SelectRPCProviderWithMode(cfg, mode),
@@ -91,7 +96,7 @@ func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, 
 		SelectMessageQueueProvider(cfg),
 		SelectDistributedLockProvider(cfg),
 	}
-	for _, p := range providers {
+	for _, p := range selectedProviders {
 		if p == nil {
 			continue
 		}
@@ -106,7 +111,13 @@ func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, 
 //
 // SelectConfigSourceProvider 根据配置选择配置源 provider。
 func SelectConfigSourceProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
-	typ := getConfigString(cfg, "configsource.backend", "configsource.type", "config_source.backend", "config_source.type")
+	typ := governanceProviderOverride(cfg, "configsource")
+	if typ == "" {
+		typ = getConfigString(cfg, "configsource.backend", "configsource.type", "config_source.backend", "config_source.type")
+	}
+	if typ == "" {
+		typ = DefaultGovernanceProviderDefaults(DetectGovernanceMode(cfg)).ConfigSource
+	}
 	return providerFromMap(configSourceProviderFactories, typ, "local")
 }
 
@@ -120,8 +131,17 @@ func SelectDiscoveryProvider(cfg datacontract.Config) runtimecontract.ServicePro
 // SelectDiscoveryProviderWithMode selects the discovery provider with an explicit governance mode.
 //
 // SelectDiscoveryProviderWithMode 在显式治理模式下选择服务发现 provider。
-func SelectDiscoveryProviderWithMode(cfg datacontract.Config, _ resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
-	typ := getConfigString(cfg, "discovery.backend", "discovery.type")
+func SelectDiscoveryProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
+	if isGovernanceCapabilityDisabled(cfg, "discovery") {
+		return providerFromMap(discoveryProviderFactories, "noop", "noop")
+	}
+	typ := governanceProviderOverride(cfg, "discovery")
+	if typ == "" {
+		typ = getConfigString(cfg, "discovery.backend", "discovery.type")
+	}
+	if typ == "" {
+		typ = DefaultGovernanceProviderDefaults(mode).Discovery
+	}
 	return providerFromMap(discoveryProviderFactories, typ, "noop")
 }
 
@@ -136,9 +156,15 @@ func SelectSelectorProvider(cfg datacontract.Config) runtimecontract.ServiceProv
 //
 // SelectSelectorProviderWithMode 在显式治理模式下选择 selector provider。
 func SelectSelectorProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
-	algorithm := getConfigString(cfg, "selector.backend", "selector.algorithm", "selector.type")
-	if algorithm == "" && IsMicroserviceMode(mode) {
-		algorithm = "p2c_ewma"
+	if isGovernanceCapabilityDisabled(cfg, "selector") {
+		return providerFromMap(selectorProviderFactories, "noop", "noop")
+	}
+	algorithm := governanceProviderOverride(cfg, "selector")
+	if algorithm == "" {
+		algorithm = getConfigString(cfg, "selector.backend", "selector.algorithm", "selector.type")
+	}
+	if algorithm == "" {
+		algorithm = DefaultGovernanceProviderDefaults(mode).Selector
 	}
 	return providerFromMap(selectorProviderFactories, algorithm, "noop")
 }
@@ -153,8 +179,14 @@ func SelectRPCProvider(cfg datacontract.Config) runtimecontract.ServiceProvider 
 // SelectRPCProviderWithMode selects the RPC provider with an explicit governance mode.
 //
 // SelectRPCProviderWithMode 在显式治理模式下选择 RPC provider。
-func SelectRPCProviderWithMode(cfg datacontract.Config, _ resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
-	rpcMode := getConfigString(cfg, "rpc.mode")
+func SelectRPCProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
+	rpcMode := governanceProviderOverride(cfg, "rpc")
+	if rpcMode == "" {
+		rpcMode = getConfigString(cfg, "rpc.mode")
+	}
+	if rpcMode == "" {
+		rpcMode = DefaultGovernanceProviderDefaults(mode).RPC
+	}
 	return providerFromMap(rpcProviderFactories, rpcMode, "noop")
 }
 
@@ -169,10 +201,19 @@ func SelectTracingProvider(cfg datacontract.Config) runtimecontract.ServiceProvi
 //
 // SelectTracingProviderWithMode 在显式治理模式下选择 tracing provider。
 func SelectTracingProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
+	if isGovernanceCapabilityDisabled(cfg, "tracing") {
+		return providerFromMap(tracingProviderFactories, "noop", "noop")
+	}
 	enabled := cfg != nil && cfg.GetBool("tracing.enabled")
-	backend := getConfigString(cfg, "tracing.backend", "tracing.type")
-	if backend == "" && (enabled || IsMicroserviceMode(mode)) {
+	backend := governanceProviderOverride(cfg, "tracing")
+	if backend == "" {
+		backend = getConfigString(cfg, "tracing.backend", "tracing.type")
+	}
+	if backend == "" && enabled {
 		backend = "otel"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(mode).Tracing
 	}
 	return providerFromMap(tracingProviderFactories, backend, "noop")
 }
@@ -188,10 +229,19 @@ func SelectMetadataProvider(cfg datacontract.Config) runtimecontract.ServiceProv
 //
 // SelectMetadataProviderWithMode 在显式治理模式下选择 metadata provider。
 func SelectMetadataProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
-	backend := getConfigString(cfg, "metadata.mode", "metadata.backend")
+	if isGovernanceCapabilityDisabled(cfg, "metadata") {
+		return providerFromMap(metadataProviderFactories, "noop", "noop")
+	}
+	backend := governanceProviderOverride(cfg, "metadata")
+	if backend == "" {
+		backend = getConfigString(cfg, "metadata.mode", "metadata.backend")
+	}
 	enabled := cfg != nil && (cfg.Get("metadata.propagate_prefix") != nil || cfg.GetBool("metadata.enabled"))
-	if backend == "" && (enabled || IsMicroserviceMode(mode)) {
+	if backend == "" && enabled {
 		backend = "default"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(mode).Metadata
 	}
 	return providerFromMap(metadataProviderFactories, backend, "noop")
 }
@@ -207,10 +257,19 @@ func SelectServiceAuthProvider(cfg datacontract.Config) runtimecontract.ServiceP
 //
 // SelectServiceAuthProviderWithMode 在显式治理模式下选择服务间认证 provider。
 func SelectServiceAuthProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
-	backend := getConfigString(cfg, "service_auth.backend", "service_auth.mode")
+	if isGovernanceCapabilityDisabled(cfg, "serviceauth") {
+		return providerFromMap(serviceAuthProviderFactories, "noop", "noop")
+	}
+	backend := governanceProviderOverride(cfg, "serviceauth")
+	if backend == "" {
+		backend = getConfigString(cfg, "service_auth.backend", "service_auth.mode")
+	}
 	enabled := cfg != nil && cfg.GetBool("service_auth.enabled")
-	if backend == "" && (enabled || IsMicroserviceMode(mode)) {
+	if backend == "" && enabled {
 		backend = "token"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(mode).ServiceAuth
 	}
 	return providerFromMap(serviceAuthProviderFactories, backend, "noop")
 }
@@ -226,10 +285,19 @@ func SelectCircuitBreakerProvider(cfg datacontract.Config) runtimecontract.Servi
 //
 // SelectCircuitBreakerProviderWithMode 在显式治理模式下选择熔断 provider。
 func SelectCircuitBreakerProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
-	backend := getConfigString(cfg, "circuit_breaker.backend", "circuit_breaker.type")
+	if isGovernanceCapabilityDisabled(cfg, "circuitbreaker") {
+		return providerFromMap(circuitBreakerProviderFactories, "noop", "noop")
+	}
+	backend := governanceProviderOverride(cfg, "circuitbreaker")
+	if backend == "" {
+		backend = getConfigString(cfg, "circuit_breaker.backend", "circuit_breaker.type")
+	}
 	enabled := cfg != nil && cfg.GetBool("circuit_breaker.enabled")
-	if backend == "" && (enabled || IsMicroserviceMode(mode)) {
+	if backend == "" && enabled {
 		backend = "sentinel"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(mode).CircuitBreaker
 	}
 	return providerFromMap(circuitBreakerProviderFactories, backend, "noop")
 }
@@ -238,10 +306,16 @@ func SelectCircuitBreakerProviderWithMode(cfg datacontract.Config, mode resilien
 //
 // SelectDTMProvider 根据配置与开关状态选择 DTM provider。
 func SelectDTMProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
-	backend := getConfigString(cfg, "dtm.backend", "dtm.type", "dtm.driver")
+	backend := governanceProviderOverride(cfg, "dtm")
+	if backend == "" {
+		backend = getConfigString(cfg, "dtm.backend", "dtm.type", "dtm.driver")
+	}
 	enabled := cfg != nil && cfg.GetBool("dtm.enabled")
 	if backend == "" && enabled {
 		backend = "dtmsdk"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(DetectGovernanceMode(cfg)).DTM
 	}
 	return providerFromMap(dtmProviderFactories, backend, "noop")
 }
@@ -250,10 +324,16 @@ func SelectDTMProvider(cfg datacontract.Config) runtimecontract.ServiceProvider 
 //
 // SelectMessageQueueProvider 根据配置与开关状态选择消息队列 provider。
 func SelectMessageQueueProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
-	backend := getConfigString(cfg, "message_queue.backend", "message_queue.type")
+	backend := governanceProviderOverride(cfg, "message_queue")
+	if backend == "" {
+		backend = getConfigString(cfg, "message_queue.backend", "message_queue.type")
+	}
 	enabled := cfg != nil && cfg.GetBool("message_queue.enabled")
 	if backend == "" && enabled {
 		backend = "redis"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(DetectGovernanceMode(cfg)).MessageQueue
 	}
 	return providerFromMap(messageQueueProviderFactories, backend, "noop")
 }
@@ -262,10 +342,16 @@ func SelectMessageQueueProvider(cfg datacontract.Config) runtimecontract.Service
 //
 // SelectDistributedLockProvider 根据配置与开关状态选择分布式锁 provider。
 func SelectDistributedLockProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
-	backend := getConfigString(cfg, "distributed_lock.backend", "distributed_lock.type")
+	backend := governanceProviderOverride(cfg, "distributed_lock")
+	if backend == "" {
+		backend = getConfigString(cfg, "distributed_lock.backend", "distributed_lock.type")
+	}
 	enabled := cfg != nil && cfg.GetBool("distributed_lock.enabled")
 	if backend == "" && enabled {
 		backend = "redis"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(DetectGovernanceMode(cfg)).DistributedLock
 	}
 	return providerFromMap(distributedLockProviderFactories, backend, "noop")
 }

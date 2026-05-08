@@ -41,6 +41,21 @@ metadata:
   propagate_prefix:
     - x-md-
 
+# 治理覆盖配置
+# - mode 由 cmd/app/main.go 中的 gorp.WithMicroserviceMode() 决定，通常不需要在这里重复声明
+# - disable 用于显式关闭某个默认治理件
+# - providers 用于显式替换默认 provider backend
+governance:
+  disable: []
+  providers: {}
+  # 示例：
+  # disable:
+  #   - tracing
+  #   - selector
+  # providers:
+  #   serviceauth: mtls
+  #   tracing: noop
+
 # service_auth 配置（关闭；需要服务间调用时再启用 token 模式）
 service_auth:
   enabled: false

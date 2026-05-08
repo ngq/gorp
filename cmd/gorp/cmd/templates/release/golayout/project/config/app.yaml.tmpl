@@ -18,22 +18,23 @@ server:
   http:
     addr: :8080
 
-configsource:
-  type: local
-
-discovery:
-  type: noop
-  service:
-    name: {{.Name}}
-    addr: 127.0.0.1
-    port: 8080
-
-selector:
-  algorithm: noop
-
-rpc:
-  mode: noop
-  timeout_ms: 30000
+# 如需切换外部配置源、服务发现、selector 或 RPC 传输，再按需显式开启
+# configsource:
+#   type: local
+#
+# discovery:
+#   type: consul
+#   service:
+#     name: {{.Name}}
+#     addr: 127.0.0.1
+#     port: 8080
+#
+# selector:
+#   algorithm: p2c_ewma
+#
+# rpc:
+#   mode: grpc
+#   timeout_ms: 30000
 
 # 数据库配置（默认使用本地 sqlite，保证模板开箱即跑）
 database:
@@ -54,6 +55,18 @@ metadata:
   propagate_prefix:
     - x-md-
   constant_metadata: {}
+
+# 治理覆盖配置
+# - mode 默认由 cmd/app/main.go 中的 gorp.WithMicroserviceMode() 决定
+# - 只在需要关闭默认治理件或替换 provider 时再写这里
+governance:
+  disable: []
+  providers: {}
+  # 示例：
+  # disable:
+  #   - tracing
+  # providers:
+  #   serviceauth: mtls
 
 serviceauth:
   mode: noop

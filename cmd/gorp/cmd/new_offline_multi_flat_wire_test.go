@@ -92,6 +92,7 @@ func TestRenderMultiFlatWireTemplateIncludesTests(t *testing.T) {
 	require.Contains(t, readmeText, "`internal/server/http`")
 	require.Contains(t, readmeText, "`internal/server/grpc`")
 	require.Contains(t, readmeText, "gorp.Run(...)")
+	require.Contains(t, readmeText, "WithMicroserviceMode")
 	require.Contains(t, readmeText, "GRPCServerRegistrar + pb.RegisterXxxServer(...)")
 	require.Contains(t, readmeText, "GRPCConnFactory + pb.NewXxxClient(conn)")
 	require.NotContains(t, readmeText, "services/*/start.go")

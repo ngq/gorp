@@ -54,6 +54,8 @@ type HTTPServiceOptions struct {
 	DisableGorm    bool
 	DisableMetrics bool
 	GovernanceMode resiliencecontract.GovernanceMode
+	GovernanceDisable []string
+	GovernanceProviders map[string]string
 }
 
 type runConfig struct {

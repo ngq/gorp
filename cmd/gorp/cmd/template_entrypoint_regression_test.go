@@ -33,6 +33,7 @@ func TestGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMicroserviceMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
@@ -177,6 +178,7 @@ func TestMultiFlatWireTemplateUsesApplicationEntrypointAndKeepsWireInCmdLayer(t 
 	text := string(content)
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMicroserviceMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
@@ -217,6 +219,7 @@ func TestReleaseGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMicroserviceMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
@@ -278,10 +281,23 @@ func TestReleaseProjectTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
+	require.Contains(t, text, "gorp.WithMicroserviceMode()")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.NotContains(t, text, "frameworkbootstrap.BootHTTPService(")
 	require.NotContains(t, text, "frameworkbootstrap.")
 	require.Contains(t, text, `apphttp "example.com/release-project-entry/app/http"`)
+
+	readme, err := os.ReadFile(filepath.Join(projectDir, "README.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "WithMicroserviceMode")
+	require.Contains(t, string(readme), "governance.disable")
+	require.Contains(t, string(readme), "governance.providers")
+
+	configFile, err := os.ReadFile(filepath.Join(projectDir, "config", "app.yaml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configFile), "governance:")
+	require.Contains(t, string(configFile), "disable: []")
+	require.Contains(t, string(configFile), "providers: {}")
 }
 
 func TestGoLayoutDockerfileRunsProjectBinaryDirectly(t *testing.T) {
@@ -329,9 +345,19 @@ func TestGoLayoutDocsAndDeployAssetsFollowApplicationAndProjectScopedNaming(t *t
 	require.NoError(t, err)
 	readmeText := string(readme)
 	require.Contains(t, readmeText, "gorp.Run")
+	require.Contains(t, readmeText, "WithMicroserviceMode")
+	require.Contains(t, readmeText, "governance.disable")
+	require.Contains(t, readmeText, "governance.providers")
 	require.Contains(t, readmeText, "docs/deploy.md")
 	require.Contains(t, readmeText, "demo-app")
 	require.NotContains(t, readmeText, "framework/bootstrap")
+
+	configFile, err := os.ReadFile(filepath.Join(projectDir, "config", "app.yaml"))
+	require.NoError(t, err)
+	configText := string(configFile)
+	require.Contains(t, configText, "governance:")
+	require.Contains(t, configText, "disable: []")
+	require.Contains(t, configText, "providers: {}")
 
 	deployDoc, err := os.ReadFile(filepath.Join(projectDir, "docs", "deploy.md"))
 	require.NoError(t, err)
@@ -377,9 +403,19 @@ func TestReleaseGoLayoutDocsAndDeployAssetsFollowApplicationAndProjectScopedNami
 	require.NoError(t, err)
 	readmeText := string(readme)
 	require.Contains(t, readmeText, "gorp.Run")
+	require.Contains(t, readmeText, "WithMicroserviceMode")
+	require.Contains(t, readmeText, "governance.disable")
+	require.Contains(t, readmeText, "governance.providers")
 	require.Contains(t, readmeText, "docs/deploy.md")
 	require.Contains(t, readmeText, "demo-app")
 	require.NotContains(t, readmeText, "framework/bootstrap")
+
+	configFile, err := os.ReadFile(filepath.Join(projectDir, "config", "app.yaml"))
+	require.NoError(t, err)
+	configText := string(configFile)
+	require.Contains(t, configText, "governance:")
+	require.Contains(t, configText, "disable: []")
+	require.Contains(t, configText, "providers: {}")
 
 	deployDoc, err := os.ReadFile(filepath.Join(projectDir, "docs", "deploy.md"))
 	require.NoError(t, err)

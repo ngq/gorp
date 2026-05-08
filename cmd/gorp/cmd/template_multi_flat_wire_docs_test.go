@@ -51,6 +51,7 @@ func TestMultiFlatWireDocsLinkToDeployAssets(t *testing.T) {
 	require.Contains(t, readmeText, "`internal/server/http`")
 	require.Contains(t, readmeText, "`internal/server/grpc`")
 	require.Contains(t, readmeText, "gorp.Run(...)")
+	require.Contains(t, readmeText, "WithMicroserviceMode")
 	require.Contains(t, readmeText, "mfwdocs-user-service")
 	require.Contains(t, readmeText, "mfwdocs-order-service")
 	require.Contains(t, readmeText, "mfwdocs-product-service")

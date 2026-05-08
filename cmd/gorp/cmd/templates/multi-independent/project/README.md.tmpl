@@ -55,7 +55,7 @@ Makefile
 
 - 每个服务统一从 `services/<service>/cmd/main.go` 启动
 - Wire 只保留在 `cmd/` 层收口依赖
-- 默认优先通过 `gorp.Run(...)` + application runtime 启动
+- 默认优先通过 `gorp.Run(...) + gorp.WithMicroserviceMode()` 启动微服务治理主线
 - HTTP 接线放 `internal/server/http/`
 - gRPC 扩展位放 `internal/server/grpc/`
 - `shared/` 只放稳定共享 helper，不再承担服务默认装配

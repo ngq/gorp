@@ -13,7 +13,14 @@ import (
 
 func TestHTTPOptionMapsToBootstrapOptions(t *testing.T) {
 	cfg := runConfig{}
-	HTTP(HTTPServiceOptions{DisableRedis: true, DisableGorm: true, DisableMetrics: true, GovernanceMode: resiliencecontract.GovernanceModeMicroservice}).apply(&cfg)
+	HTTP(HTTPServiceOptions{
+		DisableRedis:       true,
+		DisableGorm:        true,
+		DisableMetrics:     true,
+		GovernanceMode:     resiliencecontract.GovernanceModeMicroservice,
+		GovernanceDisable:  []string{"tracing"},
+		GovernanceProviders: map[string]string{"serviceauth": "mtls"},
+	}).apply(&cfg)
 	if !cfg.httpEnabled {
 		t.Fatalf("expected http enabled")
 	}
@@ -22,6 +29,12 @@ func TestHTTPOptionMapsToBootstrapOptions(t *testing.T) {
 	}
 	if cfg.httpOpts.GovernanceMode != "microservice" {
 		t.Fatalf("expected governance mode propagated, got %q", cfg.httpOpts.GovernanceMode)
+	}
+	if len(cfg.httpOpts.GovernanceDisable) != 1 || cfg.httpOpts.GovernanceDisable[0] != "tracing" {
+		t.Fatalf("expected governance disable propagated, got %#v", cfg.httpOpts.GovernanceDisable)
+	}
+	if cfg.httpOpts.GovernanceProviders["serviceauth"] != "mtls" {
+		t.Fatalf("expected governance provider override propagated, got %#v", cfg.httpOpts.GovernanceProviders)
 	}
 }
 
@@ -250,6 +263,11 @@ func TestWithGovernanceModeOverridesStartupMode(t *testing.T) {
 	if cfg.httpOpts.GovernanceMode != "monolith" {
 		t.Fatalf("expected governance mode monolith after override, got %q", cfg.httpOpts.GovernanceMode)
 	}
+
+	WithGinFirstMode().apply(&cfg)
+	if cfg.httpOpts.GovernanceMode != "gin-first" {
+		t.Fatalf("expected governance mode gin-first after override, got %q", cfg.httpOpts.GovernanceMode)
+	}
 }
 
 func TestHTTPOptionGovernanceModeLastWinsAcrossMultipleHTTPDeclarations(t *testing.T) {
@@ -277,5 +295,23 @@ func TestExplicitGovernanceModeOptionOverridesHTTPGovernanceMode(t *testing.T) {
 	}
 	if cfg.httpOpts.GovernanceMode != "microservice" {
 		t.Fatalf("expected explicit governance mode option to win, got %q", cfg.httpOpts.GovernanceMode)
+	}
+}
+
+func TestGovernanceOverrideHelpersMutateHTTPOptions(t *testing.T) {
+	cfg, err := resolveRunConfig(
+		"demo",
+		HTTP(),
+		WithGovernanceDisabled("tracing", "selector"),
+		WithGovernanceProvider("serviceauth", "mtls"),
+	)
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if len(cfg.httpOpts.GovernanceDisable) != 2 {
+		t.Fatalf("expected governance disables captured, got %#v", cfg.httpOpts.GovernanceDisable)
+	}
+	if cfg.httpOpts.GovernanceProviders["serviceauth"] != "mtls" {
+		t.Fatalf("expected governance provider override captured, got %#v", cfg.httpOpts.GovernanceProviders)
 	}
 }

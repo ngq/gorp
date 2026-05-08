@@ -19,6 +19,10 @@ const (
 	//
 	// GovernanceModeMonolith 表示继续走轻量、本地优先的单体主线。
 	GovernanceModeMonolith GovernanceMode = "monolith"
+	// GovernanceModeGinFirst keeps Gin-native development ergonomics while staying on the shared governance mainline.
+	//
+	// GovernanceModeGinFirst 表示在共享治理主线下优先保留 Gin 原生开发体验。
+	GovernanceModeGinFirst GovernanceMode = "gin-first"
 	// GovernanceModeMicroservice enables the default microservice governance mainline.
 	//
 	// GovernanceModeMicroservice 表示启用默认微服务治理主线。

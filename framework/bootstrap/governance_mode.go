@@ -31,6 +31,8 @@ func DetectGovernanceMode(cfg datacontract.Config) resiliencecontract.Governance
 		switch cfg.GetString(key) {
 		case string(resiliencecontract.GovernanceModeMicroservice):
 			return resiliencecontract.GovernanceModeMicroservice
+		case string(resiliencecontract.GovernanceModeGinFirst):
+			return resiliencecontract.GovernanceModeGinFirst
 		case string(resiliencecontract.GovernanceModeMonolith):
 			return resiliencecontract.GovernanceModeMonolith
 		}
@@ -46,6 +48,8 @@ func NormalizeGovernanceMode(mode resiliencecontract.GovernanceMode) resiliencec
 	switch mode {
 	case resiliencecontract.GovernanceModeMicroservice:
 		return resiliencecontract.GovernanceModeMicroservice
+	case resiliencecontract.GovernanceModeGinFirst:
+		return resiliencecontract.GovernanceModeGinFirst
 	default:
 		return resiliencecontract.GovernanceModeMonolith
 	}
@@ -56,4 +60,11 @@ func NormalizeGovernanceMode(mode resiliencecontract.GovernanceMode) resiliencec
 // IsMicroserviceMode 返回当前模式是否代表微服务主线。
 func IsMicroserviceMode(mode resiliencecontract.GovernanceMode) bool {
 	return NormalizeGovernanceMode(mode) == resiliencecontract.GovernanceModeMicroservice
+}
+
+// IsGinFirstMode reports whether the given mode keeps Gin-native development ergonomics.
+//
+// IsGinFirstMode 返回当前模式是否表示保留 Gin 原生开发体验。
+func IsGinFirstMode(mode resiliencecontract.GovernanceMode) bool {
+	return NormalizeGovernanceMode(mode) == resiliencecontract.GovernanceModeGinFirst
 }

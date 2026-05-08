@@ -3,7 +3,7 @@
 默认单服务 Gin Web API starter。
 
 说明：
-- 这里描述的是项目模板主链与单服务入口。
+- 这里描述的是项目模板主线与单服务入口。
 - 这不代表相关 `contrib` 后端已经进入“已完成”状态。
 
 ## 启动
@@ -28,13 +28,18 @@ deploy/                  # Docker / Kubernetes 交付资产
 
 ## 默认主线
 
-- `cmd/app/main.go` 使用 `gorp.Run` 启动默认 HTTP 主线
+- `cmd/app/main.go` 使用 `gorp.Run + gorp.WithMicroserviceMode()` 启动默认治理主线
+- 模板默认走微服务治理模式；如果后续明确要回到轻量单体模式，再切到 `gorp.WithMonolithMode()`
+- 默认治理采用“隐式提供 + 显式覆盖”：
+  - 模板不展开整份默认治理配置
+  - 只在 `config/app.yaml` 里写 `governance.disable` / `governance.providers.*` 覆盖项
+  - 启动时可通过治理摘要看到最终生效结果
 - `app/http/routes.go` 只注册业务路由
 - `/healthz` 与 `/metrics` 由 application 默认主线注册
 - Demo CRUD 只是最小业务样板，可以直接替换
 - 部署资产与镜像命名说明见 `docs/deploy.md`
-- Kubernetes / 镜像默认使用项目级名称：`{{.KubernetesName}}`
-- 样板可直接替换，不代表 Kubernetes / configsource / registry contrib 已完成
+- Kubernetes / 镜像默认使用项目级命名：`{{.KubernetesName}}`
+- 模板可以直接替换，不代表 Kubernetes / configsource / registry contrib 已完成
 
 ## 开发顺序
 

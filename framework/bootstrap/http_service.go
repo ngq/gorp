@@ -25,6 +25,7 @@ import (
 	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -37,6 +38,12 @@ import (
 	gormpkg "gorm.io/gorm"
 )
 
+var (
+	buildHTTPProvidersFunc                        = buildHTTPProviders
+	registerSelectedMicroserviceProvidersWithMode = RegisterSelectedMicroserviceProvidersWithMode
+	registerSelectedMicroserviceProvidersWithOptionsFunc = registerSelectedMicroserviceProvidersWithOptions
+)
+
 // HTTPServiceOptions describes the bootstrap options for the default HTTP mainline.
 //
 // HTTPServiceOptions 描述默认 HTTP 主线的 bootstrap 选项。
@@ -47,6 +54,8 @@ type HTTPServiceOptions struct {
 	DisableMetrics bool
 	EnablePprof    bool
 	GovernanceMode string
+	GovernanceDisable  []string
+	GovernanceProviders map[string]string
 }
 
 // HTTPServiceRuntime carries the assembled HTTP runtime state used during startup callbacks.
@@ -62,6 +71,8 @@ type HTTPServiceRuntime struct {
 	JWT         securitycontract.JWTService
 	Config      datacontract.Config
 	ServiceName string
+	GovernanceMode    resiliencecontract.GovernanceMode
+	GovernanceSummary GovernanceSummary
 }
 
 // NewHTTPServiceRuntime builds the default HTTP runtime without starting the server.
@@ -71,11 +82,11 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	app := framework.NewApplication()
 	c := app.Container()
 
-	providers := buildHTTPProviders(opts)
+	providers := buildHTTPProvidersFunc(opts)
 	if err := c.RegisterProviders(providers...); err != nil {
 		return nil, fmt.Errorf("register providers: %w", err)
 	}
-	if err := RegisterSelectedMicroserviceProvidersWithMode(c, opts.GovernanceMode); err != nil {
+	if err := registerSelectedMicroserviceProvidersWithOptionsFunc(c, opts.GovernanceMode, opts.GovernanceDisable, opts.GovernanceProviders); err != nil {
 		return nil, fmt.Errorf("register selected microservice providers: %w", err)
 	}
 
@@ -89,6 +100,15 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		ServiceName: serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
+	effectiveConfig := overlayGovernanceConfig(rt.Config, opts.GovernanceDisable, opts.GovernanceProviders)
+	governanceMode := DetectGovernanceMode(effectiveConfig)
+	if opts.GovernanceMode != "" {
+		governanceMode = NormalizeGovernanceMode(resiliencecontract.GovernanceMode(opts.GovernanceMode))
+	}
+	governanceSummary := BuildGovernanceSummaryWithModeOverride(effectiveConfig, governanceMode, opts.GovernanceMode)
+	rt.GovernanceMode = governanceMode
+	rt.GovernanceSummary = governanceSummary
+	rt.Logger.Info(FormatGovernanceSummary(governanceSummary))
 
 	if !opts.DisableGorm {
 		rt.DB = container.MustMakeGorm(c)
@@ -146,6 +166,7 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 	}
 
 	RegisterHealthCheck(rt.Router, serviceName)
+	RegisterGovernanceInspectEndpoints(rt.Router, rt.GovernanceSummary)
 	if !opts.DisableMetrics {
 		RegisterMetricsEndpoint(rt.Router)
 		rt.Router.Use(httpmiddleware.MetricsMiddleware())
