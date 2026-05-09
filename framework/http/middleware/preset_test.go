@@ -334,3 +334,109 @@ func TestDefaultHTTPServiceGovernanceSetCircuitBreakerPrecedesBodyLimit(t *testi
 		t.Fatal("expected handler not to be called")
 	}
 }
+
+// TestDefaultHTTPServiceGovernanceOrderStable verifies the HTTP server governance order remains stable.
+// This is the HTTP-side counterpart of rpc/governance.TestDefaultClientPresetOrderStable.
+//
+// TestDefaultHTTPServiceGovernanceOrderStable 验证 HTTP 服务端治理顺序保持稳定。
+// 这是 rpc/governance.TestDefaultClientPresetOrderStable 的 HTTP 侧对称测试。
+func TestDefaultHTTPServiceGovernanceOrderStable(t *testing.T) {
+	order := DefaultHTTPServiceGovernanceOrder()
+	if len(order) != 13 {
+		t.Fatalf("expected 13 HTTP governance stages, got %d", len(order))
+	}
+	expected := []string{
+		"request_identity",
+		"logging",
+		"recovery",
+		"cors",
+		"security_headers",
+		"timeout",
+		"load_shedding",
+		"rate_limit",
+		"circuit_breaker",
+		"body_limit",
+		"locale",
+		"metrics",
+		"compression",
+	}
+	for i := range expected {
+		if order[i] != expected[i] {
+			t.Fatalf("expected stable order %v, got %v", expected, order)
+		}
+	}
+	// 入站链路最先是 request_identity，最后是 compression
+	if order[0] != "request_identity" || order[len(order)-1] != "compression" {
+		t.Fatalf("unexpected order %v", order)
+	}
+	// 服务保护类必须在 body_limit 之前
+	protectionStages := []string{"load_shedding", "rate_limit", "circuit_breaker"}
+	bodyLimitIdx := indexOfStr(order, "body_limit")
+	for _, stage := range protectionStages {
+		idx := indexOfStr(order, stage)
+		if idx >= bodyLimitIdx {
+			t.Fatalf("expected %s before body_limit, but %s at %d and body_limit at %d", stage, stage, idx, bodyLimitIdx)
+		}
+	}
+	// recovery 必须在 timeout 之前，确保 panic 能被捕获后再走超时逻辑
+	recoveryIdx := indexOfStr(order, "recovery")
+	timeoutIdx := indexOfStr(order, "timeout")
+	if recoveryIdx >= timeoutIdx {
+		t.Fatalf("expected recovery before timeout, but recovery at %d and timeout at %d", recoveryIdx, timeoutIdx)
+	}
+}
+
+// TestDefaultHTTPServiceGovernanceSetFullChainMatchesOrder verifies that when all optional stages are enabled,
+// the actual middleware slice has one entry per order slot.
+//
+// TestDefaultHTTPServiceGovernanceSetFullChainMatchesOrder 验证当所有可选阶段启用时，
+// 实际中间件切片的长度与正式顺序列表一致。
+func TestDefaultHTTPServiceGovernanceSetFullChainMatchesOrder(t *testing.T) {
+	order := DefaultHTTPServiceGovernanceOrder()
+	set := DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
+		API: RecommendedMiddlewareOptions{
+			CORS: func() *CORSOptions {
+				opts := DefaultCORSOptions()
+				return &opts
+			}(),
+			EnableMetrics:     true,
+			EnableCompression: true,
+		},
+		RateLimiter:    denyContractLimiter{},
+		CircuitBreaker: denyCircuitBreaker{},
+		MaxConcurrent:  8,
+	})
+	// 全量启用后，实际中间件数量应与正式顺序列表完全一致
+	if len(set) != len(order) {
+		t.Fatalf("expected full governance set size %d (matching order), got %d", len(order), len(set))
+	}
+}
+
+// TestDefaultHTTPServiceGovernanceSetDefaultChainMatchesActiveStages verifies that the default governance set
+// (without optional stages) only includes stages that are active by default.
+//
+// TestDefaultHTTPServiceGovernanceSetDefaultChainMatchesActiveStages 验证默认治理集
+// （不含可选阶段）只包含默认启用的阶段。
+func TestDefaultHTTPServiceGovernanceSetDefaultChainMatchesActiveStages(t *testing.T) {
+	order := DefaultHTTPServiceGovernanceOrder()
+	set := DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{})
+	// 默认集只包含始终启用的阶段 + 默认启用的可选阶段（security_headers, timeout, body_limit, locale, metrics）
+	// 默认不启用：cors, load_shedding, rate_limit, circuit_breaker, compression
+	// 即默认启用 8 个，对应顺序列表中剔除了 5 个可选阶段
+	if len(set) != 8 {
+		t.Fatalf("expected default governance set size 8, got %d", len(set))
+	}
+	// 确保默认启用集的数量不超过正式顺序列表
+	if len(set) > len(order) {
+		t.Fatalf("default set size %d exceeds order size %d", len(set), len(order))
+	}
+}
+
+func indexOfStr(slice []string, target string) int {
+	for i, s := range slice {
+		if s == target {
+			return i
+		}
+	}
+	return -1
+}

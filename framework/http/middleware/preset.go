@@ -319,6 +319,35 @@ func UseAdminAPIMiddleware(router transportcontract.HTTPRouter, base observabili
 	router.Use(AdminAPIMiddlewareSet(base, opts)...)
 }
 
+// DefaultHTTPServiceGovernanceOrder returns the stable logical order of the HTTP server governance middleware chain.
+//
+// The order here defines the formal execution contract: middleware registered earlier wraps all later middleware,
+// so it runs first on the inbound path and last on the outbound path.
+// Any change to this list is a breaking change to the governance chain contract.
+//
+// DefaultHTTPServiceGovernanceOrder 返回 HTTP 服务端治理中间件链的稳定逻辑顺序。
+//
+// 此顺序定义了正式的执行契约：先注册的中间件包裹后注册的所有中间件，
+// 因此在入站路径上最先执行、在出站路径上最后执行。
+// 对本列表的任何变更都是治理链契约的破坏性变更。
+func DefaultHTTPServiceGovernanceOrder() []string {
+	return []string{
+		"request_identity",
+		"logging",
+		"recovery",
+		"cors",
+		"security_headers",
+		"timeout",
+		"load_shedding",
+		"rate_limit",
+		"circuit_breaker",
+		"body_limit",
+		"locale",
+		"metrics",
+		"compression",
+	}
+}
+
 // DefaultHTTPServiceGovernancePreset returns the default HTTP service governance middleware preset.
 //
 // DefaultHTTPServiceGovernancePreset 返回默认 HTTP 服务治理中间件预设。

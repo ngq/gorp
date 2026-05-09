@@ -35,6 +35,8 @@ type GovernanceSummary struct {
 	ProviderDecisions       map[string]GovernanceProviderDecision  `json:"provider_decisions"`
 	ConfigSnapshot          map[string]any                         `json:"config_snapshot"`
 	ResolutionOrder         []string                               `json:"resolution_order"`
+	MiddlewareChainOrder    []string                               `json:"middleware_chain_order"`
+	RPCClientChainOrder     []string                               `json:"rpc_client_chain_order"`
 }
 
 // GovernanceFeatureDecision explains why one governance feature is enabled or disabled.
@@ -83,19 +85,21 @@ func BuildGovernanceSummaryWithModeOverride(cfg datacontract.Config, mode resili
 	configSnapshot := buildGovernanceConfigSnapshot(configView, modeOverride, configOverrides, codeOverrides)
 
 	return GovernanceSummary{
-		Mode:               mode,
-		ModeSource:         modeSource,
-		ModeReason:         modeReason,
-		EnabledFeatures:    governanceFeatureNames(features),
+		Mode:                mode,
+		ModeSource:          modeSource,
+		ModeReason:          modeReason,
+		EnabledFeatures:     governanceFeatureNames(features),
 		ModeDefaultFeatures: governanceFeatureNames(defaultFeatures),
-		DisabledByOverride: governanceDisabledNames(mergedOverrides.Disabled),
-		DisabledByConfig:   governanceDisabledNames(configOverrides.Disabled),
-		DisabledByCode:     governanceDisabledNames(codeOverrides.Disabled),
-		FeatureDecisions:   featureDecisions,
-		ProviderBackends:   governanceProviderBackendsFromDecisions(providerDecisions),
-		ProviderDecisions:  providerDecisions,
-		ConfigSnapshot:     configSnapshot,
-		ResolutionOrder:    governanceResolutionOrder(),
+		DisabledByOverride:  governanceDisabledNames(mergedOverrides.Disabled),
+		DisabledByConfig:    governanceDisabledNames(configOverrides.Disabled),
+		DisabledByCode:      governanceDisabledNames(codeOverrides.Disabled),
+		FeatureDecisions:    featureDecisions,
+		ProviderBackends:    governanceProviderBackendsFromDecisions(providerDecisions),
+		ProviderDecisions:   providerDecisions,
+		ConfigSnapshot:      configSnapshot,
+		ResolutionOrder:     governanceResolutionOrder(),
+		MiddlewareChainOrder: governanceHTTPMiddlewareChainOrder(),
+		RPCClientChainOrder: governanceRPCClientChainOrder(),
 	}
 }
 
@@ -146,6 +150,12 @@ func FormatGovernanceDiagnostic(summary GovernanceSummary) string {
 	writeLine("Mode Source: %s", summary.ModeSource)
 	writeLine("Mode Reason: %s", summary.ModeReason)
 	writeLine("Resolution Order: %s", strings.Join(summary.ResolutionOrder, " > "))
+	if len(summary.MiddlewareChainOrder) > 0 {
+		writeLine("HTTP Middleware Chain: %s", strings.Join(summary.MiddlewareChainOrder, " → "))
+	}
+	if len(summary.RPCClientChainOrder) > 0 {
+		writeLine("RPC Client Chain: %s", strings.Join(summary.RPCClientChainOrder, " → "))
+	}
 
 	writeLine("")
 	writeLine("Features")
@@ -223,6 +233,12 @@ func formatGovernanceBriefDiagnostic(summary GovernanceSummary) string {
 	writeGovernanceLine(&b, "Mode Reason: %s", summary.ModeReason)
 	writeGovernanceLine(&b, "Enabled Features: %s", governanceJoinOrNone(summary.EnabledFeatures))
 	writeGovernanceLine(&b, "Disabled By Override: %s", governanceJoinOrNone(summary.DisabledByOverride))
+	if len(summary.MiddlewareChainOrder) > 0 {
+		writeGovernanceLine(&b, "HTTP Chain: %s", strings.Join(summary.MiddlewareChainOrder, " → "))
+	}
+	if len(summary.RPCClientChainOrder) > 0 {
+		writeGovernanceLine(&b, "RPC Chain: %s", strings.Join(summary.RPCClientChainOrder, " → "))
+	}
 
 	providers := make([]string, 0, len(summary.ProviderBackends))
 	for _, name := range governanceProviderNames() {
@@ -772,5 +788,38 @@ func governanceResolutionOrder() []string {
 		"config_explicit_override",
 		"mode_defaults",
 		"provider_fallback",
+	}
+}
+
+// governanceHTTPMiddlewareChainOrder 返回 HTTP 服务端中间件链的正式逻辑顺序。
+// 入站方向按此顺序执行，出站方向逆序执行。
+func governanceHTTPMiddlewareChainOrder() []string {
+	return []string{
+		"request_identity",
+		"logging",
+		"recovery",
+		"cors",
+		"security_headers",
+		"timeout",
+		"load_shedding",
+		"rate_limit",
+		"circuit_breaker",
+		"body_limit",
+		"locale",
+		"metrics",
+		"compression",
+	}
+}
+
+// governanceRPCClientChainOrder 返回 RPC 出站调用治理链的正式逻辑顺序。
+func governanceRPCClientChainOrder() []string {
+	return []string{
+		"selector",
+		"timeout",
+		"tracing",
+		"metadata",
+		"serviceauth",
+		"breaker",
+		"retry",
 	}
 }
