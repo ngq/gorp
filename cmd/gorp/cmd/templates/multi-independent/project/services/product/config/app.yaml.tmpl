@@ -1,53 +1,71 @@
-# 商品服务配置
-server:
+app:
+  name: product-service
+  env: development
   address: ":8083"
-  mode: "debug"
 
-db:
-  dbname: "product"   # SQLite 数据库文件名
+service:
+  name: product-service
 
-# Redis 配置
+server:
+  http:
+    addr: ":8083"
+    mode: debug
+
+database:
+  driver: sqlite
+  dsn: product.db
+
 redis:
   addr: "${REDIS_ADDR:localhost:6379}"
   password: ""
   db: 0
 
-# 如需服务发现，再按需开启；当前默认治理主线不强开 discovery
+log:
+  level: debug
+
+tracing:
+  enabled: true
+  backend: otel
+  service_name: product-service
+  otel:
+    endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
+  sampling_rate: 1.0
+
+metadata:
+  enabled: true
+  propagate_prefix:
+    - x-md-
+
+service_auth:
+  mode: token
+  token:
+    secret: "change-me-in-production"
+    issuer: "product-service"
+    audience: "internal"
+    expiry: 3600
+  allowed_services: []
+
+cache:
+  driver: memory
+
+message_queue:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+
+# 治理覆盖配置
+governance:
+  disable: []
+  providers: {}
+
+# 如需服务发现，可再开启
 # discovery:
 #   enabled: true
-#   type: "consul"  # consul / etcd / nacos
+#   type: consul
 #   consul:
 #     addr: "${CONSUL_ADDR:localhost:8500}"
 #     service_name: "product-service"
 #     service_port: 8083
-
-# 链路追踪配置
-tracing:
-  enabled: true
-  service_name: "product-service"
-  endpoint: "${JAEGER_ENDPOINT:http://localhost:4318/v1/traces}"
-
-# 限流配置
-ratelimit:
-  enabled: true
-  requests_per_second: 100
-  burst: 200
-
-# 熔断配置
-circuit_breaker:
-  enabled: true
-  threshold: 5
-  timeout: 30s
-
-# 缓存配置
-cache:
-  enabled: true
-  ttl: 300s
-
-# 分布式锁配置
-distributed_lock:
-  enabled: true
-  redis_key_prefix: "lock:"
-
-log:
-  level: "debug"

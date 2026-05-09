@@ -1,17 +1,35 @@
 app:
   name: "{{.Name}}"
-  env: "development"
+  env: development
+  address: :8080
 
-http:
-  addr: ":8888"
+server:
+  http:
+    addr: :8080
+    mode: debug
 
-swagger:
-  enable: true
-  basic_auth:
-    enable: false
-    username: ""
-    password: ""
+log:
+  level: debug
 
+# tracing 配置（关闭；需要时再切到 otel）
+tracing:
+  enabled: false
+  backend: otel
+  service_name: {{.Name}}
+  otel:
+    endpoint: localhost:4317
+  sampling_rate: 1.0
+
+# metadata 传播配置（关闭；需要时再启用）
+metadata:
+  enabled: false
+  propagate_prefix:
+    - x-md-
+
+# 治理覆盖配置
+# - mode 由 cmd/app/main.go 中的 gorp.WithMicroserviceMode() 决定
+# - disable 用于显式关闭某个默认治理件
+# - providers 用于显式替换默认 provider backend
 governance:
   disable: []
   providers: {}
@@ -20,3 +38,10 @@ governance:
   #   - tracing
   # providers:
   #   serviceauth: mtls
+
+swagger:
+  enable: true
+  basic_auth:
+    enable: false
+    username: ""
+    password: ""

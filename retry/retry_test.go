@@ -13,6 +13,9 @@ import (
 type exportRetryStub struct{}
 
 func (s *exportRetryStub) Do(context.Context, func() error) error { return nil }
+func (s *exportRetryStub) DoForResource(_ context.Context, _ string, fn func() error) error {
+	return fn()
+}
 func (s *exportRetryStub) DoWithResult(context.Context, func() (any, error)) (any, error) {
 	return "ok", nil
 }

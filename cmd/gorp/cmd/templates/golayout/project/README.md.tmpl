@@ -42,6 +42,22 @@ deploy/                  # Docker / Kubernetes 交付资产
 - Kubernetes / 镜像默认使用项目级命名：`{{.KubernetesName}}`
 - 模板可以直接替换，不代表 Kubernetes / configsource / registry contrib 已完成
 
+### 治理模式
+
+- `gorp.WithMicroserviceMode()` — 微服务模式（模板默认）
+- `gorp.WithMonolithMode()` — 单体模式，只启用基础治理件（request_identity / logging / recovery / timeout / metrics）
+- `gorp.WithGinFirstMode()` — Gin 优先模式，保持原生 Gin 开发风格同时可选接入部分微服务治理
+
+### 诊断端点
+
+启动后可通过以下端点查看治理生效状态：
+
+- `GET /debug/governance` — JSON 格式完整治理诊断
+- `GET /debug/governance?view=brief` — 文本摘要
+- `GET /debug/governance?view=providers` — provider 决策详情
+- `GET /debug/governance?view=features` — feature 启用状态
+- `GET /doctor/governance` — 同上（doctor 路径别名）
+
 ## 开发顺序
 
 1. 在 `internal/biz` 定义用例与仓储接口

@@ -31,7 +31,8 @@ log:
 
 tracing:
   enabled: true
-  backend: stdout
+  backend: otel
+  service_name: order-service
   otel:
     endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
   sampling_rate: 1.0
@@ -55,7 +56,7 @@ cache:
   driver: memory
 
 distributed_lock:
-  enabled: true
+  enabled: false
   backend: redis
   redis:
     addr: "${REDIS_ADDR:localhost:6379}"
@@ -70,6 +71,11 @@ message_queue:
     addr: "${REDIS_ADDR:localhost:6379}"
     password: ""
     db: 0
+
+# 治理覆盖配置
+governance:
+  disable: []
+  providers: {}
 
 services:
   user_service:

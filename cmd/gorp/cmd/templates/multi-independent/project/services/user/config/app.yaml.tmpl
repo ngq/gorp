@@ -1,53 +1,94 @@
-# 用户服务配置
-server:
+app:
+  name: user-service
+  env: development
   address: ":8081"
-  mode: "debug"
 
-db:
-  dbname: "user"   # SQLite 数据库文件名
+service:
+  name: user-service
 
-# Redis 配置
+rpc:
+  mode: grpc
+  grpc:
+    address: ":9081"
+
+server:
+  http:
+    addr: ":8081"
+    mode: debug
+
+database:
+  driver: sqlite
+  dsn: user.db
+
 redis:
   addr: "${REDIS_ADDR:localhost:6379}"
   password: ""
   db: 0
 
-# 如需服务发现，再按需开启；当前默认治理主线不强开 discovery
+log:
+  level: debug
+
+tracing:
+  enabled: true
+  backend: otel
+  service_name: user-service
+  otel:
+    endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
+  sampling_rate: 1.0
+
+metadata:
+  enabled: true
+  propagate_prefix:
+    - x-md-
+
+service_auth:
+  mode: token
+  token:
+    secret: "change-me-in-production"
+    issuer: "user-service"
+    audience: "internal"
+    expiry: 3600
+  allowed_services:
+    - order-service
+
+cache:
+  driver: memory
+
+distributed_lock:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+  key_prefix: lock:
+
+message_queue:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+
+# 治理覆盖配置
+# - mode 由 cmd/app/main.go 中的 gorp.WithMicroserviceMode() 决定
+# - disable 用于显式关闭某个默认治理件
+# - providers 用于显式替换默认 provider backend
+governance:
+  disable: []
+  providers: {}
+  # 示例：
+  # disable:
+  #   - tracing
+  # providers:
+  #   serviceauth: mtls
+
+# 如需服务发现，可再开启
 # discovery:
 #   enabled: true
-#   type: "consul"  # consul / etcd / nacos
+#   type: consul
 #   consul:
 #     addr: "${CONSUL_ADDR:localhost:8500}"
 #     service_name: "user-service"
 #     service_port: 8081
-
-# 链路追踪配置
-tracing:
-  enabled: true
-  service_name: "user-service"
-  endpoint: "${JAEGER_ENDPOINT:http://localhost:4318/v1/traces}"
-
-# 限流配置
-ratelimit:
-  enabled: true
-  requests_per_second: 100
-  burst: 200
-
-# 熔断配置
-circuit_breaker:
-  enabled: true
-  threshold: 5
-  timeout: 30s
-
-# 缓存配置
-cache:
-  enabled: true
-  ttl: 300s
-
-# 分布式锁配置
-distributed_lock:
-  enabled: true
-  redis_key_prefix: "lock:"
-
-log:
-  level: "debug"
