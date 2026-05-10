@@ -1,3 +1,10 @@
+// Package proto provides type resolver for cross-file/cross-package type resolution.
+// Parses Go AST to resolve type dependencies across imports.
+// Caches resolved types for performance.
+//
+// Proto 包提供类型解析器，用于跨文件/跨包类型解析。
+// 解析 Go AST 以解决跨 import 的类型依赖。
+// 缓存已解析的类型以提高性能。
 package proto
 
 import (

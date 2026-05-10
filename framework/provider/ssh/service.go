@@ -1,3 +1,10 @@
+// Package ssh provides SSH service implementation.
+// Manages SSH connections with configurable authentication.
+// Supports password and key-based authentication with known_hosts verification.
+//
+// SSH 包提供 SSH 服务实现。
+// 管理带可配置认证的 SSH 连接。
+// 支持密码和密钥认证，带 known_hosts 验证。
 package ssh
 
 import (
@@ -31,6 +38,11 @@ type sshConfig struct {
 	Hosts      map[string]hostConfig `mapstructure:"hosts"`
 }
 
+// Service manages SSH connections to multiple hosts.
+// Core logic: Cache connections, dial on demand, handle authentication.
+//
+// Service 管理到多主机的 SSH 连接。
+// 核心逻辑：缓存连接、按需拨号、处理认证。
 type Service struct {
 	c runtimecontract.Container
 
@@ -92,10 +104,20 @@ func (s *sessionHandle) Close() error {
 	return s.raw.Close()
 }
 
+// NewService creates a new SSH service with container reference.
+// Core logic: Initialize empty client cache.
+//
+// NewService 创建新的 SSH 服务，携带容器引用。
+// 核心逻辑：初始化空的客户端缓存。
 func NewService(c runtimecontract.Container) (*Service, error) {
 	return &Service{c: c, clients: map[string]*clientHandle{}}, nil
 }
 
+// Client returns SSH client for specified host name.
+// Core logic: Check cache, dial if not cached, store in cache.
+//
+// Client 返回指定主机名的 SSH 客户端。
+// 核心逻辑：检查缓存、若未缓存则拨号、存入缓存。
 func (s *Service) Client(hostName string) (integrationcontract.SSHClient, error) {
 	hostName = strings.TrimSpace(hostName)
 	if hostName == "" {
@@ -150,6 +172,11 @@ func (s *Service) Client(hostName string) (integrationcontract.SSHClient, error)
 	return client, nil
 }
 
+// dial establishes SSH connection with host configuration.
+// Core logic: Expand paths, configure authentication, establish connection.
+//
+// dial 使用主机配置建立 SSH 连接。
+// 核心逻辑：扩展路径、配置认证、建立连接。
 func dial(h hostConfig, timeout time.Duration) (*ssh.Client, error) {
 	expand := func(p string) string {
 		p = strings.TrimSpace(p)

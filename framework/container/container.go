@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide the framework's runtime dependency injection container implementation.
-// - Manage direct bindings, deferred providers, singleton lifecycle, and provider boot order.
-// - Serve as the central assembly point for providers used by bootstrap and application startup.
+// Package container provides runtime dependency injection container for gorp framework.
+// Manages direct bindings, deferred providers, singleton lifecycle, and provider boot order.
+// Serves as central assembly point for providers used by bootstrap and application startup.
 //
-// 适用场景：
-// - 提供框架运行时依赖注入容器实现。
-// - 管理直接绑定、延迟 provider、单例生命周期和 provider 启动顺序。
-// - 作为 bootstrap 与 application 启动阶段装配 provider 的核心承载点。
+// 容器包提供 gorp 框架的运行时依赖注入容器实现。
+// 管理直接绑定、延迟 provider、单例生命周期和 provider 启动顺序。
+// 作为 bootstrap 与 application 启动阶段装配 provider 的核心承载点。
 package container
 
 import (

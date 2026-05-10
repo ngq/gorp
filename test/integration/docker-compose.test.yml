@@ -1,0 +1,84 @@
+# gorp 深度集成测试环境
+# 用于测试 gRPC/etcd/Redis/tracing 等真实 backend 端到端场景
+version: "3.8"
+
+services:
+  # etcd - 服务注册发现测试
+  etcd:
+    image: quay.io/coreos/etcd:v3.5
+    container_name: gorp-test-etcd
+    command: >
+      etcd
+      --advertise-client-urls=http://etcd:2379
+      --listen-client-urls=http://0.0.0.0:2379
+      --data-dir=/tmp/etcd-data
+    ports:
+      - "2379:2379"
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis - 消息队列测试
+  redis:
+    image: redis:7-alpine
+    container_name: gorp-test-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Mock gRPC Backend - gRPC 全链路测试
+  mock-grpc-backend:
+    build:
+      context: ./mock_backend
+      dockerfile: Dockerfile.mock
+    container_name: gorp-test-grpc-backend
+    ports:
+      - "50051:50051"
+    environment:
+      - GORP_TEST_TRACING_ENABLED=true
+      - GORP_TEST_ETCD_ADDR=etcd:2379
+    depends_on:
+      etcd:
+        condition: service_healthy
+
+  # Jaeger - tracing 收集测试
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: gorp-test-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "14268:14268"  # HTTP collector
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  # 测试执行容器
+  test-runner:
+    build:
+      context: ../../
+      dockerfile: test/integration/Dockerfile.test
+    container_name: gorp-test-runner
+    command: go test -tags=integration -v ./test/integration/...
+    depends_on:
+      etcd:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mock-grpc-backend:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    environment:
+      - GORP_TEST_ETCD_ADDR=etcd:2379
+      - GORP_TEST_REDIS_ADDR=redis:6379
+      - GORP_TEST_GRPC_BACKEND_ADDR=mock-grpc-backend:50051
+      - GORP_TEST_JAEGER_ADDR=jaeger:4317
+    volumes:
+      - ../../:/gorp  # 挂载项目代码用于测试

@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Group providers into stable bootstrap bundles by responsibility.
-// - Give application assembly code predictable provider slices for foundation, ORM, auth, and business helpers.
-// - Keep top-level bootstrap composition declarative instead of scattering provider lists.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file groups providers into stable bootstrap bundles by responsibility.
+// Provides predictable provider slices for foundation, ORM, auth, business helpers.
 //
-// 适用场景：
-// - 按职责把 provider 组织成稳定的 bootstrap 分组。
-// - 为应用装配代码提供 foundation、ORM、auth 和业务简化能力的可预测 provider 切片。
-// - 让顶层 bootstrap 组合保持声明式，而不是把 provider 列表散落各处。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件按职责把 provider 组织成稳定的 bootstrap 分组。
+// 为应用装配代码提供 foundation、ORM、auth 和业务简化能力的可预测 provider 切片。
 package bootstrap
 
 import (

@@ -1,3 +1,10 @@
+// Package proto provides handler parser for Gin HTTP handlers.
+// Extracts request/response types from Gin handler functions.
+// Supports ShouldBind/JSON response type inference.
+//
+// Proto 包提供 Handler 解析器，用于 Gin HTTP handlers。
+// 从 Gin handler 函数提取请求/响应类型。
+// 支持 ShouldBind/JSON 响应类型推断。
 package proto
 
 import (

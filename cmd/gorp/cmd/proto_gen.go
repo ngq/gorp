@@ -53,7 +53,7 @@ func init() {
 	protoCmd.AddCommand(protoGenCmd)
 
 	protoGenCmd.Flags().StringVarP(&protoDir, "proto-dir", "d", "api/proto", "Proto 文件目录")
-	protoGenCmd.Flags().StringSliceVarP(&protoFiles, "proto-files", "f", nil, "指定的 Proto 文件（多个用逗号分隔）")
+	protoGenCmd.Flags().StringSliceVarP(&protoFiles, "proto-file", "f", nil, "指定的 Proto 文件（可多次指定）")
 	protoGenCmd.Flags().StringVarP(&outputDir, "output", "o", "", "输出目录（默认同输入目录）")
 	protoGenCmd.Flags().StringSliceVar(&importPathsP, "import-paths", nil, "protoc 导入路径 (-I)")
 	protoGenCmd.Flags().StringVar(&goOpt, "go-opt", "paths=source_relative", "--go_opt 参数")

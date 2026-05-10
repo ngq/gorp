@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose the framework router contract over Gin router groups.
-// - Keep grouped route registration and middleware composition inside the provider adapter layer.
-// - Let business code depend on transport abstractions instead of Gin-specific route APIs.
+// Package gin provides Gin-based HTTP server implementation for gorp framework.
+// This file implements the HTTP router interface wrapping Gin RouterGroup.
+// Supports route registration, middleware mounting, and child group creation.
 //
-// 适用场景：
-// - 在 Gin router group 之上暴露框架路由契约。
-// - 将分组路由注册和中间件组合收口在 provider 适配层内。
-// - 让业务代码依赖 transport 抽象，而不是 Gin 专属路由 API。
+// Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
+// 本文件实现 HTTP 路由接口，包装 Gin RouterGroup。
+// 支持路由注册、中间件挂载和子路由组创建。
 package gin
 
 import (

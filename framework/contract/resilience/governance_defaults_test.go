@@ -20,10 +20,10 @@ func TestDefaultGovernanceFeatureSetRemainStable(t *testing.T) {
 	if !microservice.RequestIdentity || !microservice.Logging || !microservice.Recovery || !microservice.Timeout || !microservice.Metrics {
 		t.Fatalf("expected microservice base governance defaults enabled, got %+v", microservice)
 	}
-	if !microservice.MetadataPropagation || !microservice.Tracing || !microservice.Selector || !microservice.ServiceAuth || !microservice.CircuitBreaker {
-		t.Fatalf("expected microservice advanced governance defaults enabled, got %+v", microservice)
+	if !microservice.MetadataPropagation || !microservice.Tracing || !microservice.Selector || !microservice.ServiceAuth || !microservice.CircuitBreaker || !microservice.LoadShedding {
+		t.Fatalf("expected microservice advanced governance defaults enabled (including loadshedding), got %+v", microservice)
 	}
-	if microservice.Retry || microservice.LoadShedding || microservice.Discovery {
-		t.Fatalf("expected retry/load-shedding/discovery to stay disabled until fully promoted, got %+v", microservice)
+	if microservice.Retry || microservice.Discovery {
+		t.Fatalf("expected retry/discovery to stay disabled until fully promoted, got %+v", microservice)
 	}
 }

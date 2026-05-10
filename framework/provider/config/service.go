@@ -1,3 +1,10 @@
+// Package config provides configuration service implementation for gorp framework.
+// Implements Config contract with viper-based layered loading.
+// Supports YAML, environment variables, env(KEY) placeholders, and config source extension.
+//
+// 配置服务包，提供 gorp 框架的配置服务实现。
+// 基于 viper 实现分层加载的 Config 契约。
+// 支持 YAML、环境变量、env(KEY) 占位符和配置源扩展。
 package config
 
 import (
@@ -15,13 +22,15 @@ import (
 	"github.com/subosito/gotenv"
 )
 
-// Service 是基于 viper 的默认配置服务实现。
+// Service is the default config service implementation based on viper.
+// Supports YAML, layered overlay, environment variable override, and env(KEY) placeholder replacement.
+// Supports config source extension (local files/remote config).
+// Core logic: Hold viper instance, delegate Get/Unmarshal operations.
 //
-// 中文说明：
-// - env 记录当前加载的环境名，例如 dev / test / prod；
-// - v 持有真正的配置读取器，后续 Get/Unmarshal 都委托给它。
-// - 该实现同时支持 yaml、多层覆盖、环境变量覆盖与 env(KEY) 占位符替换。
-// - 支持配置源扩展（本地文件/远程配置）。
+// Service 是基于 viper 的默认配置服务实现。
+// 支持 YAML、分层覆盖、环境变量覆盖与 env(KEY) 占位符替换。
+// 支持配置源扩展（本地文件/远程配置）。
+// 核心逻辑：持有 viper 实例、委托 Get/Unmarshal 操作。
 type Service struct {
 	env    string
 	v      *viper.Viper
@@ -44,18 +53,18 @@ func NewServiceWithSource(source datacontract.ConfigSource) *Service {
 	}
 }
 
+// Env returns the current loaded environment name.
+//
+// Env 返回当前加载的环境名。
 func (s *Service) Env() string { return s.env }
 
-// Load 按固定顺序加载配置，确保同一套输入始终得到确定性的最终结果。
+// Load loads configuration in a fixed order for deterministic results.
+// Order: local files + config source + environment variables.
+// Core logic: Normalize env, load base files, merge env overlay, apply env vars.
 //
-// 加载顺序：
-// 1. 本地文件层：合并 config/*.yaml + app.<env>.yaml + config/<env>/*.yaml
-// 2. 配置源层：若存在 ConfigSource，则把 source.Load 的结果覆盖到当前配置
-// 3. 环境变量层：通过 AutomaticEnv 覆盖最终值
-//
-// 额外能力：
-// - YAML 内容中的 env(KEY) 会在读取文件时先替换成真实环境变量。
-// - 如果引用了不存在的环境变量，会直接报错，避免带着半残配置继续运行。
+// Load 按固定顺序加载配置，确保确定性结果。
+// 顺序：本地文件 + 配置源 + 环境变量。
+// 核心逻辑：规范化环境名、加载基础文件、合并环境覆盖、应用环境变量。
 func (s *Service) Load(env string) error {
 	s.env = NormalizeEnv(env)
 
@@ -80,12 +89,13 @@ func (s *Service) Load(env string) error {
 	return nil
 }
 
-// LoadLocalConfigToViper 统一按 framework 约定把本地配置加载到指定 viper 实例。
+// LoadLocalConfigToViper loads local config files to specified viper instance.
+// Shared by Config provider and ConfigSource.local provider.
+// Core logic: Discover base files, merge env overlay, apply env substitution.
 //
-// 中文说明：
-// - 这是 Config 与 ConfigSource.local 共用的本地加载主链；
-// - env 会统一走 NormalizeEnv，兼容 dev/test/prod 与历史别名；
-// - root 为空时自动按 APP_BASE_PATH/工作目录推导项目根。
+// LoadLocalConfigToViper 将本地配置文件加载到指定 viper 实例。
+// 由 Config provider 和 ConfigSource.local provider 共用。
+// 核心逻辑：发现基础文件、合并环境覆盖、应用环境变量替换。
 func LoadLocalConfigToViper(v *viper.Viper, env, root string) error {
 	if v == nil {
 		return fmt.Errorf("config: viper instance is nil")
@@ -292,11 +302,13 @@ func (s *Service) Unmarshal(key string, out any) error {
 	return s.v.UnmarshalKey(key, out)
 }
 
-// Watch 监听配置变化。
+// Watch watches configuration changes if config source supports it.
+// Local file source does not support hot update.
+// Core logic: Delegate to config source if available, otherwise return error.
 //
-// 中文说明：
-// - 如果配置源支持 Watch，返回 ConfigWatcher；
-// - 否则返回 nil（本地文件不支持热更新）。
+// Watch 监听配置变化（如果配置源支持）。
+// 本地文件源不支持热更新。
+// 核心逻辑：委托给配置源（如果可用），否则返回错误。
 func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	if s.source != nil {
 		return s.source.Watch(ctx, key)
@@ -305,11 +317,11 @@ func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWat
 	return nil, fmt.Errorf("config: watch not supported for local file source")
 }
 
-// Reload 强制重新加载配置。
+// Reload forces reload of configuration from all sources.
+// Core logic: Reload from remote source first, then reload local files.
 //
-// 中文说明：
-// - 重新读取本地 config/*.yaml；
-// - 如果配置源存在，先从远程拉取配置。
+// Reload 强制重新加载配置。
+// 核心逻辑：先从远程源重新加载，然后重新加载本地文件。
 func (s *Service) Reload(ctx context.Context) error {
 	// 从远程配置源拉取（如果存在）
 	if s.source != nil {

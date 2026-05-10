@@ -1,3 +1,10 @@
+// Package grpc provides gRPC interceptors for gorp framework.
+// Includes trace/request ID propagation, Prometheus metrics collection.
+// Supports both unary and stream interceptors for client and server.
+//
+// gRPC 拦截器包，提供 gorp 框架的 gRPC 拦截器能力。
+// 包括 trace/request ID 传播、Prometheus 指标采集。
+// 支持客户端和服务端的一元和流拦截器。
 package grpc
 
 import (

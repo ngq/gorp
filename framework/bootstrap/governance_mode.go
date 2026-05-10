@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Centralize governance-mode detection used by bootstrap selection and startup helpers.
-// - Keep monolith and microservice default-provider behavior explicit in one place.
-// - Allow application options and config-driven assembly to share the same runtime-mode semantics.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file centralizes governance-mode detection for bootstrap and startup helpers.
+// Keeps monolith and microservice default-provider behavior explicit in one place.
 //
-// 适用场景：
-// - 集中处理 bootstrap 选择与启动 helper 使用的治理模式判断。
-// - 将 monolith 与 microservice 的默认 provider 语义显式收口到一个位置。
-// - 让 application 选项与配置驱动装配共享同一套运行模式语义。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件集中处理 bootstrap 选择与启动 helper 使用的治理模式判断。
+// 将 monolith 与 microservice 的默认 provider 语义显式收口到一个位置。
 package bootstrap
 
 import (

@@ -1,12 +1,15 @@
-// Application scenarios:
-// - Expose a standard `/metrics` endpoint for Prometheus scraping.
-// - Register Go runtime metrics such as GC, memory, and goroutine statistics.
-// - Reuse `router.Mount()` with a plain `http.Handler` instead of binding Gin-specific handlers.
+// Package gin provides Gin-based HTTP server implementation for gorp framework.
+// This file provides Prometheus metrics handler and Go runtime metrics registration.
+// Exposes /metrics endpoint and registers GC, memory, goroutine collectors.
 //
-// 适用场景：
-// - 暴露标准 `/metrics` 端点供 Prometheus 抓取。
-// - 注册 Go 运行时指标，例如 GC、内存和 goroutine 统计。
-// - 通过普通 `http.Handler` 复用 `router.Mount()`，而不是绑定 Gin 专属 handler。
+// Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
+// 本文件提供 Prometheus 指标 handler 和 Go 运行时指标注册。
+// 暴露 /metrics 端点并注册 GC、内存、goroutine 采集器。
+//
+// Eg:
+//
+//	router.Mount("/metrics", ginprovider.PrometheusHandler())
+//	ginprovider.RegisterGoRuntimeMetrics()
 package gin
 
 import (

@@ -1,12 +1,18 @@
-// Application scenarios:
-// - Expose the root-package application startup surface and top-level aliases for runtime/app assembly.
-// - Keep business startup code on a short public path while delegating concrete behavior to framework/application.
-// - Re-export common startup options, callbacks, errors, and runtime access types.
+// Package gorp provides the root-package application startup surface for gorp framework.
+// Exposes top-level aliases for runtime/app assembly and common startup options.
+// Re-export runtime access types, callbacks, errors from framework/application.
 //
-// 适用场景：
-// - 暴露根包层的应用启动入口，以及 runtime/app 装配所需的顶层别名。
-// - 让业务启动代码走更短的公共路径，同时把具体实现委托给 `framework/application`。
-// - 重导出常用启动选项、回调、错误和 runtime 访问类型。
+// Gorp 包提供 gorp 框架的根包层应用启动入口。
+// 暴露 runtime/app 装配所需的顶层别名和常用启动选项。
+// 从 framework/application 重导出 runtime 访问类型、回调、错误。
+//
+// Eg:
+//
+//	gorp.Run("my-service",
+//	    gorp.HTTP(),
+//	    gorp.WithProviders(configprovider.NewProvider()),
+//	    gorp.WithHTTPRoutes(registerRoutes),
+//	)
 package gorp
 
 import (
@@ -238,6 +244,17 @@ func WithGovernanceMode(mode GovernanceMode) Option {
 // WithGovernanceDisabled 显式关闭一个或多个默认治理能力。
 func WithGovernanceDisabled(names ...string) Option {
 	return application.WithGovernanceDisabled(names...)
+}
+
+// WithGovernanceEnabled explicitly enables one or more governance capabilities that are off by default.
+// This is the symmetric counterpart of WithGovernanceDisabled.
+// When the same feature appears in both enable and disable, disable takes precedence.
+//
+// WithGovernanceEnabled 显式开启一个或多个默认关闭的治理能力。
+// 这是 WithGovernanceDisabled 的对称入口。
+// 当同一 feature 同时出现在 enable 和 disable 中时，disable 生效。
+func WithGovernanceEnabled(names ...string) Option {
+	return application.WithGovernanceEnabled(names...)
 }
 
 // WithGovernanceProvider explicitly overrides one governance provider backend.

@@ -1,12 +1,16 @@
-// Application scenarios:
-// - Expose the root-package HTTP response helpers built on the framework responder chain.
-// - Give business handlers a short path for success and error response output.
-// - Preserve unified responder semantics while keeping the fallback behavior easy to consume.
+// Package gorp provides the root-package application startup surface for gorp framework.
+// This file exposes HTTP response helpers built on framework responder chain.
+// Gives business handlers short path for success and error response output.
 //
-// 适用场景：
-// - 暴露基于框架 responder 链的根包级 HTTP 响应 helper。
-// - 为业务 handler 提供简短的成功/错误响应输出入口。
-// - 在保持统一 responder 语义的同时，让默认回退行为更易使用。
+// Gorp 包提供 gorp 框架的根包层应用启动入口。
+// 本文件暴露基于框架 responder 链的 HTTP 响应 helper。
+// 为业务 handler 提供简短的成功/错误响应输出入口。
+//
+// Eg:
+//
+//	func Ping(c gorp.HTTPContext) {
+//	    gorp.Success(c, map[string]any{"pong": true})
+//	}
 package gorp
 
 import (

@@ -1,3 +1,10 @@
+// Package log provides zap backend implementation for gorp framework logging.
+// Implements contract.Logger interface with configurable encoder and sink.
+// Supports lumberjack for rotation and file-rotatelogs for time-based rotation.
+//
+// 日志包提供 zap 后端实现，用于 gorp 框架的日志服务。
+// 实现 contract.Logger 接口，支持可配置的编码器和 sink。
+// 支持 lumberjack 滚动和 file-rotatelogs 时间滚动。
 package log
 
 import (

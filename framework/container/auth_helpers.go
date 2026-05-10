@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose focused security-related convenience helpers on top of the runtime container.
-// - Keep common JWT capability access compact for handlers, middleware, and bootstrap hooks.
-// - Avoid scattering repeated auth service lookup code across packages.
+// Package container provides runtime dependency injection container for gorp framework.
+// This file exposes security-related convenience helpers for JWT capability access.
+// Keeps common auth service lookup compact for handlers, middleware, bootstrap hooks.
 //
-// 适用场景：
-// - 在运行时容器之上暴露聚焦安全能力的便捷 helper。
-// - 让 handler、middleware 和 bootstrap hook 获取 JWT 能力时保持简洁。
-// - 避免认证服务查找代码散落在各个包里重复出现。
+// 容器包提供 gorp 框架的运行时依赖注入容器实现。
+// 本文件暴露聚焦安全能力的便捷 helper。
+// 让 handler、middleware 和 bootstrap hook 获取 JWT 能力时保持简洁。
 package container
 
 import (

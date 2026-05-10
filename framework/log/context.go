@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Attach request-scoped loggers to context for middleware and handler flows.
-// - Let downstream code fetch either the context logger or the default fallback consistently.
-// - Support deriving per-request field-enriched loggers without mutating the global default logger.
+// Package log provides lightweight logging utilities for gorp framework.
+// Attaches request-scoped loggers to context for middleware and handler flows.
+// Supports deriving per-request field-enriched loggers without mutating global default.
 //
-// 适用场景：
-// - 在 context 中挂载请求级 logger，供 middleware 和 handler 流程使用。
-// - 让下游代码一致地获取 context logger 或默认回退 logger。
-// - 支持在不修改全局默认 logger 的前提下派生带请求字段的 logger。
+// 日志包提供 gorp 框架的轻量日志工具能力。
+// 在 context 中挂载请求级 logger，供 middleware 和 handler 流程使用。
+// 支持在不修改全局默认 logger 的前提下派生带请求字段的 logger。
 package log
 
 import (

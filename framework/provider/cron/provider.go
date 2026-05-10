@@ -1,3 +1,22 @@
+// Package cron provides cron scheduling service for gorp framework.
+// Implements framework-level wrapper around robfig/cron with timeout control and Prometheus metrics.
+// Supports second-level cron expressions with automatic panic recovery.
+//
+// Cron 调度服务包，提供 gorp 框架的定时任务调度能力。
+// 对 robfig/cron 做 framework 级封装，包含超时控制和 Prometheus 指标采集。
+// 支持秒级 cron 表达式，自动 panic 恢复。
+//
+// Eg:
+//
+//	// 注册 Provider
+//	app.Register(cron.NewProvider())
+//
+//	// 添加定时任务
+//	cronSvc := c.MustMake(runtimecontract.CronKey).(runtimecontract.Cron)
+//	cronSvc.AddNamed("cleanup", "0 0 3 * * *", func(ctx context.Context) error {
+//	    return cleanupOldData(ctx)
+//	})
+//	cronSvc.Start()
 package cron
 
 import (
@@ -9,27 +28,40 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// Provider 把 Cron 服务注册进容器。
+// Provider registers the cron service contract.
+// Exposes runtimecontract.CronKey for unified task registration.
+// Core logic: Create Service instance with second-level parser, bind to container.
 //
-// 中文说明：
-// - 统一暴露 contract.CronKey；
-// - 让业务和 starter 通过同一个调度入口注册定时任务；
-// - 底层使用 robfig/cron，但上层不需要直接依赖其装配细节。
+// Provider 注册 Cron 服务契约。
+// 统一暴露 runtimecontract.CronKey，用于定时任务注册。
+// 核心逻辑：创建支持秒级表达式的 Service 实例、绑定到容器。
 type Provider struct{}
 
-// NewProvider 创建 cron provider。
+// NewProvider creates a new cron provider instance.
+//
+// NewProvider 创建新的 Cron Provider 实例。
 func NewProvider() *Provider { return &Provider{} }
 
-// Name 返回 provider 名称。
+// Name returns the provider name "cron".
+//
+// Name 返回 Provider 名称 "cron"。
 func (p *Provider) Name() string { return "cron" }
 
-// IsDefer 表示 cron provider 不走延迟加载。
+// IsDefer returns false, cron should be initialized immediately for service registration.
+//
+// IsDefer 返回 false，Cron 应立即初始化以便任务注册。
 func (p *Provider) IsDefer() bool { return false }
 
-// Provides 返回 cron provider 暴露的能力 key。
+// Provides returns the cron service contract key.
+//
+// Provides 返回 Cron 服务契约键。
 func (p *Provider) Provides() []string { return []string{runtimecontract.CronKey} }
 
-// Register 绑定 Cron 服务。
+// Register binds the cron service factory to the container.
+// Core logic: Create Service with second-level parser, bind factory.
+//
+// Register 将 Cron 服务工厂绑定到容器。
+// 核心逻辑：创建支持秒级表达式的 Service、绑定工厂。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(runtimecontract.CronKey, func(runtimecontract.Container) (any, error) {
 		return NewService(), nil
@@ -37,20 +69,29 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	return nil
 }
 
-// Boot cron provider 无额外启动逻辑。
+// Boot is a no-op for cron provider.
+//
+// Boot Cron Provider 无启动逻辑（启动由 Start 调用触发）。
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
-// Service 对 robfig/cron 做 framework 级封装。
+// Service wraps robfig/cron with framework-level enhancements.
+// Features: timeout control, Prometheus metrics, panic recovery.
+// Core logic: Encapsulate robfig/cron, add timeout and metrics hooks.
 //
-// 中文说明：
-// - 对外收口 framework 自己的定时任务注册心智；
-// - 内部补了超时控制与 Prometheus 指标采集；
-// - 让业务侧不必在每个 cron job 外层重复写这些样板。
+// Service 对 robfig/cron 做 framework 级封装。
+// 特性：超时控制、Prometheus 指标采集、panic 恢复。
+// 核心逻辑：封装 robfig/cron，添加超时和指标 hooks。
 type Service struct {
-	c *cron.Cron
+	c *cron.Cron // c is the underlying cron scheduler.
+	            //
+	             // c 底层 cron 调度器。
 }
 
+// NewService creates a cron service with second-level expression support.
+// Includes automatic panic recovery chain.
+//
 // NewService 创建支持秒级表达式的 Cron 调度器。
+// 包含自动 panic 恢复链。
 func NewService() *Service {
 	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 	c := cron.New(
@@ -60,11 +101,13 @@ func NewService() *Service {
 	return &Service{c: c}
 }
 
-// Add 注册一个不带指标标签的定时任务。
+// Add registers a cron job without Prometheus metrics labels.
+// Suitable for simple scheduled tasks.
+// Core logic: Wrap function with 5-minute timeout, add to scheduler.
 //
-// 中文说明：
-// - 适合简单定时任务场景；
-// - 统一补 5 分钟超时，避免任务无限悬挂。
+// Add 注册不带指标标签的定时任务。
+// 适用于简单定时任务场景。
+// 核心逻辑：用 5 分钟超时包装函数、添加到调度器。
 func (s *Service) Add(spec string, fn func(ctx context.Context) error) (int, error) {
 	id, err := s.c.AddFunc(spec, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -75,11 +118,13 @@ func (s *Service) Add(spec string, fn func(ctx context.Context) error) (int, err
 	return int(id), err
 }
 
-// AddNamed 注册一个带 Prometheus 指标标签的定时任务。
+// AddNamed registers a cron job with Prometheus metrics labels.
+// Suitable for tasks requiring execution monitoring by name.
+// Core logic: Wrap function with timeout, add metrics recording, add to scheduler.
 //
-// 中文说明：
-// - 适合需要按任务名观测执行情况的场景；
-// - 会记录执行中数量、总次数、耗时和成功/失败状态。
+// AddNamed 注册带 Prometheus 指标标签的定时任务。
+// 适用于需要按任务名观测执行情况的场景。
+// 核心逻辑：用超时包装函数、添加指标记录、添加到调度器。
 func (s *Service) AddNamed(name, spec string, fn func(ctx context.Context) error) (int, error) {
 	id, err := s.c.AddFunc(spec, func() {
 		start := time.Now()
@@ -103,18 +148,18 @@ func (s *Service) AddNamed(name, spec string, fn func(ctx context.Context) error
 	return int(id), err
 }
 
-// Start 启动 Cron 调度器。
+// Start begins the cron scheduler.
+// Registered jobs will start executing according to their schedules.
 //
-// 中文说明：
-// - 由宿主或业务启动流程调用后，已注册任务才会开始调度。
+// Start 启动 Cron 调度器。
+// 已注册的任务将按调度表达式开始执行。
 func (s *Service) Start() {
 	s.c.Start()
 }
 
-// Stop 停止 Cron 调度器。
+// Stop stops the cron scheduler and returns context for waiting on running jobs.
 //
-// 中文说明：
-// - 返回底层停止上下文，便于上层等待正在执行中的任务完成。
+// Stop 停止 Cron 调度器，返回 context 用于等待正在执行的任务完成。
 func (s *Service) Stop() context.Context {
 	return s.c.Stop()
 }

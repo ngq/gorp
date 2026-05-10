@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Offer container-side helper methods for provider introspection and diagnostics.
-// - Support CLI or tooling queries without polluting the core runtime container contract.
-// - Keep provider registry visibility available to internal framework tooling.
+// Package container provides runtime dependency injection container for gorp framework.
+// This file offers provider introspection and diagnostics helper methods.
+// Supports CLI or tooling queries without polluting core container contract.
 //
-// 适用场景：
-// - 为容器提供 provider 维度的辅助查询和诊断能力。
-// - 支持 CLI 或工具侧查询，而不污染核心运行时容器契约。
-// - 为框架内部工具保留 provider 注册表的可见性。
+// 容器包提供 gorp 框架的运行时依赖注入容器实现。
+// 本文件提供 provider 维度的辅助查询和诊断能力。
+// 支持 CLI 或工具侧查询，而不污染核心运行时容器契约。
 package container
 
 import "sort"

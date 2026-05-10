@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Host the runtime-facing HTTP service implementation backed by Gin and net/http.
-// - Expose both the framework router facade and the underlying net/http server object.
-// - Support application lifecycle operations such as run and graceful shutdown.
+// Package gin provides Gin-based HTTP server implementation for gorp framework.
+// This file implements the HTTP service interface with Gin engine and net/http server.
+// Supports application lifecycle operations: Run, Shutdown, Router, Server access.
 //
-// 适用场景：
-// - 承载基于 Gin 与 net/http 的运行时 HTTP 服务实现。
-// - 同时暴露框架路由门面与底层 net/http server 对象。
-// - 支持启动与优雅关闭等应用生命周期操作。
+// Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
+// 本文件实现 HTTP 服务接口，包含 Gin engine 和 net/http server。
+// 支持应用生命周期操作：Run、Shutdown、Router、Server 访问。
 package gin
 
 import (
@@ -48,3 +46,10 @@ func (s *service) Run() error { return s.srv.ListenAndServe() }
 //
 // Shutdown 优雅关闭 HTTP 服务。
 func (s *service) Shutdown(ctx context.Context) error { return s.srv.Shutdown(ctx) }
+
+// GINEngine returns the underlying *gin.Engine for Gin-first usage.
+// Implements transportcontract.GINEngineProvider.
+//
+// GINEngine 返回底层 *gin.Engine，供 Gin-first 使用。
+// 实现 transportcontract.GINEngineProvider。
+func (s *service) GINEngine() any { return s.engine }

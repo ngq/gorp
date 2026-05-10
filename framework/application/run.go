@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose the main startup entrypoints of the application package.
-// - Support both direct boot and runtime-only build workflows for HTTP services.
-// - Keep service-name validation, startup cancellation, and runtime construction semantics stable.
+// Package application provides application startup entrypoints for gorp framework.
+// This file exposes the main startup entrypoints: Run and Build.
+// Supports direct boot and runtime-only build workflows for HTTP services.
 //
-// 适用场景：
-// - 暴露 application 包的主启动入口。
-// - 同时支持直接启动和仅构建 runtime 的 HTTP 服务工作流。
-// - 稳定维护服务名校验、启动取消和 runtime 构建语义。
+// 应用启动包提供 gorp 框架的应用启动入口。
+// 本文件暴露主启动入口：Run 和 Build。
+// 支持直接启动和仅构建 runtime 的 HTTP 服务工作流。
 package application
 
 import (

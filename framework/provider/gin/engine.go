@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Prepare the Gin engine with framework container, tracing, metadata, and optional service auth hooks.
-// - Keep provider-specific lifecycle wiring out of business route registration code.
-// - Centralize optional engine-level middleware attachment in one place.
+// Package gin provides Gin-based HTTP server implementation for gorp framework.
+// This file implements engine-level middleware attachment and container injection.
+// Mounts tracing, metadata propagation, and optional service auth middleware.
 //
-// 适用场景：
-// - 为 Gin engine 预装框架容器、Tracing、Metadata 与可选服务认证挂载点。
-// - 将 provider 专属生命周期装配从业务路由注册代码中隔离出来。
-// - 将可选 engine 级中间件挂载逻辑集中收口到一个位置。
+// Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
+// 本文件实现 engine 级中间件挂载和容器注入。
+// 挂载 tracing、元数据传播和可选的服务认证中间件。
 package gin
 
 import (
@@ -130,4 +128,29 @@ func getLogger(c runtimecontract.Container) observabilitycontract.Logger {
 	}
 	l, _ := providerlog.NewDefaultLogger()
 	return l
+}
+
+// newGinFirstEngine 创建 Gin-first 模式下的 Engine。
+// 只注入 injectRequestContainer（框架容器注入），不自动挂载治理 preset。
+// 用户获取 *gin.Engine 后通过 engine.Use(AdaptMiddleware(...)) 按需手动挂载治理 middleware。
+//
+// newGinFirstEngine creates the Engine for Gin-first mode.
+// Only injects container middleware; governance presets are NOT auto-mounted.
+// Users obtain *gin.Engine and manually mount governance middleware via engine.Use(AdaptMiddleware(...)).
+func newGinFirstEngine(c runtimecontract.Container) *gin.Engine {
+	engine := gin.New()
+	engine.Use(injectRequestContainer(c))
+	return engine
+}
+
+// isGinFirstMode detects whether the current governance mode is gin-first.
+//
+// isGinFirstMode 检测当前治理模式是否为 gin-first。
+func isGinFirstMode(c runtimecontract.Container) bool {
+	cfg := getConfig(c)
+	if cfg == nil {
+		return false
+	}
+	modeStr := strings.TrimSpace(cfg.GetString("governance.mode"))
+	return strings.EqualFold(modeStr, "gin-first") || strings.EqualFold(modeStr, "ginfirst")
 }

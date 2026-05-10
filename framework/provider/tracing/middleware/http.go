@@ -1,3 +1,10 @@
+// Package middleware provides HTTP tracing middleware for gorp framework.
+// Creates spans for each HTTP request, extracts/injects trace context.
+// Records method, URL, status code, latency as span attributes.
+//
+// 中间件包提供 HTTP 追踪中间件，用于 gorp 框架。
+// 为每个 HTTP 请求创建 Span，提取/注入追踪上下文。
+// 记录方法、URL、状态码、延迟作为 Span 属性。
 package middleware
 
 import (
@@ -11,6 +18,11 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// TracingMiddleware creates HTTP middleware for distributed tracing.
+// Core logic: Extract trace context, create span, record attributes, inject trace ID.
+//
+// TracingMiddleware 创建用于分布式追踪的 HTTP 中间件。
+// 核心逻辑：提取追踪上下文、创建 Span、记录属性、注入 Trace ID。
 func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {

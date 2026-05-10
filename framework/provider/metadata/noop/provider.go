@@ -1,3 +1,10 @@
+// Package noop provides no-op metadata implementation for monolith scenarios.
+// All operations return empty values or no-op behavior.
+// Suitable for single-service deployments without cross-boundary metadata propagation.
+//
+// 空元数据包提供空元数据实现，用于单体应用场景。
+// 所有操作返回空值或空行为。
+// 适用于单服务部署，无需跨边界元数据传播。
 package noop
 
 import (

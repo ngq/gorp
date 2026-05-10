@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide recursive directory upload support for deploy workflows.
-// - Mirror local directory structures onto remote Unix-like paths through SFTP.
-// - Offer one simple helper for small and medium deployment artifact uploads.
+// Package deploy provides deployment utilities for gorp framework.
+// This file provides recursive directory upload support for deploy workflows.
+// Mirrors local directory structures onto remote Unix-like paths through SFTP.
 //
-// 适用场景：
-// - 为部署流程提供递归目录上传能力。
-// - 通过 SFTP 把本地目录结构镜像到远端 Unix 风格路径。
-// - 为中小规模部署产物上传提供一个简单 helper。
+// 部署包提供 gorp 框架的部署工具能力。
+// 本文件为部署流程提供递归目录上传能力。
+// 通过 SFTP 把本地目录结构镜像到远端 Unix 风格路径。
 package deploy
 
 import (

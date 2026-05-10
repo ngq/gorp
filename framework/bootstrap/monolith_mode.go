@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide a safe default provider bundle for monolith-friendly deployments.
-// - Prefer noop/local implementations for capabilities that are optional in single-process apps.
-// - Let monolith assembly stay simple without losing contract completeness.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file provides safe default provider bundle for monolith-friendly deployments.
+// Prefers noop/local implementations for optional capabilities in single-process apps.
 //
-// 适用场景：
-// - 为单体友好部署提供安全的默认 provider 组合。
-// - 对单进程应用中可选的能力优先使用 noop/local 实现。
-// - 让 monolith 装配保持简单，同时不丢失契约完整性。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件为单体友好部署提供安全的默认 provider 组合。
+// 对单进程应用中可选的能力优先使用 noop/local 实现。
 package bootstrap
 
 import (

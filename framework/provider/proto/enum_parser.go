@@ -1,3 +1,10 @@
+// Package proto provides enum parser for converting Go const/iota to proto enum.
+// Supports iota expression evaluation and enum name inference.
+// Generates proto enum definitions from Go source code.
+//
+// Proto 包提供枚举解析器，用于将 Go const/iota 转换为 proto enum。
+// 支持 iota 表达式求值和枚举名推断。
+// 从 Go 源代码生成 proto enum 定义。
 package proto
 
 import (

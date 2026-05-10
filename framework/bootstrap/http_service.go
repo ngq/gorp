@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Assemble and run the default HTTP service mainline used by the framework.
-// - Build one reusable runtime object that carries app, container, router, config, DB, Redis, and JWT capabilities.
-// - Centralize health checks, metrics, pprof, graceful shutdown, and host/direct run behavior.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file assembles and runs the default HTTP service mainline.
+// Builds reusable runtime carrying app, container, router, config, DB, Redis, JWT.
 //
-// 适用场景：
-// - 装配并运行框架默认 HTTP 服务主线。
-// - 构建一个复用型 runtime 对象，统一承载 app、container、router、config、DB、Redis 和 JWT 能力。
-// - 集中管理健康检查、指标、pprof、优雅停机以及 host/direct 两种运行模式。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件装配并运行框架默认 HTTP 服务主线。
+// 构建复用型 runtime 对象，统一承载 app、container、router、config、DB、Redis、JWT 能力。
 package bootstrap
 
 import (
@@ -55,6 +53,7 @@ type HTTPServiceOptions struct {
 	EnablePprof    bool
 	GovernanceMode string
 	GovernanceDisable  []string
+	GovernanceEnable   []string
 	GovernanceProviders map[string]string
 }
 
@@ -86,7 +85,7 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	if err := c.RegisterProviders(providers...); err != nil {
 		return nil, fmt.Errorf("register providers: %w", err)
 	}
-	if err := registerSelectedMicroserviceProvidersWithOptionsFunc(c, opts.GovernanceMode, opts.GovernanceDisable, opts.GovernanceProviders); err != nil {
+	if err := registerSelectedMicroserviceProvidersWithOptionsFunc(c, opts.GovernanceMode, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders); err != nil {
 		return nil, fmt.Errorf("register selected microservice providers: %w", err)
 	}
 
@@ -100,7 +99,7 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		ServiceName: serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
-	effectiveConfig := overlayGovernanceConfig(rt.Config, opts.GovernanceDisable, opts.GovernanceProviders)
+	effectiveConfig := overlayGovernanceConfig(rt.Config, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders)
 	governanceMode := DetectGovernanceMode(effectiveConfig)
 	if opts.GovernanceMode != "" {
 		governanceMode = NormalizeGovernanceMode(resiliencecontract.GovernanceMode(opts.GovernanceMode))

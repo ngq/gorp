@@ -1,3 +1,27 @@
+// Package gorm provides GORM ORM integration for gorp framework.
+// Supported drivers: sqlite/sqlite3, mysql, postgres/postgresql/pgsql.
+// Configuration via config.yaml:
+//
+// GORM ORM 包，提供基于 GORM 的数据库 ORM 能力。
+// 支持的驱动：sqlite/sqlite3, mysql, postgres/postgresql/pgsql。
+// 通过 config.yaml 配置：
+//
+//	database:
+//	  driver: mysql
+//	  dsn: "user:password@tcp(localhost:3306)/dbname?charset=utf8mb4"
+//	  max_open_conns: 100
+//	  max_idle_conns: 10
+//	  conn_max_lifetime: "30m"
+//	  conn_max_idletime: "10m"
+//
+// Eg:
+//
+//	// 注册 Provider
+//	app.Register(gorm.NewProvider())
+//
+//	// 使用 GORM
+//	db := c.MustMake(datacontract.GormKey).(*gorm.DB)
+//	db.Find(&users)
 package gorm
 
 import (
@@ -15,16 +39,36 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// Provider registers the GORM DB contract.
+//
+// Provider 注册 GORM 数据库契约。
 type Provider struct{}
 
+// NewProvider creates a new GORM provider instance.
+//
+// NewProvider 创建新的 GORM Provider 实例。
 func NewProvider() *Provider { return &Provider{} }
 
+// Name returns the provider name "orm.gorm".
+//
+// Name 返回 Provider 名称 "orm.gorm"。
 func (p *Provider) Name() string { return "orm.gorm" }
 
+// IsDefer returns false, GORM should be initialized immediately for DB connection.
+//
+// IsDefer 返回 false，GORM 应立即初始化以建立数据库连接。
 func (p *Provider) IsDefer() bool { return false }
 
+// Provides returns the GORM contract key.
+//
+// Provides 返回 GORM 契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.GormKey} }
 
+// Register binds the GORM DB factory to the container.
+// Core logic: Parse config, create dialector, open GORM, apply pool settings, start metrics collector.
+//
+// Register 将 GORM 数据库工厂绑定到容器。
+// 核心逻辑：解析配置、创建 dialector、打开 GORM、应用连接池设置、启动指标采集器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.GormKey, func(c runtimecontract.Container) (any, error) {
 		cfgAny, err := c.Make(datacontract.ConfigKey)
@@ -100,4 +144,7 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	return nil
 }
 
+// Boot is a no-op for GORM provider.
+//
+// Boot GORM Provider 无启动逻辑（初始化在 Register 中完成）。
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }

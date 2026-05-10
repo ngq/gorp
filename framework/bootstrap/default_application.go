@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Build the framework's default bootstrap application for CLI and general startup paths.
-// - Reuse one shared provider assembly strategy for non-HTTP bootstrap entrypoints.
-// - Expose a small set of helper constructors for default application creation.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file builds the default bootstrap application for CLI and general startup paths.
+// Reuses one shared provider assembly strategy for non-HTTP bootstrap entrypoints.
 //
-// 适用场景：
-// - 为 CLI 和通用启动路径构建框架默认 bootstrap application。
-// - 为非 HTTP 的 bootstrap 入口复用统一的 provider 装配策略。
-// - 暴露一组默认 application 构建辅助入口。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件为 CLI 和通用启动路径构建框架默认 bootstrap application。
+// 为非 HTTP 的 bootstrap 入口复用统一的 provider 装配策略。
 package bootstrap
 
 import (

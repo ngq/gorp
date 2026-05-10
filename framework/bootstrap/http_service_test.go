@@ -30,7 +30,7 @@ func TestNewHTTPServiceRuntimeLeavesGovernanceOverrideEmptyByDefault(t *testing.
 	buildHTTPProvidersFunc = func(opts HTTPServiceOptions) []runtimecontract.ServiceProvider {
 		return nil
 	}
-	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, providers map[string]string) error {
+	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, enabled []string, providers map[string]string) error {
 		gotMode = modeOverride
 		return sentinel
 	}
@@ -56,7 +56,7 @@ func TestNewHTTPServiceRuntimeForwardsMicroserviceGovernanceOverride(t *testing.
 	buildHTTPProvidersFunc = func(opts HTTPServiceOptions) []runtimecontract.ServiceProvider {
 		return nil
 	}
-	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, providers map[string]string) error {
+	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, enabled []string, providers map[string]string) error {
 		gotMode = modeOverride
 		return sentinel
 	}
@@ -83,7 +83,7 @@ func TestNewHTTPServiceRuntimeForwardsGovernanceDisableAndProviderOverrides(t *t
 	)
 	sentinel := errors.New("stop after capture")
 	buildHTTPProvidersFunc = func(opts HTTPServiceOptions) []runtimecontract.ServiceProvider { return nil }
-	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, providers map[string]string) error {
+	registerSelectedMicroserviceProvidersWithOptionsFunc = func(c runtimecontract.Container, modeOverride string, disabled []string, enabled []string, providers map[string]string) error {
 		gotDisabled = append([]string(nil), disabled...)
 		gotProviders = providers
 		return sentinel
@@ -530,6 +530,7 @@ func TestBuildGovernanceSummaryWithModeOverrideReportsCodeAndConfigSources(t *te
 			"circuit_breaker.enabled":       true,
 		}},
 		[]string{"selector"},
+		nil,
 		map[string]string{"serviceauth": "mtls"},
 	)
 

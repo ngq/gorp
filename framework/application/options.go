@@ -1,12 +1,18 @@
-// Application scenarios:
-// - Expose startup option builders for the application package.
-// - Let business code declare HTTP mode, provider sets, migration hooks, and route registration succinctly.
-// - Keep option composition stable while allowing setup and route hooks to grow incrementally.
+// Package application provides application startup entrypoints for gorp framework.
+// This file exposes startup option builders for HTTP mode, providers, hooks.
+// Lets business code declare startup configuration succinctly.
 //
-// 适用场景：
-// - 暴露 application 包的启动选项构造入口。
-// - 让业务代码可以简洁声明 HTTP 模式、provider 集合、迁移钩子和路由注册逻辑。
-// - 在保持选项组合语义稳定的前提下，支持 setup 与路由钩子逐步扩展。
+// 应用启动包提供 gorp 框架的应用启动入口。
+// 本文件暴露启动选项构造入口，包括 HTTP 模式、provider、钩子。
+// 让业务代码可以简洁声明启动配置。
+//
+// Eg:
+//
+//	application.Run("my-service",
+//	    application.HTTP(),
+//	    application.WithProviders(configprovider.NewProvider()),
+//	    application.WithHTTPRoutes(registerRoutes),
+//	)
 package application
 
 import (
@@ -216,6 +222,22 @@ func WithGovernanceDisabled(names ...string) Option {
 			return
 		}
 		cfg.httpOpts.GovernanceDisable = append(cfg.httpOpts.GovernanceDisable, names...)
+	})
+}
+
+// WithGovernanceEnabled explicitly enables one or more governance capabilities that are off by default.
+// This is the symmetric counterpart of WithGovernanceDisabled.
+// When the same feature appears in both enable and disable, disable takes precedence.
+//
+// WithGovernanceEnabled 显式开启一个或多个默认关闭的治理能力。
+// 这是 WithGovernanceDisabled 的对称入口。
+// 当同一 feature 同时出现在 enable 和 disable 中时，disable 生效。
+func WithGovernanceEnabled(names ...string) Option {
+	return optionFunc(func(cfg *runConfig) {
+		if len(names) == 0 {
+			return
+		}
+		cfg.httpOpts.GovernanceEnable = append(cfg.httpOpts.GovernanceEnable, names...)
 	})
 }
 

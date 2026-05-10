@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Manage the process-wide default logger used across the framework.
-// - Keep default logger reads and writes concurrency-safe.
-// - Provide a noop fallback so logging calls remain safe before explicit initialization.
+// Package log provides lightweight logging utilities for gorp framework.
+// This file manages process-wide default logger used across the framework.
+// Keeps default logger reads and writes concurrency-safe with noop fallback.
 //
-// 适用场景：
-// - 管理框架全局使用的进程级默认 logger。
-// - 保证默认 logger 的读写具备并发安全。
-// - 提供 noop 回退，确保在显式初始化前日志调用也始终安全。
+// 日志包提供 gorp 框架的轻量日志工具能力。
+// 本文件管理框架全局使用的进程级默认 logger。
+// 保证默认 logger 的读写具备并发安全，提供 noop 回退。
 package log
 
 import (

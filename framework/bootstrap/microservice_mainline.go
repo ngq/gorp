@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide the full provider bundle used by microservice-oriented bootstrap paths.
-// - Collect discovery, selector, RPC, tracing, metadata, service-auth, and DTM capabilities in one place.
-// - Keep microservice mainline assembly explicit and reusable.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file provides full provider bundle for microservice-oriented bootstrap paths.
+// Collects discovery, selector, RPC, tracing, metadata, service-auth, DTM capabilities.
 //
-// 适用场景：
-// - 为微服务导向的 bootstrap 路径提供完整 provider 组合。
-// - 在一个位置集中 discovery、selector、RPC、tracing、metadata、service-auth 和 DTM 能力。
-// - 让微服务主线装配保持显式且可复用。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件为微服务导向的 bootstrap 路径提供完整 provider 组合。
+// 在一个位置集中 discovery、selector、RPC、tracing、metadata、service-auth、DTM 能力。
 package bootstrap
 
 import (

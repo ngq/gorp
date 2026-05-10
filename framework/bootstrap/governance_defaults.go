@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Centralize the mode-aware default provider backends used by the governance bootstrap path.
-// - Give selectors one stable source of truth for monolith, microservice, and gin-first defaults.
-// - Keep provider-default behavior testable without scattering mode checks across many selectors.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file centralizes mode-aware default provider backends for governance bootstrap.
+// Provides stable source of truth for monolith, microservice, and gin-first defaults.
 //
-// 适用场景：
-// - 集中维护治理 bootstrap 路径里按模式生效的默认 provider backend。
-// - 为 monolith、microservice、gin-first 三种模式提供统一默认值真源。
-// - 让 provider 默认行为可测试，而不是把模式判断散落到多个 selector 中。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件集中维护治理 bootstrap 路径里按模式生效的默认 provider backend。
+// 为 monolith、microservice、gin-first 三种模式提供统一默认值真源。
 package bootstrap
 
 import resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
@@ -23,6 +21,7 @@ type GovernanceProviderDefaults struct {
 	Metadata       string
 	ServiceAuth    string
 	CircuitBreaker string
+	Retry          string
 	DTM            string
 	MessageQueue   string
 	DistributedLock string
@@ -44,6 +43,7 @@ func DefaultGovernanceProviderDefaults(mode resiliencecontract.GovernanceMode) G
 		Metadata:        "noop",
 		ServiceAuth:     "noop",
 		CircuitBreaker:  "noop",
+		Retry:           "noop",
 		DTM:             "noop",
 		MessageQueue:    "noop",
 		DistributedLock: "noop",

@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Centralize small internal helpers used by the application startup flow.
-// - Normalize option handling and startup context checks before runtime construction.
-// - Keep helper logic separate from exported APIs so the public entrypoints stay easy to scan.
+// Package application provides application startup entrypoints for gorp framework.
+// This file centralizes internal helpers for startup flow normalization.
+// Normalizes option handling and startup context checks before runtime construction.
 //
-// 适用场景：
-// - 集中管理 application 启动流程中使用的小型内部辅助逻辑。
-// - 在 runtime 构建前统一处理选项归一化与启动 context 检查。
-// - 将辅助逻辑与导出 API 分离，让公开入口保持更易浏览的结构。
+// 应用启动包提供 gorp 框架的应用启动入口。
+// 本文件集中管理启动流程的内部辅助逻辑。
+// 在 runtime 构建前统一处理选项归一化与启动 context 检查。
 package application
 
 import (

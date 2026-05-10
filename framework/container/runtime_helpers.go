@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose strongly typed helper accessors on top of the generic runtime container.
-// - Let higher-level code fetch common capabilities without repeating type assertions.
-// - Keep convenience helpers close to the container package while preserving contract-driven resolution.
+// Package container provides runtime dependency injection container for gorp framework.
+// This file exposes strongly typed helper accessors for common capabilities.
+// Lets higher-level code fetch DB, Redis, Logger without type assertions.
 //
-// 适用场景：
-// - 在通用运行时容器之上暴露强类型辅助访问入口。
-// - 让上层代码获取常见能力时无需重复编写类型断言。
-// - 在保持契约驱动解析的前提下，把便捷 helper 收口在 container 包内。
+// 容器包提供 gorp 框架的运行时依赖注入容器实现。
+// 本文件在通用运行时容器之上暴露强类型辅助访问入口。
+// 让上层代码获取 DB、Redis、Logger 等常见能力时无需类型断言。
 package container
 
 import (

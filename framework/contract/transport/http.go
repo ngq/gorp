@@ -43,3 +43,14 @@ type HTTP interface {
 	// Shutdown 优雅关闭 HTTP 服务。
 	Shutdown(ctx context.Context) error
 }
+
+// GINEngineProvider is an optional interface that HTTP implementations can satisfy
+// to expose the underlying *gin.Engine for Gin-first usage.
+// When the HTTP service is backed by Gin, callers can type-assert to this interface
+// to access native Gin capabilities.
+//
+// GINEngineProvider 是 HTTP 实现可满足的可选接口，用于暴露底层 *gin.Engine 供 Gin-first 使用。
+// 当 HTTP 服务由 Gin 驱动时，调用方可通过类型断言访问原生 Gin 能力。
+type GINEngineProvider interface {
+	GINEngine() any
+}

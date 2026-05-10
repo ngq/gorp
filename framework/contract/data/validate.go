@@ -111,8 +111,13 @@ func (e ValidationErrors) Errors() []string {
 //
 // ValidatorConfig 描述校验器级配置。
 type ValidatorConfig struct {
-	Enabled bool
-	Locale  string
+	Enabled         bool
+	Locale          string
+	TranslateErrors bool // TranslateErrors controls whether to translate validation errors.
+	                   // When false, returns raw English errors for better performance.
+	                   //
+	                   // TranslateErrors 控制是否翻译校验错误。
+	                   // 为 false 时返回原始英文错误，性能更好。
 
 	CustomRules map[string]CustomRuleConfig
 }

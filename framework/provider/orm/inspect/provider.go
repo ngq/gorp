@@ -1,3 +1,19 @@
+// Package inspect provides database schema inspection service.
+// Supported drivers: sqlite/sqlite3, mysql, pgx (PostgreSQL).
+// The service queries information_schema or PRAGMA tables to get schema metadata.
+//
+// 数据库 schema 检查服务包，提供表和列信息查询能力。
+// 支持的驱动：sqlite/sqlite3, mysql, pgx (PostgreSQL)。
+// 服务通过查询 information_schema 或 PRAGMA 表获取 schema 元数据。
+// Eg:
+//
+//	// 注册 Provider（依赖 sqlx）
+//	app.Register(inspect.NewProvider())
+//
+//	// 使用检查服务
+//	inspector := c.MustMake(datacontract.DBInspectorKey).(datacontract.DBInspector)
+//	tables, _ := inspector.Tables(ctx)
+//	columns, _ := inspector.Columns(ctx, "users")
 package inspect
 
 import (
@@ -11,14 +27,36 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// Provider registers the database inspector contract.
+//
+// Provider 注册数据库检查器契约。
 type Provider struct{}
 
+// NewProvider creates a new inspect provider instance.
+//
+// NewProvider 创建新的检查器 Provider 实例。
 func NewProvider() *Provider { return &Provider{} }
 
-func (p *Provider) Name() string       { return "orm.inspect" }
-func (p *Provider) IsDefer() bool      { return false }
+// Name returns the provider name "orm.inspect".
+//
+// Name 返回 Provider 名称 "orm.inspect"。
+func (p *Provider) Name() string { return "orm.inspect" }
+
+// IsDefer returns false, inspector should be initialized immediately.
+//
+// IsDefer 返回 false，检查器应立即初始化。
+func (p *Provider) IsDefer() bool { return false }
+
+// Provides returns the DB inspector contract key.
+//
+// Provides 返回数据库检查器契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.DBInspectorKey} }
 
+// Register binds the inspector service factory to the container.
+// Note: This provider depends on SQLX provider being registered first.
+//
+// Register 将检查器服务工厂绑定到容器。
+// 注意：此 Provider 依赖 SQLX Provider 先注册。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.DBInspectorKey, func(c runtimecontract.Container) (any, error) {
 		v, err := c.Make(datacontract.SQLXKey)
@@ -32,17 +70,35 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	return nil
 }
 
+// Boot is a no-op for inspect provider.
+//
+// Boot 检查器 Provider 无启动逻辑。
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
+// Service implements datacontract.DBInspector interface.
+//
+// Service 实现 datacontract.DBInspector 接口。
 type Service struct {
-	db     *sqlx.DB
-	driver string
+	db     *sqlx.DB // db is the underlying database connection.
+	              //
+	               // db 底层数据库连接。
+	driver string   // driver is the database driver name.
+	              //
+	               // driver 数据库驱动名称。
 }
 
+// Ping checks database connectivity.
+//
+// Ping 检查数据库连接是否正常。
 func (s *Service) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
+// Tables returns all table names in the database.
+// Core logic: Query driver-specific system tables (sqlite_master, information_schema.tables).
+//
+// Tables 返回数据库中所有表的名称。
+// 核心逻辑：查询驱动特定的系统表（sqlite_master、information_schema.tables）。
 func (s *Service) Tables(ctx context.Context) ([]datacontract.Table, error) {
 	switch s.driver {
 	case "sqlite", "sqlite3":
@@ -95,6 +151,11 @@ func (s *Service) Tables(ctx context.Context) ([]datacontract.Table, error) {
 	}
 }
 
+// Columns returns all column info for a specific table.
+// Core logic: Query driver-specific system tables (PRAGMA table_info, information_schema.columns).
+//
+// Columns 返回指定表的所有列信息。
+// 核心逻辑：查询驱动特定的系统表（PRAGMA table_info、information_schema.columns）。
 func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Column, error) {
 	switch s.driver {
 	case "sqlite", "sqlite3":
@@ -227,6 +288,11 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 	}
 }
 
+// quoteSQLiteIdent quotes a SQLite identifier to handle special characters.
+// Core logic: Escape double quotes by doubling them, then wrap in quotes.
+//
+// quoteSQLiteIdent 对 SQLite 标识符进行引号包裹，处理特殊字符。
+// 核心逻辑：双引号转义为两个双引号，再用双引号包裹。
 func quoteSQLiteIdent(name string) string {
 	escaped := ""
 	for _, r := range name {

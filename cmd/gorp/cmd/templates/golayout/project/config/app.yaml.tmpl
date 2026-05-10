@@ -25,27 +25,56 @@ log:
   level: debug
   format: console  # console, json
 
-# tracing 配置（关闭；需要时再切到 otel）
+# tracing 配置
 tracing:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用 tracing
+  enabled: true
+  backend: otel
+  service_name: {{.Name}}
+  otel:
+    endpoint: localhost:4317
+  sampling_rate: 1.0
+{{- else }}
+  # 单体/Gin-first 模式：关闭；需要时再切到 otel
   enabled: false
   backend: otel
   service_name: {{.Name}}
   otel:
     endpoint: localhost:4317
   sampling_rate: 1.0
+{{- end }}
 
-# metadata 传播配置（关闭；需要时再启用默认前缀传播）
+# metadata 传播配置
 metadata:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用 metadata 传播
+  enabled: true
+  backend: default
+  propagate_prefix:
+    - x-md-
+{{- else }}
+  # 单体/Gin-first 模式：关闭；需要时再启用
   enabled: false
   backend: default
   propagate_prefix:
     - x-md-
+{{- end }}
 
 # 治理覆盖配置
-# - mode 由 cmd/app/main.go 中的 gorp.WithMicroserviceMode() 决定，通常不需要在这里重复声明
+# - mode 由 cmd/app/main.go 中的治理模式决定，通常不需要在这里重复声明
 # - disable 用于显式关闭某个默认治理件
 # - providers 用于显式替换默认 provider backend
 governance:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：自动启用 tracing/selector/serviceauth/circuitbreaker
+  disable: []
+  providers:
+    tracing: otel
+    selector: p2c_ewma
+    serviceauth: token
+    circuitbreaker: sentinel
+{{- else }}
   disable: []
   providers: {}
   # 示例：
@@ -55,9 +84,22 @@ governance:
   # providers:
   #   serviceauth: mtls
   #   tracing: noop
+{{- end }}
 
-# service_auth 配置（关闭；需要服务间调用时再启用 token 模式）
+# service_auth 配置
 service_auth:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用服务间认证
+  enabled: true
+  backend: token
+  token:
+    secret: change-me-in-production
+    issuer: {{.Name}}
+    audience: ""
+    expiry: 3600
+  allowed_services: []
+{{- else }}
+  # 单体/Gin-first 模式：关闭；需要服务间调用时再启用
   enabled: false
   backend: token
   token:
@@ -66,6 +108,49 @@ service_auth:
     audience: ""
     expiry: 3600
   allowed_services: []
+{{- end }}
+
+# circuit_breaker 配置
+circuit_breaker:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用熔断
+  enabled: true
+  backend: sentinel
+  sentinel:
+    strategy: error_count
+    threshold: 50
+    retry_timeout_ms: 5000
+{{- else }}
+  # 单体/Gin-first 模式：关闭
+  enabled: false
+  backend: sentinel
+{{- end }}
+
+# selector 配置
+selector:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用 P2C 选择器
+  enabled: true
+  backend: p2c_ewma
+{{- else }}
+  # 单体/Gin-first 模式：关闭
+  enabled: false
+  backend: random
+{{- end }}
+
+# discovery 配置
+discovery:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用服务发现
+  enabled: true
+  backend: etcd
+  etcd:
+    endpoints: ["localhost:2379"]
+{{- else }}
+  # 单体/Gin-first 模式：关闭
+  enabled: false
+  backend: noop
+{{- end }}
 
 # 业务 JWT 配置（已预留接入位）
 auth:

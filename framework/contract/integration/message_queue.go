@@ -142,18 +142,94 @@ func WithTTL(ttl time.Duration) PublishOption {
 type MessageQueueConfig struct {
 	Type string
 
+	// Redis configuration
 	RedisAddr     string
 	RedisPassword string
 	RedisDB       int
 
-	RabbitMQURL   string
-	RabbitMQVHost string
+	// Kafka configuration (using IBM/sarama SDK)
+	KafkaBrokers         []string
+	KafkaGroupID         string
+	KafkaClientID        string
+	KafkaVersion         string // e.g., "2.8.0"
+	KafkaCompression     string // "none", "gzip", "snappy", "lz4", "zstd"
+	KafkaPartitioner     string // "hash", "random", "round-robin"
+	KafkaRequiredACKs    int    // 0=NoResponse, 1=Leader, -1=All
+	KafkaMaxMessageBytes int
+	KafkaFlushFrequency  time.Duration
+	KafkaEnableTLS       bool
+	KafkaTLSCertFile     string
+	KafkaTLSKeyFile      string
+	KafkaTLSCACertFile   string
 
-	KafkaBrokers []string
-	KafkaGroupID string
+	// RabbitMQ configuration (using amqp091-go SDK)
+	RabbitMQURL          string // "amqp://guest:guest@localhost:5672/"
+	RabbitMQVHost        string
+	RabbitMQExchange     string
+	RabbitMQExchangeType string // "direct", "fanout", "topic", "headers"
+	RabbitMQQueuePrefix  string
+	RabbitMQPrefetch     int
+	RabbitMQEnableTLS    bool
 
+	// RocketMQ configuration (using apache/rocketmq-client-go SDK)
+	RocketMQNamesrvAddr  string // "localhost:9876"
+	RocketMQGroupName    string
+	RocketMQInstanceName string
+	RocketMQRetryTimes   int
+	RocketMQEnableTLS    bool
+
+	// Common configuration
 	MaxRetry       int
 	RetryDelay     time.Duration
 	Timeout        time.Duration
 	ConsumerBuffer int
+}
+
+// NativeMQClientProvider is an optional interface that MessageQueue implementations
+// can satisfy to expose the underlying native MQ client for advanced usage.
+// This allows "MQ-first" users to access native SDK capabilities while staying
+// within the framework's governance boundary.
+//
+// NativeMQClientProvider 是 MessageQueue 实现可满足的可选接口，
+// 用于暴露底层原生 MQ 客户端供高级使用。
+// 这允许"MQ-first"用户访问原生 SDK 能力，同时保持在框架的治理边界内。
+type NativeMQClientProvider interface {
+	// NativeMQClient returns the underlying MQ client instance.
+	// The concrete type depends on the implementation:
+	//   - redis: *redis.Client
+	//   - kafka: sarama.Client
+	//   - rabbitmq: *amqp.Connection
+	//   - rocketmq: rocketmq.Producer or rocketmq.Consumer
+	//
+	// NativeMQClient 返回底层 MQ 客户端实例。
+	// 具体类型取决于实现。
+	NativeMQClient() any
+}
+
+// NativePublisherProvider is an optional interface for accessing
+// the underlying native publisher client.
+//
+// NativePublisherProvider 是访问底层原生发布者客户端的可选接口。
+type NativePublisherProvider interface {
+	// NativePublisher returns the underlying native publisher.
+	// The concrete type depends on the implementation:
+	//   - redis: *redis.Client
+	//   - kafka: sarama.SyncProducer or sarama.AsyncProducer
+	//   - rabbitmq: *amqp.Channel
+	//   - rocketmq: rocketmq.Producer
+	NativePublisher() any
+}
+
+// NativeSubscriberProvider is an optional interface for accessing
+// the underlying native subscriber client.
+//
+// NativeSubscriberProvider 是访问底层原生订阅者客户端的可选接口。
+type NativeSubscriberProvider interface {
+	// NativeSubscriber returns the underlying native subscriber.
+	// The concrete type depends on the implementation:
+	//   - redis: *redis.PubSub
+	//   - kafka: sarama.ConsumerGroup
+	//   - rabbitmq: *amqp.Channel
+	//   - rocketmq: rocketmq.PushConsumer or rocketmq.PullConsumer
+	NativeSubscriber() any
 }

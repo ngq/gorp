@@ -48,8 +48,15 @@ func DefaultGovernanceFeatureSet(mode GovernanceMode) GovernanceFeatureSet {
 		base.Selector = true
 		base.ServiceAuth = true
 		base.CircuitBreaker = true
+		// LoadShedding 在微服务模式下默认启用，提供过载保护。
+		// 默认值：MaxConcurrent = runtime.GOMAXPROCS(0) * 100（约 100-800 并发）
+		base.LoadShedding = true
 	case GovernanceModeGinFirst:
-		fallthrough
+		// Gin-first 模式：基础能力与 monolith 相同，
+		// 但语义不同——框架不自动注入高级治理 middleware，
+		// 用户通过 *gin.Engine.Use(AdaptMiddleware(...)) 按需手动挂载。
+		// 基础 5 项由框架 preset 自动启用，高级能力需显式开启。
+		return base
 	case GovernanceModeMonolith:
 		return base
 	default:
@@ -57,4 +64,68 @@ func DefaultGovernanceFeatureSet(mode GovernanceMode) GovernanceFeatureSet {
 	}
 
 	return base
+}
+
+// GovernanceDefaultsTable captures all governance default values for one mode,
+// projected into a serializable, inspection-friendly format.
+// This struct is populated lazily (only when view=defaults is requested)
+// to avoid bloating the default GovernanceSummary JSON output.
+//
+// GovernanceDefaultsTable 捕获某个治理模式下所有默认值，
+// 以可序列化、可检查的格式呈现。
+// 此结构体按需填充（仅在 view=defaults 时请求），
+// 避免撑大默认的 GovernanceSummary JSON 输出。
+type GovernanceDefaultsTable struct {
+	Mode                   GovernanceMode         `json:"mode"`
+	FeatureDefaults        map[string]bool        `json:"feature_defaults"`
+	ProviderDefaults       map[string]string      `json:"provider_defaults"`
+	HTTPMiddlewareDefaults HTTPMiddlewareDefaults `json:"http_middleware_defaults"`
+	RPCClientDefaults      RPCClientDefaults      `json:"rpc_client_defaults"`
+}
+
+// HTTPMiddlewareDefaults captures the default HTTP middleware option values.
+//
+// HTTPMiddlewareDefaults 捕获 HTTP 中间件的默认选项值。
+type HTTPMiddlewareDefaults struct {
+	Timeout           string                 `json:"timeout"`
+	BodyLimit         string                 `json:"body_limit"`
+	MaxConcurrent     int                    `json:"max_concurrent"`
+	EnableMetrics     bool                   `json:"enable_metrics"`
+	EnableCompression bool                   `json:"enable_compression"`
+	CORS              CORSDefaults           `json:"cors"`
+	SecurityHeaders   SecurityHeaderDefaults `json:"security_headers"`
+	Locale            LocaleDefaults         `json:"locale"`
+}
+
+// CORSDefaults captures CORS-specific default values (applied when CORS is explicitly enabled).
+//
+// CORSDefaults 捕获 CORS 相关默认值（显式启用 CORS 时生效）。
+type CORSDefaults struct {
+	AllowOrigins  []string `json:"allow_origins"`
+	MaxAgeSeconds int      `json:"max_age_seconds"`
+}
+
+// SecurityHeaderDefaults captures security-header-specific default values.
+//
+// SecurityHeaderDefaults 捕获安全头相关默认值。
+type SecurityHeaderDefaults struct {
+	XFrameOptions       string `json:"x_frame_options"`
+	XContentTypeOptions string `json:"x_content_type_options"`
+	ReferrerPolicy      string `json:"referrer_policy"`
+}
+
+// LocaleDefaults captures locale-specific default values.
+//
+// LocaleDefaults 捕获本地化相关默认值。
+type LocaleDefaults struct {
+	Supported []string `json:"supported"`
+	Default   string   `json:"default"`
+	QueryKeys []string `json:"query_keys"`
+}
+
+// RPCClientDefaults captures the default RPC client option values.
+//
+// RPCClientDefaults 捕获 RPC 客户端默认选项值。
+type RPCClientDefaults struct {
+	Timeout string `json:"timeout"`
 }

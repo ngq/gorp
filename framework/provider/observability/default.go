@@ -1,3 +1,10 @@
+// Package observability provides observability service implementation for gorp framework.
+// Includes metrics, tracing, logging, and error reporting components.
+// Prometheus metrics, noop tracer by default, extensible to OpenTelemetry.
+//
+// 可观测性包提供可观测性服务实现，用于 gorp 框架。
+// 包括指标、追踪、日志和错误上报组件。
+// Prometheus 指标、默认 noop tracer，可扩展到 OpenTelemetry。
 package observability
 
 import (
@@ -10,6 +17,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// DefaultObservability aggregates metrics, tracer, logger, and error reporter.
+// Core logic: Provide unified access to all observability components.
+//
+// DefaultObservability 聚合指标、追踪器、日志器和错误上报器。
+// 核心逻辑：提供统一的可观测性组件访问入口。
 type DefaultObservability struct {
 	metrics       observabilitycontract.Metrics
 	tracer        observabilitycontract.Tracer
@@ -17,6 +29,11 @@ type DefaultObservability struct {
 	errorReporter resiliencecontract.ErrorReporter
 }
 
+// NewDefaultObservability creates observability with all components.
+// Core logic: Store all components for unified access.
+//
+// NewDefaultObservability 创建携带所有组件的可观测性实例。
+// 核心逻辑：存储所有组件供统一访问。
 func NewDefaultObservability(
 	metrics observabilitycontract.Metrics,
 	tracer observabilitycontract.Tracer,

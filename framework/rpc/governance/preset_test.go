@@ -28,10 +28,10 @@ func (r *captureRetry) IsRetryable(err error) bool { return false }
 // TestDefaultClientPresetOrderStable 验证出站 RPC 治理顺序保持稳定。
 func TestDefaultClientPresetOrderStable(t *testing.T) {
 	order := DefaultClientPresetOrder()
-	if len(order) != 7 {
-		t.Fatalf("expected 7 outbound governance stages, got %d", len(order))
+	if len(order) != 8 {
+		t.Fatalf("expected 8 outbound governance stages (including loadshedding), got %d", len(order))
 	}
-	expected := []string{"selector", "timeout", "tracing", "metadata", "serviceauth", "breaker", "retry"}
+	expected := []string{"selector", "timeout", "tracing", "metadata", "serviceauth", "loadshedding", "breaker", "retry"}
 	for i := range expected {
 		if order[i] != expected[i] {
 			t.Fatalf("expected stable order %v, got %v", expected, order)

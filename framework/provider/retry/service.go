@@ -1,3 +1,8 @@
+// Package retry provides retry service implementation.
+// Implements retry logic with exponential backoff, jitter, and error classification.
+//
+// 重试包提供重试服务实现。
+// 实现带指数退避、抖动和错误分类的重试逻辑。
 package retry
 
 import (
@@ -14,11 +19,21 @@ import (
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
+// RetryService implements retry logic with configurable policy.
+// Core logic: Execute function with retry, calculate delay with jitter, classify retryable errors.
+//
+// RetryService 实现带可配置策略的重试逻辑。
+// 核心逻辑：带重试执行函数、带抖动计算延迟、分类可重试错误。
 type RetryService struct {
 	cfg *resiliencecontract.RetryConfig
 	rng *rand.Rand
 }
 
+// NewRetryService creates a retry service with configuration.
+// Core logic: Initialize random source for jitter.
+//
+// NewRetryService 创建带配置的重试服务。
+// 核心逻辑：初始化随机源用于抖动。
 func NewRetryService(cfg *resiliencecontract.RetryConfig) *RetryService {
 	return &RetryService{
 		cfg: cfg,
@@ -26,6 +41,11 @@ func NewRetryService(cfg *resiliencecontract.RetryConfig) *RetryService {
 	}
 }
 
+// Do executes function with default retry policy.
+// Core logic: Call doWithPolicy with default config.
+//
+// Do 使用默认重试策略执行函数。
+// 核心逻辑：调用 doWithPolicy 并使用默认配置。
 func (r *RetryService) Do(ctx context.Context, fn func() error) error {
 	return r.doWithPolicy(ctx, r.cfg.DefaultPolicy, fn)
 }
@@ -82,6 +102,11 @@ func (r *RetryService) DoWithResult(ctx context.Context, fn func() (any, error))
 	return result, nil
 }
 
+// IsRetryable checks if error is retryable based on policy.
+// Core logic: Check AppError reason/code, gRPC status, network error type.
+//
+// IsRetryable 根据策略检查错误是否可重试。
+// 核心逻辑：检查 AppError reason/code、gRPC status、网络错误类型。
 func (r *RetryService) IsRetryable(err error) bool {
 	if err == nil {
 		return false

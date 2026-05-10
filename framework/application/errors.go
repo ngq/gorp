@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Define stable startup and assembly error sentinels for the application package.
-// - Let callers use `errors.Is` against well-known bootstrap and runtime failures.
-// - Keep error semantics centralized while other application files focus on behavior.
+// Package application provides application startup entrypoints for gorp framework.
+// This file defines stable startup and assembly error sentinels.
+// Let callers use errors.Is against well-known bootstrap and runtime failures.
 //
-// 适用场景：
-// - 为 application 包定义稳定的启动与装配错误哨兵值。
-// - 让调用方可以通过 `errors.Is` 判断已知的启动与运行时失败。
-// - 将错误语义集中管理，让其他 application 文件专注于行为实现。
+// 应用启动包提供 gorp 框架的应用启动入口。
+// 本文件定义稳定的启动与装配错误哨兵值。
+// 让调用方可以通过 errors.Is 判断已知的启动与运行时失败。
 package application
 
 import "errors"

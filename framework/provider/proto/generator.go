@@ -1,3 +1,10 @@
+// Package proto provides proto generator implementation.
+// Core implementation of ProtoGenerator contract.
+// Supports protoc invocation, Go AST parsing, Gin route parsing.
+//
+// Proto 包提供 proto 生成器实现。
+// ProtoGenerator 契约的核心实现。
+// 支持 protoc 调用、Go AST 解析、Gin 路由解析。
 package proto
 
 import (

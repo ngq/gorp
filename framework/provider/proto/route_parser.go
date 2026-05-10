@@ -1,3 +1,10 @@
+// Package proto provides route parser for Gin routes.
+// Converts Gin route definitions to proto service definitions.
+// Supports path parameter conversion (:id -> {id}).
+//
+// Proto 包提供路由解析器，用于 Gin 路由。
+// 将 Gin 路由定义转换为 proto service 定义。
+// 支持路径参数转换（:id -> {id}）。
 package proto
 
 import (

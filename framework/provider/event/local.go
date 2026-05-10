@@ -1,3 +1,10 @@
+// Package event provides local in-memory event bus implementation for gorp framework.
+// Suitable for single-application internal event communication.
+// Supports synchronous and asynchronous publishing, multiple handlers per event.
+//
+// 事件包提供本地内存事件总线实现，用于 gorp 框架。
+// 适用于单体应用内部事件通信。
+// 支持同步和异步发布、单事件多处理器。
 package event
 
 import (

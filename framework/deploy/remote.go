@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide a lightweight SSH command execution helper for deploy workflows.
-// - Hide session lifecycle management behind one small utility function.
-// - Return merged stdout/stderr output for deployment logging and diagnostics.
+// Package deploy provides deployment utilities for gorp framework.
+// Provides lightweight SSH command execution helper for deploy workflows.
+// Hides session lifecycle management, returns merged stdout/stderr output.
 //
-// 适用场景：
-// - 为部署流程提供轻量级 SSH 命令执行 helper。
-// - 把 session 生命周期管理隐藏在一个小工具函数后面。
-// - 返回合并后的 stdout/stderr 输出，方便部署日志和排障。
+// 部署包提供 gorp 框架的部署工具能力。
+// 为部署流程提供轻量级 SSH 命令执行 helper。
+// 把 session 生命周期管理隐藏在一个小工具函数后面。
 package deploy
 
 import (

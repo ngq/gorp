@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose the public version marker of the root package.
-// - Give release tooling and business code one stable constant for build/version display.
-// - Keep source-build and release-build version semantics explicit.
+// Package gorp provides the root-package application startup surface for gorp framework.
+// This file exposes the public version marker of the root package.
+// Provides stable constant for build/version display for release tooling.
 //
-// 适用场景：
-// - 暴露根包层的公共版本标记。
-// - 为发布工具和业务代码提供稳定的构建/版本展示常量。
-// - 显式表达源码构建与正式发布的版本语义。
+// Gorp 包提供 gorp 框架的根包层应用启动入口。
+// 本文件暴露根包层的公共版本标记。
+// 为发布工具和业务代码提供稳定的构建/版本展示常量。
 package gorp
 
 // Release is the current public root-package version marker.

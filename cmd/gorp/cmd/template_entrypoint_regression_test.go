@@ -33,7 +33,7 @@ func TestGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
-	require.Contains(t, text, "gorp.WithMicroserviceMode()")
+	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
@@ -43,6 +43,58 @@ func TestGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	require.NotContains(t, text, "rt.Container")
 	require.NotContains(t, text, "cmd.Execute()")
 	require.Contains(t, text, `apphttp "example.com/golayout-entry/app/http"`)
+}
+
+func TestGoLayoutTemplateWithMicroserviceMode(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "golayout-microservice")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "golayout-microservice",
+		Module:          "example.com/golayout-microservice",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+		GovernanceMode:  "microservice",
+	})
+
+	require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(starterTemplateGoLayout), projectDir, data))
+
+	mainFile := filepath.Join(projectDir, "cmd", "app", "main.go")
+	content, err := os.ReadFile(mainFile)
+	require.NoError(t, err)
+	text := string(content)
+
+	require.Contains(t, text, "gorp.WithMicroserviceMode()")
+}
+
+func TestGoLayoutTemplateWithGinFirstMode(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "golayout-ginfirst")
+	data := buildScaffoldData(scaffoldInput{
+		Name:            "golayout-ginfirst",
+		Module:          "example.com/golayout-ginfirst",
+		FrameworkModule: "github.com/ngq/gorp",
+		FrameworkPath:   ".",
+		Backend:         "gorm",
+		WithDB:          true,
+		WithSwagger:     true,
+		GovernanceMode:  "gin-first",
+	})
+
+	require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(starterTemplateGoLayout), projectDir, data))
+
+	mainFile := filepath.Join(projectDir, "cmd", "app", "main.go")
+	content, err := os.ReadFile(mainFile)
+	require.NoError(t, err)
+	text := string(content)
+
+	require.Contains(t, text, "gorp.WithGinFirstMode()")
 }
 
 func TestGoLayoutTemplateRoutesDoNotDuplicateHealthz(t *testing.T) {
@@ -178,7 +230,7 @@ func TestMultiFlatWireTemplateUsesApplicationEntrypointAndKeepsWireInCmdLayer(t 
 	text := string(content)
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
-	require.Contains(t, text, "gorp.WithMicroserviceMode()")
+	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
@@ -219,7 +271,7 @@ func TestReleaseGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
-	require.Contains(t, text, "gorp.WithMicroserviceMode()")
+	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.Contains(t, text, "func migrate(rt *gorp.HTTPRuntime) error")
@@ -281,7 +333,7 @@ func TestReleaseProjectTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 
 	require.Contains(t, text, "gorp.Run(")
 	require.Contains(t, text, "gorp.HTTP()")
-	require.Contains(t, text, "gorp.WithMicroserviceMode()")
+	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.NotContains(t, text, "frameworkbootstrap.BootHTTPService(")
 	require.NotContains(t, text, "frameworkbootstrap.")

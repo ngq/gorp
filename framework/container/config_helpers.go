@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose typed config access helpers on top of the runtime container.
-// - Keep config capability lookup consistent across bootstrap and application code.
-// - Avoid repeating container-to-config assertions in callers.
+// Package container provides runtime dependency injection container for gorp framework.
+// This file exposes typed config access helpers on top of runtime container.
+// Keeps config capability lookup consistent across bootstrap and application code.
 //
-// 适用场景：
-// - 在运行时容器之上暴露强类型配置访问 helper。
-// - 让 bootstrap 与 application 代码获取配置能力时保持一致。
-// - 避免调用方重复编写 container 到 config 的断言逻辑。
+// 容器包提供 gorp 框架的运行时依赖注入容器实现。
+// 本文件在运行时容器之上暴露强类型配置访问 helper。
+// 让 bootstrap 与 application 代码获取配置能力时保持一致。
 package container
 
 import (

@@ -1,12 +1,20 @@
-// Application scenarios:
-// - Provide the runtime root-path capability used by bootstrap and filesystem-aware services.
-// - Resolve application base, storage, runtime, log, config, and temp directories from config and environment.
-// - Centralize default path conventions behind one provider bound to contract.RootKey.
+// Package app provides application root-path capability for gorp framework.
+// Resolves base, storage, runtime, log, config, and temp directories from config and environment.
+// Centralizes default path conventions behind one provider bound to contract.RootKey.
 //
-// 适用场景：
-// - 提供 bootstrap 和文件系统相关服务所需的运行时根路径能力。
-// - 根据配置和环境变量解析应用的 base、storage、runtime、log、config 和 temp 目录。
-// - 通过绑定到 contract.RootKey 的单一 provider 统一默认路径约定。
+// 应用路径包提供应用根路径能力，用于 gorp 框架。
+// 根据配置和环境变量解析 base、storage、runtime、log、config 和 temp 目录。
+// 通过绑定到 contract.RootKey 的单一 provider 统一默认路径约定。
+//
+// Eg:
+//
+//	// 注册 Provider
+//	app.Register(app.NewProvider())
+//
+//	// 获取路径服务
+//	root := c.MustMake(runtimecontract.RootKey).(runtimecontract.Root)
+//	logPath := root.LogPath()
+//	configPath := root.ConfigPath()
 package app
 
 import (

@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Build one effective governance summary that can be reused by startup logs, tests, and future inspect tooling.
-// - Keep "what is enabled", "what is disabled by override", and "which provider backends are active" visible in one place.
-// - Make implicit governance defaults observable without forcing users to expand all defaults in config files.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file builds governance summary for startup logs, tests, and inspect tooling.
+// Makes “what is enabled/disabled” and “provider backends” observable in one place.
 //
-// 适用场景：
-// - 生成统一的治理生效摘要，供启动日志、测试和后续 inspect 工具复用。
-// - 将“启用了什么”“被显式关闭了什么”“当前 provider backend 是什么”集中展示。
-// - 让隐式默认治理可观测，而不是要求用户在配置文件中展开所有默认值。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件生成统一的治理生效摘要，供启动日志、测试和后续 inspect 工具复用。
+// 将启用了什么、关闭了什么、当前 provider backend 集中展示。
 package bootstrap
 
 import (
@@ -22,21 +20,25 @@ import (
 //
 // GovernanceSummary 描述某个运行模式下最终生效的治理结果。
 type GovernanceSummary struct {
-	Mode                    resiliencecontract.GovernanceMode      `json:"mode"`
-	ModeSource              string                                 `json:"mode_source"`
-	ModeReason              string                                 `json:"mode_reason"`
-	EnabledFeatures         []string                               `json:"enabled_features"`
-	ModeDefaultFeatures     []string                               `json:"mode_default_features"`
-	DisabledByOverride      []string                               `json:"disabled_by_override"`
-	DisabledByConfig        []string                               `json:"disabled_by_config"`
-	DisabledByCode          []string                               `json:"disabled_by_code"`
-	FeatureDecisions        map[string]GovernanceFeatureDecision   `json:"feature_decisions"`
-	ProviderBackends        map[string]string                      `json:"provider_backends"`
-	ProviderDecisions       map[string]GovernanceProviderDecision  `json:"provider_decisions"`
-	ConfigSnapshot          map[string]any                         `json:"config_snapshot"`
-	ResolutionOrder         []string                               `json:"resolution_order"`
-	MiddlewareChainOrder    []string                               `json:"middleware_chain_order"`
-	RPCClientChainOrder     []string                               `json:"rpc_client_chain_order"`
+	Mode                 resiliencecontract.GovernanceMode           `json:"mode"`
+	ModeSource           string                                      `json:"mode_source"`
+	ModeReason           string                                      `json:"mode_reason"`
+	EnabledFeatures      []string                                    `json:"enabled_features"`
+	ModeDefaultFeatures  []string                                    `json:"mode_default_features"`
+	DisabledByOverride   []string                                    `json:"disabled_by_override"`
+	DisabledByConfig     []string                                    `json:"disabled_by_config"`
+	DisabledByCode       []string                                    `json:"disabled_by_code"`
+	EnabledByOverride    []string                                    `json:"enabled_by_override"`
+	EnabledByConfig      []string                                    `json:"enabled_by_config"`
+	EnabledByCode        []string                                    `json:"enabled_by_code"`
+	FeatureDecisions     map[string]GovernanceFeatureDecision        `json:"feature_decisions"`
+	ProviderBackends     map[string]string                           `json:"provider_backends"`
+	ProviderDecisions    map[string]GovernanceProviderDecision       `json:"provider_decisions"`
+	ConfigSnapshot       map[string]any                              `json:"config_snapshot"`
+	ResolutionOrder      []string                                    `json:"resolution_order"`
+	MiddlewareChainOrder []string                                    `json:"middleware_chain_order"`
+	RPCClientChainOrder  []string                                    `json:"rpc_client_chain_order"`
+	Defaults             *resiliencecontract.GovernanceDefaultsTable `json:"defaults,omitempty"`
 }
 
 // GovernanceFeatureDecision explains why one governance feature is enabled or disabled.
@@ -76,30 +78,36 @@ func BuildGovernanceSummaryWithModeOverride(cfg datacontract.Config, mode resili
 	configOverrides, codeOverrides, configView := splitGovernanceOverrides(cfg)
 	mergedOverrides := governanceOverrides{
 		Disabled:         mergeGovernanceDisabled(configOverrides.Disabled, codeOverrides.Disabled),
+		Enabled:          mergeGovernanceEnabled(configOverrides.Enabled, codeOverrides.Enabled),
 		ProviderBackends: mergeGovernanceProviderBackends(configOverrides.ProviderBackends, codeOverrides.ProviderBackends),
 	}
+	// 先关闭再开启：同一 feature 同时在 disable 和 enable 中时，disable 生效
 	features := applyGovernanceFeatureDisables(defaultFeatures, mergedOverrides.Disabled)
+	features = applyGovernanceFeatureEnables(features, mergedOverrides.Enabled)
 	modeSource, modeReason := governanceModeDecision(configView, modeOverride)
-	featureDecisions := buildGovernanceFeatureDecisions(mode, defaultFeatures, configOverrides.Disabled, codeOverrides.Disabled)
+	featureDecisions := buildGovernanceFeatureDecisions(mode, defaultFeatures, configOverrides.Disabled, codeOverrides.Disabled, configOverrides.Enabled, codeOverrides.Enabled)
 	providerDecisions := buildGovernanceProviderDecisions(configView, mode, configOverrides, codeOverrides)
 	configSnapshot := buildGovernanceConfigSnapshot(configView, modeOverride, configOverrides, codeOverrides)
 
 	return GovernanceSummary{
-		Mode:                mode,
-		ModeSource:          modeSource,
-		ModeReason:          modeReason,
-		EnabledFeatures:     governanceFeatureNames(features),
-		ModeDefaultFeatures: governanceFeatureNames(defaultFeatures),
-		DisabledByOverride:  governanceDisabledNames(mergedOverrides.Disabled),
-		DisabledByConfig:    governanceDisabledNames(configOverrides.Disabled),
-		DisabledByCode:      governanceDisabledNames(codeOverrides.Disabled),
-		FeatureDecisions:    featureDecisions,
-		ProviderBackends:    governanceProviderBackendsFromDecisions(providerDecisions),
-		ProviderDecisions:   providerDecisions,
-		ConfigSnapshot:      configSnapshot,
-		ResolutionOrder:     governanceResolutionOrder(),
+		Mode:                 mode,
+		ModeSource:           modeSource,
+		ModeReason:           modeReason,
+		EnabledFeatures:      governanceFeatureNames(features),
+		ModeDefaultFeatures:  governanceFeatureNames(defaultFeatures),
+		DisabledByOverride:   governanceDisabledNames(mergedOverrides.Disabled),
+		DisabledByConfig:     governanceDisabledNames(configOverrides.Disabled),
+		DisabledByCode:       governanceDisabledNames(codeOverrides.Disabled),
+		EnabledByOverride:    governanceEnabledNames(mergedOverrides.Enabled),
+		EnabledByConfig:      governanceEnabledNames(configOverrides.Enabled),
+		EnabledByCode:        governanceEnabledNames(codeOverrides.Enabled),
+		FeatureDecisions:     featureDecisions,
+		ProviderBackends:     governanceProviderBackendsFromDecisions(providerDecisions),
+		ProviderDecisions:    providerDecisions,
+		ConfigSnapshot:       configSnapshot,
+		ResolutionOrder:      governanceResolutionOrder(),
 		MiddlewareChainOrder: governanceHTTPMiddlewareChainOrder(),
-		RPCClientChainOrder: governanceRPCClientChainOrder(),
+		RPCClientChainOrder:  governanceRPCClientChainOrder(),
 	}
 }
 
@@ -117,12 +125,24 @@ func FormatGovernanceSummary(summary GovernanceSummary) string {
 		disabled = "none"
 	}
 
+	enabledBy := strings.Join(summary.EnabledByOverride, ", ")
+
 	providers := make([]string, 0, len(summary.ProviderBackends))
 	for key, value := range summary.ProviderBackends {
 		providers = append(providers, fmt.Sprintf("%s=%s", key, value))
 	}
 	sort.Strings(providers)
 
+	if enabledBy != "" {
+		return fmt.Sprintf(
+			"governance mode=%s enabled=[%s] disabled_by_override=[%s] enabled_by_override=[%s] providers=[%s]",
+			summary.Mode,
+			enabled,
+			disabled,
+			enabledBy,
+			strings.Join(providers, ", "),
+		)
+	}
 	return fmt.Sprintf(
 		"governance mode=%s enabled=[%s] disabled_by_override=[%s] providers=[%s]",
 		summary.Mode,
@@ -218,6 +238,8 @@ func FormatGovernanceDiagnosticView(summary GovernanceSummary, view string) stri
 		return formatGovernanceFeaturesDiagnostic(summary)
 	case "config":
 		return formatGovernanceConfigDiagnostic(summary)
+	case "defaults":
+		return formatGovernanceDefaultsDiagnostic(summary)
 	case "full":
 		return FormatGovernanceDiagnostic(summary)
 	default:
@@ -233,6 +255,9 @@ func formatGovernanceBriefDiagnostic(summary GovernanceSummary) string {
 	writeGovernanceLine(&b, "Mode Reason: %s", summary.ModeReason)
 	writeGovernanceLine(&b, "Enabled Features: %s", governanceJoinOrNone(summary.EnabledFeatures))
 	writeGovernanceLine(&b, "Disabled By Override: %s", governanceJoinOrNone(summary.DisabledByOverride))
+	if len(summary.EnabledByOverride) > 0 {
+		writeGovernanceLine(&b, "Enabled By Override: %s", governanceJoinOrNone(summary.EnabledByOverride))
+	}
 	if len(summary.MiddlewareChainOrder) > 0 {
 		writeGovernanceLine(&b, "HTTP Chain: %s", strings.Join(summary.MiddlewareChainOrder, " → "))
 	}
@@ -310,6 +335,81 @@ func formatGovernanceConfigDiagnostic(summary GovernanceSummary) string {
 	return b.String()
 }
 
+// formatGovernanceDefaultsDiagnostic renders the governance defaults table as human-readable text.
+// This view shows what the framework would use if no overrides were applied.
+//
+// formatGovernanceDefaultsDiagnostic 将治理默认值表渲染成人类可读文本。
+// 此视图展示框架在没有任何覆盖时的默认值。
+func formatGovernanceDefaultsDiagnostic(summary GovernanceSummary) string {
+	var b strings.Builder
+	writeGovernanceLine(&b, "Governance Defaults")
+	writeGovernanceLine(&b, "Mode: %s", summary.Mode)
+
+	if summary.Defaults == nil {
+		writeGovernanceLine(&b, "(defaults table not loaded)")
+		return b.String()
+	}
+	d := summary.Defaults
+
+	// 特性默认值
+	writeGovernanceLine(&b, "")
+	writeGovernanceLine(&b, "Feature Defaults")
+	for _, name := range governanceAllFeatureNames() {
+		if enabled, ok := d.FeatureDefaults[name]; ok {
+			state := "disabled"
+			if enabled {
+				state = "enabled"
+			}
+			writeGovernanceLine(&b, "- %s: %s", name, state)
+		}
+	}
+
+	// Provider 默认值
+	writeGovernanceLine(&b, "")
+	writeGovernanceLine(&b, "Provider Defaults")
+	for _, name := range governanceProviderNames() {
+		if backend, ok := d.ProviderDefaults[name]; ok {
+			writeGovernanceLine(&b, "- %s: %s", name, backend)
+		}
+	}
+
+	// HTTP 中间件默认值
+	writeGovernanceLine(&b, "")
+	writeGovernanceLine(&b, "HTTP Middleware Defaults")
+	writeGovernanceLine(&b, "- timeout: %s", d.HTTPMiddlewareDefaults.Timeout)
+	writeGovernanceLine(&b, "- body_limit: %s", d.HTTPMiddlewareDefaults.BodyLimit)
+	writeGovernanceLine(&b, "- max_concurrent: %d", d.HTTPMiddlewareDefaults.MaxConcurrent)
+	writeGovernanceLine(&b, "- enable_metrics: %t", d.HTTPMiddlewareDefaults.EnableMetrics)
+	writeGovernanceLine(&b, "- enable_compression: %t", d.HTTPMiddlewareDefaults.EnableCompression)
+
+	// CORS 默认值
+	cors := d.HTTPMiddlewareDefaults.CORS
+	writeGovernanceLine(&b, "- cors:")
+	writeGovernanceLine(&b, "  allow_origins: %s", strings.Join(cors.AllowOrigins, ", "))
+	writeGovernanceLine(&b, "  max_age_seconds: %d", cors.MaxAgeSeconds)
+
+	// 安全头默认值
+	sec := d.HTTPMiddlewareDefaults.SecurityHeaders
+	writeGovernanceLine(&b, "- security_headers:")
+	writeGovernanceLine(&b, "  x_frame_options: %s", sec.XFrameOptions)
+	writeGovernanceLine(&b, "  x_content_type_options: %s", sec.XContentTypeOptions)
+	writeGovernanceLine(&b, "  referrer_policy: %s", sec.ReferrerPolicy)
+
+	// 本地化默认值
+	loc := d.HTTPMiddlewareDefaults.Locale
+	writeGovernanceLine(&b, "- locale:")
+	writeGovernanceLine(&b, "  supported: %s", strings.Join(loc.Supported, ", "))
+	writeGovernanceLine(&b, "  default: %s", loc.Default)
+	writeGovernanceLine(&b, "  query_keys: %s", strings.Join(loc.QueryKeys, ", "))
+
+	// RPC 客户端默认值
+	writeGovernanceLine(&b, "")
+	writeGovernanceLine(&b, "RPC Client Defaults")
+	writeGovernanceLine(&b, "- timeout: %s", d.RPCClientDefaults.Timeout)
+
+	return b.String()
+}
+
 func writeGovernanceLine(b *strings.Builder, format string, args ...any) {
 	if b.Len() > 0 {
 		b.WriteByte('\n')
@@ -354,6 +454,19 @@ func governanceDisabledNames(disabled map[string]struct{}) []string {
 	}
 	names := make([]string, 0, len(disabled))
 	for name := range disabled {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// governanceEnabledNames 从 enabled 集合中提取排序后的名称列表。
+func governanceEnabledNames(enabled map[string]struct{}) []string {
+	if len(enabled) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(enabled))
+	for name := range enabled {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -430,6 +543,7 @@ func buildGovernanceProviderDecisions(cfg datacontract.Config, mode resilienceco
 		{Name: "metadata", DisabledCapability: "metadata", Factories: metadataProviderFactories, Fallback: "noop", ModeDefault: defaults.Metadata, ConfigKeys: []string{"metadata.mode", "metadata.backend"}, ConfigEnabled: metadataEnabledFromConfig, ConfigEnabledValue: "default", FallbackReason: "provider backend fell back to noop metadata"},
 		{Name: "serviceauth", DisabledCapability: "serviceauth", Factories: serviceAuthProviderFactories, Fallback: "noop", ModeDefault: defaults.ServiceAuth, ConfigKeys: []string{"service_auth.backend", "service_auth.mode"}, ConfigEnabled: serviceAuthEnabledFromConfig, ConfigEnabledValue: "token", FallbackReason: "provider backend fell back to noop serviceauth"},
 		{Name: "circuitbreaker", DisabledCapability: "circuitbreaker", Factories: circuitBreakerProviderFactories, Fallback: "noop", ModeDefault: defaults.CircuitBreaker, ConfigKeys: []string{"circuit_breaker.backend", "circuit_breaker.type"}, ConfigEnabled: circuitBreakerEnabledFromConfig, ConfigEnabledValue: "sentinel", FallbackReason: "provider backend fell back to noop circuitbreaker"},
+		{Name: "retry", DisabledCapability: "retry", Factories: retryProviderFactories, Fallback: "noop", ModeDefault: defaults.Retry, ConfigKeys: []string{"retry.backend", "retry.type"}, ConfigEnabled: retryEnabledFromConfig, ConfigEnabledValue: "default", FallbackReason: "provider backend fell back to noop retry"},
 		{Name: "dtm", Factories: dtmProviderFactories, Fallback: "noop", ModeDefault: defaults.DTM, ConfigKeys: []string{"dtm.backend", "dtm.type", "dtm.driver"}, ConfigEnabled: dtmEnabledFromConfig, ConfigEnabledValue: "dtmsdk", FallbackReason: "provider backend fell back to noop dtm"},
 		{Name: "message_queue", Factories: messageQueueProviderFactories, Fallback: "noop", ModeDefault: defaults.MessageQueue, ConfigKeys: []string{"message_queue.backend", "message_queue.type"}, ConfigEnabled: messageQueueEnabledFromConfig, ConfigEnabledValue: "redis", FallbackReason: "provider backend fell back to noop message queue"},
 		{Name: "distributed_lock", Factories: distributedLockProviderFactories, Fallback: "noop", ModeDefault: defaults.DistributedLock, ConfigKeys: []string{"distributed_lock.backend", "distributed_lock.type"}, ConfigEnabled: distributedLockEnabledFromConfig, ConfigEnabledValue: "redis", FallbackReason: "provider backend fell back to noop distributed lock"},
@@ -561,8 +675,14 @@ func messageQueueEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 func distributedLockEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 	return "distributed_lock.enabled", cfg != nil && cfg.GetBool("distributed_lock.enabled")
 }
+func retryEnabledFromConfig(cfg datacontract.Config) (string, bool) {
+	return "retry.enabled", cfg != nil && cfg.GetBool("retry.enabled")
+}
 
-func buildGovernanceFeatureDecisions(mode resiliencecontract.GovernanceMode, defaults resiliencecontract.GovernanceFeatureSet, configDisabled map[string]struct{}, codeDisabled map[string]struct{}) map[string]GovernanceFeatureDecision {
+// buildGovernanceFeatureDecisions 构建每个 feature 的启用/关闭决策记录。
+// 优先级：code disable > config disable > code enable > config enable > mode default。
+// 同一 feature 同时被 disable 和 enable 时，disable 生效。
+func buildGovernanceFeatureDecisions(mode resiliencecontract.GovernanceMode, defaults resiliencecontract.GovernanceFeatureSet, configDisabled map[string]struct{}, codeDisabled map[string]struct{}, configEnabled map[string]struct{}, codeEnabled map[string]struct{}) map[string]GovernanceFeatureDecision {
 	decisions := make(map[string]GovernanceFeatureDecision, 13)
 	defaultNames := governanceFeatureNames(defaults)
 	defaultSet := make(map[string]struct{}, len(defaultNames))
@@ -571,6 +691,7 @@ func buildGovernanceFeatureDecisions(mode resiliencecontract.GovernanceMode, def
 	}
 
 	for _, name := range governanceAllFeatureNames() {
+		// 最高优先级：代码显式关闭
 		if _, ok := codeDisabled[name]; ok {
 			decisions[name] = GovernanceFeatureDecision{
 				Enabled: false,
@@ -579,6 +700,7 @@ func buildGovernanceFeatureDecisions(mode resiliencecontract.GovernanceMode, def
 			}
 			continue
 		}
+		// 次高优先级：配置显式关闭
 		if _, ok := configDisabled[name]; ok {
 			decisions[name] = GovernanceFeatureDecision{
 				Enabled: false,
@@ -587,6 +709,41 @@ func buildGovernanceFeatureDecisions(mode resiliencecontract.GovernanceMode, def
 			}
 			continue
 		}
+		// 代码显式开启（仅在非模式默认时记录来源）
+		if _, ok := codeEnabled[name]; ok {
+			if _, isDefault := defaultSet[name]; isDefault {
+				decisions[name] = GovernanceFeatureDecision{
+					Enabled: true,
+					Source:  "mode_default",
+					Reason:  fmt.Sprintf("%s is enabled by the current governance mode defaults", name),
+				}
+			} else {
+				decisions[name] = GovernanceFeatureDecision{
+					Enabled: true,
+					Source:  "code_override",
+					Reason:  fmt.Sprintf("%s was explicitly enabled by startup option", name),
+				}
+			}
+			continue
+		}
+		// 配置显式开启（仅在非模式默认时记录来源）
+		if _, ok := configEnabled[name]; ok {
+			if _, isDefault := defaultSet[name]; isDefault {
+				decisions[name] = GovernanceFeatureDecision{
+					Enabled: true,
+					Source:  "mode_default",
+					Reason:  fmt.Sprintf("%s is enabled by the current governance mode defaults", name),
+				}
+			} else {
+				decisions[name] = GovernanceFeatureDecision{
+					Enabled: true,
+					Source:  "config_override",
+					Reason:  fmt.Sprintf("%s was explicitly enabled by governance.enable", name),
+				}
+			}
+			continue
+		}
+		// 模式默认
 		if _, ok := defaultSet[name]; ok {
 			decisions[name] = GovernanceFeatureDecision{
 				Enabled: true,
@@ -632,6 +789,7 @@ func governanceProviderNames() []string {
 		"metadata",
 		"serviceauth",
 		"circuitbreaker",
+		"retry",
 		"dtm",
 		"message_queue",
 		"distributed_lock",
@@ -692,6 +850,9 @@ func governanceTrackedConfigKeys() []string {
 		"circuit_breaker.enabled",
 		"circuit_breaker.backend",
 		"circuit_breaker.type",
+		"retry.enabled",
+		"retry.backend",
+		"retry.type",
 		"dtm.enabled",
 		"dtm.backend",
 		"dtm.type",

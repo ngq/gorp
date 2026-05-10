@@ -1,3 +1,10 @@
+// Package testing provides testing utilities for gorp framework.
+// This file provides container setup helpers for integration tests.
+// Creates test container with config, logger, DB, Redis capabilities.
+//
+// 测试包提供 gorp 框架的测试工具能力。
+// 本文件提供用于集成测试的容器设置 helper。
+// 创建携带 config、logger、DB、Redis 能力的测试容器。
 package testing
 
 import (

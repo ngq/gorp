@@ -10,6 +10,7 @@
 package middleware
 
 import (
+	"runtime"
 	"time"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -116,7 +117,7 @@ func DefaultAdminMiddlewareOptions() AdminMiddlewareOptions {
 func DefaultHTTPServiceGovernanceDefaults() DefaultHTTPServiceGovernanceOptions {
 	return DefaultHTTPServiceGovernanceOptions{
 		API:           DefaultRecommendedMiddlewareOptions(),
-		MaxConcurrent: 0,
+		MaxConcurrent: runtime.GOMAXPROCS(0) * 100, // 默认并发限制：CPU核数 * 100
 	}
 }
 

@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide strongly typed access helpers for app-service style bindings.
-// - Reduce repetitive container type assertions in business and bootstrap code.
-// - Keep generic service resolution ergonomics inside the container package.
+// Package container provides runtime dependency injection container for gorp framework.
+// This file provides strongly typed access helpers for app-service style bindings.
+// Reduces repetitive container type assertions in business and bootstrap code.
 //
-// 适用场景：
-// - 为 app-service 风格绑定提供强类型访问 helper。
-// - 减少业务代码和 bootstrap 代码中重复的容器类型断言。
-// - 把泛型服务解析的人体工学能力收口在 container 包内。
+// 容器包提供 gorp 框架的运行时依赖注入容器实现。
+// 本文件为 app-service 风格绑定提供强类型访问 helper。
+// 减少业务代码和 bootstrap 代码中重复的容器类型断言。
 package container
 
 import (

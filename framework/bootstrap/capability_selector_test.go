@@ -592,7 +592,7 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 	}, true)
 
 	// 代码侧显式关闭 tracing（模拟 WithGovernanceDisabled("tracing")）
-	if err := registerSelectedMicroserviceProvidersWithOptions(c, "microservice", []string{"tracing"}, nil); err != nil {
+	if err := registerSelectedMicroserviceProvidersWithOptions(c, "microservice", []string{"tracing"}, nil, nil); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
@@ -626,7 +626,7 @@ func TestCodeProviderOverrideWinsOverConfigProviderOverrideForSameKey(t *testing
 	}, true)
 
 	// 代码侧 WithGovernanceProvider("serviceauth", "noop") 覆盖配置的 mtls
-	if err := registerSelectedMicroserviceProvidersWithOptions(c, "microservice", nil, map[string]string{"serviceauth": "noop"}); err != nil {
+	if err := registerSelectedMicroserviceProvidersWithOptions(c, "microservice", nil, nil, map[string]string{"serviceauth": "noop"}); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
@@ -667,7 +667,7 @@ func TestOverridePriorityChainForSingleFeature(t *testing.T) {
 	}
 
 	// 级别1：代码显式覆盖 —— 通过 overlay 注入的代码覆盖优先于配置
-	overlayCfg := overlayGovernanceConfig(configOverrideCfg, nil, map[string]string{"tracing": "otel"})
+	overlayCfg := overlayGovernanceConfig(configOverrideCfg, nil, nil, map[string]string{"tracing": "otel"})
 	if got := SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicroservice).Name(); got != "tracing.otel" {
 		t.Fatalf("priority 1 (code override): expected tracing.otel, got %s", got)
 	}

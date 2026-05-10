@@ -1,3 +1,10 @@
+// Package redis provides Redis service for gorp framework.
+// This file defines Prometheus metrics hook for Redis client monitoring.
+// Includes command count, duration, and connection count metrics.
+//
+// Redis 包提供 Redis 服务，用于 gorp 框架。
+// 本文件定义用于 Redis 客户端监控的 Prometheus 指标 hook。
+// 包括命令次数、耗时和连接数指标。
 package redis
 
 import (

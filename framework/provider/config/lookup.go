@@ -1,3 +1,8 @@
+// Package config provides multi-key configuration lookup utilities.
+// Supports fallback across multiple config keys, useful for backward compatibility.
+//
+// 配置包提供多键配置查找工具。
+// 支持在多个配置键之间回退查找，适用于向后兼容场景。
 package config
 
 import (
@@ -8,7 +13,13 @@ import (
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 )
 
-// GetAny 返回第一个存在的配置值。
+// GetAny returns the first existing configuration value from multiple keys.
+// Iterates through keys in order, returns first non-nil value.
+// Core logic: Validate config, iterate keys, return first match.
+//
+// GetAny 从多个键中返回第一个存在的配置值。
+// 按顺序遍历键，返回第一个非 nil 的值。
+// 核心逻辑：验证配置对象、遍历键、返回首个匹配。
 func GetAny(cfg datacontract.Config, keys ...string) (any, bool) {
 	if cfg == nil {
 		return nil, false
@@ -24,7 +35,13 @@ func GetAny(cfg datacontract.Config, keys ...string) (any, bool) {
 	return nil, false
 }
 
-// GetStringAny 返回第一个非空字符串配置。
+// GetStringAny returns the first non-empty string configuration from multiple keys.
+// Handles string conversion for various types.
+// Core logic: Iterate keys, trim whitespace, return first non-empty.
+//
+// GetStringAny 从多个键中返回第一个非空字符串配置。
+// 处理各种类型的字符串转换。
+// 核心逻辑：遍历键、去除空白、返回首个非空值。
 func GetStringAny(cfg datacontract.Config, keys ...string) string {
 	if cfg == nil {
 		return ""
@@ -48,7 +65,13 @@ func GetStringAny(cfg datacontract.Config, keys ...string) string {
 	return ""
 }
 
-// GetBoolAny 返回第一个可解析布尔配置及是否存在。
+// GetBoolAny returns the first parseable boolean configuration and existence flag.
+// Supports bool, string, int, int64, float64 types.
+// Core logic: Iterate keys, parse to bool, return value and existence.
+//
+// GetBoolAny 返回第一个可解析布尔配置及是否存在标志。
+// 支持 bool、string、int、int64、float64 类型。
+// 核心逻辑：遍历键、解析为布尔值、返回值和存在标志。
 func GetBoolAny(cfg datacontract.Config, keys ...string) (bool, bool) {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
@@ -74,7 +97,13 @@ func GetBoolAny(cfg datacontract.Config, keys ...string) (bool, bool) {
 	return false, false
 }
 
-// GetIntAny 返回第一个可解析整数配置。
+// GetIntAny returns the first parseable integer configuration from multiple keys.
+// Handles int, int64, float64, string types.
+// Core logic: Iterate keys, parse to int, return first valid.
+//
+// GetIntAny 从多个键中返回第一个可解析整数配置。
+// 处理 int、int64、float64、string 类型。
+// 核心逻辑：遍历键、解析为整数、返回首个有效值。
 func GetIntAny(cfg datacontract.Config, keys ...string) int {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
@@ -98,7 +127,13 @@ func GetIntAny(cfg datacontract.Config, keys ...string) int {
 	return 0
 }
 
-// GetFloatAny 返回第一个可解析浮点配置。
+// GetFloatAny returns the first parseable float configuration from multiple keys.
+// Handles float64, float32, int, int64, string types.
+// Core logic: Iterate keys, parse to float, return first valid.
+//
+// GetFloatAny 从多个键中返回第一个可解析浮点配置。
+// 处理 float64、float32、int、int64、string 类型。
+// 核心逻辑：遍历键、解析为浮点数、返回首个有效值。
 func GetFloatAny(cfg datacontract.Config, keys ...string) float64 {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
@@ -124,7 +159,13 @@ func GetFloatAny(cfg datacontract.Config, keys ...string) float64 {
 	return 0
 }
 
-// GetStringSliceAny 返回第一个字符串切片配置。
+// GetStringSliceAny returns the first string slice configuration from multiple keys.
+// Handles []string, []any, string types with proper conversion.
+// Core logic: Iterate keys, convert to []string, return first non-empty.
+//
+// GetStringSliceAny 从多个键中返回第一个字符串切片配置。
+// 处理 []string、[]any、string 类型并进行适当转换。
+// 核心逻辑：遍历键、转换为 []string、返回首个非空。
 func GetStringSliceAny(cfg datacontract.Config, keys ...string) []string {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)
@@ -154,7 +195,13 @@ func GetStringSliceAny(cfg datacontract.Config, keys ...string) []string {
 	return nil
 }
 
-// GetStringMapAny 返回第一个字符串 map 配置。
+// GetStringMapAny returns the first string map configuration from multiple keys.
+// Handles map[string]string, map[string]any with proper conversion.
+// Core logic: Iterate keys, convert to map[string]string, return first found.
+//
+// GetStringMapAny 从多个键中返回第一个字符串 map 配置。
+// 处理 map[string]string、map[string]any 类型并进行适当转换。
+// 核心逻辑：遍历键、转换为 map[string]string、返回首个找到的。
 func GetStringMapAny(cfg datacontract.Config, keys ...string) map[string]string {
 	for _, key := range keys {
 		v, ok := GetAny(cfg, key)

@@ -22,6 +22,7 @@ var newOfflineBackend string
 var newOfflineWithDB bool
 var newOfflineWithSwagger bool
 var newOfflineFrameworkVersion string
+var newOfflineGovernanceMode string
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)
@@ -82,6 +83,11 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	} else {
 		project.WithSwagger = starterProject.WithSwagger
 	}
+	if cmd.Flags().Changed("governance-mode") {
+		project.GovernanceMode = normalizeGovernanceMode(newOfflineGovernanceMode)
+	} else {
+		project.GovernanceMode = normalizeGovernanceMode("")
+	}
 
 	folder, err := prepareScaffoldTargetDir(cwd, name)
 	if err != nil {
@@ -107,6 +113,7 @@ func init() {
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
 	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), if set, no replace directive will be generated")
+	newCmd.Flags().StringVar(&newOfflineGovernanceMode, "governance-mode", "", "governance mode: monolith, gin-first, microservice")
 }
 
 func renderTemplateDir(src fs.FS, srcRoot string, dstRoot string, data map[string]any) error {

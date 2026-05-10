@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose root-package context helpers for container, validated body, request ID, and trace ID access.
-// - Keep high-frequency support context accessors available from the top-level public API.
-// - Re-export common support primitives without forcing direct dependency on framework/contract/support.
+// Package gorp provides the root-package application startup surface for gorp framework.
+// This file exposes context helpers for container, validated body, request ID, trace ID.
+// Keeps high-frequency support context accessors available from top-level API.
 //
-// 适用场景：
-// - 暴露根包层的 container、validated body、request ID 和 trace ID context helper。
-// - 让高频 support 上下文访问入口可以直接从顶层公共 API 使用。
-// - 在不强迫业务直接依赖 framework/contract/support 的前提下重导出常用 support 原语。
+// Gorp 包提供 gorp 框架的根包层应用启动入口。
+// 本文件暴露根包层的 container、validated body、request ID、trace ID context helper。
+// 让高频 support 上下文访问入口可以直接从顶层公共 API 使用。
 package gorp
 
 import (

@@ -21,7 +21,13 @@ func main() {
 	if err := gorp.Run(
 		"{{.Name}}",
 		gorp.HTTP(),
+{{- if .IsMicroserviceMode }}
 		gorp.WithMicroserviceMode(),
+{{- else if .IsGinFirstMode }}
+		gorp.WithGinFirstMode(),
+{{- else }}
+		gorp.WithMonolithMode(),
+{{- end }}
 		gorp.WithMigrate(migrate),
 		gorp.WithSetup(setup),
 	); err != nil {

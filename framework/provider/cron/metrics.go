@@ -1,3 +1,10 @@
+// Package cron provides cron scheduling service for gorp framework.
+// This file defines Prometheus metrics for cron job monitoring.
+// Includes execution count, duration, in-progress count, and scheduled count.
+//
+// Cron 调度服务包，提供 gorp 框架的定时任务调度能力。
+// 本文件定义用于 cron 任务监控的 Prometheus 指标。
+// 包括执行次数、耗时、当前执行数和已调度数。
 package cron
 
 import (

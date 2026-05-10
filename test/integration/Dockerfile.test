@@ -1,0 +1,31 @@
+# gorp 集成测试构建镜像
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /gorp
+
+# 安装依赖
+RUN apk add --no-cache git make
+
+# 复制 go.mod 和 go.sum
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 复制源码
+COPY . ./
+
+# 构建（不需要构建产物，只用于测试）
+RUN go build -v ./...
+
+# 测试镜像
+FROM golang:1.23-alpine
+
+WORKDIR /gorp
+
+# 安装测试依赖
+RUN apk add --no-cache git docker-cli
+
+# 复制源码
+COPY --from=builder /gorp /gorp
+
+# 默认命令：运行集成测试
+CMD ["go", "test", "-tags=integration", "-v", "./test/integration/..."]

@@ -1,3 +1,10 @@
+// Package middleware provides gRPC tracing middleware for gorp framework.
+// Creates spans for each RPC call, extracts/injects trace context.
+// Supports OpenTelemetry integration via Tracer contract.
+//
+// 中间件包提供 gRPC 追踪中间件，用于 gorp 框架。
+// 为每个 RPC 调用创建 Span，提取/注入追踪上下文。
+// 通过 Tracer 契约支持 OpenTelemetry 集成。
 package middleware
 
 import (

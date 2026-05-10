@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Parse explicit governance overrides from config without requiring callers to repeat all defaults.
-// - Support low-cost "disable this capability" and "replace this backend" control paths.
-// - Keep override semantics reusable across selectors, summaries, and future bootstrap helpers.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file parses explicit governance overrides from config without repeating defaults.
+// Supports “disable capability” and “replace provider backend” control paths.
 //
-// 适用场景：
-// - 解析显式治理覆盖配置，而不要求调用方展开所有默认值。
-// - 支持低成本“关闭某个治理能力”和“替换某个 provider backend”控制路径。
-// - 让覆盖语义可供 selector、生效摘要和后续 bootstrap helper 复用。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件解析显式治理覆盖配置，而不要求调用方展开所有默认值。
+// 支持低成本关闭某个治理能力和替换某个 provider backend 控制路径。
 package bootstrap
 
 import (
@@ -18,6 +16,7 @@ import (
 
 type governanceOverrides struct {
 	Disabled         map[string]struct{}
+	Enabled          map[string]struct{}
 	ProviderBackends map[string]string
 }
 
@@ -27,12 +26,14 @@ func splitGovernanceOverrides(cfg datacontract.Config) (configOverrides governan
 		configView = overlay.base
 		codeOverrides = governanceOverrides{
 			Disabled:         normalizeGovernanceDisabledList(overlay.governanceDisable),
+			Enabled:          normalizeGovernanceDisabledList(overlay.governanceEnable),
 			ProviderBackends: cloneGovernanceProviderMap(overlay.governanceProviders),
 		}
 	}
 
 	configOverrides = governanceOverrides{
 		Disabled:         loadGovernanceDisabledSet(configView),
+		Enabled:          loadGovernanceEnabledSet(configView),
 		ProviderBackends: loadGovernanceProviderOverrides(configView),
 	}
 	return configOverrides, codeOverrides, configView
@@ -42,6 +43,7 @@ func loadGovernanceOverrides(cfg datacontract.Config) governanceOverrides {
 	configOverrides, codeOverrides, _ := splitGovernanceOverrides(cfg)
 	return governanceOverrides{
 		Disabled:         mergeGovernanceDisabled(configOverrides.Disabled, codeOverrides.Disabled),
+		Enabled:          mergeGovernanceEnabled(configOverrides.Enabled, codeOverrides.Enabled),
 		ProviderBackends: mergeGovernanceProviderBackends(configOverrides.ProviderBackends, codeOverrides.ProviderBackends),
 	}
 }
@@ -94,6 +96,7 @@ func loadGovernanceProviderOverrides(cfg datacontract.Config) map[string]string 
 		"metadata",
 		"serviceauth",
 		"circuitbreaker",
+		"retry",
 		"dtm",
 		"message_queue",
 		"distributed_lock",
@@ -118,6 +121,80 @@ func governanceProviderOverride(cfg datacontract.Config, key string) string {
 func isGovernanceCapabilityDisabled(cfg datacontract.Config, name string) bool {
 	_, ok := loadGovernanceDisabledSet(cfg)[normalizeGovernanceKey(name)]
 	return ok
+}
+
+// loadGovernanceEnabledSet 从配置中读取 governance.enable 列表。
+func loadGovernanceEnabledSet(cfg datacontract.Config) map[string]struct{} {
+	if cfg == nil {
+		return map[string]struct{}{}
+	}
+	return normalizeGovernanceDisabledValue(cfg.Get("governance.enable"))
+}
+
+// mergeGovernanceEnabled 合并配置层和代码层的 governance.enable 列表。
+func mergeGovernanceEnabled(base map[string]struct{}, overlay map[string]struct{}) map[string]struct{} {
+	if len(base) == 0 && len(overlay) == 0 {
+		return nil
+	}
+	merged := make(map[string]struct{}, len(base)+len(overlay))
+	for key := range base {
+		merged[key] = struct{}{}
+	}
+	for key := range overlay {
+		merged[key] = struct{}{}
+	}
+	return merged
+}
+
+// applyGovernanceFeatureEnables 将 enabled 列表中的 feature 设为 true。
+// 与 applyGovernanceFeatureDisables 对称，用于开启默认关闭的治理能力。
+// 注意：调用方应先执行 disables 再执行 enables，当同一 feature 同时出现在两个列表中时，disable 生效。
+func applyGovernanceFeatureEnables(features resiliencecontract.GovernanceFeatureSet, enabled map[string]struct{}) resiliencecontract.GovernanceFeatureSet {
+	if len(enabled) == 0 {
+		return features
+	}
+
+	if _, ok := enabled["request_identity"]; ok {
+		features.RequestIdentity = true
+	}
+	if _, ok := enabled["logging"]; ok {
+		features.Logging = true
+	}
+	if _, ok := enabled["recovery"]; ok {
+		features.Recovery = true
+	}
+	if _, ok := enabled["timeout"]; ok {
+		features.Timeout = true
+	}
+	if _, ok := enabled["metrics"]; ok {
+		features.Metrics = true
+	}
+	if _, ok := enabled["metadata"]; ok {
+		features.MetadataPropagation = true
+	}
+	if _, ok := enabled["tracing"]; ok {
+		features.Tracing = true
+	}
+	if _, ok := enabled["selector"]; ok {
+		features.Selector = true
+	}
+	if _, ok := enabled["serviceauth"]; ok {
+		features.ServiceAuth = true
+	}
+	if _, ok := enabled["circuitbreaker"]; ok {
+		features.CircuitBreaker = true
+	}
+	if _, ok := enabled["retry"]; ok {
+		features.Retry = true
+	}
+	if _, ok := enabled["loadshedding"]; ok {
+		features.LoadShedding = true
+	}
+	if _, ok := enabled["discovery"]; ok {
+		features.Discovery = true
+	}
+
+	return features
 }
 
 func applyGovernanceFeatureDisables(features resiliencecontract.GovernanceFeatureSet, disabled map[string]struct{}) resiliencecontract.GovernanceFeatureSet {
@@ -196,6 +273,9 @@ func applyGovernanceProviderOverrides(defaults GovernanceProviderDefaults, overr
 	}
 	if value := overrides["circuitbreaker"]; value != "" {
 		defaults.CircuitBreaker = value
+	}
+	if value := overrides["retry"]; value != "" {
+		defaults.Retry = value
 	}
 	if value := overrides["dtm"]; value != "" {
 		defaults.DTM = value

@@ -30,7 +30,11 @@ log:
   level: debug
 
 tracing:
+{{- if .IsMicroserviceMode }}
   enabled: true
+{{- else }}
+  enabled: false
+{{- end }}
   backend: otel
   service_name: order-service
   otel:
@@ -38,11 +42,16 @@ tracing:
   sampling_rate: 1.0
 
 metadata:
+{{- if .IsMicroserviceMode }}
   enabled: true
+{{- else }}
+  enabled: false
+{{- end }}
   propagate_prefix:
     - x-md-
 
 service_auth:
+{{- if .IsMicroserviceMode }}
   mode: token
   token:
     secret: "change-me-in-production"
@@ -51,6 +60,15 @@ service_auth:
     expiry: 3600
   allowed_services:
     - user-service
+{{- else }}
+  mode: noop
+  token:
+    secret: "change-me-in-production"
+    issuer: "order-service"
+    audience: ""
+    expiry: 3600
+  allowed_services: []
+{{- end }}
 
 cache:
   driver: memory
@@ -74,8 +92,41 @@ message_queue:
 
 # 治理覆盖配置
 governance:
+{{- if .IsMicroserviceMode }}
+  disable: []
+  providers:
+    tracing: otel
+    selector: p2c_ewma
+    serviceauth: token
+    circuitbreaker: sentinel
+{{- else }}
   disable: []
   providers: {}
+{{- end }}
+
+# circuit_breaker 配置
+circuit_breaker:
+{{- if .IsMicroserviceMode }}
+  enabled: true
+  backend: sentinel
+  sentinel:
+    strategy: error_count
+    threshold: 50
+    retry_timeout_ms: 5000
+{{- else }}
+  enabled: false
+  backend: sentinel
+{{- end }}
+
+# selector 配置
+selector:
+{{- if .IsMicroserviceMode }}
+  enabled: true
+  backend: p2c_ewma
+{{- else }}
+  enabled: false
+  backend: random
+{{- end }}
 
 services:
   user_service:

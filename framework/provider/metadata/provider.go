@@ -1,3 +1,10 @@
+// Package metadata provides metadata propagation service for gorp framework.
+// Supports automatic metadata injection and extraction across HTTP/gRPC boundaries.
+// Configurable propagation prefix and constant metadata.
+//
+// 元数据包提供元数据传播服务，用于 gorp 框架。
+// 支持跨 HTTP/gRPC 边界的自动元数据注入和提取。
+// 可配置传播前缀和常量元数据。
 package metadata
 
 import (
@@ -8,18 +15,44 @@ import (
 	"github.com/ngq/gorp/framework/provider/metadata/propagator"
 )
 
+// Provider registers metadata propagation service.
+// Core logic: Create Metadata and Propagator, bind to container.
+//
+// Provider 注册元数据传播服务。
+// 核心逻辑：创建 Metadata 和 Propagator、绑定到容器。
 type Provider struct{}
 
+// NewProvider creates a new metadata provider.
+//
+// NewProvider 创建新的元数据 provider。
 func NewProvider() *Provider { return &Provider{} }
 
+// Name returns provider name for identification.
+//
+// Name 返回 provider 名称，用于标识。
 func (p *Provider) Name() string { return "metadata.default" }
 
+// IsDefer indicates metadata provider should defer loading.
+// Can be loaded after transport providers.
+//
+// IsDefer 表示元数据 provider 应延迟加载。
+// 可以在传输 provider 之后加载。
 func (p *Provider) IsDefer() bool { return true }
 
+// Provides returns the capability keys this provider exposes.
+// Exposes MetadataKey and MetadataPropagatorKey.
+//
+// Provides 返回 provider 暴露的能力键。
+// 暴露 MetadataKey 和 MetadataPropagatorKey。
 func (p *Provider) Provides() []string {
 	return []string{transportcontract.MetadataKey, transportcontract.MetadataPropagatorKey}
 }
 
+// Register binds metadata services to the container.
+// Core logic: Create Metadata instance, create Propagator with config, bind both.
+//
+// Register 将元数据服务绑定到容器。
+// 核心逻辑：创建 Metadata 实例、创建带配置的 Propagator、绑定两者。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(transportcontract.MetadataKey, func(c runtimecontract.Container) (any, error) {
 		return transportcontract.NewMetadata(), nil
@@ -31,6 +64,11 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	return nil
 }
 
+// Boot initializes the metadata provider.
+// No additional startup logic required.
+//
+// Boot 初始化元数据 provider。
+// 无需额外启动逻辑。
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
 func readMetadataConfig(c runtimecontract.Container) transportcontract.MetadataConfig {

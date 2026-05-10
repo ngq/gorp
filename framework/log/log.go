@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide lightweight field builders and default-logger helpers for framework-wide logging.
-// - Offer one centralized utility layer above the observability logger contract.
-// - Keep common logging operations concise for framework and business code.
+// Package log provides lightweight logging utilities for gorp framework.
+// This file provides field builders and default-logger helpers for logging.
+// Offers centralized utility layer above the observability logger contract.
 //
-// 适用场景：
-// - 为框架级日志提供轻量字段构造器和默认 logger helper。
-// - 在 observability logger 契约之上提供统一工具层。
-// - 让框架代码和业务代码都能用更简洁的方式进行常见日志操作。
+// 日志包提供 gorp 框架的轻量日志工具能力。
+// 本文件提供轻量字段构造器和默认 logger helper。
+// 在 observability logger 契约之上提供统一工具层。
 package log
 
 import observabilitycontract "github.com/ngq/gorp/framework/contract/observability"

@@ -14,6 +14,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 	"time"
 
@@ -238,8 +239,9 @@ func TestDefaultHTTPServiceGovernanceSetIncludesServiceProtection(t *testing.T) 
 
 func TestDefaultHTTPServiceGovernanceDefaultsRemainStable(t *testing.T) {
 	defaults := DefaultHTTPServiceGovernanceDefaults()
-	if defaults.MaxConcurrent != 0 {
-		t.Fatalf("expected default MaxConcurrent 0, got %d", defaults.MaxConcurrent)
+	expectedMaxConcurrent := runtime.GOMAXPROCS(0) * 100
+	if defaults.MaxConcurrent != expectedMaxConcurrent {
+		t.Fatalf("expected default MaxConcurrent %d (CPU核数×100), got %d", expectedMaxConcurrent, defaults.MaxConcurrent)
 	}
 	if defaults.API.Timeout != 15*time.Second {
 		t.Fatalf("expected default timeout 15s, got %s", defaults.API.Timeout)
@@ -266,8 +268,9 @@ func TestDefaultHTTPServiceGovernanceDefaultsRemainStable(t *testing.T) {
 
 func TestDefaultHTTPServiceGovernanceSetStableDefaultCardinality(t *testing.T) {
 	set := DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{})
-	if len(set) != 8 {
-		t.Fatalf("expected 8 default governance middleware entries, got %d", len(set))
+	// 默认集包含：request_identity, logging, recovery (3) + security_headers (1) + timeout (1) + loadshedding (1) + body_limit (1) + locale (1) + metrics (1) = 9
+	if len(set) != 9 {
+		t.Fatalf("expected 9 default governance middleware entries (including loadshedding), got %d", len(set))
 	}
 }
 
@@ -436,11 +439,11 @@ func TestDefaultHTTPServiceGovernanceSetFullChainMatchesOrder(t *testing.T) {
 func TestDefaultHTTPServiceGovernanceSetDefaultChainMatchesActiveStages(t *testing.T) {
 	order := DefaultHTTPServiceGovernanceOrder()
 	set := DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{})
-	// 默认集只包含始终启用的阶段 + 默认启用的可选阶段（security_headers, timeout, body_limit, locale, metrics）
-	// 默认不启用：cors, load_shedding, rate_limit, circuit_breaker, compression
-	// 即默认启用 8 个，对应顺序列表中剔除了 5 个可选阶段
-	if len(set) != 8 {
-		t.Fatalf("expected default governance set size 8, got %d", len(set))
+	// 默认集包含始终启用的阶段 + 默认启用的可选阶段
+	// 默认启用：request_identity, logging, recovery, security_headers, timeout, loadshedding, body_limit, locale, metrics = 9
+	// 默认不启用：cors, rate_limit, circuit_breaker, compression
+	if len(set) != 9 {
+		t.Fatalf("expected default governance set size 9 (including loadshedding), got %d", len(set))
 	}
 	// 确保默认启用集的数量不超过正式顺序列表
 	if len(set) > len(order) {

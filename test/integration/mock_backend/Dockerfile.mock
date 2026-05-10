@@ -1,0 +1,24 @@
+# Mock gRPC Backend 构建镜像
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /mock_backend
+
+# 复制 mock backend 源码
+COPY . ./
+
+# 构建 mock server
+RUN CGO_ENABLED=0 go build -o /mock_server ./main.go
+
+# 运行镜像
+FROM alpine:3.20
+
+WORKDIR /app
+
+# 复制构建产物
+COPY --from=builder /mock_server /app/mock_server
+
+# 暴露端口
+EXPOSE 50051
+
+# 启动 mock server
+CMD ["/app/mock_server"]

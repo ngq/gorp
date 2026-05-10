@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Manage the lifecycle of multiple host-managed services in one place.
-// - Provide a reusable startup/stop helper with priority ordering and lifecycle hooks.
-// - Support rollback on startup failure and reverse-order shutdown for framework-managed services.
+// Package lifecycle provides service lifecycle management for gorp framework.
+// Manages lifecycle of multiple host-managed services in one place.
+// Provides startup/stop helper with priority ordering and lifecycle hooks.
 //
-// 适用场景：
-// - 在一个位置统一管理多个被 host 托管的服务生命周期。
-// - 提供带优先级排序和生命周期钩子的通用启动/停止 helper。
-// - 支持启动失败回滚，以及框架托管服务的逆序关闭。
+// 生命周期包提供 gorp 框架的服务生命周期管理能力。
+// 在一个位置统一管理多个被 host 托管的服务生命周期。
+// 提供带优先级排序和生命周期钩子的通用启动/停止 helper。
 package lifecycle
 
 import (

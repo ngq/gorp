@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose container-backed capability accessors from the application package.
-// - Offer stable helpers for service identity propagation and gRPC request metadata access.
-// - Keep transport/bootstrap-facing convenience APIs available without leaking lower-level package details.
+// Package application provides application startup entrypoints for gorp framework.
+// Exposes container-backed capability accessors and transport convenience APIs.
+// Offers stable helpers for service identity propagation and gRPC metadata access.
 //
-// 适用场景：
-// - 从 application 包暴露基于容器的能力获取入口。
-// - 提供稳定的服务身份透传助手以及 gRPC 请求元数据读取助手。
-// - 在不泄漏底层包细节的前提下，保留面向 transport/bootstrap 的便捷 API。
+// 应用启动包提供 gorp 框架的应用启动入口。
+// 暴露基于容器的能力获取入口和 transport 便捷 API。
+// 提供稳定的服务身份透传助手和 gRPC 元数据读取助手。
 package application
 
 import (

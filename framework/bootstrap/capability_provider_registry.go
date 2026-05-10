@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Maintain the provider factory registries used by bootstrap selection logic.
-// - Allow built-in and contributed capability providers to be resolved from config values.
-// - Support optional factory extension points without hard-coding every provider choice into selectors.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file maintains provider factory registries for bootstrap selection logic.
+// Allows built-in and contributed capability providers to be resolved from config.
 //
-// 适用场景：
-// - 维护 bootstrap 选择逻辑所依赖的 provider factory 注册表。
-// - 让内建和扩展能力 provider 可以通过配置值解析出来。
-// - 支持可选 factory 扩展点，而不是把所有 provider 选择写死在 selector 里。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件维护 bootstrap 选择逻辑所依赖的 provider factory 注册表。
+// 让内建和扩展能力 provider 可以通过配置值解析出来。
 package bootstrap
 
 import (
@@ -41,6 +39,8 @@ import (
 	mqnoop "github.com/ngq/gorp/framework/provider/messagequeue/noop"
 	metadatadefault "github.com/ngq/gorp/framework/provider/metadata"
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
+	retryprovider "github.com/ngq/gorp/framework/provider/retry"
+	retrynoop "github.com/ngq/gorp/framework/provider/retry/noop"
 	rpcgrpc "github.com/ngq/gorp/framework/provider/rpc/grpc"
 	rpchttp "github.com/ngq/gorp/framework/provider/rpc/http"
 	rpcnoop "github.com/ngq/gorp/framework/provider/rpc/noop"
@@ -132,6 +132,12 @@ func RegisterTracingProviderFactory(key string, factory providerFactory) {
 func RegisterMetadataProviderFactory(key string, factory providerFactory) {
 	metadataProviderFactories.register(key, factory)
 }
+// RegisterRetryProviderFactory registers a retry provider factory.
+//
+// RegisterRetryProviderFactory 注册重试 provider factory。
+func RegisterRetryProviderFactory(key string, factory providerFactory) {
+	retryProviderFactories.register(key, factory)
+}
 
 var (
 	configSourceProviderFactories = providerFactoryRegistry{
@@ -211,6 +217,11 @@ var (
 		"redis": func() runtimecontract.ServiceProvider { return dlockredis.NewProvider() },
 		"noop":  func() runtimecontract.ServiceProvider { return dlocknoop.NewProvider() },
 		"":      func() runtimecontract.ServiceProvider { return dlocknoop.NewProvider() },
+	}
+	retryProviderFactories = providerFactoryRegistry{
+		"default": func() runtimecontract.ServiceProvider { return retryprovider.NewProvider() },
+		"noop":    func() runtimecontract.ServiceProvider { return retrynoop.NewProvider() },
+		"":        func() runtimecontract.ServiceProvider { return retrynoop.NewProvider() },
 	}
 )
 

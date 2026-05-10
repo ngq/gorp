@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Hold the shared types and option contracts used by application startup helpers.
-// - Provide one place for runtime aliases, callback contracts, and internal startup config.
-// - Keep run/options/accessor files focused on behavior instead of repeating shared declarations.
+// Package application provides application startup entrypoints for gorp framework.
+// This file holds shared types and option contracts for startup helpers.
+// Provides runtime aliases, callback contracts, and internal startup config.
 //
-// 适用场景：
-// - 承载 application 启动辅助所需的共享类型与选项契约。
-// - 为 runtime 别名、回调契约和内部启动配置提供统一定义位置。
-// - 让 run/options/accessor 等文件专注于行为实现，而不是重复声明公共类型。
+// 应用启动包提供 gorp 框架的应用启动入口。
+// 本文件承载启动辅助所需的共享类型与选项契约。
+// 提供 runtime 别名、回调契约和内部启动配置。
 package application
 
 import (
@@ -55,6 +53,7 @@ type HTTPServiceOptions struct {
 	DisableMetrics bool
 	GovernanceMode resiliencecontract.GovernanceMode
 	GovernanceDisable []string
+	GovernanceEnable  []string
 	GovernanceProviders map[string]string
 }
 

@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Overlay governance disable/provider overrides on top of the shared config contract.
-// - Let startup options reuse the same selector path as file-based config overrides.
-// - Keep config-driven and code-driven governance overrides on one effective view.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file overlays governance disable/provider overrides on shared config contract.
+// Unifies config-driven and code-driven governance overrides in one effective view.
 //
-// 适用场景：
-// - 在共享配置契约之上叠加治理关闭项和 provider 覆盖项。
-// - 让启动 option 复用与配置文件相同的 selector 逻辑路径。
-// - 将配置驱动与代码驱动的治理覆盖统一到同一个生效视图上。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件在共享配置契约之上叠加治理关闭项和 provider 覆盖项。
+// 将配置驱动与代码驱动的治理覆盖统一到同一个生效视图上。
 package bootstrap
 
 import (
@@ -16,18 +14,22 @@ import (
 )
 
 type governanceOverlayConfig struct {
-	base              datacontract.Config
-	governanceDisable []string
+	base                datacontract.Config
+	governanceDisable   []string
+	governanceEnable    []string
 	governanceProviders map[string]string
 }
 
-func overlayGovernanceConfig(base datacontract.Config, disabled []string, providers map[string]string) datacontract.Config {
-	if len(disabled) == 0 && len(providers) == 0 {
+// overlayGovernanceConfig 在基础配置之上叠加代码级治理覆盖（关闭项、开启项、provider 覆盖项）。
+// 将代码驱动和配置驱动的治理覆盖统一到同一个生效视图上。
+func overlayGovernanceConfig(base datacontract.Config, disabled []string, enabled []string, providers map[string]string) datacontract.Config {
+	if len(disabled) == 0 && len(enabled) == 0 && len(providers) == 0 {
 		return base
 	}
 	return &governanceOverlayConfig{
 		base:                base,
 		governanceDisable:   append([]string(nil), disabled...),
+		governanceEnable:    append([]string(nil), enabled...),
 		governanceProviders: cloneGovernanceProviderMap(providers),
 	}
 }
@@ -44,6 +46,10 @@ func (c *governanceOverlayConfig) Get(key string) any {
 	case "governance.disable":
 		if len(c.governanceDisable) > 0 {
 			return append([]string(nil), c.governanceDisable...)
+		}
+	case "governance.enable":
+		if len(c.governanceEnable) > 0 {
+			return append([]string(nil), c.governanceEnable...)
 		}
 	}
 	if value, ok := c.lookupGovernanceProviderKey(key); ok {

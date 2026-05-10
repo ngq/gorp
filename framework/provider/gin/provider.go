@@ -1,12 +1,20 @@
-// Application scenarios:
-// - Register Gin as the framework's HTTP provider implementation.
-// - Wire the default responder, Gin engine, and runtime HTTP service into the container.
-// - Build a production-ready HTTP entrypoint with configuration-driven server settings.
+// Package gin provides Gin-based HTTP server implementation for gorp framework.
+// Implements framework-level HTTP service contract with Gin engine and net/http server.
+// Includes container injection, default responder, Prometheus metrics, and graceful shutdown.
 //
-// 适用场景：
-// - 将 Gin 注册为框架的 HTTP provider 实现。
-// - 把默认 responder、Gin engine 和运行时 HTTP service 装配进容器。
-// - 以配置驱动的方式构建可用于生产的 HTTP 入口。
+// Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
+// 实现框架级 HTTP 服务契约，包含 Gin engine 和 net/http server。
+// 包括容器注入、默认响应器、Prometheus 指标和优雅关闭。
+//
+// Eg:
+//
+//	// 注册 Provider
+//	app.Register(gin.NewProvider())
+//
+//	// 获取 HTTP 服务
+//	httpSvc := c.MustMake(transportcontract.HTTPKey).(transportcontract.HTTP)
+//	httpSvc.Router().GET("/hello", helloHandler)
+//	httpSvc.Run()
 package gin
 
 import (
@@ -23,6 +31,13 @@ import (
 )
 
 const httpEngineKey = "framework.http.engine"
+
+// HTTPEngineKey is the public container key for the underlying Gin engine.
+// Use this key to retrieve *gin.Engine from the framework container.
+//
+// HTTPEngineKey 是底层 Gin engine 的公开容器键。
+// 使用此键从框架容器获取 *gin.Engine。
+const HTTPEngineKey = httpEngineKey
 
 // Provider wires the Gin-based HTTP server into the framework container.
 //
@@ -64,10 +79,18 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	}
 
 	c.Bind(httpEngineKey, func(c runtimecontract.Container) (any, error) {
-		engine := gin.New()
-		engine.Use(injectRequestContainer(c))
-		engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(getLogger(c))))
-		attachHTTPTransportMiddleware(engine, c)
+		var engine *gin.Engine
+		if isGinFirstMode(c) {
+			// Gin-first 模式：只注入容器中间件，不自动挂载治理 preset
+			// 用户通过 engine.Use(AdaptMiddleware(...)) 手动挂载
+			engine = newGinFirstEngine(c)
+		} else {
+			// 抽象主线模式：自动挂载默认治理 preset + transport middleware
+			engine = gin.New()
+			engine.Use(injectRequestContainer(c))
+			engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(getLogger(c))))
+			attachHTTPTransportMiddleware(engine, c)
+		}
 		return engine, nil
 	}, true)
 

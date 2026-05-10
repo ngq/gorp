@@ -1,3 +1,8 @@
+// Package config provides environment normalization utilities for gorp framework.
+// Standardizes environment names: dev/test/prod, with backward compatibility for legacy aliases.
+//
+// 配置包提供 gorp 框架的环境名规范化工具。
+// 统一环境名约定：dev/test/prod，并兼容历史别名 development/testing/production。
 package config
 
 import "strings"
@@ -11,12 +16,13 @@ const (
 	LegacyProd    = "production"
 )
 
-// NormalizeEnv 统一环境名。
+// NormalizeEnv normalizes environment name to framework standard.
+// Converts legacy aliases to short names: development->dev, testing->test, production->prod.
+// Core logic: Trim whitespace, lowercase, map to canonical name.
 //
-// 中文说明：
-// - framework 级统一约定使用 `dev / test / prod`；
-// - 兼容历史值 `development / testing / production`；
-// - 这样业务项目不必自己再约定一套环境命名。
+// NormalizeEnv 将环境名规范化为框架统一标准。
+// 将历史别名转换为短名：development->dev, testing->test, production->prod。
+// 核心逻辑：去除空白、小写化、映射到标准名称。
 func NormalizeEnv(env string) string {
 	env = strings.TrimSpace(strings.ToLower(env))
 	switch env {

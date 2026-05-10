@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose root-package security context helpers and shared security aliases.
-// - Keep JWT subject and service-identity access convenient for handlers and middleware.
-// - Re-export common security primitives without forcing direct dependency on lower-level packages.
+// Package gorp provides the root-package application startup surface for gorp framework.
+// This file exposes security context helpers and shared security aliases.
+// Keeps JWT subject and service-identity access convenient for handlers.
 //
-// 适用场景：
-// - 暴露根包层的安全上下文 helper 和共享安全别名。
-// - 让 handler 和 middleware 更方便地访问 JWT 主体信息与服务身份信息。
-// - 在不强迫业务直接依赖更底层包的前提下重导出常用安全原语。
+// Gorp 包提供 gorp 框架的根包层应用启动入口。
+// 本文件暴露根包层的安全上下文 helper 和共享安全别名。
+// 让 handler 和 middleware 更方便地访问 JWT 主体与服务身份信息。
 package gorp
 
 import (

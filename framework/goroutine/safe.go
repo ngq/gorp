@@ -1,3 +1,10 @@
+// Package goroutine provides goroutine safety utilities for gorp framework.
+// This file provides SafeGo for panic recovery in goroutines.
+// Prevents panic from crashing the entire process, logs errors instead.
+//
+// Goroutine 包提供 gorp 框架的 goroutine 安全工具能力。
+// 本文件提供 SafeGo 用于 goroutine 中的 panic 恢复。
+// 防止 panic 把整个进程直接打崩，而是尽量记录到统一 logger。
 package goroutine
 
 import (

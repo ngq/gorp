@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose one formal inspect/doctor HTTP view for the effective governance result.
-// - Reuse the same governance summary used by startup logs and tests.
-// - Make implicit defaults queryable at runtime without introducing a second summary model.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file exposes formal inspect/doctor HTTP view for governance results.
+// Reuses the same governance summary used by startup logs and tests.
 //
-// 适用场景：
-// - 为最终治理生效结果暴露统一的 inspect / doctor HTTP 视图。
-// - 复用启动日志和测试已经使用的同一份治理摘要。
-// - 让隐式默认在运行时可查询，而不是再引入第二套摘要模型。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件为最终治理生效结果暴露统一的 inspect/doctor HTTP 视图。
+// 复用启动日志和测试已经使用的同一份治理摘要。
 package bootstrap
 
 import (
@@ -25,6 +23,21 @@ func RegisterGovernanceInspectEndpoints(router transportcontract.HTTPRouter, sum
 	}
 
 	handler := func(c transportcontract.HTTPContext) {
+		view := strings.ToLower(strings.TrimSpace(c.DefaultQuery("view", "")))
+
+		// view=defaults 时懒加载默认值表，不影响共享 summary
+		if view == "defaults" {
+			summaryCopy := summary
+			summaryCopy.Defaults = BuildGovernanceDefaultsTable(summary.Mode)
+			if wantsGovernanceDiagnosticText(c) {
+				c.Header("Content-Type", "text/plain; charset=utf-8")
+				c.String(http.StatusOK, FormatGovernanceDiagnosticView(summaryCopy, view))
+				return
+			}
+			c.JSON(http.StatusOK, summaryCopy)
+			return
+		}
+
 		if wantsGovernanceDiagnosticText(c) {
 			c.Header("Content-Type", "text/plain; charset=utf-8")
 			c.String(http.StatusOK, FormatGovernanceDiagnosticView(summary, c.DefaultQuery("view", "")))

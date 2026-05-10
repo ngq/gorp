@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Register app-service-specific runtime bindings during bootstrap.
-// - Keep app-service mode assembly compact while preserving singleton startup behavior.
-// - Provide a small focused helper used by higher-level bootstrap flows.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file registers app-service-specific runtime bindings during bootstrap.
+// Keeps app-service mode assembly compact while preserving singleton startup behavior.
 //
-// 适用场景：
-// - 在 bootstrap 阶段注册 app-service 模式专用的运行时绑定。
-// - 在保持单例启动语义的同时，让 app-service 模式装配保持精简。
-// - 为更高层的 bootstrap 流程提供一个小而专注的辅助入口。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件在 bootstrap 阶段注册 app-service 模式专用的运行时绑定。
+// 在保持单例启动语义的同时，让 app-service 模式装配保持精简。
 package bootstrap
 
 import runtimecontract "github.com/ngq/gorp/framework/contract/runtime"

@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Provide the legacy direct SSH dial helper used by older deploy flows.
-// - Support key-based SSH connection setup with known_hosts verification.
-// - Keep this compatibility helper available while the provider-based SSH capability becomes the main path.
+// Package deploy provides deployment utilities for gorp framework.
+// This file provides legacy direct SSH dial helper for older deploy flows.
+// Supports key-based SSH connection setup with known_hosts verification.
 //
-// 适用场景：
-// - 为旧部署流程提供直接 SSH 连接 helper。
-// - 支持基于私钥和 known_hosts 校验的 SSH 建连。
-// - 在 provider 化 SSH 能力成为主路径之前，保留这层兼容 helper。
+// 部署包提供 gorp 框架的部署工具能力。
+// 本文件为旧部署流程提供直接 SSH 连接 helper。
+// 支持基于私钥和 known_hosts 校验的 SSH 建连。
 package deploy
 
 import (

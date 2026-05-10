@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Select capability providers from runtime configuration during bootstrap.
-// - Keep config-driven microservice assembly centralized and predictable.
-// - Support explicit backend selection together with governance-mode defaults.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// This file selects capability providers from runtime configuration during bootstrap.
+// Keeps config-driven microservice assembly centralized and predictable.
 //
-// 适用场景：
-// - 在 bootstrap 阶段根据运行时配置选择能力 provider。
-// - 将配置驱动的微服务装配逻辑集中管理并保持可预测性。
-// - 同时支持显式 backend 选择与治理模式驱动的默认行为。
+// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
+// 本文件在 bootstrap 阶段根据运行时配置选择能力 provider。
+// 将配置驱动的微服务装配逻辑集中管理并保持可预测性。
 package bootstrap
 
 import (
@@ -47,10 +45,10 @@ func RegisterSelectedMicroserviceProviders(c runtimecontract.Container) error {
 //
 // RegisterSelectedMicroserviceProvidersWithMode 在显式 mode 覆盖下解析并注册微服务 provider。
 func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, modeOverride string) error {
-	return registerSelectedMicroserviceProvidersWithOptions(c, modeOverride, nil, nil)
+	return registerSelectedMicroserviceProvidersWithOptions(c, modeOverride, nil, nil, nil)
 }
 
-func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Container, modeOverride string, disabled []string, providerOverrides map[string]string) error {
+func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Container, modeOverride string, disabled []string, enabled []string, providerOverrides map[string]string) error {
 	if c == nil || !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}
@@ -59,7 +57,7 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 		return err
 	}
 	cfg, _ := cfgAny.(datacontract.Config)
-	cfg = overlayGovernanceConfig(cfg, disabled, providerOverrides)
+	cfg = overlayGovernanceConfig(cfg, disabled, enabled, providerOverrides)
 
 	configSourceProvider := SelectConfigSourceProvider(cfg)
 	if configSourceProvider != nil {
@@ -74,7 +72,7 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 				if err := cfgSvc.Reload(context.Background()); err != nil {
 					return err
 				}
-				cfg = overlayGovernanceConfig(cfgSvc, disabled, providerOverrides)
+				cfg = overlayGovernanceConfig(cfgSvc, disabled, enabled, providerOverrides)
 			}
 		}
 	}
@@ -300,6 +298,35 @@ func SelectCircuitBreakerProviderWithMode(cfg datacontract.Config, mode resilien
 		backend = DefaultGovernanceProviderDefaults(mode).CircuitBreaker
 	}
 	return providerFromMap(circuitBreakerProviderFactories, backend, "noop")
+}
+
+
+// SelectRetryProvider selects the retry provider from config.
+//
+// SelectRetryProvider 根据配置选择重试 provider。
+func SelectRetryProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
+	return SelectRetryProviderWithMode(cfg, DetectGovernanceMode(cfg))
+}
+
+// SelectRetryProviderWithMode selects the retry provider with an explicit governance mode.
+//
+// SelectRetryProviderWithMode 在显式治理模式下选择重试 provider。
+func SelectRetryProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
+	if isGovernanceCapabilityDisabled(cfg, "retry") {
+		return providerFromMap(retryProviderFactories, "noop", "noop")
+	}
+	backend := governanceProviderOverride(cfg, "retry")
+	if backend == "" {
+		backend = getConfigString(cfg, "retry.backend", "retry.type")
+	}
+	enabled := cfg != nil && cfg.GetBool("retry.enabled")
+	if backend == "" && enabled {
+		backend = "default"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(mode).Retry
+	}
+	return providerFromMap(retryProviderFactories, backend, "noop")
 }
 
 // SelectDTMProvider selects the DTM provider from config and enable flags.

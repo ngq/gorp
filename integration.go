@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Expose root-package aliases and helpers for integration capabilities such as message queue and distributed lock.
-// - Keep common integration capability access on a short public path for business code.
-// - Re-export stable integration primitives without requiring direct imports of contract packages.
+// Package gorp provides the root-package application startup surface for gorp framework.
+// This file exposes aliases and helpers for integration capabilities.
+// Provides short public path for message queue, distributed lock, and outbox.
 //
-// 适用场景：
-// - 暴露根包层的集成能力别名和 helper，例如消息队列与分布式锁。
-// - 让业务代码通过简短公共路径获取常用 integration 能力。
-// - 在不要求业务直接导入 contract 包的前提下重导出稳定集成原语。
+// Gorp 包提供 gorp 框架的根包层应用启动入口。
+// 本文件暴露根包层的集成能力别名和 helper。
+// 让业务代码通过简短公共路径获取常用 integration 能力。
 package gorp
 
 import (

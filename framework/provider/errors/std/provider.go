@@ -1,3 +1,10 @@
+// Package std provides standard error handling implementation for gorp framework.
+// Supports error creation, conversion, HTTP/gRPC error code mapping.
+// Self-implemented, not copied from Kratos.
+//
+// 标准错误处理包，提供 gorp 框架的统一错误处理实现。
+// 支持错误创建、转换、HTTP/gRPC 错误码转换。
+// 自研实现，不抄袭 Kratos。
 package std
 
 import (
@@ -15,14 +22,37 @@ import (
 // - 自己实现，不抄袭 Kratos。
 type Provider struct{}
 
+// NewProvider creates a new error handling provider.
+//
+// NewProvider 创建新的错误处理 provider。
 func NewProvider() *Provider { return &Provider{} }
 
+// Name returns provider name for identification.
+//
+// Name 返回 provider 名称，用于标识。
 func (p *Provider) Name() string  { return "errors.default" }
+
+// IsDefer indicates error handler should defer loading.
+// Can be loaded after other core providers.
+//
+// IsDefer 表示错误处理器应延迟加载。
+// 可以在其他核心 provider 之后加载。
 func (p *Provider) IsDefer() bool { return true }
+
+// Provides returns the capability keys this provider exposes.
+// Exposes ErrorsKey for error handling service.
+//
+// Provides 返回 provider 暴露的能力键。
+// 暴露 ErrorsKey 用于错误处理服务。
 func (p *Provider) Provides() []string {
 	return []string{resiliencecontract.ErrorsKey}
 }
 
+// Register binds the error handler factory to the container.
+// Core logic: Create errorHandler instance, bind to container.
+//
+// Register 将错误处理器工厂绑定到容器。
+// 核心逻辑：创建 errorHandler 实例、绑定到容器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	// 注册错误处理器
 	c.Bind(resiliencecontract.ErrorsKey, func(c runtimecontract.Container) (any, error) {
@@ -31,11 +61,20 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	return nil
 }
 
+// Boot initializes the error handler provider.
+// No additional startup logic required.
+//
+// Boot 初始化错误处理 provider。
+// 无需额外启动逻辑。
 func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
-// ErrorHandler 错误处理器。
+// ErrorHandler is the error handling service.
+// Core logic: Convert error codes, wrap errors, classify error types.
+//
+// ErrorHandler 是错误处理服务。
+// 核心逻辑：转换错误码、包装错误、分类错误类型。
 type errorHandler struct{}
 
 // HTTPToGRPC 将 HTTP 错误码转换为 gRPC 错误码。

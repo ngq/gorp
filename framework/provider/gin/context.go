@@ -1,12 +1,10 @@
-// Application scenarios:
-// - Adapt Gin request and response primitives into the framework HTTP context contract.
-// - Allow provider code to unwrap Gin context only when framework-level abstractions are insufficient.
-// - Keep headers, route params, bind helpers, and output helpers consistent for transport handlers.
+// Package gin provides Gin-based HTTP server implementation for gorp framework.
+// This file implements HTTP context adaptation wrapping Gin Context.
+// Provides request/response primitives, bind helpers, and header access.
 //
-// 适用场景：
-// - 将 Gin 的请求与响应原语适配为框架 HTTPContext 契约。
-// - 仅在框架级抽象不足时，允许 provider 代码下探取回 Gin context。
-// - 为 transport 处理器统一请求头、路由参数、绑定助手与输出助手。
+// Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
+// 本文件实现 HTTP context 适配，包装 Gin Context。
+// 提供请求/响应原语、绑定助手和头部访问。
 package gin
 
 import (

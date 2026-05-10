@@ -1,3 +1,10 @@
+// Package proto provides validation rule converter.
+// Converts Go validate/binding tags to protoc-gen-validate annotations.
+// Supports common validation rules: required, min, max, email, etc.
+//
+// Proto 包提供验证规则转换器。
+// 将 Go validate/binding tag 转换为 protoc-gen-validate 注解。
+// 支持常见验证规则：required、min、max、email 等。
 package proto
 
 import (

@@ -345,6 +345,7 @@ type scaffoldInput struct {
 	Backend          string
 	WithDB           bool
 	WithSwagger      bool
+	GovernanceMode   string // 治理模式：monolith, gin-first, microservice
 }
 
 func buildScaffoldData(in scaffoldInput) map[string]any {
@@ -355,6 +356,7 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 	protoUserGoPackage := in.Module + "/proto/user/v1;userv1"
 	protoUserGoPackageLen := len([]byte(protoUserGoPackage))
 	kubeName := toKubernetesName(in.Name)
+	governanceMode := normalizeGovernanceMode(in.GovernanceMode)
 	return map[string]any{
 		"Name":                          in.Name,
 		"ProjectName":                   in.Name, // 别名，供 README 等模板使用
@@ -375,9 +377,24 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 		"IsEntBackend":                  in.Backend == "ent",
 		"WithDB":                        in.WithDB,
 		"WithSwagger":                   in.WithSwagger,
+		"GovernanceMode":                governanceMode,
+		"IsMonolithMode":                governanceMode == "monolith",
+		"IsGinFirstMode":                governanceMode == "gin-first",
+		"IsMicroserviceMode":            governanceMode == "microservice",
 		"ProtoUserGoPackage":            protoUserGoPackage,
 		"ProtoUserGoPackageLenHex":      fmt.Sprintf("\\x%02x", protoUserGoPackageLen),
 		"ProtoUserGoPackageFieldLenHex": fmt.Sprintf("\\x%02x", protoUserGoPackageLen+2),
+	}
+}
+
+// normalizeGovernanceMode 规范化治理模式，空值默认回落到 monolith。
+func normalizeGovernanceMode(mode string) string {
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	switch mode {
+	case "microservice", "gin-first", "monolith":
+		return mode
+	default:
+		return "monolith"
 	}
 }
 
