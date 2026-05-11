@@ -31,7 +31,7 @@ func TestService_Load_MultiFile_EnvDir_AndEnvPlaceholder(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, "config", "app.yaml"), []byte("app:\n  address: ':8080'\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "config", "database.yaml"), []byte("database:\n  dsn: 'env(DB_DSN)'\n"), 0o644))
 
-	// legacy env overlay file
+	// env overlay file
 	require.NoError(t, os.WriteFile(filepath.Join(root, "config", "app.testing.yaml"), []byte("redis:\n  addr: '127.0.0.1:6379'\n"), 0o644))
 
 	// env directory overlay

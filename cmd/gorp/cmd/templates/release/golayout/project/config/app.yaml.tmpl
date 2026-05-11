@@ -6,11 +6,11 @@
 service:
   name: {{.Name}}
   namespace: default
-  environment: development
+  env: dev
 
 app:
   name: {{.Name}}
-  env: development
+  env: dev
   debug: true
   address: :8080
 

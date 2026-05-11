@@ -139,65 +139,39 @@ func LoadLocalConfigToViper(v *viper.Viper, env, root string) error {
 
 	// env overlay file (app.<env>.yaml)
 	if env != "" {
-		envFiles := []string{filepath.Join(configDir, fmt.Sprintf("app.%s.yaml", env))}
-		// 中文说明：
-		// - framework 统一环境名后，仍兼容历史命名：
-		//   dev <-> development
-		//   test <-> testing
-		//   prod <-> production
-		// - 这样旧项目不需要立刻批量改名配置文件，也能平滑过渡。
-		switch env {
-		case EnvDev:
-			envFiles = append(envFiles, filepath.Join(configDir, "app.development.yaml"))
-		case EnvTest:
-			envFiles = append(envFiles, filepath.Join(configDir, "app.testing.yaml"))
-		case EnvProd:
-			envFiles = append(envFiles, filepath.Join(configDir, "app.production.yaml"))
-		}
-		for _, envFile := range envFiles {
-			if _, err := os.Stat(envFile); err == nil {
-				b, err := readFileWithEnvSubst(envFile)
-				if err != nil {
-					return err
-				}
-				if err := v.MergeConfig(bytes.NewReader(b)); err != nil {
-					return fmt.Errorf("merge env config (%s): %w", envFile, err)
-				}
+		envFile := filepath.Join(configDir, fmt.Sprintf("app.%s.yaml", env))
+		if _, err := os.Stat(envFile); err == nil {
+			b, err := readFileWithEnvSubst(envFile)
+			if err != nil {
+				return err
+			}
+			if err := v.MergeConfig(bytes.NewReader(b)); err != nil {
+				return fmt.Errorf("merge env config (%s): %w", envFile, err)
 			}
 		}
 
 		// env directory overlay (config/<env>/*.yaml)
-		envDirs := []string{filepath.Join(configDir, env)}
-		switch env {
-		case EnvDev:
-			envDirs = append(envDirs, filepath.Join(configDir, "development"))
-		case EnvTest:
-			envDirs = append(envDirs, filepath.Join(configDir, "testing"))
-		case EnvProd:
-			envDirs = append(envDirs, filepath.Join(configDir, "production"))
-		}
-		for _, envDir := range envDirs {
-			if entries, err := os.ReadDir(envDir); err == nil {
-				files := make([]string, 0, len(entries))
-				for _, e := range entries {
-					if e.IsDir() {
-						continue
-					}
-					name := e.Name()
-					if !strings.HasSuffix(name, ".yaml") {
-						continue
-					}
-					files = append(files, filepath.Join(envDir, name))
+		envDir := filepath.Join(configDir, env)
+		if entries, err := os.ReadDir(envDir); err == nil {
+			files := make([]string, 0, len(entries))
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
 				}
-				sort.Strings(files)
-				for _, p := range files {
-					b, err := readFileWithEnvSubst(p)
-					if err != nil {
-						return err
-					}
-					if err := v.MergeConfig(bytes.NewReader(b)); err != nil {
-						return fmt.Errorf("merge env dir config (%s): %w", p, err)
-					}
+				name := e.Name()
+				if !strings.HasSuffix(name, ".yaml") {
+					continue
+				}
+				files = append(files, filepath.Join(envDir, name))
+			}
+			sort.Strings(files)
+			for _, p := range files {
+				b, err := readFileWithEnvSubst(p)
+				if err != nil {
+					return err
+				}
+				if err := v.MergeConfig(bytes.NewReader(b)); err != nil {
+					return fmt.Errorf("merge env dir config (%s): %w", p, err)
 				}
 			}
 		}
@@ -275,12 +249,6 @@ func readFileWithEnvSubst(path string) ([]byte, error) {
 }
 
 func projectRoot() string {
-	// 中文说明：
-	// - 当前 config provider 采用“host root + framework config convention”模型：
-	//   1. 优先取环境变量 `APP_BASE_PATH`
-	//   2. 否则回退到当前工作目录
-	// - 这说明它已经不是早期的裸 `Getwd()` 推断，但也还不是完全无宿主假设的极简中立 provider；
-	// - framework 冻仓阶段先把这层语义写清并稳定下来，后续若继续抽仓再判断是否还需要进一步下沉约定。
 	if base := strings.TrimSpace(os.Getenv("APP_BASE_PATH")); base != "" {
 		if filepath.IsAbs(base) {
 			return filepath.Clean(base)

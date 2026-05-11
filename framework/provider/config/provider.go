@@ -75,6 +75,5 @@ func (p *Provider) Boot(runtimecontract.Container) error {
 	// 中文说明：
 	// - APP_ENV 是整个配置装载流程的入口变量；
 	// - framework 级统一约定使用 dev / test / prod；
-	// - 同时兼容 development / testing / production 的历史值。
-	return p.cfg.Load(env)
+		return p.cfg.Load(env)
 }

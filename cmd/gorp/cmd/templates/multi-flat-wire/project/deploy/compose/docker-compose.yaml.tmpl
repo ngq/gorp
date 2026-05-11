@@ -14,7 +14,7 @@ services:
     working_dir: /workspace
     command: ["sh", "-lc", "go run ./services/user/cmd"]
     environment:
-      APP_ENV: development
+      APP_ENV: dev
       REDIS_ADDR: redis:6379
     volumes:
       - ../..:/workspace
@@ -30,7 +30,7 @@ services:
     working_dir: /workspace
     command: ["sh", "-lc", "go run ./services/order/cmd"]
     environment:
-      APP_ENV: development
+      APP_ENV: dev
       REDIS_ADDR: redis:6379
     volumes:
       - ../..:/workspace
@@ -47,7 +47,7 @@ services:
     working_dir: /workspace
     command: ["sh", "-lc", "go run ./services/product/cmd"]
     environment:
-      APP_ENV: development
+      APP_ENV: dev
       REDIS_ADDR: redis:6379
     volumes:
       - ../..:/workspace
