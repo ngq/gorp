@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify lifecycle manager ordering, rollback, and state transitions.
-// - Protect the manager's hook invocation and idempotency semantics from regressions.
-// - Document expected runtime behavior through focused unit tests.
+// Package lifecycle_test provides unit tests for lifecycle manager ordering and state transitions.
 //
 // 适用场景：
 // - 验证 lifecycle manager 的顺序、回滚和状态流转行为。

@@ -1,3 +1,8 @@
+// Package governance_test provides unit tests for RPC governance preset and interceptor chain.
+//
+// 适用场景：
+// - 验证 RPC governance preset 的重试、超时、熔断等拦截器链配置。
+// - 确保 preset 组装和参数传递正确。
 package governance
 
 import (

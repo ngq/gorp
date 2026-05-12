@@ -1,3 +1,8 @@
+// Package http_test provides unit tests for HTTP RPC transport and handler registration.
+//
+// 适用场景：
+// - 验证 HTTP RPC server 的启动、路由注册和中间件链路。
+// - 确保 HTTP 场景下的 discovery、tracing 集成正确。
 package http
 
 import (
@@ -121,6 +126,11 @@ func (s *captureSelector) Select(ctx context.Context, instances []transportcontr
 	}, nil
 }
 
+// TestClientCallUsesCircuitBreaker 验证 HTTP 客户端调用使用熔断器包装。
+//
+// 中文说明：
+// - 资源名格式为 "rpc.http.{service}.{path}"。
+// - 响应体正确解码为 map[string]bool。
 func TestClientCallUsesCircuitBreaker(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -151,6 +161,10 @@ func TestClientCallUsesCircuitBreaker(t *testing.T) {
 	}
 }
 
+// TestClientCallPropagatesTraceIDFromContext 验证 HTTP 客户端从 context 传播 trace ID。
+//
+// 中文说明：
+// - NewTraceIDContext 设置的 trace ID 会随请求传播到下游服务。
 func TestClientCallPropagatesTraceIDFromContext(t *testing.T) {
 	var gotTraceID string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +189,10 @@ func TestClientCallPropagatesTraceIDFromContext(t *testing.T) {
 	}
 }
 
+// TestClientCallInjectsServiceAuthTracingAndMetadata 验证 HTTP 客户端注入 service token、tracing 和 metadata。
+//
+// 中文说明：
+// - service token、tracing header 和 metadata 均正确注入到下游 HTTP 请求。
 func TestClientCallInjectsServiceAuthTracingAndMetadata(t *testing.T) {
 	var gotToken, gotTrace, gotMetadata string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -211,6 +229,10 @@ func TestClientCallInjectsServiceAuthTracingAndMetadata(t *testing.T) {
 	}
 }
 
+// TestClientCallRetryUsesResourceAwarePath 验证 HTTP 客户端使用资源感知的路径作为重试键。
+//
+// 中文说明：
+// - retry.DoForResource 使用标准化后的资源名 "rpc.http.{service}.{path}"。
 func TestClientCallRetryUsesResourceAwarePath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -236,6 +258,10 @@ func TestClientCallRetryUsesResourceAwarePath(t *testing.T) {
 	}
 }
 
+// TestClientCallReportsLatencyToSelector 验证 HTTP 客户端向 selector 报告延迟和字节数。
+//
+// 中文说明：
+// - DoneInfo 包含 Latency、BytesSent、BytesReceived 等指标。
 func TestClientCallReportsLatencyToSelector(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(10 * time.Millisecond)

@@ -1,3 +1,7 @@
+// Package application_test provides unit tests for application option configuration.
+//
+// 适用场景：
+// - 验证 HTTP / gRPC / Governance 等 Application Option 到 Bootstrap Options 的映射。
 package application
 
 import (

@@ -1,3 +1,8 @@
+// Package gin_test provides unit tests for Gin HTTP server bridge and handler registration.
+//
+// 适用场景：
+// - 验证 Gin HTTP server 的 handler 注册和路由行为。
+// - 确保 governance 中间件链正确集成到 Gin engine。
 package gin
 
 import (
@@ -13,6 +18,11 @@ import (
 	httpmiddleware "github.com/ngq/gorp/framework/http/middleware"
 )
 
+// TestAdaptMiddlewarePreservesRequestIdentity 验证 AdaptMiddleware 正确传递 request identity。
+//
+// 中文说明：
+// - 通过 AdaptMiddleware 将框架 transport middleware 适配到 Gin。
+// - RequestIdentity 写入的 request ID 在后续 Gin middleware 中可见。
 func TestAdaptMiddlewarePreservesRequestIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
@@ -42,6 +52,10 @@ func TestAdaptMiddlewarePreservesRequestIdentity(t *testing.T) {
 	}
 }
 
+// TestAdaptMiddlewareSyncsContext 验证 AdaptMiddleware 正确同步 trace ID 到 Gin context。
+//
+// 中文说明：
+// - RequestIdentity 设置的 trace ID 可在后续 Gin middleware 中通过 context 查到。
 func TestAdaptMiddlewareSyncsContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
@@ -69,6 +83,10 @@ func TestAdaptMiddlewareSyncsContext(t *testing.T) {
 	}
 }
 
+// TestNativeEngineFromHTTPService 验证可从 Gin HTTP service 提取原生 *gin.Engine。
+//
+// 中文说明：
+// - NativeEngine 从实现了 GINEngineProvider 的 service 中提取 *gin.Engine。
 func TestNativeEngineFromHTTPService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
@@ -86,6 +104,10 @@ func TestNativeEngineFromHTTPService(t *testing.T) {
 	}
 }
 
+// TestNativeEngineFromNonGinService 验证非 Gin HTTP service 返回 false。
+//
+// 中文说明：
+// - NativeEngine 对不实现 GINEngineProvider 的 service 返回 ok=false。
 func TestNativeEngineFromNonGinService(t *testing.T) {
 	// 模拟非 Gin HTTP 服务
 	svc := &nonGinHTTPService{}
@@ -95,6 +117,10 @@ func TestNativeEngineFromNonGinService(t *testing.T) {
 	}
 }
 
+// TestNativeRouterGroupFromHTTPService 验证可从 Gin HTTP service 提取 *gin.RouterGroup。
+//
+// 中文说明：
+// - NativeRouterGroup 从 service 中提取原生路由组，供高级用户直接操作。
 func TestNativeRouterGroupFromHTTPService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
@@ -112,6 +138,10 @@ func TestNativeRouterGroupFromHTTPService(t *testing.T) {
 	}
 }
 
+// TestGinFirstEngineDoesNotAutoMountGovernance 验证 Gin-first engine 不自动挂载 governance。
+//
+// 中文说明：
+// - Gin-first 模式只注入 container middleware，不自动装配 governance preset。
 func TestGinFirstEngineDoesNotAutoMountGovernance(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -136,6 +166,11 @@ func TestGinFirstEngineDoesNotAutoMountGovernance(t *testing.T) {
 	}
 }
 
+// TestMixedGinAndAbstractMiddleware 验证原生 Gin middleware 与框架抽象 middleware 可混合使用。
+//
+// 中文说明：
+// - AdaptMiddleware 将框架抽象 middleware 适配到 Gin，两者顺序正确。
+// - 执行顺序为：原生 Gin middleware → 框架抽象 middleware → handler。
 func TestMixedGinAndAbstractMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()

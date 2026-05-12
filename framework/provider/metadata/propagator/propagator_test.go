@@ -1,3 +1,8 @@
+// Package propagator_test provides unit tests for metadata carrier propagation logic.
+//
+// 适用场景：
+// - 验证 MetadataCarrier 接口实现和 context 传播行为。
+// - 确保 carrier 对 metadata 的注入和读取正确。
 package propagator
 
 import (
@@ -43,6 +48,11 @@ func (c *mockCarrier) Values(key string) []string {
 	return c.data[key]
 }
 
+// TestDefaultPropagator_Extract 验证默认 propagator 正确提取匹配前缀的 metadata。
+//
+// 中文说明：
+// - Extract 只提取匹配前缀的 key（如 "x-md-"）。
+// - 不匹配前缀的 key（如 authorization）不会被提取。
 func TestDefaultPropagator_Extract(t *testing.T) {
 	prop := NewDefaultPropagator([]string{"x-md-"}, nil)
 
@@ -70,6 +80,10 @@ func TestDefaultPropagator_Extract(t *testing.T) {
 	}
 }
 
+// TestDefaultPropagator_Inject 验证默认 propagator 正确注入 metadata 到 carrier。
+//
+// 中文说明：
+// - 常量 metadata 和匹配前缀的 context metadata 均被注入到 carrier。
 func TestDefaultPropagator_Inject(t *testing.T) {
 	prop := NewDefaultPropagator([]string{"x-md-"}, map[string]string{
 		"x-md-app": "test-app",
@@ -96,6 +110,10 @@ func TestDefaultPropagator_Inject(t *testing.T) {
 	}
 }
 
+// TestDefaultPropagator_InjectClientMetadata 验证 propagator 正确注入 client context metadata。
+//
+// 中文说明：
+// - 从 NewClientContext 创建的 context 中提取 metadata 并注入到 carrier。
 func TestDefaultPropagator_InjectClientMetadata(t *testing.T) {
 	prop := NewDefaultPropagator(nil, nil)
 
@@ -114,6 +132,11 @@ func TestDefaultPropagator_InjectClientMetadata(t *testing.T) {
 	}
 }
 
+// TestDefaultPropagator_MatchPrefix 验证 propagator 前缀匹配逻辑。
+//
+// 中文说明：
+// - nil 前缀默认使用 "x-md-"。
+// - 空字符串前缀匹配所有 key。
 func TestDefaultPropagator_MatchPrefix(t *testing.T) {
 	// nil 前缀列表使用默认前缀 "x-md-"
 	prop := NewDefaultPropagator(nil, nil)
@@ -137,6 +160,11 @@ func TestDefaultPropagator_MatchPrefix(t *testing.T) {
 	}
 }
 
+// TestNoopPropagator 验证 noop propagator 不修改任何状态。
+//
+// 中文说明：
+// - Extract 返回原 context，不做处理。
+// - Inject 不修改 carrier。
 func TestNoopPropagator(t *testing.T) {
 	prop := NewNoopPropagator()
 

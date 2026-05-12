@@ -1,3 +1,7 @@
+// Package ent_test provides unit tests for the ORM ent provider.
+//
+// 适用场景：
+// - 验证 ORM ent provider 的注册与数据库操作行为。
 package ent
 
 import (

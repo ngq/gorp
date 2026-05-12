@@ -1,3 +1,7 @@
+// Package container_test provides unit tests for container rule resolution.
+//
+// 适用场景：
+// - 验证容器规则解析器的注册、匹配和执行行为。
 package container
 
 import (

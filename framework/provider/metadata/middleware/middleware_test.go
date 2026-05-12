@@ -1,3 +1,8 @@
+// Package middleware_test provides unit tests for metadata propagation middleware.
+//
+// 适用场景：
+// - 验证 metadata propagator 在 HTTP 和 gRPC 之间的上下文传播行为。
+// - 确保 carrier 实现和 middleware 拦截逻辑正确。
 package middleware
 
 import (
@@ -26,6 +31,11 @@ func (testMetadataPropagator) Extract(ctx context.Context, carrier transportcont
 	return transportcontract.NewServerContext(ctx, md)
 }
 
+// TestMetadataHTTPMiddlewareExtractsIntoContext 验证 HTTP metadata 中间件正确提取 header 到 context。
+//
+// 中文说明：
+// - MetadataMiddleware 从 HTTP header 中提取 metadata 并写入 context。
+// - 下游 handler 可通过 GetHeaderValue 获取提取的 metadata。
 func TestMetadataHTTPMiddlewareExtractsIntoContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	propagator := testMetadataPropagator{}
@@ -59,6 +69,10 @@ func TestMetadataHTTPMiddlewareExtractsIntoContext(t *testing.T) {
 	require.Equal(t, "u1", got)
 }
 
+// TestMetadataGRPCClientInterceptorPreservesOutgoingMetadata 验证 gRPC 客户端拦截器保留已有 metadata。
+//
+// 中文说明：
+// - UnaryClientInterceptor 在传播 metadata 时保留已有的 outgoing context。
 func TestMetadataGRPCClientInterceptorPreservesOutgoingMetadata(t *testing.T) {
 	propagator := testMetadataPropagator{}
 	ctx := metadata.NewOutgoingContext(context.Background(), metadata.New(map[string]string{"x-existing": "keep"}))

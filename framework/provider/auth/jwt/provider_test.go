@@ -1,3 +1,8 @@
+// Package jwt_test provides unit tests for JWT auth provider registration and config binding.
+//
+// 适用场景：
+// - 验证 JWT auth provider 的注册、IsDefer、Provides 等接口契约。
+// - 确保 Container 绑定和配置注入逻辑正确。
 package jwt
 
 import (

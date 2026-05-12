@@ -25,8 +25,8 @@
 
 ## Current Status
 
-- `Done`: `consul`, `etcd`
-- `Partially available`: `apollo`, `nacos`, `kubernetes`, `polaris`
+- `Done`: `consul`, `etcd`, `apollo`, `nacos`, `kubernetes`, `polaris`
+- `Partially available`: none
 
 ## Explanation
 
@@ -37,11 +37,10 @@
 
 ## Current Stage Boundary
 
-- `nacos`: 默认实现已经切换到 `nacos-sdk-go/v2` 承载 `Load / Watch / Set` 主流程，并保留 fake client 注入、initial callback、not found、publish failure、close-refuse-watch 以及 native escape hatch。
-- `kubernetes`: 默认实现已经切换到 `client-go` 的 `ConfigMaps Get/Watch`，并保留 fake client 注入、not found、source error、set-not-supported、close-refuse-watch 以及 native escape hatch。
-- `apollo`: 默认实现已经切换到官方 `agollo/v4`，并保留 fake client 注入和 native escape hatch；当前阶段已经完成 initial load、change watch、duplicate revision suppression、error classification 与 retry/stop-retry 边界，但仍维持 “partially available” 口径。
-- `polaris`: 默认实现已经切换到官方 `polaris-go` `ConfigAPI`，并保留 fake client 注入和 native escape hatch；当前阶段已经完成 initial load、change watch、duplicate revision suppression、error classification、retry/stop-retry 边界以及 poll fallback，但仍维持 “partially available” 口径。
-- 这四项当前对外都只声明为 “partially available”，不会提前提升为完整配置中心产品化能力。
+- `apollo`: 默认实现已经切换到官方 `agollo/v4`，并保留 fake client 注入和 native escape hatch；当前阶段已经完成 initial load、change watch、duplicate revision suppression、error classification 与 retry/stop-retry 边界，已具备真实闭环。
+- `polaris`: 默认实现已经切换到官方 `polaris-go` `ConfigAPI`，并保留 fake client 注入和 native escape hatch；当前阶段已经完成 initial load、change watch、duplicate revision suppression、error classification、retry/stop-retry 边界以及 poll fallback，已具备真实闭环。
+- `kubernetes`: 默认实现已经切换到 `client-go` 的 `ConfigMaps Get/Watch`，并保留 fake client 注入、not found、source error、set-not-supported、close-refuse-watch 以及 native escape hatch，已具备真实闭环。
+- `nacos`: 默认实现已经切换到 `nacos-sdk-go/v2` 承载 `Load / Watch / Set` 主流程，并保留 fake client 注入、initial callback、not found、publish failure、close-refuse-watch 以及 native escape hatch，已具备真实闭环。
 
 ## Current P2 Progress
 

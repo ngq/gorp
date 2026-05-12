@@ -1,3 +1,7 @@
+// Package error_reporter_test provides unit tests for the error reporter provider.
+//
+// 适用场景：
+// - 验证 Error Reporter provider 的注册与错误上报行为。
 package error_reporter
 
 import (

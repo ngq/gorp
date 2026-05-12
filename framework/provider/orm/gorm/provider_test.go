@@ -1,3 +1,7 @@
+// Package gorm_test provides unit tests for the ORM GORM provider.
+//
+// 适用场景：
+// - 验证 ORM GORM provider 的注册与数据库操作行为。
 package gorm_test
 
 import (

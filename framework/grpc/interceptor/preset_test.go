@@ -1,3 +1,7 @@
+// Package interceptor_test provides unit tests for gRPC interceptor preset ordering.
+//
+// 适用场景：
+// - 验证 gRPC 拦截器的预设顺序与组合行为。
 package interceptor
 
 import (

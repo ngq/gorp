@@ -1,3 +1,7 @@
+// Package loadshedding_test provides unit tests for the load shedding provider.
+//
+// 适用场景：
+// - 验证 Load Shedding provider 的注册与限流行为。
 package loadshedding
 
 import (

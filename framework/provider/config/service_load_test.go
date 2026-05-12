@@ -1,3 +1,8 @@
+// Package config_test provides unit tests for config service file loading and path resolution.
+//
+// 适用场景：
+// - 验证 LoadLocalConfigToViper 对 app base path 的尊重行为。
+// - 确保配置目录解析和文件加载路径正确。
 package config
 
 import (

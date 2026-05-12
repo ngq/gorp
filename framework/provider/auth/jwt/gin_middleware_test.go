@@ -1,3 +1,8 @@
+// Package jwt_test provides unit tests for JWT auth middleware request context behavior.
+//
+// 适用场景：
+// - 验证 JWT auth 中间件向 request context 写入鉴权信息的正确性。
+// - 确保 Gin 集成下 middleware 的上下文传递行为稳定。
 package jwt
 
 import (

@@ -1,3 +1,8 @@
+// Package retry_test provides unit tests for retry service execution and backoff behavior.
+//
+// 适用场景：
+// - 验证 RetryService.Do 的重试语义和成功/失败路径。
+// - 确保指数退避、错误处理和资源清理行为正确。
 package retry
 
 import (

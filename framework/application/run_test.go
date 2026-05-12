@@ -1,3 +1,7 @@
+// Package application_test provides unit tests for application run lifecycle and error handling.
+//
+// 适用场景：
+// - 验证 Application Run 的启动、停止和错误处理行为。
 package application
 
 import (

@@ -1,3 +1,7 @@
+// Package cron_test provides unit tests for the cron provider.
+//
+// 适用场景：
+// - 验证 Cron provider 的注册与契约实现。
 package cron
 
 import (

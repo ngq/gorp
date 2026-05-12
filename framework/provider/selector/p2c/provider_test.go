@@ -1,3 +1,7 @@
+// Package p2c_test provides unit tests for the P2C (power of two choices) load balancer selector.
+//
+// 适用场景：
+// - 验证 P2C Selector 的实例选择、负载估算和自适应行为。
 package p2c
 
 import (

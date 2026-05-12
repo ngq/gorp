@@ -1,3 +1,7 @@
+// Package container_test provides unit tests for service provider registration and boot order.
+//
+// 适用场景：
+// - 验证服务商注册、引导顺序与 boot 调用的正确性。
 package container
 
 import (

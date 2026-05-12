@@ -1,3 +1,8 @@
+// Package container_test provides unit tests for the service container.
+//
+// 适用场景：
+// - 验证容器的注册、引导、延迟加载和依赖解析行为。
+// - 验证服务提供商的加载顺序与错误传播。
 package container
 
 import (

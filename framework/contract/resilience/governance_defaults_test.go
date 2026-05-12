@@ -1,3 +1,8 @@
+// Package resilience_test provides unit tests for governance feature defaults stability.
+//
+// 适用场景：
+// - 验证 DefaultGovernanceFeatureSet 在不同 governance mode 下的默认能力集稳定。
+// - 确保各模式的 request_identity、logging、recovery、timeout、metrics 等基础能力默认启用。
 package resilience
 
 import "testing"

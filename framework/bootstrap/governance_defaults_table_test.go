@@ -1,3 +1,8 @@
+// Package bootstrap_test provides unit tests for governance defaults table construction.
+//
+// 适用场景：
+// - 验证 BuildGovernanceDefaultsTable 在不同 governance mode 下的 feature 默认值。
+// - 确保单体、微服务和 Gin-first 模式的默认能力矩阵稳定。
 package bootstrap
 
 import (

@@ -1,3 +1,7 @@
+// Package container_test provides unit tests for deferred provider loading behavior.
+//
+// 适用场景：
+// - 验证延迟（Defer）服务提供商的注册与延迟加载时机。
 package container
 
 import (

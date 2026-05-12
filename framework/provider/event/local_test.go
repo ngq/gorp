@@ -1,3 +1,8 @@
+// Package event_test provides unit tests for local event bus publish-subscribe behavior.
+//
+// 适用场景：
+// - 验证 BaseEvent 的创建、发布和订阅处理逻辑。
+// - 确保事件总线的并发安全和错误处理行为正确。
 package event
 
 import (
@@ -11,8 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestBaseEvent 验证 BaseEvent 的创建和字段赋值。
+//
+// 中文说明：
+// - Name、Payload、OccurredAt 字段正确赋值。
+// - OccurredAt 时间戳在合理范围内（当前时间 ±1 秒）。
 func TestBaseEvent(t *testing.T) {
-	// 测试创建事件
 	payload := map[string]string{"key": "value"}
 	event := NewBaseEvent("test.event", payload)
 
@@ -22,6 +31,11 @@ func TestBaseEvent(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), event.OccurredAt(), time.Second)
 }
 
+// TestLocalEventBus_SubscribePublish 验证事件订阅与发布的基本流程。
+//
+// 中文说明：
+// - 订阅后发布事件，处理器被正确调用。
+// - 同一事件可重复发布，处理器每次都被触发。
 func TestLocalEventBus_SubscribePublish(t *testing.T) {
 	bus := NewLocalEventBus()
 
@@ -44,6 +58,11 @@ func TestLocalEventBus_SubscribePublish(t *testing.T) {
 	assert.Equal(t, int32(2), atomic.LoadInt32(&count))
 }
 
+// TestLocalEventBus_MultipleHandlers 验证同一事件可注册多个处理器。
+//
+// 中文说明：
+// - 同一事件名可挂载多个 handler。
+// - 发布事件时所有处理器按注册顺序依次执行。
 func TestLocalEventBus_MultipleHandlers(t *testing.T) {
 	bus := NewLocalEventBus()
 
@@ -69,6 +88,11 @@ func TestLocalEventBus_MultipleHandlers(t *testing.T) {
 	assert.Equal(t, []string{"handler1", "handler2", "handler3"}, results)
 }
 
+// TestLocalEventBus_HandlerError 验证处理器返回错误时的行为。
+//
+// 中文说明：
+// - Publish 返回第一个错误。
+// - 即使某个处理器出错，其他处理器仍继续执行。
 func TestLocalEventBus_HandlerError(t *testing.T) {
 	bus := NewLocalEventBus()
 
@@ -90,6 +114,10 @@ func TestLocalEventBus_HandlerError(t *testing.T) {
 	assert.True(t, successCalled) // 其他处理器仍然执行
 }
 
+// TestLocalEventBus_NoSubscribers 验证发布无订阅者事件时的行为。
+//
+// 中文说明：
+// - 发布到无订阅者的事件名时，Publish 返回 nil，不报错。
 func TestLocalEventBus_NoSubscribers(t *testing.T) {
 	bus := NewLocalEventBus()
 
@@ -99,6 +127,11 @@ func TestLocalEventBus_NoSubscribers(t *testing.T) {
 	assert.NoError(t, err) // 无订阅者时返回 nil
 }
 
+// TestLocalEventBus_PublishAsync 验证异步发布事件的行为。
+//
+// 中文说明：
+// - PublishAsync 立即返回，处理器在后台异步执行。
+// - 等待后处理器确实被触发。
 func TestLocalEventBus_PublishAsync(t *testing.T) {
 	bus := NewLocalEventBus()
 
@@ -119,6 +152,10 @@ func TestLocalEventBus_PublishAsync(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&count))
 }
 
+// TestLocalEventBus_Unsubscribe 验证取消订阅后不再接收事件。
+//
+// 中文说明：
+// - 取消订阅后，同名事件发布不再触发处理器。
 func TestLocalEventBus_Unsubscribe(t *testing.T) {
 	bus := NewLocalEventBus()
 
@@ -142,6 +179,10 @@ func TestLocalEventBus_Unsubscribe(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&count)) // 计数不变
 }
 
+// TestLocalEventBus_HasSubscribers 验证 HasSubscribers 的准确性。
+//
+// 中文说明：
+// - 有订阅者时返回 true；取消订阅后返回 false。
 func TestLocalEventBus_HasSubscribers(t *testing.T) {
 	bus := NewLocalEventBus()
 

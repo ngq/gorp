@@ -1,3 +1,7 @@
+// Package wrr_test provides unit tests for the weighted round-robin load balancer selector.
+//
+// 适用场景：
+// - 验证 WRR（加权轮询）Selector 的权重选择与轮询行为。
 package wrr
 
 import (

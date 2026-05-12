@@ -1,3 +1,8 @@
+// Package validate_test provides unit tests for validation service and tag-based rules.
+//
+// 适用场景：
+// - 验证 validate service 对 struct tag 规则（required、email、min、max）的解析和执行。
+// - 确保错误消息和字段名返回正确。
 package validate
 
 import (

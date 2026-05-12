@@ -1,3 +1,8 @@
+// Package provider_test provides boundary tests for provider registration and container integration.
+//
+// 适用场景：
+// - 验证多个 provider 的注册顺序和 container 绑定行为。
+// - 确保 app、jwt、cache、host 等 provider 的集成正确。
 package provider
 
 import (

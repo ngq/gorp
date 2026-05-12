@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify that the Gin-backed HTTP context output helpers behave consistently.
-// - Guard the provider adapter against regressions in string, XML, data, and redirect output.
-// - Keep provider-level context output behavior stable while mainline abstractions evolve.
+// Package gin_test provides unit tests for Gin-backed HTTP context output helpers.
 //
 // 适用场景：
 // - 验证基于 Gin 的 HTTP context 输出助手行为一致。

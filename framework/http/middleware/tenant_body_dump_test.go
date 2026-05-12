@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify newly added tenant and body-dump middleware on the HTTP mainline.
-// - Lock tenant resolution, required-tenant enforcement, and request-response capture behavior.
-// - Keep these newer middleware categories stable as they formally enter the mainline.
+// Package middleware_test provides unit tests for tenant and body-dump middleware.
 //
 // 适用场景：
 // - 验证新加入主线的租户与 body-dump 中间件能力。

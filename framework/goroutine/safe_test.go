@@ -1,3 +1,8 @@
+// Package goroutine_test provides unit tests for goroutine-safe utilities and container integration.
+//
+// 适用场景：
+// - 验证 goroutine 安全工具在并发场景下的行为正确。
+// - 确保 SafeGo 等工具在 container 集成中的安全性和资源管理。
 package goroutine
 
 import (

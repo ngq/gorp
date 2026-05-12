@@ -1,3 +1,7 @@
+// Package outbox_test provides unit tests for the outbox memory implementation.
+//
+// 适用场景：
+// - 验证 Outbox 内存实现的发布、查询和清理行为。
 package outbox
 
 import (

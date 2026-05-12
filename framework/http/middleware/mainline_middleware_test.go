@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify the core timeout, rate-limit, and idempotency middleware behavior on the HTTP mainline.
-// - Keep unified responses and resource-selection rules stable during middleware refactors.
-// - Reuse a small Gin bridge helper to exercise transport middleware in realistic request flows.
+// Package middleware_test provides unit tests for core HTTP middleware behavior.
 //
 // 适用场景：
 // - 验证 HTTP 主线上的超时、限流和幂等等核心中间件行为。

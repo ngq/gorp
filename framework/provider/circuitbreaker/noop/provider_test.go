@@ -1,3 +1,7 @@
+// Package noop_test provides unit tests for the circuit breaker noop provider.
+//
+// 适用场景：
+// - 验证熔断器 noop provider 的注册与空操作行为。
 package noop
 
 import (

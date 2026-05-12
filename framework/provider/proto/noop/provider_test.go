@@ -1,3 +1,8 @@
+// Package noop_test provides unit tests for proto noop provider contract.
+//
+// 适用场景：
+// - 验证 proto noop provider 的 Name、IsDefer、Provides 接口契约。
+// - 确保空实现的 provider 符合 ServiceProvider 规范。
 package noop
 
 import (

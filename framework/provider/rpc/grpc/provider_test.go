@@ -1,3 +1,8 @@
+// Package grpc_test provides unit tests for gRPC server transport and interceptor registration.
+//
+// 适用场景：
+// - 验证 gRPC server 的启动、interceptor 注册和 metadata 处理。
+// - 确保 discovery、observability、resilience 等中间件的集成正确。
 package grpc
 
 import (
@@ -99,6 +104,10 @@ func (s *captureSelector) Select(ctx context.Context, instances []transportcontr
 	}, nil
 }
 
+// TestCircuitBreakerUnaryInterceptorUsesNormalizedResource 验证熔断拦截器使用标准化资源名。
+//
+// 中文说明：
+// - 资源名格式为 "rpc.grpc.{service}.{package}.{service}.{method}"。
 func TestCircuitBreakerUnaryInterceptorUsesNormalizedResource(t *testing.T) {
 	cb := &testCircuitBreaker{}
 	client := NewClient(&transportcontract.RPCConfig{Mode: "grpc", TimeoutMS: 1000}, nil, nil, nil, nil, nil, cb, nil)
@@ -123,6 +132,10 @@ func TestCircuitBreakerUnaryInterceptorUsesNormalizedResource(t *testing.T) {
 	}
 }
 
+// TestServiceAuthUnaryClientInterceptorInjectsToken 验证客户端拦截器正确注入 service token。
+//
+// 中文说明：
+// - serviceAuthUnaryClientInterceptor 在 outgoing metadata 中注入 x-service-token。
 func TestServiceAuthUnaryClientInterceptorInjectsToken(t *testing.T) {
 	interceptor := serviceAuthUnaryClientInterceptor(testServiceTokenIssuer{}, "billing-service")
 	err := interceptor(
@@ -145,6 +158,10 @@ func TestServiceAuthUnaryClientInterceptorInjectsToken(t *testing.T) {
 	}
 }
 
+// TestServiceAuthUnaryServerInterceptorInjectsIdentity 验证服务端拦截器正确注入 service identity。
+//
+// 中文说明：
+// - serviceAuthUnaryServerInterceptor 从 token 解析出 identity 并注入 context。
 func TestServiceAuthUnaryServerInterceptorInjectsIdentity(t *testing.T) {
 	interceptor := serviceAuthUnaryServerInterceptor(testServiceAuthenticator{})
 	_, err := interceptor(
@@ -167,6 +184,10 @@ func TestServiceAuthUnaryServerInterceptorInjectsIdentity(t *testing.T) {
 	}
 }
 
+// TestGRPCMetadataCarrierSupportsTracingInjection 验证 gRPC metadata carrier 支持 tracing injection。
+//
+// 中文说明：
+// - tracerInjector 通过 gRPCMetadataCarrier 将 trace 信息注入 metadata。
 func TestGRPCMetadataCarrierSupportsTracingInjection(t *testing.T) {
 	md := metadata.New(nil)
 	carrier := newGRPCMetadataCarrier(md)
@@ -178,6 +199,10 @@ func TestGRPCMetadataCarrierSupportsTracingInjection(t *testing.T) {
 	}
 }
 
+// TestClientCallUsesSelectorAndResourceAwareRetryOnFailure 验证客户端调用使用 selector 做服务发现。
+//
+// 中文说明：
+// - client.Call 通过 selector 选取目标实例进行调用。
 func TestClientCallUsesSelectorAndResourceAwareRetryOnFailure(t *testing.T) {
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

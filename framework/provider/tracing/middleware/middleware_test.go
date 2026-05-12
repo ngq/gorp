@@ -1,3 +1,8 @@
+// Package middleware_test provides unit tests for tracing middleware interceptor behavior.
+//
+// 适用场景：
+// - 验证 tracing middleware 在 HTTP 和 gRPC 请求中的 span 创建和传播。
+// - 确保 trace context 正确注入到下游调用。
 package middleware
 
 import (

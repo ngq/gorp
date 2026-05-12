@@ -1,3 +1,7 @@
+// Package noop_test provides unit tests for the load shedding noop provider.
+//
+// 适用场景：
+// - 验证负载摘除 noop provider 的空操作行为。
 package noop
 
 import (

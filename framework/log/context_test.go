@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify context-based logger storage and retrieval behavior.
-// - Protect nil handling and context field derivation semantics from regressions.
-// - Document expected framework/log context helper behavior through focused tests.
+// Package log_test provides unit tests for context-based logger storage and retrieval.
 //
 // 适用场景：
 // - 验证基于 context 的 logger 存取行为。

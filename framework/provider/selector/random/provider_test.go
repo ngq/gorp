@@ -1,3 +1,7 @@
+// Package random_test provides unit tests for the random load balancer selector.
+//
+// 适用场景：
+// - 验证 Random Selector 的实例选择行为与均匀性。
 package random
 
 import (

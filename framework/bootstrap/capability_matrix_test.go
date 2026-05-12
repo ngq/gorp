@@ -1,3 +1,7 @@
+// Package bootstrap_test provides unit tests for the bootstrap capability matrix.
+//
+// 适用场景：
+// - 验证引导阶段 capability matrix 的构建与 Feature 检测行为。
 package bootstrap
 
 import (

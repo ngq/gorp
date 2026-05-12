@@ -1,3 +1,7 @@
+// Package runtime_test provides unit tests for the ORM runtime provider.
+//
+// 适用场景：
+// - 验证 ORM runtime provider 的注册与迁移行为。
 package runtime
 
 import (

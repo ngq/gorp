@@ -1,3 +1,7 @@
+// Package log_test provides unit tests for the log provider.
+//
+// 适用场景：
+// - 验证 Log provider 的注册、引导和日志写入行为。
 package log
 
 import (

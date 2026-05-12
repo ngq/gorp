@@ -1,3 +1,7 @@
+// Package host_test provides unit tests for the host provider.
+//
+// 适用场景：
+// - 验证 Host provider 的注册、引导和生命周期行为。
 package host
 
 import (

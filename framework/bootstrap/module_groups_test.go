@@ -1,3 +1,8 @@
+// Package bootstrap_test provides unit tests for foundation providers and module group stability.
+//
+// 适用场景：
+// - 验证 FoundationProviders 返回的 6 个基础 provider 列表稳定。
+// - 确保 module groups 定义在运行时不被意外修改。
 package bootstrap
 
 import (

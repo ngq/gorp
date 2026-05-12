@@ -1,3 +1,11 @@
+// Package proto_test provides unit and integration tests for the proto generator.
+//
+// 适用场景：
+// - 验证 Service-first 工作流：Go Service 接口 → Proto 文件的完整生成链路。
+// - 验证同包多文件 DTO 自动发现、跨包 import-paths 递归闭包、嵌套类型推导。
+// - 验证特殊类型（time.Time / time.Duration / []byte / any）的 proto 映射。
+// - 验证 Proto-first 工作流：Proto 文件 → Go pb.go / gRPC service 代码生成。
+// - 验证不可解析类型或不支持的 map 组合直接返回明确错误，而非产出 placeholder。
 package proto
 
 import (

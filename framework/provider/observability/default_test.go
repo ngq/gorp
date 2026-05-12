@@ -1,3 +1,7 @@
+// Package observability_test provides unit tests for the observability default provider.
+//
+// 适用场景：
+// - 验证可观测性默认 provider 的注册与指标/tracing 行为。
 package observability
 
 import (

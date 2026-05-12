@@ -1,3 +1,7 @@
+// Package container_test provides unit tests for service provider name and key binding.
+//
+// 适用场景：
+// - 验证容器对服务商名称的注册、识别与 key 绑定行为。
 package container
 
 import (

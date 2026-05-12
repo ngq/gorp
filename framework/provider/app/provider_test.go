@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify the app provider's binding key and default path resolution behavior.
-// - Protect config-driven path overrides from regressions.
-// - Document expected path derivation semantics through focused unit tests.
+// Package app_test provides unit tests for app provider binding key and path resolution.
 //
 // 适用场景：
 // - 验证 app provider 的绑定 key 和默认路径解析行为。

@@ -1,3 +1,7 @@
+// Package grpc_test provides unit tests for the gRPC provider interceptors.
+//
+// 适用场景：
+// - 验证 gRPC provider 的 unary / streaming interceptor 注册与执行顺序。
 package grpc
 
 import (

@@ -1,3 +1,7 @@
+// Package metadata_test provides unit tests for the metadata provider.
+//
+// 适用场景：
+// - 验证 Metadata provider 的注册与契约实现。
 package metadata
 
 import (

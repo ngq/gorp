@@ -1,16 +1,8 @@
-// 配置校验测试
-// 验证 ValidateCriticalConfig 在各种配置场景下的行为：
-// - 有效配置通过校验
-// - 缺失必填字段报错
-// - 条件校验（server.http / database）正确跳过或触发
-// - 错误消息格式清晰可读
+// Package bootstrap_test provides unit tests for config validation and schema checking.
 //
-// Config validation tests.
-// Verifies ValidateCriticalConfig behavior across various scenarios:
-// - Valid config passes validation
-// - Missing required fields produce errors
-// - Conditional validation (server.http / database) skips or triggers correctly
-// - Error messages are clear and readable
+// 适用场景：
+// - 验证 ValidateCriticalConfig 在各种配置场景下的行为。
+// - 有效配置通过校验；缺失必填字段报错；条件校验正确跳过或触发；错误消息格式清晰可读。
 package bootstrap
 
 import (

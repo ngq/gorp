@@ -1,3 +1,9 @@
+// Package bootstrap_test provides integration and boundary tests for HTTP service runtime bootstrapping.
+//
+// 适用场景：
+// - 验证 HTTP Service runtime 的初始化、governance override 和 provider 注册行为。
+// - 验证 pprof / governance inspect 端点的路由注册与响应格式。
+// - 验证 governance summary 与 diagnostic 的构建与格式化逻辑。
 package bootstrap
 
 import (
@@ -99,6 +105,10 @@ func TestNewHTTPServiceRuntimeForwardsGovernanceDisableAndProviderOverrides(t *t
 	require.Equal(t, "mtls", gotProviders["serviceauth"])
 }
 
+// =============================================================================
+// pprof 端点注册与行为
+// =============================================================================
+
 func TestAutoMigrateModelsNilRuntime(t *testing.T) {
 	require.NoError(t, AutoMigrateModels(nil, struct{}{}))
 }
@@ -148,6 +158,10 @@ func TestRegisterPprofEndpointsRejectsPost(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
+
+// =============================================================================
+// Governance Inspect 端点注册与视图
+// =============================================================================
 
 func TestRegisterGovernanceInspectEndpointsUsesGET(t *testing.T) {
 	router := &recordingRouter{}
@@ -399,6 +413,10 @@ func TestRegisterGovernanceInspectEndpointsSupportsFullView(t *testing.T) {
 	require.Contains(t, w.Body.String(), "Providers")
 	require.Contains(t, w.Body.String(), "Config Snapshot")
 }
+
+// =============================================================================
+// Governance Summary 与 Diagnostic 格式与构建
+// =============================================================================
 
 func TestBuildGovernanceSummaryReportsOverridesAndProviders(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{

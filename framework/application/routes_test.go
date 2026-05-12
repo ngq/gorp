@@ -1,3 +1,7 @@
+// Package application_test provides unit tests for application route registration and composition.
+//
+// 适用场景：
+// - 验证 HTTP Route Option 的组合、注册和执行顺序。
 package application
 
 import (

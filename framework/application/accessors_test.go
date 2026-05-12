@@ -1,3 +1,7 @@
+// Package application_test provides unit tests for the application service identity accessors.
+//
+// 适用场景：
+// - 验证 Application Service 从 context 中提取身份、安全主体和租户信息的 accessor 行为。
 package application
 
 import (

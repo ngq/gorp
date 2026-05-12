@@ -1,3 +1,7 @@
+// Package config_test provides unit tests for the config service.
+//
+// 适用场景：
+// - 验证 Config Service 的 Watch、Load 和 key 变更通知行为。
 package config
 
 import (

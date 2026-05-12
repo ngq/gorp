@@ -1,3 +1,7 @@
+// Package container_test provides unit tests for container failure semantics.
+//
+// 适用场景：
+// - 验证容器在服务商注册、引导失败时的错误传播与处理行为。
 package container
 
 import (

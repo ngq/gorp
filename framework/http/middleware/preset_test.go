@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify the stability of default, recommended, internal, and admin middleware presets.
-// - Guard preset ordering and default-value decisions against accidental drift.
-// - Ensure preset-based assembly keeps producing the intended HTTP baseline behavior.
+// Package middleware_test provides unit tests for HTTP middleware preset stability.
 //
 // 适用场景：
 // - 验证 default、recommended、internal、admin 中间件预设的稳定性。
@@ -80,6 +77,10 @@ func TestDefaultMiddlewareSetStableSize(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Recommended API Middleware Preset
+// =============================================================================
+
 // TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders verifies the default public API preset behavior.
 //
 // TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders 验证默认对外 API 预设行为。
@@ -143,6 +144,10 @@ func TestRecommendedAPIMiddlewareSetEnablesConfiguredCORS(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Internal / Admin API Middleware Preset
+// =============================================================================
+
 // TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults verifies that internal presets disable public-facing defaults.
 //
 // TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults 验证内网预设会关闭面向公网的默认能力。
@@ -196,6 +201,10 @@ func TestAdminAPIMiddlewareSetRequiresAuthorizationByDefault(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Body Limit 与 HTTP Service Governance 预设
+// =============================================================================
+
 // TestRecommendedAPIMiddlewareSetAppliesBodyLimit verifies that body limit remains active in the recommended API preset.
 //
 // TestRecommendedAPIMiddlewareSetAppliesBodyLimit 验证推荐 API 预设中的请求体限制保持生效。
@@ -223,6 +232,10 @@ func TestRecommendedAPIMiddlewareSetAppliesBodyLimit(t *testing.T) {
 		t.Fatalf("expected 413, got %d", recorder.Code)
 	}
 }
+
+// =============================================================================
+// Default HTTP Service Governance 预设
+// =============================================================================
 
 // TestDefaultHTTPServiceGovernanceSetIncludesServiceProtection verifies the default HTTP governance preset order.
 //
@@ -459,6 +472,10 @@ func indexOfStr(slice []string, target string) int {
 	}
 	return -1
 }
+
+// =============================================================================
+// Governance Preset Provider 替换与运行时行为
+// =============================================================================
 
 // TestGovernancePresetProviderReplacementChangesRuntimeBehavior verifies that swapping a provider
 // in the governance preset actually changes the observed HTTP response behavior.

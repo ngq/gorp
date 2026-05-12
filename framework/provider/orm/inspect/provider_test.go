@@ -1,3 +1,7 @@
+// Package inspect_test provides unit tests for the ORM schema inspector provider.
+//
+// 适用场景：
+// - 验证 ORM schema inspector provider 的注册与表结构检查行为。
 package inspect
 
 import (

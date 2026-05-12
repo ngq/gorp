@@ -1,3 +1,7 @@
+// Package cache_test provides unit tests for the cache provider.
+//
+// 适用场景：
+// - 验证 Cache provider 的 Get / Set / Delete / Exists / TTL 等核心行为。
 package cache
 
 import (

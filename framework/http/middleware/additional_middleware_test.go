@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify the broader mainline middleware catalog beyond timeout, rate limit, and idempotency.
-// - Lock down request identity, overload protection, cache, locale, authorization, audit, validation, and metrics behavior.
-// - Provide a single regression suite for transport middleware that is exercised through Gin-backed request flows.
+// Package middleware_test provides unit tests for extended HTTP middleware catalog.
 //
 // 适用场景：
 // - 验证除超时、限流和幂等之外的更完整主线中间件目录。
@@ -220,6 +217,10 @@ func TestRequestIdentityReusesProvidedHeaders(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// 请求标识与过载保护
+// =============================================================================
+
 // TestLoadSheddingRejectsWhenConcurrentSlotsAreFull verifies fast failure when no concurrency slot is available.
 //
 // TestLoadSheddingRejectsWhenConcurrentSlotsAreFull 验证无可用并发槽位时会快速失败。
@@ -375,6 +376,10 @@ func TestCircuitBreakerRecordsSuccessAndFailureWithRouteResource(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// 缓存、压缩与 body 限制
+// =============================================================================
+
 // TestCacheControlWritesHeader verifies fixed Cache-Control output.
 //
 // TestCacheControlWritesHeader 验证固定 Cache-Control 头输出。
@@ -433,6 +438,10 @@ func TestETagWritesHeaderAndReturnsNotModifiedOnMatch(t *testing.T) {
 		t.Fatalf("expected same ETag header, got %q", secondRecorder.Header().Get("ETag"))
 	}
 }
+
+// =============================================================================
+// IP 黑白名单、本地化与安全头
+// =============================================================================
 
 // TestIPAllowlistAndDenylist verifies allowlist pass-through and denylist blocking behavior.
 //
@@ -511,6 +520,10 @@ func TestLocaleUsesQueryThenHeaderThenDefault(t *testing.T) {
 		t.Fatalf("expected default locale zh, got %q", defaultRecorder.Body.String())
 	}
 }
+
+// =============================================================================
+// 安全头与 selector 条件中间件
+// =============================================================================
 
 // TestSecurityHeadersWritesDefaultsAndCustomValues verifies default security headers and custom overrides.
 //
@@ -689,6 +702,10 @@ func TestSelectorWhenAppliesOnlyOnMatchedRoutes(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// 鉴权、日志与审计
+// =============================================================================
+
 // TestAuthorizationMiddleware verifies unauthorized rejection, successful role checks, and forbidden rejection.
 //
 // TestAuthorizationMiddleware 验证未认证拒绝、角色校验成功以及无权限拒绝。
@@ -802,6 +819,10 @@ func TestLoggingMiddlewareWritesAccessLogWithRequestIdentity(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Recovery panic 恢复
+// =============================================================================
+
 // TestRecoveryMiddlewareRecoversAndLogsPanic verifies panic recovery, unified 500 output, and panic logging.
 //
 // TestRecoveryMiddlewareRecoversAndLogsPanic 验证 panic 恢复、统一 500 输出和 panic 日志记录。
@@ -849,6 +870,10 @@ func TestRecoveryMiddlewareRecoversAndLogsPanic(t *testing.T) {
 		t.Fatalf("expected panic field boom, got %v", fieldValue(last.fields, "panic"))
 	}
 }
+
+// =============================================================================
+// Audit 审计
+// =============================================================================
 
 // TestAuditMiddlewareWritesActorAndOutcomeFields verifies audit fields such as actor, locale, resource, and outcome.
 //
@@ -915,6 +940,10 @@ func TestAuditMiddlewareWritesActorAndOutcomeFields(t *testing.T) {
 		t.Fatalf("expected locale en, got %v", fieldValue(entry.fields, "locale"))
 	}
 }
+
+// =============================================================================
+// Bind 绑定与校验
+// =============================================================================
 
 // TestBindAndValidateJSONStoresValidatedBody verifies that successful validation stores the validated body in request context.
 //
@@ -1009,6 +1038,10 @@ func TestBindAndValidateJSONReturnsUnifiedError(t *testing.T) {
 		t.Fatalf("expected validation details, got %q", resp.Details)
 	}
 }
+
+// =============================================================================
+// Metrics 指标
+// =============================================================================
 
 // TestMetricsMiddlewareRecordsRequestCount verifies request counter increments with method, route, and status labels.
 //

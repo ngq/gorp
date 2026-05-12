@@ -1,3 +1,7 @@
+// Package sqlx_test provides unit tests for the ORM sqlx provider.
+//
+// 适用场景：
+// - 验证 ORM sqlx provider 的注册与数据库操作行为。
 package sqlx
 
 import (

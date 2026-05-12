@@ -1,3 +1,10 @@
+// Package bootstrap_test provides integration tests for governance mode and capability provider selection.
+//
+// 适用场景：
+// - 验证 governance mode 的检测、标准化与模式感知选择逻辑。
+// - 验证各 provider backend 的 Select 优先級（backend key > config > code disable > default）。
+// - 验证 RegisterSelectedMicroserviceProviders 的重载、传播与降级行为。
+// - 验证 governance override 链路的优先级顺序。
 package bootstrap
 
 import (
@@ -254,6 +261,10 @@ func (s *reloadingConfigStub) Reload(ctx context.Context) error {
 	return nil
 }
 
+// =============================================================================
+// RegisterSelectedMicroserviceProviders 注册与重载行为
+// =============================================================================
+
 func TestRegisterSelectedMicroserviceProviders_SkipsWithoutConfigBinding(t *testing.T) {
 	app := framework.NewApplication()
 	c := app.Container()
@@ -331,6 +342,10 @@ func TestRegisterSelectedMicroserviceProviders_PropagatesReloadError(t *testing.
 	}
 }
 
+// =============================================================================
+// Registry Factory 降级与默认值稳定性
+// =============================================================================
+
 func TestRegistryFactories_ProvideExpectedFallbacks(t *testing.T) {
 	assertProviderName(t, providerFromMap(configSourceProviderFactories, "", "local"), "configsource.local")
 	assertProviderName(t, providerFromMap(discoveryProviderFactories, "", "noop"), "discovery.noop")
@@ -388,6 +403,10 @@ func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *tes
 	assertProviderName(t, providers[10], "dlock.noop")
 }
 
+// =============================================================================
+// Governance Mode 检测与标准化
+// =============================================================================
+
 func TestDetectGovernanceModeDefaultsToMonolith(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{}}
 	if got := DetectGovernanceMode(cfg); got != resiliencecontract.GovernanceModeMonolith {
@@ -429,6 +448,10 @@ func TestNormalizeGovernanceModePreservesGinFirst(t *testing.T) {
 		t.Fatal("expected gin-first not to be treated as microservice mode")
 	}
 }
+
+// =============================================================================
+// Mode-Aware Provider 选择逻辑
+// =============================================================================
 
 func TestModeAwareSelectionsPromoteMicroserviceDefaults(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
@@ -604,6 +627,10 @@ func TestRegisterSelectedMicroserviceProvidersWithModeOverrideWinsOverConfig(t *
 	assertBoundKey(t, c, securitycontract.ServiceAuthKey)
 	assertBoundKey(t, c, resiliencecontract.CircuitBreakerKey)
 }
+
+// =============================================================================
+// Override 优先级链路
+// =============================================================================
 
 // TestCodeDisableOverridesConfigEnableForSameFeature 验证代码侧 WithGovernanceDisabled 与配置启用冲突时，代码关闭优先
 func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {

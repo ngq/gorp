@@ -1,7 +1,4 @@
-// Application scenarios:
-// - Verify default logger behavior and field helper output.
-// - Protect context fallback and derived logger behavior from regressions.
-// - Document expected framework/log utility semantics through focused tests.
+// Package log_test provides unit tests for default logger behavior and field helpers.
 //
 // 适用场景：
 // - 验证默认 logger 行为和字段 helper 输出。

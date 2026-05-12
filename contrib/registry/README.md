@@ -25,8 +25,8 @@
 
 ## 当前状态口径
 
-- `已完成`：`consul`、`etcd`、`nacos`
-- `部分可用`：`eureka`、`kubernetes`、`polaris`、`servicecomb`、`zookeeper`
+- `已完成`：`consul`、`etcd`、`nacos`、`kubernetes`、`polaris`
+- `部分可用`：`eureka`、`servicecomb`、`zookeeper`
 
 ## 说明
 
@@ -37,9 +37,9 @@
 
 ## 当前阶段收口边界
 
-- `kubernetes`：默认实现已切到 `client-go` `Endpoints Get/Watch`，并明确不再自造 `Register / Deregister` 语义；当前保留初始快照、缓存命中、not found、source error、关闭退出、关闭后拒绝 watch 与 native 下探能力。
-- `eureka / polaris / servicecomb / zookeeper`：已完成 P2 阶段最小闭环，其中这四项都已进入第二层继续补强；其中 `polaris` 默认实现已进一步切到官方 `polaris-go` `ProviderAPI + ConsumerAPI`，`zookeeper / servicecomb / eureka` 已补齐 `As / Underlying` 下探，但 `eureka / servicecomb` 仍维持适配器路线。
-- 当前五项都只按“部分可用”对外表述，不在这里提前宣传为完整产品化注册中心能力。
+- `kubernetes`：默认实现已切到 `client-go` `Endpoints Get/Watch`，并明确不再自造 `Register / Deregister` 语义；当前保留初始快照、缓存命中、not found、source error、关闭退出、关闭后拒绝 watch 与 native 下探能力，已具备真实发现闭环。
+- `eureka / servicecomb / zookeeper`：已完成 P2 阶段最小闭环，其中这三项都已进入第二层继续补强；`zookeeper` 已补齐 `As / Underlying` 下探，但三者仍维持“部分可用”口径。
+- `polaris`：默认实现已进一步切到官方 `polaris-go` `ProviderAPI + ConsumerAPI`，由官方 SDK 承接默认注册、发现与 watch；同时保留 fake client 注入、重复注册保护、关闭后拒绝 watch、watch 失败退避重试、稳定实例排序、重复快照抑制、native `As / Underlying` 与行为测试，已具备真实注册发现闭环。
 
 ## 当前 P2 进度
 
