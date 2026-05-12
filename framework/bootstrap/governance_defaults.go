@@ -13,17 +13,18 @@ import resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 //
 // GovernanceProviderDefaults 描述按治理模式生效的默认 provider backend。
 type GovernanceProviderDefaults struct {
-	ConfigSource   string
-	Discovery      string
-	Selector       string
-	RPC            string
-	Tracing        string
-	Metadata       string
-	ServiceAuth    string
-	CircuitBreaker string
-	Retry          string
-	DTM            string
-	MessageQueue   string
+	ConfigSource    string
+	Discovery       string
+	Selector        string
+	RPC             string
+	Tracing         string
+	Metadata        string
+	ServiceAuth     string
+	CircuitBreaker  string
+	LoadShedder     string
+	Retry           string
+	DTM             string
+	MessageQueue    string
 	DistributedLock string
 }
 
@@ -43,6 +44,7 @@ func DefaultGovernanceProviderDefaults(mode resiliencecontract.GovernanceMode) G
 		Metadata:        "noop",
 		ServiceAuth:     "noop",
 		CircuitBreaker:  "noop",
+		LoadShedder:     "noop",
 		Retry:           "noop",
 		DTM:             "noop",
 		MessageQueue:    "noop",
@@ -66,6 +68,9 @@ func DefaultGovernanceProviderDefaults(mode resiliencecontract.GovernanceMode) G
 	}
 	if features.CircuitBreaker {
 		defaults.CircuitBreaker = "sentinel"
+	}
+	if features.LoadShedding {
+		defaults.LoadShedder = "semaphore"
 	}
 
 	return defaults

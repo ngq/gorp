@@ -32,6 +32,7 @@ import (
 	gingin "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/ngq/gorp/framework/provider/host"
 	redisProvider "github.com/ngq/gorp/framework/provider/redis"
+	"google.golang.org/grpc"
 
 	gormpkg "gorm.io/gorm"
 )
@@ -58,8 +59,10 @@ type HTTPServiceOptions struct {
 }
 
 // HTTPServiceRuntime carries the assembled HTTP runtime state used during startup callbacks.
+// In microservice mode, also carries the gRPC server instance for service registration.
 //
 // HTTPServiceRuntime 承载启动回调阶段使用的 HTTP runtime 状态。
+// 在微服务模式下，同时承载 gRPC 服务器实例供服务注册使用。
 type HTTPServiceRuntime struct {
 	App         *framework.Application
 	Container   runtimecontract.Container
@@ -72,6 +75,20 @@ type HTTPServiceRuntime struct {
 	ServiceName string
 	GovernanceMode    resiliencecontract.GovernanceMode
 	GovernanceSummary GovernanceSummary
+
+	// GRPCServer 是底层 gRPC 服务器实例，仅在微服务模式下可用。
+	// 用户可在 setup 回调中使用此字段注册 proto 服务。
+	//
+	// GRPCServer is the underlying gRPC server instance, only available in microservice mode.
+	// Users can use this field to register proto services in the setup callback.
+	GRPCServer *grpc.Server
+
+	// GRPCServerRegistrar 是 gRPC 服务注册器，仅在微服务模式下可用。
+	// 提供 RegisterProto 方法用于注册 proto 生成的服务实现。
+	//
+	// GRPCServerRegistrar is the gRPC server registrar, only available in microservice mode.
+	// Provides RegisterProto method for registering protobuf-generated service implementations.
+	GRPCServerRegistrar transportcontract.GRPCServerRegistrar
 }
 
 // NewHTTPServiceRuntime builds the default HTTP runtime without starting the server.
@@ -99,6 +116,16 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		ServiceName: serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
+
+	// 启动阶段 fail-fast 校验关键配置：缺失或无效的必填字段立即报错，
+	// 避免 viper 零值静默传播导致后续运行时错误难以排查。
+	//
+	// Fail-fast validation of critical config at startup: missing or invalid
+	// required fields error immediately, preventing silent viper zero values
+	// from causing hard-to-diagnose runtime errors later.
+	if err := ValidateCriticalConfig(rt.Config); err != nil {
+		return nil, fmt.Errorf("config validation: %w", err)
+	}
 	effectiveConfig := overlayGovernanceConfig(rt.Config, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders)
 	governanceMode := DetectGovernanceMode(effectiveConfig)
 	if opts.GovernanceMode != "" {
@@ -114,9 +141,20 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	}
 	if !opts.DisableRedis {
 		// Redis is optional in this mainline, so keep startup tolerant when the capability is absent.
-		// Redis 在这条主线里是可选能力，因此这里保持“缺失不阻断启动”的语义。
+		// Redis 在这条主线里是可选能力，因此这里保持”缺失不阻断启动”的语义。
 		if redisSvc, err := container.MakeRedis(c); err == nil {
 			rt.Redis = redisSvc
+		}
+	}
+
+	// 在微服务模式下，尝试从容器解析 gRPC 服务注册器
+	// 让用户可以在 setup 回调中通过 rt.GRPCServer 注册 proto 服务
+	// In microservice mode, try to resolve gRPC server registrar from container
+	// Let users register proto services via rt.GRPCServer in the setup callback
+	if IsMicroserviceMode(governanceMode) && c.IsBind(transportcontract.GRPCServerRegistrarKey) {
+		if registrar, err := container.MakeGRPCServerRegistrar(c); err == nil {
+			rt.GRPCServerRegistrar = registrar
+			rt.GRPCServer = registrar.Server()
 		}
 	}
 
@@ -229,8 +267,11 @@ func RegisterPprofEndpoints(router transportcontract.HTTPRouter) {
 }
 
 // RunHTTP runs the HTTP service through the host capability when present.
+// In microservice mode, also starts the gRPC server alongside HTTP when the container
+// has a GRPCServerRegistrar bound.
 //
 // RunHTTP 优先通过 host 能力运行 HTTP 服务。
+// 在微服务模式下，当容器绑定了 GRPCServerRegistrar 时，同时启动 gRPC 服务器。
 func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) error {
 	hostSvc, err := container.MakeHost(c)
 	if err != nil {
@@ -249,7 +290,14 @@ func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) e
 		return fmt.Errorf("register http service to host: %w", err)
 	}
 
+	// 在微服务模式下，尝试将 gRPC 服务器也注册到 host 统一管理
+	// In microservice mode, try to register gRPC server to host for unified management
+	grpcStarted := registerGRPCToHost(c, hostSvc, logger)
+
 	logger.Info("starting http server")
+	if grpcStarted {
+		logger.Info("starting grpc server")
+	}
 	if err := hostSvc.Start(context.Background()); err != nil {
 		return err
 	}
@@ -275,9 +323,52 @@ func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) e
 	return nil
 }
 
+// registerGRPCToHost tries to register the gRPC server to the host when the container
+// has a GRPCServerRegistrar bound. Returns true if gRPC was successfully registered.
+//
+// registerGRPCToHost 尝试在容器绑定了 GRPCServerRegistrar 时将 gRPC 服务器注册到 host。
+// 如果 gRPC 成功注册则返回 true。
+func registerGRPCToHost(c runtimecontract.Container, hostSvc runtimecontract.Host, logger observabilitycontract.Logger) bool {
+	// 检查容器是否有 gRPC 能力
+	// Check if container has gRPC capability
+	if !c.IsBind(transportcontract.GRPCServerRegistrarKey) {
+		return false
+	}
+
+	// 解析 RPC Server
+	// Resolve RPC Server
+	rpcServerAny, err := c.Make(transportcontract.RPCServerKey)
+	if err != nil {
+		logger.Info("grpc server not available, skipping grpc host registration")
+		return false
+	}
+
+	rpcServer, ok := rpcServerAny.(transportcontract.RPCServer)
+	if !ok {
+		return false
+	}
+
+	// 创建 Hostable 适配器并注册到 host
+	// Create Hostable adapter and register to host
+	grpcHostable, err := newGRPCHostableFromRPCServer(rpcServer)
+	if err != nil {
+		logger.Info("grpc server adapter creation failed, skipping grpc host registration")
+		return false
+	}
+
+	if err := hostSvc.RegisterService("grpc", grpcHostable); err != nil {
+		logger.Info(fmt.Sprintf("register grpc service to host failed: %v, skipping", err))
+		return false
+	}
+
+	return true
+}
+
 // runHTTPDirectly runs the HTTP service without the host abstraction.
+// In microservice mode, also starts the gRPC server alongside HTTP.
 //
 // runHTTPDirectly 在不使用 host 抽象的情况下直接运行 HTTP 服务。
+// 在微服务模式下，同时启动 gRPC 服务器。
 func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.Logger) error {
 	httpSvc, err := container.MakeHTTP(c)
 	if err != nil {
@@ -304,6 +395,20 @@ func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.L
 		}
 	}()
 
+	// 在直跑模式下，尝试同时启动 gRPC 服务器
+	// In direct mode, try to start gRPC server alongside HTTP
+	var rpcServer transportcontract.RPCServer
+	if c.IsBind(transportcontract.GRPCServerRegistrarKey) {
+		if rpcServerAny, rpcErr := c.Make(transportcontract.RPCServerKey); rpcErr == nil {
+			if rs, ok := rpcServerAny.(transportcontract.RPCServer); ok {
+				if startErr := rs.Start(ctx); startErr == nil {
+					rpcServer = rs
+					logger.Info("starting grpc server (direct mode)")
+				}
+			}
+		}
+	}
+
 	select {
 	case <-ctx.Done():
 		logger.Info("shutdown signal received")
@@ -316,6 +421,17 @@ func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.L
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// 先停止 gRPC 服务器，再停止 HTTP 服务器
+	// Stop gRPC server first, then HTTP server
+	if rpcServer != nil {
+		if stopErr := rpcServer.Stop(shutdownCtx); stopErr != nil {
+			logger.Info(fmt.Sprintf("grpc server stop failed: %v", stopErr))
+		} else {
+			logger.Info("grpc server stopped gracefully")
+		}
+	}
+
 	if err := httpSvc.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("graceful shutdown failed: %w", err)
 	}

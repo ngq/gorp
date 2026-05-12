@@ -24,6 +24,11 @@ var (
 // HTTPRuntime 是 application 回调使用的启动上下文。
 type HTTPRuntime = bootstrap.HTTPServiceRuntime
 
+// GRPCRuntime is the startup runtime exposed to application gRPC callbacks.
+//
+// GRPCRuntime 是 application 回调使用的 gRPC 启动上下文。
+type GRPCRuntime = bootstrap.GRPCServiceRuntime
+
 // ServiceProvider reuses the provider declaration from the runtime contract.
 //
 // ServiceProvider 复用 runtime contract 中的 provider 声明。
@@ -59,6 +64,7 @@ type HTTPServiceOptions struct {
 
 type runConfig struct {
 	httpEnabled bool
+	grpcEnabled bool
 	httpOpts    bootstrap.HTTPServiceOptions
 	migrate     MigrateFunc
 	setup       SetupFunc

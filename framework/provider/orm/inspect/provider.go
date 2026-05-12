@@ -129,7 +129,7 @@ func (s *Service) Tables(ctx context.Context) ([]datacontract.Table, error) {
 			out = append(out, datacontract.Table{Name: n})
 		}
 		return out, nil
-	case "pgx":
+	case "pgx", "postgres":
 		var names []string
 		err := s.db.SelectContext(ctx, &names, `
 			SELECT table_name
@@ -231,7 +231,7 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 			})
 		}
 		return out, nil
-	case "pgx":
+	case "pgx", "postgres":
 		type row struct {
 			Name       string         `db:"column_name"`
 			Type       string         `db:"column_type"`

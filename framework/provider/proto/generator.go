@@ -142,10 +142,12 @@ func (g *Generator) GenFromProto(ctx context.Context, opts integrationcontract.P
 //
 // 中文说明：
 // - 解析 Go AST 提取接口定义；
-// - 提取请求/响应类型的完整字段定义；
-// - 支持跨文件类型解析（当提供 ImportPaths 时）；
-// - 生成 proto service 和 messages。
+// - 自动扫描同 package 下全部非测试 Go 文件，收集完整 struct 定义；
+// - 对 request/response 可达的自定义类型构建递归闭包；
+// - 对无法解析的自定义类型直接报错，而不是生成 placeholder。
 func (g *Generator) GenFromService(ctx context.Context, opts integrationcontract.ServiceToProtoOptions) error {
+	_ = ctx
+
 	// 解析 Go 文件
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, opts.ServicePath, nil, parser.ParseComments)
@@ -153,42 +155,8 @@ func (g *Generator) GenFromService(ctx context.Context, opts integrationcontract
 		return fmt.Errorf("proto: parse service file: %w", err)
 	}
 
-	// 提取当前文件的结构体定义
-	structDefs := g.extractStructDefs(f)
-
-	// 如果提供了 ImportPaths，尝试解析跨文件类型
-	if len(opts.ImportPaths) > 0 {
-		resolver := NewTypeResolver(opts.ImportPaths)
-
-		// 收集所有需要解析的类型
-		var typesToResolve []string
-		for _, typeDef := range structDefs {
-			for _, field := range typeDef.Fields {
-				if field.Type != nil && field.Type.Name != "" && !g.isBuiltInType(field.Type.Name) {
-					typesToResolve = append(typesToResolve, field.Type.Name)
-				}
-			}
-		}
-
-		// 解析跨文件类型
-		if len(typesToResolve) > 0 {
-			baseDir := filepath.Dir(opts.ServicePath)
-			for _, importPath := range opts.ImportPaths {
-				resolved, err := resolver.ResolveTypesFromImport(importPath, typesToResolve, baseDir)
-				if err == nil {
-					for typeName, resolvedTypeDef := range resolved {
-						if _, exists := structDefs[typeName]; !exists {
-							structDefs[typeName] = resolvedTypeDef
-						}
-					}
-				}
-			}
-		}
-	}
-
 	// 提取服务定义
 	services := g.extractServices(f)
-
 	if len(services) == 0 {
 		return fmt.Errorf("proto: no service interface found in %s", opts.ServicePath)
 	}
@@ -207,6 +175,34 @@ func (g *Generator) GenFromService(ctx context.Context, opts integrationcontract
 		}
 	} else {
 		svc = &services[0]
+	}
+
+	// 扫描同 package 下全部非测试 Go 文件，构建基础 structDefs。
+	structDefs, err := g.collectPackageStructDefs(opts.ServicePath)
+	if err != nil {
+		return fmt.Errorf("proto: collect package structs: %w", err)
+	}
+
+	// 从 service request/response 出发，构建根类型集合。
+	initialTypes := g.collectServiceRootTypes(svc)
+
+	// 使用 resolver 补齐跨包递归类型闭包。
+	if len(opts.ImportPaths) > 0 && len(initialTypes) > 0 {
+		resolver := NewTypeResolver(opts.ImportPaths)
+		resolved, err := resolver.ResolveAllTypes(opts.ServicePath, initialTypes)
+		if err != nil {
+			return fmt.Errorf("proto: resolve imported types: %w", err)
+		}
+		for typeName, typeDef := range resolved {
+			if _, exists := structDefs[typeName]; !exists {
+				structDefs[typeName] = typeDef
+			}
+		}
+	}
+
+	// 前置校验：所有可达自定义类型都必须可解析。
+	if err := g.validateReachableTypes(svc, structDefs); err != nil {
+		return err
 	}
 
 	// 生成 proto 内容（传入结构体定义）
@@ -662,6 +658,258 @@ func (g *Generator) isErrorType(expr ast.Expr) bool {
 	return false
 }
 
+// collectPackageStructDefs 收集 service 所在 package 的全部结构体定义。
+//
+// 中文说明：
+// - 扫描 service 文件所在目录下全部非 `_test.go` 文件；
+// - 只合并与 service 文件同 package 的 Go 文件；
+// - 统一复用 generator 的字段提取逻辑，保证同包解析口径一致。
+func (g *Generator) collectPackageStructDefs(servicePath string) (map[string]*integrationcontract.TypeDef, error) {
+	fset := token.NewFileSet()
+	serviceFile, err := parser.ParseFile(fset, servicePath, nil, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("parse service file: %w", err)
+	}
+
+	serviceDir := filepath.Dir(servicePath)
+	files, err := filepath.Glob(filepath.Join(serviceDir, "*.go"))
+	if err != nil {
+		return nil, fmt.Errorf("scan package go files: %w", err)
+	}
+
+	structDefs := make(map[string]*integrationcontract.TypeDef)
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+
+		parsed, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
+		if err != nil {
+			return nil, fmt.Errorf("parse package file %s: %w", file, err)
+		}
+		if parsed.Name == nil || serviceFile.Name == nil || parsed.Name.Name != serviceFile.Name.Name {
+			continue
+		}
+
+		for typeName, typeDef := range g.extractStructDefs(parsed) {
+			structDefs[typeName] = typeDef
+		}
+	}
+
+	return structDefs, nil
+}
+
+// collectServiceRootTypes 收集 service 方法签名中的根类型。
+//
+// 中文说明：
+// - 只收集 request / response 的根自定义类型；
+// - 内置类型会被过滤；
+// - 返回值用于驱动跨包递归闭包解析。
+func (g *Generator) collectServiceRootTypes(svc *integrationcontract.ServiceDef) []string {
+	if svc == nil {
+		return nil
+	}
+
+	var roots []string
+	for _, method := range svc.Methods {
+		roots = append(roots, g.collectRootTypeName(method.RequestType)...)
+		roots = append(roots, g.collectRootTypeName(method.ResponseType)...)
+	}
+	return uniqueStrings(roots)
+}
+
+// collectRootTypeName 从单个类型中提取根自定义类型名。
+func (g *Generator) collectRootTypeName(typeDef *integrationcontract.TypeDef) []string {
+	if typeDef == nil {
+		return nil
+	}
+	if typeDef.IsMap {
+		refs := g.collectRootTypeName(typeDef.MapKey)
+		refs = append(refs, g.collectRootTypeName(typeDef.MapValue)...)
+		return uniqueStrings(refs)
+	}
+
+	fullName := fullTypeName(typeDef)
+	if fullName == "" || g.isBuiltInType(fullName) || g.isBuiltInType(typeDef.Name) {
+		return nil
+	}
+	return []string{fullName}
+}
+
+// validateReachableTypes 校验 service 可达的所有自定义类型都已经可解析。
+//
+// 中文说明：
+// - 从每个方法的 request / response 出发递归遍历字段；
+// - 一旦发现缺失类型或 proto 不支持的 map 组合，立即报错；
+// - 错误信息带上方法和字段来源，避免生成半成品 proto。
+func (g *Generator) validateReachableTypes(svc *integrationcontract.ServiceDef, structDefs map[string]*integrationcontract.TypeDef) error {
+	if svc == nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	for _, method := range svc.Methods {
+		if err := g.validateReachableType(method.Name, "request", nil, method.RequestType, structDefs, seen); err != nil {
+			return err
+		}
+		if err := g.validateReachableType(method.Name, "response", nil, method.ResponseType, structDefs, seen); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateReachableType 递归校验单个类型节点是否可安全生成 proto。
+func (g *Generator) validateReachableType(methodName, position string, fieldPath []string, typeDef *integrationcontract.TypeDef, structDefs map[string]*integrationcontract.TypeDef, seen map[string]bool) error {
+	if typeDef == nil {
+		return nil
+	}
+
+	if typeDef.IsMap {
+		if typeDef.MapKey == nil || typeDef.MapValue == nil {
+			return fmt.Errorf("proto: method %s %s field %s uses incomplete map type", methodName, position, g.describeFieldPath(fieldPath))
+		}
+		if !g.isValidProtoMapKey(typeDef.MapKey) {
+			return fmt.Errorf("proto: method %s %s field %s uses unsupported map key type %s", methodName, position, g.describeFieldPath(fieldPath), fullTypeName(typeDef.MapKey))
+		}
+		if typeDef.MapValue.IsMap || (typeDef.MapValue.IsSlice && !g.isBytesField(typeDef.MapValue)) {
+			return fmt.Errorf("proto: method %s %s field %s uses unsupported map value type %s", methodName, position, g.describeFieldPath(fieldPath), g.describeType(typeDef.MapValue))
+		}
+		if err := g.validateReachableType(methodName, position, fieldPath, typeDef.MapValue, structDefs, seen); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	fullName := fullTypeName(typeDef)
+	if fullName == "" || g.isBuiltInType(fullName) || g.isBuiltInType(typeDef.Name) {
+		return nil
+	}
+
+	lookupName := typeDef.Name
+	if lookupName == "" {
+		lookupName = fullName
+	}
+	if seen[lookupName] {
+		return nil
+	}
+
+	structDef, ok := structDefs[lookupName]
+	if !ok {
+		return fmt.Errorf("proto: method %s %s field %s references unresolved type %s", methodName, position, g.describeFieldPath(fieldPath), fullName)
+	}
+	seen[lookupName] = true
+
+	for _, field := range structDef.Fields {
+		childPath := append(append([]string{}, fieldPath...), field.Name)
+		if err := g.validateReachableType(methodName, position, childPath, field.Type, structDefs, seen); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isValidProtoMapKey 判断 map key 是否符合 proto3 约束。
+func (g *Generator) isValidProtoMapKey(typeDef *integrationcontract.TypeDef) bool {
+	if typeDef == nil || typeDef.IsMap || typeDef.IsSlice {
+		return false
+	}
+
+	switch fullTypeName(typeDef) {
+	case "string", "int32", "int64", "uint32", "uint64", "bool":
+		return true
+	case "int", "uint":
+		return true
+	default:
+		return false
+	}
+}
+
+// describeFieldPath 生成错误信息中的字段路径。
+func (g *Generator) describeFieldPath(fieldPath []string) string {
+	if len(fieldPath) == 0 {
+		return "<root>"
+	}
+	return strings.Join(fieldPath, ".")
+}
+
+// describeType 生成人类可读的类型描述。
+func (g *Generator) describeType(typeDef *integrationcontract.TypeDef) string {
+	if typeDef == nil {
+		return "<nil>"
+	}
+	if typeDef.IsMap {
+		return fmt.Sprintf("map[%s]%s", g.describeType(typeDef.MapKey), g.describeType(typeDef.MapValue))
+	}
+
+	name := fullTypeName(typeDef)
+	if name == "" {
+		name = typeDef.Name
+	}
+	if name == "" {
+		name = "<anonymous>"
+	}
+	if typeDef.IsSlice {
+		name = "[]" + name
+	}
+	if typeDef.IsPointer {
+		name = "*" + name
+	}
+	return name
+}
+
+// serviceUsesProtoAny 判断当前 service 可达类型里是否使用了 google.protobuf.Any。
+func (g *Generator) serviceUsesProtoAny(svc *integrationcontract.ServiceDef, structDefs map[string]*integrationcontract.TypeDef) bool {
+	if svc == nil {
+		return false
+	}
+	seen := make(map[string]bool)
+	for _, method := range svc.Methods {
+		if g.typeUsesProtoAny(method.RequestType, structDefs, seen) || g.typeUsesProtoAny(method.ResponseType, structDefs, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+// typeUsesProtoAny 递归判断类型树中是否包含 any / interface{}。
+func (g *Generator) typeUsesProtoAny(typeDef *integrationcontract.TypeDef, structDefs map[string]*integrationcontract.TypeDef, seen map[string]bool) bool {
+	if typeDef == nil {
+		return false
+	}
+	if typeDef.IsMap {
+		return g.typeUsesProtoAny(typeDef.MapKey, structDefs, seen) || g.typeUsesProtoAny(typeDef.MapValue, structDefs, seen)
+	}
+	if g.goTypeToProtoType(typeDef) == "google.protobuf.Any" {
+		return true
+	}
+
+	fullName := fullTypeName(typeDef)
+	if fullName == "" || g.isBuiltInType(fullName) || g.isBuiltInType(typeDef.Name) {
+		return false
+	}
+
+	lookupName := typeDef.Name
+	if lookupName == "" {
+		lookupName = fullName
+	}
+	if seen[lookupName] {
+		return false
+	}
+	seen[lookupName] = true
+
+	structDef, ok := structDefs[lookupName]
+	if !ok {
+		return false
+	}
+	for _, field := range structDef.Fields {
+		if g.typeUsesProtoAny(field.Type, structDefs, seen) {
+			return true
+		}
+	}
+	return false
+}
+
 // generateProtoContent 生成 proto 文件内容。
 //
 // 中文说明：
@@ -677,7 +925,13 @@ func (g *Generator) generateProtoContent(svc *integrationcontract.ServiceDef, op
 
 	// HTTP 注解导入
 	if opts.IncludeHTTP {
-		buf.WriteString("import \"google/api/annotations.proto\";\n\n")
+		buf.WriteString("import \"google/api/annotations.proto\";\n")
+	}
+	if g.serviceUsesProtoAny(svc, structDefs) {
+		buf.WriteString("import \"google/protobuf/any.proto\";\n")
+	}
+	if opts.IncludeHTTP || g.serviceUsesProtoAny(svc, structDefs) {
+		buf.WriteString("\n")
 	}
 
 	// Go package
@@ -693,16 +947,16 @@ func (g *Generator) generateProtoContent(svc *integrationcontract.ServiceDef, op
 		if method.RequestType != nil && method.RequestType.Name != "" {
 			msgName := method.RequestType.Name
 			if !generatedMsgs[msgName] {
-				g.generateMessage(&buf, method.RequestType, msgName, structDefs, generatedMsgs)
 				generatedMsgs[msgName] = true
+				g.generateMessage(&buf, msgName, structDefs, generatedMsgs)
 			}
 		}
 		// 生成响应类型
 		if method.ResponseType != nil && method.ResponseType.Name != "" {
 			msgName := method.ResponseType.Name
 			if !generatedMsgs[msgName] {
-				g.generateMessage(&buf, method.ResponseType, msgName, structDefs, generatedMsgs)
 				generatedMsgs[msgName] = true
+				g.generateMessage(&buf, msgName, structDefs, generatedMsgs)
 			}
 		}
 	}
@@ -730,16 +984,18 @@ func (g *Generator) generateProtoContent(svc *integrationcontract.ServiceDef, op
 //
 // 中文说明：
 // - 根据类型名称从 structDefs 获取类型定义（包含字段和注释）；
-// - 将 Go 类型映射到 Proto 类型；
-// - 处理嵌套结构体（递归生成）；
-// - 正确处理 Map 类型和切片类型；
-// - 生成结构体注释（如果有）。
-func (g *Generator) generateMessage(buf *bytes.Buffer, typeDef *integrationcontract.TypeDef, name string, structDefs map[string]*integrationcontract.TypeDef, generatedMsgs map[string]bool) {
-	// 从 structDefs 获取类型定义
-	structDef, ok := structDefs[name]
+// - 先完整输出当前 message，再递归输出依赖 message；
+// - 这样可以避免把嵌套 message 插入到父 message 体内。
+func (g *Generator) generateMessage(buf *bytes.Buffer, name string, structDefs map[string]*integrationcontract.TypeDef, generatedMsgs map[string]bool) {
+	structDef := structDefs[name]
+	if structDef == nil {
+		return
+	}
+
+	var nestedMessages []string
 
 	// 生成结构体注释（如果有）
-	if ok && len(structDef.Comments) > 0 {
+	if len(structDef.Comments) > 0 {
 		for _, c := range structDef.Comments {
 			buf.WriteString(fmt.Sprintf("// %s\n", strings.TrimSpace(c)))
 		}
@@ -747,66 +1003,85 @@ func (g *Generator) generateMessage(buf *bytes.Buffer, typeDef *integrationcontr
 
 	buf.WriteString(fmt.Sprintf("message %s {\n", name))
 
-	if !ok {
-		// 未找到结构体定义，生成占位字段
-		buf.WriteString("  // TODO: Add fields from Go struct\n")
-		buf.WriteString("  string placeholder = 1;\n")
-	} else {
-		// 生成字段定义
-		fieldNum := 1
-		for _, field := range structDef.Fields {
-			if field.Type == nil {
-				continue
-			}
-
-			// 处理嵌套结构体
-			if field.Type.Name != "" && !g.isBuiltInType(field.Type.Name) && !field.Type.IsMap {
-				// 如果是自定义类型且未生成，递归生成
-				if _, found := structDefs[field.Type.Name]; found && !generatedMsgs[field.Type.Name] {
-					generatedMsgs[field.Type.Name] = true
-					g.generateMessage(buf, field.Type, field.Type.Name, structDefs, generatedMsgs)
-				}
-			}
-
-			// 生成字段定义
-			protoType := g.goTypeToProtoType(field.Type)
-
-			// 处理不同类型
-			var fieldDef string
-			if field.Type.IsMap {
-				// Map 类型
-				if field.Type.MapValue != nil && field.Type.MapValue.IsSlice {
-					fieldDef = fmt.Sprintf("  %s %s = %d; // WARNING: map value slice not supported\n", protoType, field.ProtoName, fieldNum)
-				} else {
-					fieldDef = fmt.Sprintf("  %s %s = %d", protoType, field.ProtoName, fieldNum)
-				}
-			} else if field.Type.IsSlice {
-				// repeated 类型
-				fieldDef = fmt.Sprintf("  repeated %s %s = %d", protoType, field.ProtoName, fieldNum)
-			} else {
-				// 普通类型
-				fieldDef = fmt.Sprintf("  %s %s = %d", protoType, field.ProtoName, fieldNum)
-			}
-
-			// 添加字段注释（优先使用 remark tag，其次是 // 注释）
-			// 如果有，放在字段后面
-			if field.Remark != "" {
-				// 优先使用 remark tag
-				fieldDef = fmt.Sprintf("%s; // %s\n", fieldDef, field.Remark)
-			} else if len(field.Comments) > 0 {
-				// 其次使用 // 注释
-				commentText := strings.Join(field.Comments, "; ")
-				fieldDef = fmt.Sprintf("%s; // %s\n", fieldDef, commentText)
-			} else {
-				fieldDef = fieldDef + ";\n"
-			}
-
-			buf.WriteString(fieldDef)
-			fieldNum++
+	fieldNum := 1
+	for _, field := range structDef.Fields {
+		if field.Type == nil {
+			continue
 		}
+
+		nestedMessages = append(nestedMessages, g.collectNestedMessageNames(field.Type, structDefs, generatedMsgs)...)
+
+		protoType := g.goTypeToProtoType(field.Type)
+		fieldDef := g.buildProtoFieldDefinition(protoType, field, fieldNum)
+		buf.WriteString(fieldDef)
+		fieldNum++
 	}
 
 	buf.WriteString("}\n\n")
+
+	for _, nestedName := range uniqueStrings(nestedMessages) {
+		if generatedMsgs[nestedName] {
+			continue
+		}
+		generatedMsgs[nestedName] = true
+		g.generateMessage(buf, nestedName, structDefs, generatedMsgs)
+	}
+}
+
+// collectNestedMessageNames 收集字段依赖的嵌套自定义消息名。
+func (g *Generator) collectNestedMessageNames(typeDef *integrationcontract.TypeDef, structDefs map[string]*integrationcontract.TypeDef, generatedMsgs map[string]bool) []string {
+	if typeDef == nil {
+		return nil
+	}
+	if typeDef.IsMap {
+		return g.collectNestedMessageNames(typeDef.MapValue, structDefs, generatedMsgs)
+	}
+
+	fullName := fullTypeName(typeDef)
+	if fullName == "" || g.isBuiltInType(fullName) || g.isBuiltInType(typeDef.Name) {
+		return nil
+	}
+
+	msgName := typeDef.Name
+	if msgName == "" {
+		msgName = fullName
+	}
+	if generatedMsgs[msgName] {
+		return nil
+	}
+	if _, found := structDefs[msgName]; !found {
+		return nil
+	}
+	return []string{msgName}
+}
+
+// isBytesField 判断字段是否应映射为 proto bytes。
+func (g *Generator) isBytesField(typeDef *integrationcontract.TypeDef) bool {
+	if typeDef == nil {
+		return false
+	}
+	return typeDef.IsSlice && typeDef.Name == "byte" && typeDef.Package == ""
+}
+
+// buildProtoFieldDefinition 根据字段类型构造 proto 字段声明。
+func (g *Generator) buildProtoFieldDefinition(protoType string, field integrationcontract.FieldDef, fieldNum int) string {
+	var fieldDef string
+	switch {
+	case field.Type.IsMap:
+		fieldDef = fmt.Sprintf("  %s %s = %d", protoType, field.ProtoName, fieldNum)
+	case field.Type.IsSlice && !g.isBytesField(field.Type):
+		fieldDef = fmt.Sprintf("  repeated %s %s = %d", protoType, field.ProtoName, fieldNum)
+	default:
+		fieldDef = fmt.Sprintf("  %s %s = %d", protoType, field.ProtoName, fieldNum)
+	}
+
+	if field.Remark != "" {
+		return fmt.Sprintf("%s; // %s\n", fieldDef, field.Remark)
+	}
+	if len(field.Comments) > 0 {
+		return fmt.Sprintf("%s; // %s\n", fieldDef, strings.Join(field.Comments, "; "))
+	}
+	return fieldDef + ";\n"
 }
 
 // goTypeToProtoType 将 Go 类型转换为 Proto 类型。
@@ -814,49 +1089,26 @@ func (g *Generator) generateMessage(buf *bytes.Buffer, typeDef *integrationcontr
 // 中文说明：
 // - 基本类型映射：string→string, int→int32, uint64→uint64 等；
 // - Map 类型生成 map<key, value> 语法；
-// - 自定义类型保持原名；
+// - selector 类型按 Package+Name 一起判断；
 // - 切片类型由调用方处理（使用 repeated）。
 func (g *Generator) goTypeToProtoType(typeDef *integrationcontract.TypeDef) string {
 	if typeDef == nil {
 		return "string"
 	}
 
-	// 处理 Map 类型
 	if typeDef.IsMap {
 		keyType := g.goTypeToProtoType(typeDef.MapKey)
 		valueType := g.goTypeToProtoType(typeDef.MapValue)
 		return fmt.Sprintf("map<%s, %s>", keyType, valueType)
 	}
 
-	// 处理指针类型（Proto3 不区分指针）
-	typeName := typeDef.Name
-
-	// Go 基本类型到 Proto 类型映射
-	typeMap := map[string]string{
-		"string":        "string",
-		"int":           "int32",
-		"int32":         "int32",
-		"int64":         "int64",
-		"uint":          "uint32",
-		"uint32":        "uint32",
-		"uint64":        "uint64",
-		"float32":       "float",
-		"float64":       "double",
-		"bool":          "bool",
-		"byte":          "bytes",
-		"[]byte":        "bytes",
-		"time.Time":     "string", // 时间类型映射为 string
-		"time.Duration": "int64",
-		"any":           "google.protobuf.Any",
-		"interface{}":   "google.protobuf.Any",
-	}
-
-	if protoType, ok := typeMap[typeName]; ok {
+	if protoType, ok := protoBuiltinType(fullTypeName(typeDef)); ok {
 		return protoType
 	}
-
-	// 自定义类型，保持原名
-	return typeName
+	if protoType, ok := protoBuiltinType(typeDef.Name); ok {
+		return protoType
+	}
+	return typeDef.Name
 }
 
 // isBuiltInType 判断是否为内置类型。
@@ -865,20 +1117,8 @@ func (g *Generator) goTypeToProtoType(typeDef *integrationcontract.TypeDef) stri
 // - 用于区分内置类型和自定义结构体；
 // - 自定义结构体需要生成对应的 message 定义。
 func (g *Generator) isBuiltInType(typeName string) bool {
-	builtIns := []string{
-		"string", "int", "int32", "int64",
-		"uint", "uint32", "uint64",
-		"float32", "float64", "bool",
-		"byte", "[]byte",
-		"time.Time", "time.Duration",
-		"any", "interface{}",
-	}
-	for _, t := range builtIns {
-		if typeName == t {
-			return true
-		}
-	}
-	return false
+	_, ok := protoBuiltinType(typeName)
+	return ok
 }
 
 // generateMethod 生成 service 方法。

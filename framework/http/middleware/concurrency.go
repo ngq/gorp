@@ -10,9 +10,13 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"time"
 
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -88,12 +92,29 @@ func (l *ConcurrencyLimiter) release() {
 }
 
 // LoadShedding rejects the request immediately when the concurrency limit is full.
+// 优先使用容器中的 LoadShedder 契约实现；若容器不可用则回退到本地 ConcurrencyLimiter。
 //
 // LoadShedding 在并发已满时立即拒绝请求。
+// 优先使用容器中的 LoadShedder 契约实现；若容器不可用则回退到本地 ConcurrencyLimiter。
 func LoadShedding(maxConcurrent int) transportcontract.HTTPMiddleware {
 	limiter := NewConcurrencyLimiter(maxConcurrent)
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
+			// 优先尝试从容器中获取 LoadShedder 契约实现
+			if shedder := loadShedderFromContext(c); shedder != nil {
+				if err := shedder.Allow(context.Background(), "http"); err != nil {
+					respondServiceBusy(c, "server is busy")
+					return
+				}
+				defer shedder.Done(context.Background(), "http", nil)
+
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			// 回退路径：使用本地 ConcurrencyLimiter
 			if limiter == nil {
 				if next != nil {
 					next(c)
@@ -111,6 +132,34 @@ func LoadShedding(maxConcurrent int) transportcontract.HTTPMiddleware {
 			}
 		}
 	}
+}
+
+// loadShedderFromContext 尝试从请求上下文中获取容器，再从容器中解析 LoadShedder 契约。
+// 如果容器不可用或 LoadShedder 未注册，返回 nil。
+func loadShedderFromContext(c transportcontract.HTTPContext) resiliencecontract.LoadShedder {
+	if c == nil || c.Context() == nil {
+		return nil
+	}
+	containerAny, ok := supportcontract.FromContainerContext(c.Context())
+	if !ok {
+		return nil
+	}
+	container, ok := containerAny.(runtimecontract.Container)
+	if !ok || container == nil {
+		return nil
+	}
+	if !container.IsBind(resiliencecontract.LoadShedderKey) {
+		return nil
+	}
+	shedderAny, err := container.Make(resiliencecontract.LoadShedderKey)
+	if err != nil {
+		return nil
+	}
+	shedder, ok := shedderAny.(resiliencecontract.LoadShedder)
+	if !ok {
+		return nil
+	}
+	return shedder
 }
 
 // ConcurrencyLimit waits for a free slot until timeout, then rejects the request.

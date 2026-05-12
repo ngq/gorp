@@ -14,6 +14,13 @@ server:
   http:
     addr: :8080
     mode: debug  # debug, release, test
+{{- if .IsMicroserviceMode }}
+  # gRPC 服务器配置（微服务模式）
+  grpc:
+    addr: :9090
+    reflection: true
+    health_check: true
+{{- end }}
 
 # 数据库配置（单体阶段使用 sqlite）
 database:
@@ -67,13 +74,14 @@ metadata:
 # - providers 用于显式替换默认 provider backend
 governance:
 {{- if .IsMicroserviceMode }}
-  # 微服务模式：自动启用 tracing/selector/serviceauth/circuitbreaker
+  # 微服务模式：自动启用 tracing/selector/serviceauth/circuitbreaker/loadshedding
   disable: []
   providers:
     tracing: otel
     selector: p2c_ewma
     serviceauth: token
     circuitbreaker: sentinel
+    loadshedding: semaphore
 {{- else }}
   disable: []
   providers: {}
@@ -124,6 +132,28 @@ circuit_breaker:
   # 单体/Gin-first 模式：关闭
   enabled: false
   backend: sentinel
+{{- end }}
+
+# load_shedding 配置（过载保护）
+load_shedding:
+{{- if .IsMicroserviceMode }}
+  # 微服务模式：默认启用过载保护
+  enabled: true
+  backend: semaphore
+  # 全局最大并发数，默认为 GOMAXPROCS * 100（约 100-800）
+  # max_concurrency: 800
+  # 按资源粒度覆盖示例：
+  # resource_policies:
+  #   http:
+  #     enabled: true
+  #     max_concurrency: 500
+  #   grpc:
+  #     enabled: true
+  #     max_concurrency: 300
+{{- else }}
+  # 单体/Gin-first 模式：关闭；需要过载保护时再启用
+  enabled: false
+  backend: semaphore
 {{- end }}
 
 # selector 配置

@@ -40,7 +40,7 @@ func TestSwaggerGenWritesIntoDocsDirectory(t *testing.T) {
 
 	content := string(mustReadFile(t, filepath.Join("cmd", "gorp", "cmd", "swagger.go")))
 	require.Contains(t, content, `filepath.Join("docs")`)
-	require.Contains(t, content, `filepath.Join("cmd", "gorp", "main.go")`)
+	require.Contains(t, content, `filepath.Join("cmd", "app", "main.go")`)
 }
 
 func mustReadFile(t *testing.T, path string) []byte {

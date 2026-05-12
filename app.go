@@ -66,12 +66,25 @@ var (
 	//
 	// ErrHTTPRuntimeBuildFailed 表示 HTTP runtime 构建失败。
 	ErrHTTPRuntimeBuildFailed = application.ErrHTTPRuntimeBuildFailed
+	// ErrGRPCServiceRunFailed indicates that booting the gRPC service failed.
+	//
+	// ErrGRPCServiceRunFailed 表示 gRPC 服务启动失败。
+	ErrGRPCServiceRunFailed = application.ErrGRPCServiceRunFailed
+	// ErrGRPCRuntimeBuildFailed indicates that building the gRPC runtime failed.
+	//
+	// ErrGRPCRuntimeBuildFailed 表示 gRPC runtime 构建失败。
+	ErrGRPCRuntimeBuildFailed = application.ErrGRPCRuntimeBuildFailed
 )
 
 // HTTPRuntime is the top-level alias of the application HTTP runtime.
 //
 // HTTPRuntime 是 application HTTP runtime 的顶层别名。
 type HTTPRuntime = application.HTTPRuntime
+
+// GRPCRuntime is the top-level alias of the application gRPC runtime.
+//
+// GRPCRuntime 是 application gRPC runtime 的顶层别名。
+type GRPCRuntime = application.GRPCRuntime
 
 // HTTPServiceOptions is the top-level alias of application HTTP service options.
 //
@@ -174,6 +187,29 @@ func Build(serviceName string, options ...Option) (*HTTPRuntime, error) {
 // HTTP 声明使用默认 HTTP 主线。
 func HTTP(opts ...HTTPServiceOptions) Option {
 	return application.HTTP(opts...)
+}
+
+// GRPC declares that the gRPC service should be started alongside the HTTP mainline.
+// This enables the gRPC server in the HTTPServiceRuntime, allowing users to register
+// proto services via rt.GRPCServer in the setup callback.
+//
+// GRPC 声明在 HTTP 主线之外同时启动 gRPC 服务。
+// 这会在 HTTPServiceRuntime 中启用 gRPC 服务器，允许用户在 setup 回调中
+// 通过 rt.GRPCServer 注册 proto 服务。
+//
+// Example:
+//
+//	gorp.Run("user-service",
+//	    gorp.HTTP(),
+//	    gorp.GRPC(),
+//	    gorp.WithMicroserviceMode(),
+//	    gorp.WithSetup(func(rt *gorp.HTTPRuntime) error {
+//	        pb.RegisterUserServiceServer(rt.GRPCServer, userService)
+//	        return nil
+//	    }),
+//	)
+func GRPC() Option {
+	return application.GRPC()
 }
 
 // WithoutHTTP explicitly disables the default HTTP declaration.

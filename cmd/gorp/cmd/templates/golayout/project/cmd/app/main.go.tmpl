@@ -22,6 +22,7 @@ func main() {
 		"{{.Name}}",
 		gorp.HTTP(),
 {{- if .IsMicroserviceMode }}
+		gorp.GRPC(),
 		gorp.WithMicroserviceMode(),
 {{- else if .IsGinFirstMode }}
 		gorp.WithGinFirstMode(),
@@ -48,5 +49,18 @@ func setup(rt *gorp.HTTPRuntime) error {
 	b := biz.NewBiz(data.NewDemoRepo(d))
 	svc := service.NewServices(b)
 	apphttp.RegisterRoutes(rt.Router, svc)
+{{- if .IsMicroserviceMode }}
+
+	// 注册 gRPC 服务（微服务模式）
+	// 在微服务模式下，rt.GRPCServer 可用于注册 proto 生成的服务实现
+	// Register gRPC services (microservice mode)
+	// In microservice mode, rt.GRPCServer can be used to register proto-generated service implementations
+	//
+	// 示例 / Example:
+	// if rt.GRPCServer != nil {
+	//     pb.RegisterYourServiceServer(rt.GRPCServer, yourServiceImpl)
+	// }
+{{- end }}
+
 	return nil
 }

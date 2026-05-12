@@ -54,4 +54,14 @@ var (
 	//
 	// ErrHTTPRuntimeBuildFailed 表示 HTTP runtime 构建失败。
 	ErrHTTPRuntimeBuildFailed = errors.New("application: http runtime build failed")
+
+	// ErrGRPCServiceRunFailed indicates that booting the gRPC service failed.
+	//
+	// ErrGRPCServiceRunFailed 表示 gRPC 服务启动失败。
+	ErrGRPCServiceRunFailed = errors.New("application: grpc service run failed")
+
+	// ErrGRPCRuntimeBuildFailed indicates that building the gRPC runtime failed.
+	//
+	// ErrGRPCRuntimeBuildFailed 表示 gRPC runtime 构建失败。
+	ErrGRPCRuntimeBuildFailed = errors.New("application: grpc runtime build failed")
 )

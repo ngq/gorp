@@ -483,6 +483,7 @@ func governanceProviderMap(defaults GovernanceProviderDefaults) map[string]strin
 		"metadata":         defaults.Metadata,
 		"serviceauth":      defaults.ServiceAuth,
 		"circuitbreaker":   defaults.CircuitBreaker,
+		"loadshedding":     defaults.LoadShedder,
 		"dtm":              defaults.DTM,
 		"message_queue":    defaults.MessageQueue,
 		"distributed_lock": defaults.DistributedLock,
@@ -543,6 +544,7 @@ func buildGovernanceProviderDecisions(cfg datacontract.Config, mode resilienceco
 		{Name: "metadata", DisabledCapability: "metadata", Factories: metadataProviderFactories, Fallback: "noop", ModeDefault: defaults.Metadata, ConfigKeys: []string{"metadata.mode", "metadata.backend"}, ConfigEnabled: metadataEnabledFromConfig, ConfigEnabledValue: "default", FallbackReason: "provider backend fell back to noop metadata"},
 		{Name: "serviceauth", DisabledCapability: "serviceauth", Factories: serviceAuthProviderFactories, Fallback: "noop", ModeDefault: defaults.ServiceAuth, ConfigKeys: []string{"service_auth.backend", "service_auth.mode"}, ConfigEnabled: serviceAuthEnabledFromConfig, ConfigEnabledValue: "token", FallbackReason: "provider backend fell back to noop serviceauth"},
 		{Name: "circuitbreaker", DisabledCapability: "circuitbreaker", Factories: circuitBreakerProviderFactories, Fallback: "noop", ModeDefault: defaults.CircuitBreaker, ConfigKeys: []string{"circuit_breaker.backend", "circuit_breaker.type"}, ConfigEnabled: circuitBreakerEnabledFromConfig, ConfigEnabledValue: "sentinel", FallbackReason: "provider backend fell back to noop circuitbreaker"},
+		{Name: "loadshedding", DisabledCapability: "loadshedding", Factories: loadShedderProviderFactories, Fallback: "noop", ModeDefault: defaults.LoadShedder, ConfigKeys: []string{"load_shedding.backend", "load_shedding.type"}, ConfigEnabled: loadSheddingEnabledFromConfig, ConfigEnabledValue: "semaphore", FallbackReason: "provider backend fell back to noop loadshedding"},
 		{Name: "retry", DisabledCapability: "retry", Factories: retryProviderFactories, Fallback: "noop", ModeDefault: defaults.Retry, ConfigKeys: []string{"retry.backend", "retry.type"}, ConfigEnabled: retryEnabledFromConfig, ConfigEnabledValue: "default", FallbackReason: "provider backend fell back to noop retry"},
 		{Name: "dtm", Factories: dtmProviderFactories, Fallback: "noop", ModeDefault: defaults.DTM, ConfigKeys: []string{"dtm.backend", "dtm.type", "dtm.driver"}, ConfigEnabled: dtmEnabledFromConfig, ConfigEnabledValue: "dtmsdk", FallbackReason: "provider backend fell back to noop dtm"},
 		{Name: "message_queue", Factories: messageQueueProviderFactories, Fallback: "noop", ModeDefault: defaults.MessageQueue, ConfigKeys: []string{"message_queue.backend", "message_queue.type"}, ConfigEnabled: messageQueueEnabledFromConfig, ConfigEnabledValue: "redis", FallbackReason: "provider backend fell back to noop message queue"},
@@ -662,6 +664,10 @@ func serviceAuthEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 
 func circuitBreakerEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 	return "circuit_breaker.enabled", cfg != nil && cfg.GetBool("circuit_breaker.enabled")
+}
+
+func loadSheddingEnabledFromConfig(cfg datacontract.Config) (string, bool) {
+	return "load_shedding.enabled", cfg != nil && cfg.GetBool("load_shedding.enabled")
 }
 
 func dtmEnabledFromConfig(cfg datacontract.Config) (string, bool) {
@@ -789,6 +795,7 @@ func governanceProviderNames() []string {
 		"metadata",
 		"serviceauth",
 		"circuitbreaker",
+		"loadshedding",
 		"retry",
 		"dtm",
 		"message_queue",
@@ -850,6 +857,9 @@ func governanceTrackedConfigKeys() []string {
 		"circuit_breaker.enabled",
 		"circuit_breaker.backend",
 		"circuit_breaker.type",
+		"load_shedding.enabled",
+		"load_shedding.backend",
+		"load_shedding.type",
 		"retry.enabled",
 		"retry.backend",
 		"retry.type",

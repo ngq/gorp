@@ -9,6 +9,8 @@ package bootstrap
 
 import (
 	circuitbreakersentinel "github.com/ngq/gorp/contrib/circuitbreaker/sentinel"
+	loadsheddingprovider "github.com/ngq/gorp/framework/provider/loadshedding"
+	loadsheddingnoop "github.com/ngq/gorp/framework/provider/loadshedding/noop"
 	configsourceapollo "github.com/ngq/gorp/contrib/configsource/apollo"
 	configsourceconsul "github.com/ngq/gorp/contrib/configsource/consul"
 	configsourceetcd "github.com/ngq/gorp/contrib/configsource/etcd"
@@ -103,6 +105,13 @@ func RegisterServiceAuthProviderFactory(key string, factory providerFactory) {
 // RegisterCircuitBreakerProviderFactory 注册熔断器 provider factory。
 func RegisterCircuitBreakerProviderFactory(key string, factory providerFactory) {
 	circuitBreakerProviderFactories.register(key, factory)
+}
+
+// RegisterLoadShedderProviderFactory registers a load-shedder provider factory.
+//
+// RegisterLoadShedderProviderFactory 注册过载保护 provider factory。
+func RegisterLoadShedderProviderFactory(key string, factory providerFactory) {
+	loadShedderProviderFactories.register(key, factory)
 }
 
 // RegisterDTMProviderFactory registers a DTM provider factory.
@@ -201,6 +210,11 @@ var (
 		"sentinel": func() runtimecontract.ServiceProvider { return circuitbreakersentinel.NewProvider() },
 		"noop":     func() runtimecontract.ServiceProvider { return circuitbreakernoop.NewProvider() },
 		"":         func() runtimecontract.ServiceProvider { return circuitbreakernoop.NewProvider() },
+	}
+	loadShedderProviderFactories = providerFactoryRegistry{
+		"semaphore": func() runtimecontract.ServiceProvider { return loadsheddingprovider.NewProvider() },
+		"noop":      func() runtimecontract.ServiceProvider { return loadsheddingnoop.NewProvider() },
+		"":          func() runtimecontract.ServiceProvider { return loadsheddingnoop.NewProvider() },
 	}
 	dtmProviderFactories = providerFactoryRegistry{
 		"sdk":    func() runtimecontract.ServiceProvider { return dtmsdk.NewProvider() },

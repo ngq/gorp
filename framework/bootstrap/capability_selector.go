@@ -28,6 +28,7 @@ func SelectedMicroserviceProviders(cfg datacontract.Config) []runtimecontract.Se
 	providers = append(providers, SelectMetadataProviderWithMode(cfg, mode))
 	providers = append(providers, SelectServiceAuthProviderWithMode(cfg, mode))
 	providers = append(providers, SelectCircuitBreakerProviderWithMode(cfg, mode))
+	providers = append(providers, SelectLoadSheddingProviderWithMode(cfg, mode))
 	providers = append(providers, SelectDTMProvider(cfg))
 	providers = append(providers, SelectMessageQueueProvider(cfg))
 	providers = append(providers, SelectDistributedLockProvider(cfg))
@@ -90,6 +91,7 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 		SelectMetadataProviderWithMode(cfg, mode),
 		SelectServiceAuthProviderWithMode(cfg, mode),
 		SelectCircuitBreakerProviderWithMode(cfg, mode),
+		SelectLoadSheddingProviderWithMode(cfg, mode),
 		SelectDTMProvider(cfg),
 		SelectMessageQueueProvider(cfg),
 		SelectDistributedLockProvider(cfg),
@@ -298,6 +300,34 @@ func SelectCircuitBreakerProviderWithMode(cfg datacontract.Config, mode resilien
 		backend = DefaultGovernanceProviderDefaults(mode).CircuitBreaker
 	}
 	return providerFromMap(circuitBreakerProviderFactories, backend, "noop")
+}
+
+// SelectLoadSheddingProvider selects the load-shedding provider from config and governance mode.
+//
+// SelectLoadSheddingProvider 根据配置与治理模式选择过载保护 provider。
+func SelectLoadSheddingProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
+	return SelectLoadSheddingProviderWithMode(cfg, DetectGovernanceMode(cfg))
+}
+
+// SelectLoadSheddingProviderWithMode selects the load-shedding provider with an explicit governance mode.
+//
+// SelectLoadSheddingProviderWithMode 在显式治理模式下选择过载保护 provider。
+func SelectLoadSheddingProviderWithMode(cfg datacontract.Config, mode resiliencecontract.GovernanceMode) runtimecontract.ServiceProvider {
+	if isGovernanceCapabilityDisabled(cfg, "loadshedding") {
+		return providerFromMap(loadShedderProviderFactories, "noop", "noop")
+	}
+	backend := governanceProviderOverride(cfg, "loadshedding")
+	if backend == "" {
+		backend = getConfigString(cfg, "load_shedding.backend", "load_shedding.type")
+	}
+	enabled := cfg != nil && cfg.GetBool("load_shedding.enabled")
+	if backend == "" && enabled {
+		backend = "semaphore"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(mode).LoadShedder
+	}
+	return providerFromMap(loadShedderProviderFactories, backend, "noop")
 }
 
 

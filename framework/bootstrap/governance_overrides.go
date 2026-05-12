@@ -96,6 +96,7 @@ func loadGovernanceProviderOverrides(cfg datacontract.Config) map[string]string 
 		"metadata",
 		"serviceauth",
 		"circuitbreaker",
+		"loadshedding",
 		"retry",
 		"dtm",
 		"message_queue",
@@ -273,6 +274,9 @@ func applyGovernanceProviderOverrides(defaults GovernanceProviderDefaults, overr
 	}
 	if value := overrides["circuitbreaker"]; value != "" {
 		defaults.CircuitBreaker = value
+	}
+	if value := overrides["loadshedding"]; value != "" {
+		defaults.LoadShedder = value
 	}
 	if value := overrides["retry"]; value != "" {
 		defaults.Retry = value

@@ -34,7 +34,7 @@ var swaggerGenCmd = &cobra.Command{
 		outDir := filepath.Join("docs")
 		_ = os.MkdirAll(outDir, 0o755)
 
-		c := exec.Command("swag", "init", "-g", filepath.Join("cmd", "gorp", "main.go"), "-o", outDir)
+		c := exec.Command("swag", "init", "-g", filepath.Join("cmd", "app", "main.go"), "-o", outDir)
 		c.Stdout = cmd.OutOrStdout()
 		c.Stderr = cmd.ErrOrStderr()
 		if err := c.Run(); err != nil {

@@ -13,9 +13,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	"github.com/spf13/viper"
@@ -271,18 +274,17 @@ func (s *Service) Unmarshal(key string, out any) error {
 }
 
 // Watch watches configuration changes if config source supports it.
-// Local file source does not support hot update.
-// Core logic: Delegate to config source if available, otherwise return error.
+// For local file source, use a lightweight polling watcher to detect changes and reload config.
+// Core logic: Delegate to config source when present; otherwise poll local files and emit key changes.
 //
 // Watch 监听配置变化（如果配置源支持）。
-// 本地文件源不支持热更新。
-// 核心逻辑：委托给配置源（如果可用），否则返回错误。
+// 对于本地文件源，使用轻量轮询监听配置文件变化并自动重载。
+// 核心逻辑：存在配置源时委托给配置源，否则轮询本地文件并发出 key 变更回调。
 func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	if s.source != nil {
 		return s.source.Watch(ctx, key)
 	}
-	// 本地文件不支持热更新
-	return nil, fmt.Errorf("config: watch not supported for local file source")
+	return newLocalConfigWatcher(ctx, s, key, 500*time.Millisecond), nil
 }
 
 // Reload forces reload of configuration from all sources.
@@ -305,4 +307,129 @@ func (s *Service) Reload(ctx context.Context) error {
 
 	// 重新加载本地文件
 	return s.Load(s.env)
+}
+
+type localConfigWatcher struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	service   *Service
+		interval  time.Duration
+	mu        sync.RWMutex
+	callbacks map[string][]func(value any)
+	lastState map[string]time.Time
+}
+
+func newLocalConfigWatcher(parent context.Context, service *Service, key string, interval time.Duration) datacontract.ConfigWatcher {
+	ctx, cancel := context.WithCancel(parent)
+	w := &localConfigWatcher{
+		ctx:       ctx,
+		cancel:    cancel,
+		service:   service,
+		interval:  interval,
+		callbacks: make(map[string][]func(value any)),
+		lastState: collectLocalConfigState(service.env),
+	}
+	if strings.TrimSpace(key) != "" {
+		w.callbacks[key] = nil
+	}
+	go w.loop()
+	return w
+}
+
+func (w *localConfigWatcher) OnChange(key string, callback func(value any)) {
+	if strings.TrimSpace(key) == "" || callback == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.callbacks[key] = append(w.callbacks[key], callback)
+}
+
+func (w *localConfigWatcher) Stop() error {
+	w.cancel()
+	return nil
+}
+
+func (w *localConfigWatcher) loop() {
+	ticker := time.NewTicker(w.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-w.ctx.Done():
+			return
+		case <-ticker.C:
+			w.checkAndReload()
+		}
+	}
+}
+
+func (w *localConfigWatcher) checkAndReload() {
+	currentState := collectLocalConfigState(w.service.env)
+	if reflect.DeepEqual(currentState, w.lastState) {
+		return
+	}
+	w.lastState = currentState
+
+	w.mu.RLock()
+	keys := make([]string, 0, len(w.callbacks))
+	previous := make(map[string]any, len(w.callbacks))
+	for key := range w.callbacks {
+		keys = append(keys, key)
+		previous[key] = w.service.Get(key)
+	}
+	w.mu.RUnlock()
+
+	if err := w.service.Reload(w.ctx); err != nil {
+		return
+	}
+
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, key := range keys {
+		value := w.service.Get(key)
+		if reflect.DeepEqual(previous[key], value) {
+			continue
+		}
+		for _, callback := range w.callbacks[key] {
+			callback(value)
+		}
+	}
+}
+
+func collectLocalConfigState(env string) map[string]time.Time {
+	root := projectRoot()
+	configDir := filepath.Join(root, "config")
+	state := make(map[string]time.Time)
+
+	baseFiles, err := discoverBaseFiles(configDir)
+	if err == nil {
+		for _, path := range baseFiles {
+			if info, statErr := os.Stat(path); statErr == nil {
+				state[path] = info.ModTime()
+			}
+		}
+	}
+
+	if strings.TrimSpace(env) != "" {
+		envFile := filepath.Join(configDir, fmt.Sprintf("app.%s.yaml", env))
+		if info, err := os.Stat(envFile); err == nil {
+			state[envFile] = info.ModTime()
+		}
+
+		envDir := filepath.Join(configDir, env)
+		if entries, err := os.ReadDir(envDir); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+					continue
+				}
+				path := filepath.Join(envDir, entry.Name())
+				if info, statErr := os.Stat(path); statErr == nil {
+					state[path] = info.ModTime()
+				}
+			}
+		}
+	}
+
+	return state
 }

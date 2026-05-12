@@ -277,6 +277,31 @@ func WithGinFirstMode() Option {
 	return WithGovernanceMode(resiliencecontract.GovernanceModeGinFirst)
 }
 
+// GRPC declares that the gRPC service should be started alongside the HTTP mainline.
+// This enables the gRPC server in the HTTPServiceRuntime, allowing users to register
+// proto services via rt.GRPCServer in the setup callback.
+//
+// GRPC 声明在 HTTP 主线之外同时启动 gRPC 服务。
+// 这会在 HTTPServiceRuntime 中启用 gRPC 服务器，允许用户在 setup 回调中
+// 通过 rt.GRPCServer 注册 proto 服务。
+//
+// Example:
+//
+//	gorp.Run("user-service",
+//	    gorp.HTTP(),
+//	    gorp.GRPC(),
+//	    gorp.WithMicroserviceMode(),
+//	    gorp.WithSetup(func(rt *gorp.HTTPRuntime) error {
+//	        pb.RegisterUserServiceServer(rt.GRPCServer, userService)
+//	        return nil
+//	    }),
+//	)
+func GRPC() Option {
+	return optionFunc(func(cfg *runConfig) {
+		cfg.grpcEnabled = true
+	})
+}
+
 func cloneGovernanceProviders(src map[string]string) map[string]string {
 	if len(src) == 0 {
 		return nil

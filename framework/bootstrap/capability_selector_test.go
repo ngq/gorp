@@ -117,6 +117,23 @@ func TestSelectCircuitBreakerProvider_AcceptsBackendAndEnabled(t *testing.T) {
 	}
 }
 
+func TestSelectLoadSheddingProvider_AcceptsBackendAndEnabled(t *testing.T) {
+	backendCfg := &selectorConfigStub{values: map[string]any{"load_shedding.backend": "semaphore"}}
+	if got := SelectLoadSheddingProvider(backendCfg).Name(); got != "loadshedding.semaphore" {
+		t.Fatalf("expected loadshedding.semaphore, got %s", got)
+	}
+
+	enabledCfg := &selectorConfigStub{values: map[string]any{"load_shedding.enabled": true}}
+	if got := SelectLoadSheddingProvider(enabledCfg).Name(); got != "loadshedding.semaphore" {
+		t.Fatalf("expected enabled config to select semaphore, got %s", got)
+	}
+
+	noopCfg := &selectorConfigStub{values: map[string]any{"load_shedding.backend": "noop"}}
+	if got := SelectLoadSheddingProvider(noopCfg).Name(); got != "loadshedding.noop" {
+		t.Fatalf("expected loadshedding.noop, got %s", got)
+	}
+}
+
 func TestSelectDTMProvider_AcceptsBackendDriverAndEnabled(t *testing.T) {
 	backendCfg := &selectorConfigStub{values: map[string]any{"dtm.backend": "dtmsdk"}}
 	if got := SelectDTMProvider(backendCfg).Name(); got != "dtm.sdk" {
@@ -323,6 +340,7 @@ func TestRegistryFactories_ProvideExpectedFallbacks(t *testing.T) {
 	assertProviderName(t, providerFromMap(metadataProviderFactories, "", "noop"), "metadata.noop")
 	assertProviderName(t, providerFromMap(serviceAuthProviderFactories, "", "noop"), "serviceauth.noop")
 	assertProviderName(t, providerFromMap(circuitBreakerProviderFactories, "", "noop"), "circuitbreaker.noop")
+	assertProviderName(t, providerFromMap(loadShedderProviderFactories, "", "noop"), "loadshedding.noop")
 	assertProviderName(t, providerFromMap(dtmProviderFactories, "", "noop"), "dtm.noop")
 	assertProviderName(t, providerFromMap(messageQueueProviderFactories, "", "noop"), "messagequeue.noop")
 	assertProviderName(t, providerFromMap(distributedLockProviderFactories, "", "noop"), "dlock.noop")
@@ -346,7 +364,7 @@ func TestDefaultGovernanceProviderDefaultsRemainStable(t *testing.T) {
 	if microservice.ConfigSource != "local" || microservice.Discovery != "noop" || microservice.RPC != "noop" {
 		t.Fatalf("unexpected microservice transport defaults: %+v", microservice)
 	}
-	if microservice.Selector != "p2c_ewma" || microservice.Tracing != "otel" || microservice.Metadata != "default" || microservice.ServiceAuth != "token" || microservice.CircuitBreaker != "sentinel" {
+	if microservice.Selector != "p2c_ewma" || microservice.Tracing != "otel" || microservice.Metadata != "default" || microservice.ServiceAuth != "token" || microservice.CircuitBreaker != "sentinel" || microservice.LoadShedder != "semaphore" {
 		t.Fatalf("unexpected microservice governance defaults: %+v", microservice)
 	}
 }
@@ -354,8 +372,8 @@ func TestDefaultGovernanceProviderDefaultsRemainStable(t *testing.T) {
 func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{}}
 	providers := SelectedMicroserviceProviders(cfg)
-	if len(providers) != 10 {
-		t.Fatalf("expected 10 selected providers, got %d", len(providers))
+	if len(providers) != 11 {
+		t.Fatalf("expected 11 selected providers, got %d", len(providers))
 	}
 	assertProviderName(t, providers[0], "discovery.noop")
 	assertProviderName(t, providers[1], "selector.noop")
@@ -364,9 +382,10 @@ func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *tes
 	assertProviderName(t, providers[4], "metadata.noop")
 	assertProviderName(t, providers[5], "serviceauth.noop")
 	assertProviderName(t, providers[6], "circuitbreaker.noop")
-	assertProviderName(t, providers[7], "dtm.noop")
-	assertProviderName(t, providers[8], "messagequeue.noop")
-	assertProviderName(t, providers[9], "dlock.noop")
+	assertProviderName(t, providers[7], "loadshedding.noop")
+	assertProviderName(t, providers[8], "dtm.noop")
+	assertProviderName(t, providers[9], "messagequeue.noop")
+	assertProviderName(t, providers[10], "dlock.noop")
 }
 
 func TestDetectGovernanceModeDefaultsToMonolith(t *testing.T) {
@@ -429,6 +448,9 @@ func TestModeAwareSelectionsPromoteMicroserviceDefaults(t *testing.T) {
 	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.sentinel" {
 		t.Fatalf("expected circuitbreaker.sentinel, got %s", got)
 	}
+	if got := SelectLoadSheddingProvider(cfg).Name(); got != "loadshedding.semaphore" {
+		t.Fatalf("expected loadshedding.semaphore, got %s", got)
+	}
 }
 
 func TestModeAwareSelectionsKeepMonolithDefaultsWithoutExplicitEnablement(t *testing.T) {
@@ -449,6 +471,9 @@ func TestModeAwareSelectionsKeepMonolithDefaultsWithoutExplicitEnablement(t *tes
 	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
 		t.Fatalf("expected circuitbreaker.noop, got %s", got)
 	}
+	if got := SelectLoadSheddingProvider(cfg).Name(); got != "loadshedding.noop" {
+		t.Fatalf("expected loadshedding.noop, got %s", got)
+	}
 }
 
 func TestModeAwareSelectionsKeepGinFirstOnLightweightDefaults(t *testing.T) {
@@ -468,6 +493,9 @@ func TestModeAwareSelectionsKeepGinFirstOnLightweightDefaults(t *testing.T) {
 	}
 	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
 		t.Fatalf("expected circuitbreaker.noop, got %s", got)
+	}
+	if got := SelectLoadSheddingProvider(cfg).Name(); got != "loadshedding.noop" {
+		t.Fatalf("expected loadshedding.noop, got %s", got)
 	}
 }
 
@@ -547,8 +575,8 @@ func TestModeAwareSelectionsRespectGovernanceDisableList(t *testing.T) {
 func TestSelectedMicroserviceProvidersPromoteMicroserviceDefaults(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
 	providers := SelectedMicroserviceProviders(cfg)
-	if len(providers) != 10 {
-		t.Fatalf("expected 10 selected providers, got %d", len(providers))
+	if len(providers) != 11 {
+		t.Fatalf("expected 11 selected providers, got %d", len(providers))
 	}
 	assertProviderName(t, providers[0], "discovery.noop")
 	assertProviderName(t, providers[1], "selector.p2c")
@@ -557,6 +585,7 @@ func TestSelectedMicroserviceProvidersPromoteMicroserviceDefaults(t *testing.T) 
 	assertProviderName(t, providers[4], "metadata.default")
 	assertProviderName(t, providers[5], "serviceauth.token")
 	assertProviderName(t, providers[6], "circuitbreaker.sentinel")
+	assertProviderName(t, providers[7], "loadshedding.semaphore")
 }
 
 func TestRegisterSelectedMicroserviceProvidersWithModeOverrideWinsOverConfig(t *testing.T) {
