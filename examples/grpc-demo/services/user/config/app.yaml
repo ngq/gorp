@@ -1,0 +1,86 @@
+app:
+  name: user-service
+  env: dev
+  address: ":8081"
+
+service:
+  name: user-service
+
+rpc:
+  mode: grpc
+  grpc:
+    address: ":9081"
+
+server:
+  http:
+    addr: ":8081"
+    mode: debug
+
+database:
+  driver: sqlite
+  dsn: user.db
+
+redis:
+  addr: "${REDIS_ADDR:localhost:6379}"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+tracing:
+  enabled: false
+  backend: otel
+  service_name: user-service
+  otel:
+    endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
+  sampling_rate: 1.0
+
+metadata:
+  enabled: false
+  propagate_prefix:
+    - x-md-
+
+service_auth:
+  mode: noop
+  token:
+    secret: "change-me-in-production"
+    issuer: "user-service"
+    audience: ""
+    expiry: 3600
+  allowed_services: []
+
+cache:
+  driver: memory
+
+message_queue:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+
+# 治理覆盖配置
+governance:
+  disable: []
+  providers: {}
+
+# circuit_breaker 配置
+circuit_breaker:
+  enabled: false
+  backend: sentinel
+
+# selector 配置
+selector:
+  enabled: false
+  backend: random
+
+# 如需服务发现，可再开启
+# discovery:
+#   enabled: true
+#   type: consul
+#   consul:
+#     addr: "${CONSUL_ADDR:localhost:8500}"
+#     service_name: "user-service"
+#     service_port: 8081

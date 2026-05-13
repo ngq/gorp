@@ -8,6 +8,8 @@ package event
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -197,4 +199,163 @@ func TestLocalEventBus_HasSubscribers(t *testing.T) {
 	bus.Unsubscribe("test.event")
 
 	assert.False(t, bus.HasSubscribers("test.event"))
+}
+
+// TestLocalEventBus_ContextCancellation 验证 context 取消时的行为。
+//
+// 中文说明：
+// - Publish 传递 context 取消信号给处理器。
+// - 处理器可以感知 context 状态并提前退出。
+func TestLocalEventBus_ContextCancellation(t *testing.T) {
+	bus := NewLocalEventBus()
+
+	// 记录处理器是否检测到 context 取消
+	var contextCancelled bool
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
+		select {
+		case <-ctx.Done():
+			contextCancelled = true
+			return ctx.Err()
+		default:
+			return nil
+		}
+	})
+
+	// 创建已取消的 context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	event := NewBaseEvent("test.event", nil)
+	err := bus.Publish(ctx, event)
+
+	// 验证处理器检测到了 context 取消
+	assert.True(t, contextCancelled)
+	assert.Error(t, err)
+	assert.Equal(t, context.Canceled, err)
+}
+
+// TestLocalEventBus_ConcurrentSubscribe 验证并发订阅的线程安全性。
+//
+// 中文说明：
+// - 多个 goroutine 同时订阅不同事件，不会出现数据竞争。
+func TestLocalEventBus_ConcurrentSubscribe(t *testing.T) {
+	bus := NewLocalEventBus()
+
+	var wg sync.WaitGroup
+	handlerCount := 100
+
+	// 并发订阅多个事件
+	for i := 0; i < handlerCount; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			eventName := fmt.Sprintf("event.%d", idx)
+			bus.Subscribe(eventName, func(ctx context.Context, event integrationcontract.Event) error {
+				return nil
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证所有事件都有订阅者
+	for i := 0; i < handlerCount; i++ {
+		eventName := fmt.Sprintf("event.%d", i)
+		assert.True(t, bus.HasSubscribers(eventName))
+	}
+}
+
+// TestLocalEventBus_ConcurrentPublish 验证并发发布的线程安全性。
+//
+// 中文说明：
+// - 多个 goroutine 同时发布事件，不会出现数据竞争。
+// - 处理器能正确收到所有事件。
+func TestLocalEventBus_ConcurrentPublish(t *testing.T) {
+	bus := NewLocalEventBus()
+
+	var count int32
+	bus.Subscribe("test.event", func(ctx context.Context, event integrationcontract.Event) error {
+		atomic.AddInt32(&count, 1)
+		return nil
+	})
+
+	var wg sync.WaitGroup
+	publishCount := 100
+
+	// 并发发布事件
+	for i := 0; i < publishCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			event := NewBaseEvent("test.event", nil)
+			bus.Publish(context.Background(), event)
+		}()
+	}
+
+	wg.Wait()
+
+	// 验证所有事件都被处理
+	assert.Equal(t, int32(publishCount), atomic.LoadInt32(&count))
+}
+
+// TestLocalEventBus_ConcurrentSubscribeAndPublish 验证同时订阅和发布的线程安全性。
+//
+// 中文说明：
+// - 一个 goroutine 订阅，另一个发布，不会出现数据竞争。
+func TestLocalEventBus_ConcurrentSubscribeAndPublish(t *testing.T) {
+	bus := NewLocalEventBus()
+
+	var wg sync.WaitGroup
+
+	// 订阅者
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			eventName := fmt.Sprintf("event.%d", i)
+			bus.Subscribe(eventName, func(ctx context.Context, event integrationcontract.Event) error {
+				return nil
+			})
+		}
+	}()
+
+	// 发布者
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			eventName := fmt.Sprintf("event.%d", i)
+			event := NewBaseEvent(eventName, nil)
+			bus.Publish(context.Background(), event)
+		}
+	}()
+
+	wg.Wait()
+}
+
+// TestLocalEventBus_MultipleEventsSameHandler 验证同一处理器订阅多个事件。
+//
+// 中文说明：
+// - 同一个处理器可以订阅不同的事件名。
+// - 各事件独立触发处理器。
+func TestLocalEventBus_MultipleEventsSameHandler(t *testing.T) {
+	bus := NewLocalEventBus()
+
+	var callCount int32
+	handler := func(ctx context.Context, event integrationcontract.Event) error {
+		atomic.AddInt32(&callCount, 1)
+		return nil
+	}
+
+	// 同一处理器订阅两个事件
+	bus.Subscribe("user.created", handler)
+	bus.Subscribe("user.updated", handler)
+
+	// 发布第一个事件
+	bus.Publish(context.Background(), NewBaseEvent("user.created", nil))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&callCount))
+
+	// 发布第二个事件
+	bus.Publish(context.Background(), NewBaseEvent("user.updated", nil))
+	assert.Equal(t, int32(2), atomic.LoadInt32(&callCount))
 }

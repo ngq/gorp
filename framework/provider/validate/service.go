@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/go-playground/locales/en"
@@ -45,16 +46,29 @@ type ValidatorService struct {
 func NewValidatorService(cfg *datacontract.ValidatorConfig) (*ValidatorService, error) {
 	v := validator.New()
 
-	uni := ut.New(en.New(), zh.New())
-	trans, ok := uni.GetTranslator(cfg.Locale)
-	if !ok {
-		trans = uni.GetFallback()
-	}
+	// 注册 JSON tag 名函数，使验证错误返回 JSON 字段名而非 Go 结构体字段名。
+	// 例如 UserReq 的 Username 字段带 `json:"username"` tag，错误消息中会显示 username 而非 Username。
+	// 如果字段没有 json tag 或 json tag 为 "-"，则回退到 Go 字段名。
+	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		if name == "" || name == "-" {
+			return fld.Name
+		}
+		return name
+	})
 
+	// 根据目标 locale 创建对应的 translator。
+	// 使用 GetFallback() 获取第一个参数（即目标 locale）的 translator，确保可靠性。
+	// 已支持 locale：zh（中文）、en（英文），其他 locale 将回退到英文。
+	var trans ut.Translator
 	switch cfg.Locale {
 	case "zh":
+		uni := ut.New(zh.New(), en.New())
+		trans = uni.GetFallback()
 		_ = zhTranslations.RegisterDefaultTranslations(v, trans)
 	default:
+		uni := ut.New(en.New(), zh.New())
+		trans = uni.GetFallback()
 		_ = enTranslations.RegisterDefaultTranslations(v, trans)
 	}
 
@@ -126,21 +140,22 @@ func (s *ValidatorService) RegisterCustom(name string, fn datacontract.CustomVal
 //
 // SetLocale 更改错误翻译的本地化语言（zh/en）。
 func (s *ValidatorService) SetLocale(locale string) error {
-	uni := ut.New(en.New(), zh.New())
-	trans, ok := uni.GetTranslator(locale)
-	if !ok {
-		return fmt.Errorf("validate: locale %s not supported", locale)
-	}
-
+	var trans ut.Translator
 	switch locale {
 	case "zh":
+		uni := ut.New(zh.New(), en.New())
+		trans = uni.GetFallback()
 		if err := zhTranslations.RegisterDefaultTranslations(s.validate, trans); err != nil {
 			return err
 		}
-	default:
+	case "en":
+		uni := ut.New(en.New(), zh.New())
+		trans = uni.GetFallback()
 		if err := enTranslations.RegisterDefaultTranslations(s.validate, trans); err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("validate: locale %s not supported", locale)
 	}
 
 	s.trans = trans

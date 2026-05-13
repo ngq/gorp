@@ -50,6 +50,14 @@ func TestNoopSAGABuilder(t *testing.T) {
 	result := builder.Add("/action", "/compensate", nil)
 	assert.Equal(t, builder, result)
 
+	// 测试 AddBranch — 确认分支选项也能链式调用
+	branchResult := builder.AddBranch("/action2", "/compensate2", nil, integrationcontract.BranchOptions{
+		RetryCount:    3,
+		RetryInterval: 5,
+		Timeout:       9,
+	})
+	assert.Equal(t, builder, branchResult)
+
 	// 测试 Submit
 	err := builder.Submit(context.Background())
 	assert.ErrorIs(t, err, ErrNoopDTM)

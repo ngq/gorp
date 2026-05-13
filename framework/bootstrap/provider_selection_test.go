@@ -159,6 +159,20 @@ func TestSelectDTMProvider_AcceptsBackendDriverAndEnabled(t *testing.T) {
 	}
 }
 
+func TestSelectDTMProvider_FallsBackToNoop(t *testing.T) {
+	// 未知 backend 应回退到 noop
+	unknownCfg := &selectorConfigStub{values: map[string]any{"dtm.backend": "unknown"}}
+	if got := SelectDTMProvider(unknownCfg).Name(); got != "dtm.noop" {
+		t.Fatalf("expected dtm.noop fallback for unknown backend, got %s", got)
+	}
+
+	// 空/零值配置默认 noop
+	emptyCfg := &selectorConfigStub{values: map[string]any{}}
+	if got := SelectDTMProvider(emptyCfg).Name(); got != "dtm.noop" {
+		t.Fatalf("expected dtm.noop for empty config, got %s", got)
+	}
+}
+
 func TestSelectTracingProvider_AcceptsEnabledAndBackends(t *testing.T) {
 	backendCases := map[string]string{
 		"otel":   "tracing.otel",
@@ -224,6 +238,28 @@ func TestSelectMessageQueueProvider_AcceptsEnabledAndBackend(t *testing.T) {
 	noopCfg := &selectorConfigStub{values: map[string]any{"message_queue.backend": "noop"}}
 	if got := SelectMessageQueueProvider(noopCfg).Name(); got != "messagequeue.noop" {
 		t.Fatalf("expected messagequeue.noop, got %s", got)
+	}
+}
+
+// TestSelectMessageQueueProvider_AcceptsContribBackends verifies that Kafka, RabbitMQ and RocketMQ
+// contrib providers are resolved when their backend key is set in config.
+//
+// TestSelectMessageQueueProvider_AcceptsContribBackends 验证配置 Kafka/RabbitMQ/RocketMQ 后端时能正确解析到对应 provider。
+func TestSelectMessageQueueProvider_AcceptsContribBackends(t *testing.T) {
+	cases := []struct {
+		backend  string
+		expected string
+	}{
+		{"kafka", "messagequeue.kafka"},
+		{"rabbitmq", "messagequeue.rabbitmq"},
+		{"rocketmq", "messagequeue.rocketmq"},
+		{"redis", "messagequeue.redis"},
+	}
+	for _, tc := range cases {
+		cfg := &selectorConfigStub{values: map[string]any{"message_queue.backend": tc.backend}}
+		if got := SelectMessageQueueProvider(cfg).Name(); got != tc.expected {
+			t.Errorf("backend=%s: expected %s, got %s", tc.backend, tc.expected, got)
+		}
 	}
 }
 

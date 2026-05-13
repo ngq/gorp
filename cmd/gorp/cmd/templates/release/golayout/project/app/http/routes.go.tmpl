@@ -4,7 +4,14 @@ import (
 	"{{.ModuleName}}/app/http/handler"
 	"{{.ModuleName}}/internal/service"
 
+{{- if .IsGinFirstMode }}
+	ginprovider "{{.FrameworkModule}}/framework/provider/gin"
+	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
+
+	"github.com/gin-gonic/gin"
+{{- else }}
 	gorp "{{.FrameworkModule}}"
+{{- end }}
 )
 
 // RegisterRoutes 注册 HTTP 路由。
@@ -14,7 +21,40 @@ import (
 // - 调用 internal/service 层注册业务路由；
 // - `/healthz` 与 `/metrics` 等基础端点由 application 默认主线统一注册，这里只关注业务 API；
 // - 业务是否启用认证或缓存能力，仍由项目自行决定；
-func RegisterRoutes(r gorp.HTTPRouter, svc *service.Services) {
+{{- if .IsGinFirstMode }}
+// - Gin-first 模式：直接使用原生 Gin Engine 注册路由；
+{{- else }}
+// - 抽象契约模式：使用 gorp.HTTPRouter 抽象接口；
+{{- end }}
+func RegisterRoutes(
+{{- if .IsGinFirstMode }}
+	httpSvc transportcontract.HTTP,
+{{- else }}
+	r gorp.HTTPRouter,
+{{- end }}
+	svc *service.Services,
+) {
+{{- if .IsGinFirstMode }}
+	// Gin-first 模式：获取原生 Gin Engine
+	engine, ok := ginprovider.NativeEngine(httpSvc)
+	if !ok {
+		panic("failed to get native gin engine")
+	}
+
+	demoHandler := handler.NewDemoHandler(svc.Demo)
+
+	api := engine.Group("/api/v1")
+	{
+		demos := api.Group("/demos")
+		{
+			demos.POST("", demoHandler.Create)
+			demos.GET("/:id", demoHandler.GetByID)
+			demos.GET("", demoHandler.List)
+			demos.PUT("/:id", demoHandler.Update)
+			demos.DELETE("/:id", demoHandler.Delete)
+		}
+	}
+{{- else }}
 	demoHandler := handler.NewDemoHandler(svc.Demo)
 
 	api := r.Group("/api/v1")
@@ -28,4 +68,5 @@ func RegisterRoutes(r gorp.HTTPRouter, svc *service.Services) {
 			demos.DELETE("/:id", demoHandler.Delete)
 		}
 	}
+{{- end }}
 }

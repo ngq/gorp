@@ -128,6 +128,46 @@ func newHTTPContext(ctx *gin.Context) transportcontract.HTTPContext {
 		}
 		return ctx.FullPath()
 	})
+	// 设置中间件相关函数
+	base.SetMiddlewareFuncs(
+		func(key string) any {
+			if ctx == nil {
+				return nil
+			}
+			val, _ := ctx.Get(key)
+			return val
+		},
+		func(key string, value any) {
+			if ctx == nil {
+				return
+			}
+			ctx.Set(key, value)
+		},
+		func(status int) {
+			if ctx == nil {
+				return
+			}
+			ctx.AbortWithStatus(status)
+		},
+		func(status int, body any) {
+			if ctx == nil {
+				return
+			}
+			ctx.AbortWithStatusJSON(status, body)
+		},
+		func() bool {
+			if ctx == nil {
+				return false
+			}
+			return ctx.IsAborted()
+		},
+		func() {
+			if ctx == nil {
+				return
+			}
+			ctx.Next()
+		},
+	)
 	return &ginHTTPContext{DefaultHTTPContext: base, gin: ctx}
 }
 
@@ -147,6 +187,25 @@ func unwrapGinContext(c transportcontract.HTTPContext) (*gin.Context, bool) {
 		return nil, false
 	}
 	return gc, true
+}
+
+// UnwrapGinContext extracts the raw Gin context from a transport HTTP context.
+// This is the public API for users who need to access Gin-specific features.
+//
+// UnwrapGinContext 从 transport HTTPContext 中提取原始 Gin context。
+// 这是公开 API，供需要访问 Gin 特有功能的用户使用。
+//
+// 使用示例：
+//
+//	func handler(c gorp.HTTPContext) {
+//	    gc, ok := gin.UnwrapGinContext(c)
+//	    if ok {
+//	        // 使用原生 Gin context
+//	        gc.HTML(200, "index.html", gin.H{})
+//	    }
+//	}
+func UnwrapGinContext(c transportcontract.HTTPContext) (*gin.Context, bool) {
+	return unwrapGinContext(c)
 }
 
 // writeGinResponseHeaders syncs request identity headers from request context into the Gin response.

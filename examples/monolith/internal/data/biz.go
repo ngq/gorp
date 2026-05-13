@@ -1,0 +1,10 @@
+package data
+
+import (
+	"monolith/internal/biz"
+)
+
+// Biz 创建业务层（依赖注入）
+func NewBiz(data *Data) *biz.Biz {
+	return biz.NewBiz(NewDemoRepo(data))
+}

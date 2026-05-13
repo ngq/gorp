@@ -99,3 +99,142 @@ func TestSubjectIDFromContextNilSafe(t *testing.T) {
 	require.False(t, ok)
 	require.Equal(t, int64(0), subjectID)
 }
+
+// TestAuthMiddlewareRejectsMissingBearerToken verifies that requests without Bearer token are rejected with 401.
+//
+// TestAuthMiddlewareRejectsMissingBearerToken 验证不带 Bearer token 的请求会被 401 拒绝。
+func TestAuthMiddlewareRejectsMissingBearerToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(jwtSvc, "")(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.GET("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	// 不设置 Authorization header
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestAuthMiddlewareRejectsInvalidToken verifies that requests with an invalid token are rejected with 401.
+//
+// TestAuthMiddlewareRejectsInvalidToken 验证无效 token 的请求会被 401 拒绝。
+func TestAuthMiddlewareRejectsInvalidToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(jwtSvc, "")(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.GET("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer invalid-token-string")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestAuthMiddlewareRejectsSubjectTypeMismatch verifies that token with unexpected subject type is rejected with 403.
+//
+// TestAuthMiddlewareRejectsSubjectTypeMismatch 验证主体类型不匹配时请求会被 403 拒绝。
+func TestAuthMiddlewareRejectsSubjectTypeMismatch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
+	// 签发 subjectType = "admin" 的 token
+	claims := jwtSvc.NewClaims(7, "admin", "admin1", []string{"admin"}, 60)
+	token, err := jwtSvc.Sign(claims)
+	require.NoError(t, err)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		// 期望 subjectType 为 "customer"
+		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.GET("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
+// TestAuthMiddlewareRejectsNilJWTService verifies that nil JWT service results in 401.
+//
+// TestAuthMiddlewareRejectsNilJWTService 验证 JWT 服务为 nil 时返回 401。
+func TestAuthMiddlewareRejectsNilJWTService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(nil, "")(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.GET("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}

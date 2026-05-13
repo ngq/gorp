@@ -1,0 +1,168 @@
+package handler
+
+import (
+	"net/http"
+	"strconv"
+
+	gorp "github.com/ngq/gorp"
+	"grpc-demo/services/order/internal/server/http/request"
+	"grpc-demo/services/order/internal/server/http/response"
+	"grpc-demo/services/order/internal/service"
+)
+
+type OrderHandler struct {
+	order *service.OrderService
+}
+
+func NewOrderHandler(order *service.OrderService) *OrderHandler {
+	return &OrderHandler{order: order}
+}
+
+func (h *OrderHandler) List(c gorp.HTTPContext) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	items, total, err := h.order.List(c.Context(), page, size)
+	if err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	respItems := make([]response.Order, len(items))
+	for i, item := range items {
+		respItems[i] = response.Order{
+			ID:          item.ID,
+			UserID:      item.UserID,
+			ProductID:   item.ProductID,
+			ProductName: item.ProductName,
+			Quantity:    item.Quantity,
+			TotalPrice:  item.TotalPrice,
+			Status:      item.Status,
+			CreatedAt:   item.CreatedAt,
+			UpdatedAt:   item.UpdatedAt,
+		}
+	}
+
+	gorp.Success(c, response.OrderList{
+		Items: respItems,
+		Total: total,
+		Page:  page,
+		Size:  size,
+	})
+}
+
+func (h *OrderHandler) GetByID(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	order, err := h.order.GetByID(c.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, map[string]any{"error": "order not found"})
+		return
+	}
+
+	gorp.Success(c, response.Order{
+		ID:          order.ID,
+		UserID:      order.UserID,
+		ProductID:   order.ProductID,
+		ProductName: order.ProductName,
+		Quantity:    order.Quantity,
+		TotalPrice:  order.TotalPrice,
+		Status:      order.Status,
+		CreatedAt:   order.CreatedAt,
+		UpdatedAt:   order.UpdatedAt,
+	})
+}
+
+func (h *OrderHandler) Create(c gorp.HTTPContext) {
+	var req request.CreateOrder
+	if err := c.BindJSON(&req); err != nil {
+		gorp.BadRequest(c, err.Error())
+		return
+	}
+
+	order, err := h.order.Create(c.Context(), service.CreateOrderRequest{
+		UserID:      req.UserID,
+		ProductID:   req.ProductID,
+		ProductName: req.ProductName,
+		Quantity:    req.Quantity,
+		TotalPrice:  req.TotalPrice,
+	})
+	if err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	gorp.SuccessWithStatus(c, http.StatusCreated, response.Order{
+		ID:          order.ID,
+		UserID:      order.UserID,
+		ProductID:   order.ProductID,
+		ProductName: order.ProductName,
+		Quantity:    order.Quantity,
+		TotalPrice:  order.TotalPrice,
+		Status:      order.Status,
+		CreatedAt:   order.CreatedAt,
+		UpdatedAt:   order.UpdatedAt,
+	})
+}
+
+func (h *OrderHandler) Delete(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	if err := h.order.Delete(c.Context(), uint(id)); err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (h *OrderHandler) GetOrderUser(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	resp, err := h.order.GetOrderUser(c.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, map[string]any{"error": err.Error()})
+		return
+	}
+
+	gorp.Success(c, response.RemoteUser{
+		ID:                resp.ID,
+		Username:          resp.Username,
+		Email:             resp.Email,
+		TraceID:           resp.TraceID,
+		RequestID:         resp.RequestID,
+		MetadataDemo:      resp.MetadataDemo,
+		CallerServiceName: resp.CallerServiceName,
+	})
+}
+
+func (h *OrderHandler) LockOrderDemo(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	resp, err := h.order.LockOrderDemo(c.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusConflict, map[string]any{"error": err.Error()})
+		return
+	}
+
+	gorp.Success(c, response.LockDemo{
+		Key:     resp.Key,
+		Success: resp.Success,
+	})
+}

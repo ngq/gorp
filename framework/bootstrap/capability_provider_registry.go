@@ -20,6 +20,9 @@ import (
 	dlockredis "github.com/ngq/gorp/contrib/dlock/redis"
 	dtmsdk "github.com/ngq/gorp/contrib/dtm/dtmsdk"
 	mqredis "github.com/ngq/gorp/contrib/messagequeue/redis"
+	mqkafka "github.com/ngq/gorp/contrib/messagequeue/kafka"
+	mqrabbitmq "github.com/ngq/gorp/contrib/messagequeue/rabbitmq"
+	mqrocketmq "github.com/ngq/gorp/contrib/messagequeue/rocketmq"
 	discoveryconsul "github.com/ngq/gorp/contrib/registry/consul"
 	discoveryetcd "github.com/ngq/gorp/contrib/registry/etcd"
 	discoveryeureka "github.com/ngq/gorp/contrib/registry/eureka"
@@ -223,9 +226,12 @@ var (
 		"":       func() runtimecontract.ServiceProvider { return dtmnoop.NewProvider() },
 	}
 	messageQueueProviderFactories = providerFactoryRegistry{
-		"redis": func() runtimecontract.ServiceProvider { return mqredis.NewProvider() },
-		"noop":  func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
-		"":      func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
+		"redis":    func() runtimecontract.ServiceProvider { return mqredis.NewProvider() },
+		"kafka":    func() runtimecontract.ServiceProvider { return mqkafka.NewProvider() },
+		"rabbitmq": func() runtimecontract.ServiceProvider { return mqrabbitmq.NewProvider() },
+		"rocketmq": func() runtimecontract.ServiceProvider { return mqrocketmq.NewProvider() },
+		"noop":     func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
+		"":         func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
 	}
 	distributedLockProviderFactories = providerFactoryRegistry{
 		"redis": func() runtimecontract.ServiceProvider { return dlockredis.NewProvider() },

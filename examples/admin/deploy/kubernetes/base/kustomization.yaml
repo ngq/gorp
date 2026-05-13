@@ -1,0 +1,20 @@
+# Kustomization 基础配置
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+  - secret.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: admin
+      app.kubernetes.io/part-of: admin
+    includeSelectors: true
+
+images:
+  - name: your-registry/admin
+    newName: your-registry/admin
+    newTag: latest

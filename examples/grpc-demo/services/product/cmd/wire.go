@@ -1,0 +1,17 @@
+//go:build wireinject
+
+package main
+
+import (
+	"github.com/ngq/gorp"
+	"grpc-demo/services/product/internal/service"
+
+	"github.com/google/wire"
+	"gorm.io/gorm"
+)
+
+func wireProductServices(db *gorm.DB, publisher gorp.MessagePublisher, subscriber gorp.MessageSubscriber) (*service.Services, error) {
+	panic(wire.Build(
+		service.NewServices,
+	))
+}

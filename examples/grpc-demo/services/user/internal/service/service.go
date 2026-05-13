@@ -1,0 +1,111 @@
+// Package service 服务层。
+package service
+
+import (
+	"context"
+
+	userv1 "grpc-demo/proto/user/v1"
+	"grpc-demo/services/user/internal/biz"
+	"grpc-demo/services/user/internal/data"
+
+	"github.com/ngq/gorp"
+	"gorm.io/gorm"
+)
+
+// Services 服务层聚合。
+type Services struct {
+	User *UserService
+}
+
+// NewServices 创建服务层。
+func NewServices(db *gorm.DB) *Services {
+	userRepo := data.NewUserRepo(db)
+	userUC := biz.NewUserUseCase(userRepo)
+	return &Services{
+		User: &UserService{uc: userUC},
+	}
+}
+
+// UserService 用户服务。
+type UserService struct {
+	userv1.UnimplementedUserServiceServer
+	uc *biz.UserUseCase
+}
+
+// CreateUserRequest 创建用户请求。
+type CreateUserRequest struct {
+	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+}
+
+// UserResponse 用户响应。
+type UserResponse struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+// List 获取用户列表。
+func (s *UserService) List(ctx context.Context, page, size int) ([]UserResponse, int64, error) {
+	users, total, err := s.uc.List(ctx, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	items := make([]UserResponse, len(users))
+	for i, u := range users {
+		items[i] = UserResponse{ID: u.ID, Username: u.Username, Email: u.Email}
+	}
+	return items, total, nil
+}
+
+// GetByID 获取单个用户。
+func (s *UserService) GetByID(ctx context.Context, id uint) (*UserResponse, error) {
+	user, err := s.uc.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &UserResponse{ID: user.ID, Username: user.Username, Email: user.Email}, nil
+}
+
+// Create 创建用户。
+func (s *UserService) Create(ctx context.Context, req CreateUserRequest) (*UserResponse, error) {
+	user, err := s.uc.Create(ctx, req.Username, req.Email)
+	if err != nil {
+		return nil, err
+	}
+	return &UserResponse{ID: user.ID, Username: user.Username, Email: user.Email}, nil
+}
+
+// Delete 删除用户。
+func (s *UserService) Delete(ctx context.Context, id uint) error {
+	return s.uc.Delete(ctx, id)
+}
+
+// GetUser 提供给其他服务调用的最小 gRPC 方法。
+func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (*userv1.GetUserResponse, error) {
+	user, err := s.uc.GetByID(ctx, uint(req.GetId()))
+	if err != nil {
+		return nil, err
+	}
+
+	metadataDemo := ""
+	if md, ok := gorp.FromServerContext(ctx); ok && md != nil {
+		metadataDemo = md.Get("x-md-demo")
+	}
+
+	callerServiceName := ""
+	if identity, ok := gorp.FromServiceIdentity(ctx); ok && identity != nil {
+		callerServiceName = identity.ServiceName
+	}
+
+	return &userv1.GetUserResponse{
+		Id:                uint64(user.ID),
+		Username:          user.Username,
+		Email:             user.Email,
+		TraceId:           gorp.GetGRPCTraceID(ctx),
+		RequestId:         gorp.GetGRPCRequestID(ctx),
+		MetadataDemo:      metadataDemo,
+		CallerServiceName: callerServiceName,
+	}, nil
+}

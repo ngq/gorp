@@ -17,6 +17,7 @@ import (
 // HTTPContext defines the transport-layer HTTP request context abstraction.
 //
 // HTTPContext 定义 transport 层 HTTP 请求上下文抽象。
+// 包含中间件所需的 Get/Set/Abort/Next 方法，支持认证中间件等场景。
 type HTTPContext interface {
 	Context() context.Context
 	SetContext(ctx context.Context)
@@ -43,6 +44,48 @@ type HTTPContext interface {
 
 	RoutePath() string
 	ResponseStatus() int
+
+	// Get retrieves a value stored in the context by key.
+	// Used by middleware to pass data to handlers (e.g., user info from auth).
+	//
+	// Get 从上下文中按 key 获取存储的值。
+	// 用于中间件向 handler 传递数据（如认证后的用户信息）。
+	Get(key string) any
+
+	// Set stores a key-value pair in the context.
+	// Used by middleware to store data for downstream handlers.
+	//
+	// Set 在上下文中存储 key-value 对。
+	// 用于中间件为下游 handler 存储数据。
+	Set(key string, value any)
+
+	// Abort aborts the request chain with the given status code.
+	// Used by middleware to stop further processing (e.g., auth failure).
+	//
+	// Abort 以给定状态码中止请求链。
+	// 用于中间件停止后续处理（如认证失败）。
+	Abort(status int)
+
+	// AbortWithJSON aborts the request chain and sends a JSON response.
+	// Convenience method for auth middleware to return error details.
+	//
+	// AbortWithJSON 中止请求链并发送 JSON 响应。
+	// 认证中间件返回错误详情的便捷方法。
+	AbortWithJSON(status int, body any)
+
+	// IsAborted returns whether the request chain has been aborted.
+	// Used by handlers to check if middleware has stopped processing.
+	//
+	// IsAborted 返回请求链是否已被中止。
+	// 用于 handler 检查中间件是否已停止处理。
+	IsAborted() bool
+
+	// Next continues to the next handler in the chain.
+	// Used by middleware to pass control to the next handler.
+	//
+	// Next 继续执行链中的下一个 handler。
+	// 用于中间件将控制权传递给下一个 handler。
+	Next()
 }
 
 // HTTPHandler defines the transport-layer HTTP handler signature.
@@ -77,6 +120,13 @@ type DefaultHTTPContext struct {
 	statusFunc     func(int)
 	routePathFunc  func() string
 	statusReadFunc func() int
+	// 中间件相关函数
+	getFunc        func(string) any
+	setFunc        func(string, any)
+	abortFunc      func(int)
+	abortJSONFunc  func(int, any)
+	isAbortedFunc  func() bool
+	nextFunc       func()
 }
 
 // NewDefaultHTTPContext creates a default transport HTTP context.
@@ -379,4 +429,86 @@ func (c *DefaultHTTPContext) SetRoutePathFunc(fn func() string) {
 		return
 	}
 	c.routePathFunc = fn
+}
+
+// Get retrieves a value stored in the context by key.
+//
+// Get 从上下文中按 key 获取存储的值。
+func (c *DefaultHTTPContext) Get(key string) any {
+	if c == nil || c.getFunc == nil {
+		return nil
+	}
+	return c.getFunc(key)
+}
+
+// Set stores a key-value pair in the context.
+//
+// Set 在上下文中存储 key-value 对。
+func (c *DefaultHTTPContext) Set(key string, value any) {
+	if c == nil || c.setFunc == nil {
+		return
+	}
+	c.setFunc(key, value)
+}
+
+// Abort aborts the request chain with the given status code.
+//
+// Abort 以给定状态码中止请求链。
+func (c *DefaultHTTPContext) Abort(status int) {
+	if c == nil || c.abortFunc == nil {
+		return
+	}
+	c.abortFunc(status)
+}
+
+// AbortWithJSON aborts the request chain and sends a JSON response.
+//
+// AbortWithJSON 中止请求链并发送 JSON 响应。
+func (c *DefaultHTTPContext) AbortWithJSON(status int, body any) {
+	if c == nil || c.abortJSONFunc == nil {
+		return
+	}
+	c.abortJSONFunc(status, body)
+}
+
+// IsAborted returns whether the request chain has been aborted.
+//
+// IsAborted 返回请求链是否已被中止。
+func (c *DefaultHTTPContext) IsAborted() bool {
+	if c == nil || c.isAbortedFunc == nil {
+		return false
+	}
+	return c.isAbortedFunc()
+}
+
+// Next continues to the next handler in the chain.
+//
+// Next 继续执行链中的下一个 handler。
+func (c *DefaultHTTPContext) Next() {
+	if c == nil || c.nextFunc == nil {
+		return
+	}
+	c.nextFunc()
+}
+
+// SetMiddlewareFuncs sets the middleware-related functions.
+//
+// SetMiddlewareFuncs 设置中间件相关函数。
+func (c *DefaultHTTPContext) SetMiddlewareFuncs(
+	get func(string) any,
+	set func(string, any),
+	abort func(int),
+	abortJSON func(int, any),
+	isAborted func() bool,
+	next func(),
+) {
+	if c == nil {
+		return
+	}
+	c.getFunc = get
+	c.setFunc = set
+	c.abortFunc = abort
+	c.abortJSONFunc = abortJSON
+	c.isAbortedFunc = isAborted
+	c.nextFunc = next
 }

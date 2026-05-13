@@ -1,0 +1,154 @@
+package handler
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strconv"
+
+	gorp "github.com/ngq/gorp"
+	"grpc-demo/services/product/internal/server/http/request"
+	"grpc-demo/services/product/internal/server/http/response"
+	"grpc-demo/services/product/internal/service"
+)
+
+type ProductHandler struct {
+	product *service.ProductService
+}
+
+func NewProductHandler(product *service.ProductService) *ProductHandler {
+	return &ProductHandler{product: product}
+}
+
+func (h *ProductHandler) List(c gorp.HTTPContext) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	items, total, err := h.product.List(c.Context(), page, size)
+	if err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	respItems := make([]response.Product, len(items))
+	for i, item := range items {
+		respItems[i] = response.Product{
+			ID:          item.ID,
+			Name:        item.Name,
+			Description: item.Description,
+			Price:       item.Price,
+			Stock:       item.Stock,
+			CreatedAt:   item.CreatedAt,
+			UpdatedAt:   item.UpdatedAt,
+		}
+	}
+
+	gorp.Success(c, response.ProductList{
+		Items: respItems,
+		Total: total,
+		Page:  page,
+		Size:  size,
+	})
+}
+
+func (h *ProductHandler) GetByID(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	product, err := h.product.GetByID(c.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, map[string]any{"error": "product not found"})
+		return
+	}
+
+	gorp.Success(c, response.Product{
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
+	})
+}
+
+func (h *ProductHandler) Create(c gorp.HTTPContext) {
+	var req request.CreateProduct
+	if err := c.BindJSON(&req); err != nil {
+		gorp.BadRequest(c, err.Error())
+		return
+	}
+
+	product, err := h.product.Create(c.Context(), service.CreateProductRequest{
+		Name:        req.Name,
+		Description: req.Description,
+		Price:       req.Price,
+		Stock:       req.Stock,
+	})
+	if err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	gorp.SuccessWithStatus(c, http.StatusCreated, response.Product{
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
+	})
+}
+
+func (h *ProductHandler) Delete(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	if err := h.product.Delete(c.Context(), uint(id)); err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (h *ProductHandler) PublishStockChanged(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	resp, err := h.product.PublishStockChanged(c.Context(), uint(id))
+	if err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	gorp.Success(c, resp)
+}
+
+func (h *ProductHandler) ConsumeStockChangedOnce(c gorp.HTTPContext) {
+	resp, err := h.product.ConsumeStockChangedOnce(c.Context())
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			c.JSON(http.StatusGatewayTimeout, map[string]any{"error": "consume timeout"})
+			return
+		}
+		gorp.Error(c, err)
+		return
+	}
+
+	gorp.Success(c, response.MQConsume{
+		Topic:   resp.Topic,
+		Body:    resp.Body,
+		Success: resp.Success,
+	})
+}

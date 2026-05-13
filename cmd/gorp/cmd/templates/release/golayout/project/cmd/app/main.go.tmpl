@@ -9,6 +9,9 @@ import (
 	"{{.ModuleName}}/internal/data"
 	"{{.ModuleName}}/internal/service"
 	"{{.FrameworkModule}}"
+{{- if .IsGinFirstMode }}
+	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
+{{- end }}
 )
 
 // main 是项目主入口。
@@ -47,6 +50,16 @@ func setup(rt *gorp.HTTPRuntime) error {
 	d := data.NewData(rt.DB)
 	b := biz.NewBiz(data.NewDemoRepo(d))
 	svc := service.NewServices(b)
+{{- if .IsGinFirstMode }}
+
+	// Gin-first 模式：传递 HTTP 服务给路由注册函数
+	httpSvc, err := rt.Container.Make(transportcontract.HTTPKey)
+	if err != nil {
+		return err
+	}
+	apphttp.RegisterRoutes(httpSvc.(transportcontract.HTTP), svc)
+{{- else }}
 	apphttp.RegisterRoutes(rt.Router, svc)
+{{- end }}
 	return nil
 }

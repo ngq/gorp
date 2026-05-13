@@ -10,6 +10,10 @@
 package middleware
 
 import (
+	"reflect"
+
+	"github.com/gin-gonic/gin"
+
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
@@ -108,4 +112,72 @@ func respondWithError(c transportcontract.HTTPContext, err resiliencecontract.Ap
 		}
 	}
 	c.JSON(response.Code, response)
+}
+
+// ValidateBodyMiddleware creates a Gin middleware that automatically binds and validates
+// the JSON request body into the given prototype object.
+// The prototype must be a pointer to a struct; each request gets a new zero-value copy.
+// On bind failure or validation failure, the middleware writes a unified error response and aborts.
+// On success, the validated object is stored in request context for downstream retrieval.
+//
+// ValidateBodyMiddleware 创建自动绑定并校验 JSON 请求体的 Gin 中间件。
+// prototype 必须是结构体指针；每次请求会创建一个新的零值拷贝。
+// 绑定或校验失败时，中间件输出统一错误响应并中断请求链。
+// 校验成功后，已校验对象存入请求上下文供下游复用。
+//
+// Example:
+//
+//	type CreateUserReq struct {
+//	    Name  string `json:"name" validate:"required,min=3"`
+//	    Email string `json:"email" validate:"required,email"`
+//	}
+//	router.POST("/users", httpmiddleware.ValidateBodyMiddleware(validator, &CreateUserReq{}), createUserHandler)
+func ValidateBodyMiddleware(validator datacontract.Validator, prototype any) func(*gin.Context) {
+	// 在中间件注册时验证 prototype 类型，尽早暴露配置错误
+	protoType := reflect.TypeOf(prototype)
+	if protoType == nil || protoType.Kind() != reflect.Ptr || protoType.Elem().Kind() != reflect.Struct {
+		panic("ValidateBodyMiddleware: prototype must be a pointer to a struct")
+	}
+	elemType := protoType.Elem()
+
+	return func(c *gin.Context) {
+		// 每次请求创建新的零值结构体，避免复用导致数据泄漏
+		obj := reflect.New(elemType).Interface()
+
+		httpCtx := newHTTPContext(c)
+		if err := BindAndValidateJSON(httpCtx, validator, obj); err != nil {
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// ValidateQueryMiddleware creates a Gin middleware that automatically binds and validates
+// query parameters into the given prototype object.
+// The prototype must be a pointer to a struct; each request gets a new zero-value copy.
+// On bind failure or validation failure, the middleware writes a unified error response and aborts.
+// On success, the validated object is stored in request context for downstream retrieval.
+//
+// ValidateQueryMiddleware 创建自动绑定并校验查询参数的 Gin 中间件。
+// prototype 必须是结构体指针；每次请求会创建一个新的零值拷贝。
+// 绑定或校验失败时，中间件输出统一错误响应并中断请求链。
+// 校验成功后，已校验对象存入请求上下文供下游复用。
+func ValidateQueryMiddleware(validator datacontract.Validator, prototype any) func(*gin.Context) {
+	protoType := reflect.TypeOf(prototype)
+	if protoType == nil || protoType.Kind() != reflect.Ptr || protoType.Elem().Kind() != reflect.Struct {
+		panic("ValidateQueryMiddleware: prototype must be a pointer to a struct")
+	}
+	elemType := protoType.Elem()
+
+	return func(c *gin.Context) {
+		obj := reflect.New(elemType).Interface()
+
+		httpCtx := newHTTPContext(c)
+		if err := BindAndValidateQuery(httpCtx, validator, obj); err != nil {
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }

@@ -43,12 +43,31 @@ var middlewareNewCmd = &cobra.Command{
 		modulePath := detectCurrentModulePath(root)
 		src := fmt.Sprintf(`package %s
 
-import gorp "%s"
+import (
+	"net/http"
+
+	gorp "%s"
+)
 
 // Middleware 返回该中间件的 framework HTTPMiddleware。
+//
+// 使用示例：
+// - c.Get(key) 获取中间件传递的数据
+// - c.Set(key, value) 存储数据供后续 handler 使用
+// - c.Abort(status) 中止请求链
+// - c.AbortWithJSON(status, body) 中止并返回 JSON 响应
+// - c.Next() 继续执行下一个 handler
 func Middleware() gorp.HTTPMiddleware {
 	return func(next gorp.HTTPHandler) gorp.HTTPHandler {
 		return func(c gorp.HTTPContext) {
+			// 示例：认证检查
+			// token := c.GetHeader("Authorization")
+			// if token == "" {
+			//     c.AbortWithJSON(http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+			//     return
+			// }
+			// c.Set("user_id", "xxx")
+
 			if next != nil {
 				next(c)
 			}

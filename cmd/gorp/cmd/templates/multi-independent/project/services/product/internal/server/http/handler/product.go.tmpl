@@ -1,13 +1,23 @@
 package handler
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
+{{- if .IsGinFirstMode }}
+	"{{.ModuleName}}/services/product/internal/server/http/request"
+	"{{.ModuleName}}/services/product/internal/server/http/response"
+	"{{.ModuleName}}/services/product/internal/service"
+
+	"github.com/gin-gonic/gin"
+{{- else }}
 	gorp "{{.FrameworkModule}}"
 	"{{.ModuleName}}/services/product/internal/server/http/request"
 	"{{.ModuleName}}/services/product/internal/server/http/response"
 	"{{.ModuleName}}/services/product/internal/service"
+{{- end }}
 )
 
 type ProductHandler struct {
@@ -17,6 +27,142 @@ type ProductHandler struct {
 func NewProductHandler(product *service.ProductService) *ProductHandler {
 	return &ProductHandler{product: product}
 }
+
+{{- if .IsGinFirstMode }}
+
+func (h *ProductHandler) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	items, total, err := h.product.List(c.Request.Context(), page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	respItems := make([]response.Product, len(items))
+	for i, item := range items {
+		respItems[i] = response.Product{
+			ID:          item.ID,
+			Name:        item.Name,
+			Description: item.Description,
+			Price:       item.Price,
+			Stock:       item.Stock,
+			CreatedAt:   item.CreatedAt,
+			UpdatedAt:   item.UpdatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, response.ProductList{
+		Items: respItems,
+		Total: total,
+		Page:  page,
+		Size:  size,
+	})
+}
+
+func (h *ProductHandler) GetByID(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	product, err := h.product.GetByID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Product{
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
+	})
+}
+
+func (h *ProductHandler) Create(c *gin.Context) {
+	var req request.CreateProduct
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	product, err := h.product.Create(c.Request.Context(), service.CreateProductRequest{
+		Name:        req.Name,
+		Description: req.Description,
+		Price:       req.Price,
+		Stock:       req.Stock,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, response.Product{
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
+	})
+}
+
+func (h *ProductHandler) Delete(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	if err := h.product.Delete(c.Request.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (h *ProductHandler) PublishStockChanged(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	resp, err := h.product.PublishStockChanged(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ProductHandler) ConsumeStockChangedOnce(c *gin.Context) {
+	resp, err := h.product.ConsumeStockChangedOnce(c.Request.Context())
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			c.JSON(http.StatusGatewayTimeout, gin.H{"error": "consume timeout"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, response.MQConsume{
+		Topic:   resp.Topic,
+		Body:    resp.Body,
+		Success: resp.Success,
+	})
+}
+{{- else }}
 
 func (h *ProductHandler) List(c gorp.HTTPContext) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -116,3 +262,38 @@ func (h *ProductHandler) Delete(c gorp.HTTPContext) {
 
 	c.Status(http.StatusNoContent)
 }
+
+func (h *ProductHandler) PublishStockChanged(c gorp.HTTPContext) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		gorp.BadRequest(c, "invalid id")
+		return
+	}
+
+	resp, err := h.product.PublishStockChanged(c.Context(), uint(id))
+	if err != nil {
+		gorp.Error(c, err)
+		return
+	}
+
+	gorp.Success(c, resp)
+}
+
+func (h *ProductHandler) ConsumeStockChangedOnce(c gorp.HTTPContext) {
+	resp, err := h.product.ConsumeStockChangedOnce(c.Context())
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			c.JSON(http.StatusGatewayTimeout, map[string]any{"error": "consume timeout"})
+			return
+		}
+		gorp.Error(c, err)
+		return
+	}
+
+	gorp.Success(c, response.MQConsume{
+		Topic:   resp.Topic,
+		Body:    resp.Body,
+		Success: resp.Success,
+	})
+}
+{{- end }}

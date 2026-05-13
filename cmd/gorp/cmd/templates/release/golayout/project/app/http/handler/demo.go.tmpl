@@ -4,11 +4,20 @@ import (
 	"net/http"
 	"strconv"
 
+{{- if .IsGinFirstMode }}
+	"{{.ModuleName}}/app/http/request"
+	"{{.ModuleName}}/app/http/response"
+	"{{.ModuleName}}/internal/biz"
+	"{{.ModuleName}}/internal/service"
+
+	"github.com/gin-gonic/gin"
+{{- else }}
 	gorp "{{.FrameworkModule}}"
 	"{{.ModuleName}}/app/http/request"
 	"{{.ModuleName}}/app/http/response"
 	"{{.ModuleName}}/internal/biz"
 	"{{.ModuleName}}/internal/service"
+{{- end }}
 )
 
 type DemoHandler struct {
@@ -19,6 +28,113 @@ func NewDemoHandler(svc *service.DemoService) *DemoHandler {
 	return &DemoHandler{svc: svc}
 }
 
+{{- if .IsGinFirstMode }}
+
+// Create 创建 Demo（Gin-first 原生风格）。
+func (h *DemoHandler) Create(c *gin.Context) {
+	var req request.CreateDemo
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	demo, err := h.svc.Create(c.Request.Context(), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, toDemoResponse(demo))
+}
+
+// GetByID 根据 ID 查询 Demo。
+func (h *DemoHandler) GetByID(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	demo, err := h.svc.GetByID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, toDemoResponse(demo))
+}
+
+// List 查询 Demo 列表。
+func (h *DemoHandler) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	demos, total, err := h.svc.List(c.Request.Context(), page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	items := make([]*response.Demo, len(demos))
+	for i, demo := range demos {
+		items[i] = toDemoResponse(demo)
+	}
+
+	c.JSON(http.StatusOK, &response.DemoList{
+		Items: items,
+		Total: total,
+		Page:  page,
+		Size:  pageSize,
+	})
+}
+
+// Update 更新 Demo。
+func (h *DemoHandler) Update(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req request.UpdateDemo
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	demo, err := h.svc.Update(c.Request.Context(), uint(id), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, toDemoResponse(demo))
+}
+
+// Delete 删除 Demo。
+func (h *DemoHandler) Delete(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	if err := h.svc.Delete(c.Request.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+{{- else }}
+
+// Create 创建 Demo（抽象契约风格）。
 func (h *DemoHandler) Create(c gorp.HTTPContext) {
 	var req request.CreateDemo
 	if err := c.BindJSON(&req); err != nil {
@@ -35,6 +151,7 @@ func (h *DemoHandler) Create(c gorp.HTTPContext) {
 	gorp.SuccessWithStatus(c, http.StatusCreated, toDemoResponse(demo))
 }
 
+// GetByID 根据 ID 查询 Demo。
 func (h *DemoHandler) GetByID(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -51,6 +168,7 @@ func (h *DemoHandler) GetByID(c gorp.HTTPContext) {
 	gorp.Success(c, toDemoResponse(demo))
 }
 
+// List 查询 Demo 列表。
 func (h *DemoHandler) List(c gorp.HTTPContext) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
@@ -80,6 +198,7 @@ func (h *DemoHandler) List(c gorp.HTTPContext) {
 	})
 }
 
+// Update 更新 Demo。
 func (h *DemoHandler) Update(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -102,6 +221,7 @@ func (h *DemoHandler) Update(c gorp.HTTPContext) {
 	gorp.Success(c, toDemoResponse(demo))
 }
 
+// Delete 删除 Demo。
 func (h *DemoHandler) Delete(c gorp.HTTPContext) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -116,6 +236,7 @@ func (h *DemoHandler) Delete(c gorp.HTTPContext) {
 
 	c.Status(http.StatusNoContent)
 }
+{{- end }}
 
 func toDemoResponse(demo *biz.Demo) *response.Demo {
 	return &response.Demo{
