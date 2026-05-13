@@ -36,6 +36,11 @@ func (p *deferredProvider) Boot(runtimecontract.Container) error {
 	return nil
 }
 
+// TestDeferredProviderUsesFirstRegistrantForSameKey verifies that when multiple
+// deferred providers register the same key, the first registrant wins.
+//
+// TestDeferredProviderUsesFirstRegistrantForSameKey 验证当多个延迟服务提供商
+// 注册相同的 key 时，先注册者获胜。
 func TestDeferredProviderUsesFirstRegistrantForSameKey(t *testing.T) {
 	c := New()
 	loadedA, bootedA := 0, 0

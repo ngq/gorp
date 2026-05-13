@@ -47,6 +47,9 @@ func TestDefaultClientPresetOrderStable(t *testing.T) {
 	}
 }
 
+// TestDefaultClientPresetOptionsZeroValueRemainsStable verifies DefaultClientPresetOptions zero value is stable.
+//
+// TestDefaultClientPresetOptionsZeroValueRemainsStable 验证 DefaultClientPresetOptions 零值保持稳定。
 func TestDefaultClientPresetOptionsZeroValueRemainsStable(t *testing.T) {
 	var opts DefaultClientPresetOptions
 	if opts.Timeout != 0 {
@@ -54,6 +57,9 @@ func TestDefaultClientPresetOptionsZeroValueRemainsStable(t *testing.T) {
 	}
 }
 
+// TestChainSkipsNilAndPreservesDeclaredOrder verifies Chain skips nil interceptors and preserves order.
+//
+// TestChainSkipsNilAndPreservesDeclaredOrder 验证 Chain 跳过 nil 拦截器并保持声明顺序。
 func TestChainSkipsNilAndPreservesDeclaredOrder(t *testing.T) {
 	var calls []string
 	first := func(next transportcontract.RPCInvoker) transportcontract.RPCInvoker {
@@ -88,12 +94,18 @@ func TestChainSkipsNilAndPreservesDeclaredOrder(t *testing.T) {
 	}
 }
 
+// TestApplyReturnsNilWhenInvokerIsNil verifies Apply returns nil when the base invoker is nil.
+//
+// TestApplyReturnsNilWhenInvokerIsNil 验证 Apply 在基础 invoker 为 nil 时返回 nil。
 func TestApplyReturnsNilWhenInvokerIsNil(t *testing.T) {
 	if Apply(nil, TimeoutMiddleware(time.Second)) != nil {
 		t.Fatal("expected nil invoker to stay nil")
 	}
 }
 
+// TestTimeoutMiddlewareNoopWhenDisabled verifies TimeoutMiddleware is a noop when timeout is zero.
+//
+// TestTimeoutMiddlewareNoopWhenDisabled 验证 TimeoutMiddleware 在超时为零时是空操作。
 func TestTimeoutMiddlewareNoopWhenDisabled(t *testing.T) {
 	next := func(ctx context.Context, service, method string, req, resp any) error { return nil }
 	wrapped := TimeoutMiddleware(0)(next)
@@ -105,6 +117,9 @@ func TestTimeoutMiddlewareNoopWhenDisabled(t *testing.T) {
 	}
 }
 
+// TestRetryMiddlewareWithResourceUsesNormalizedResource verifies RetryMiddleware normalizes resource keys.
+//
+// TestRetryMiddlewareWithResourceUsesNormalizedResource 验证 RetryMiddleware 使用规范化的资源键。
 func TestRetryMiddlewareWithResourceUsesNormalizedResource(t *testing.T) {
 	var _ resiliencecontract.Retry = (*captureRetry)(nil)
 

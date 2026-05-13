@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies that the ent provider implements ServiceProvider correctly.
+//
+// TestProviderContract 验证 ent provider 正确实现了 ServiceProvider 接口。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "orm.ent", p.Name())
@@ -40,6 +43,10 @@ func (entConfigStub) Watch(context.Context, string) (datacontract.ConfigWatcher,
 }
 func (entConfigStub) Reload(context.Context) error { return nil }
 
+// TestProviderRequiresProjectLevelFactory verifies that the ent provider
+// returns an error when the EntClientFactory is not registered.
+//
+// TestProviderRequiresProjectLevelFactory 验证 ent provider 在 EntClientFactory 未注册时返回错误。
 func TestProviderRequiresProjectLevelFactory(t *testing.T) {
 	c := container.New()
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) { return entConfigStub{}, nil }, true)

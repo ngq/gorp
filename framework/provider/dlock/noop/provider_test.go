@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestNoopLock verifies the noop distributed lock implementation.
+//
+// TestNoopLock 验证分布式锁的空操作实现。
 func TestNoopLock(t *testing.T) {
 	lock := &noopLock{}
 
@@ -39,6 +42,9 @@ func TestNoopLock(t *testing.T) {
 	assert.True(t, executed)
 }
 
+// TestDlockProvider verifies the distributed lock provider registration.
+//
+// TestDlockProvider 验证分布式锁服务提供者的注册。
 func TestProvider(t *testing.T) {
 	p := NewProvider()
 

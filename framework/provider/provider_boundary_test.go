@@ -18,6 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCoreProvidersFollowProviderFirstBoundary verifies that core providers (app, cache, auth.jwt, host)
+// follow the provider-first pattern with correct deferred status and provided keys.
+//
+// TestCoreProvidersFollowProviderFirstBoundary 验证核心 provider（app、cache、auth.jwt、host）
+// 遵循 provider-first 模式，具有正确的延迟状态和提供的键。
 func TestCoreProvidersFollowProviderFirstBoundary(t *testing.T) {
 	tests := []struct {
 		name        string

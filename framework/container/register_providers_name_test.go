@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestNewContainerBindsContainerKey verifies that a newly created container
+// automatically binds the container key to itself.
+//
+// TestNewContainerBindsContainerKey 验证新创建的容器自动将自身绑定到容器 key。
 func TestNewContainerBindsContainerKey(t *testing.T) {
 	c := New()
 	v, err := c.Make(runtimecontract.ContainerKey)
@@ -18,6 +22,10 @@ func TestNewContainerBindsContainerKey(t *testing.T) {
 	require.Equal(t, c, v)
 }
 
+// TestRegisterProviderRejectsEmptyName verifies that registering a provider
+// with an empty name returns an error.
+//
+// TestRegisterProviderRejectsEmptyName 验证注册空名称的服务提供商会返回错误。
 func TestRegisterProviderRejectsEmptyName(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0
@@ -29,6 +37,11 @@ func TestRegisterProviderRejectsEmptyName(t *testing.T) {
 	require.EqualError(t, err, "provider name is empty")
 }
 
+// TestRegisterProviderRejectsDuplicateName verifies that registering a provider
+// with a duplicate name returns an error and does not execute the duplicate.
+//
+// TestRegisterProviderRejectsDuplicateName 验证注册重名服务提供商会返回错误
+// 且不会执行重复的提供商。
 func TestRegisterProviderRejectsDuplicateName(t *testing.T) {
 	c := New()
 	loaded1, booted1 := 0, 0

@@ -82,6 +82,9 @@ func TestManager_Register(t *testing.T) {
 	}
 }
 
+// TestManager_Register_Multiple verifies that multiple services can be registered and retrieved.
+//
+// TestManager_Register_Multiple 验证多个服务可以注册并正确获取。
 func TestManager_Register_Multiple(t *testing.T) {
 	m := NewManager()
 	svc1 := &mockHostable{name: "svc1"}
@@ -96,6 +99,9 @@ func TestManager_Register_Multiple(t *testing.T) {
 	}
 }
 
+// TestManager_StartStop_Success verifies that services start and stop correctly with state transitions.
+//
+// TestManager_StartStop_Success 验证服务启动和停止以及状态转换的正确性。
 func TestManager_StartStop_Success(t *testing.T) {
 	m := NewManager()
 	svc := &mockHostable{name: "test"}
@@ -184,6 +190,9 @@ func TestManager_Start_StopOnFailure(t *testing.T) {
 	}
 }
 
+// TestManager_Lifecycle_Hooks verifies that lifecycle hooks are called in correct order during start and stop.
+//
+// TestManager_Lifecycle_Hooks 验证生命周期钩子在启动和停止时按正确顺序调用。
 func TestManager_Lifecycle_Hooks(t *testing.T) {
 	m := NewManager()
 	svc := &mockHostable{name: "test"}
@@ -223,6 +232,9 @@ func TestManager_Lifecycle_Hooks(t *testing.T) {
 	}
 }
 
+// TestManager_State verifies that Manager state transitions through Idle -> Running -> Stopped.
+//
+// TestManager_State 验证 Manager 状态经历 Idle -> Running -> Stopped 的转换。
 func TestManager_State(t *testing.T) {
 	m := NewManager()
 
@@ -245,6 +257,9 @@ func TestManager_State(t *testing.T) {
 	}
 }
 
+// TestManager_Start_Idempotent verifies that calling Start multiple times only starts services once.
+//
+// TestManager_Start_Idempotent 验证多次调用 Start 只会启动服务一次。
 func TestManager_Start_Idempotent(t *testing.T) {
 	m := NewManager()
 	svc := &mockHostable{name: "test"}
@@ -259,6 +274,9 @@ func TestManager_Start_Idempotent(t *testing.T) {
 	}
 }
 
+// TestManager_Stop_CalledOnce verifies that calling Stop multiple times only stops services once.
+//
+// TestManager_Stop_CalledOnce 验证多次调用 Stop 只会停止服务一次。
 func TestManager_Stop_CalledOnce(t *testing.T) {
 	m := NewManager()
 	svc := &mockHostable{name: "test"}
@@ -274,6 +292,9 @@ func TestManager_Stop_CalledOnce(t *testing.T) {
 	}
 }
 
+// TestState_String verifies that State String() returns correct string representations.
+//
+// TestState_String 验证 State String() 返回正确的字符串表示。
 func TestState_String(t *testing.T) {
 	tests := []struct {
 		state    State

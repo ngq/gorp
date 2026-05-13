@@ -14,6 +14,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// TestGormProvider_AppliesMaxOpenConns_AndLogger verifies that the GORM provider
+// applies database configuration (max open connections) and logger correctly.
+//
+// TestGormProvider_AppliesMaxOpenConns_AndLogger 验证 GORM provider 正确应用数据库配置（最大连接数）和日志配置。
 func TestGormProvider_AppliesMaxOpenConns_AndLogger(t *testing.T) {
 	c, cleanup := testinghelper.NewTestContainer(t)
 	defer cleanup()

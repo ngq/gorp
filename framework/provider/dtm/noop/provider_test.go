@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestNoopDTMClient verifies the noop DTM client implementation.
+//
+// TestNoopDTMClient 验证分布式事务管理客户端的空操作实现。
 func TestNoopDTMClient(t *testing.T) {
 	client := &noopDTMClient{}
 
@@ -37,6 +40,9 @@ func TestNoopDTMClient(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoopDTM)
 }
 
+// TestNoopSAGABuilder verifies the noop SAGA transaction builder.
+//
+// TestNoopSAGABuilder 验证 SAGA 事务构建器的空操作实现。
 func TestNoopSAGABuilder(t *testing.T) {
 	builder := &noopSAGABuilder{}
 
@@ -54,6 +60,9 @@ func TestNoopSAGABuilder(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoopDTM)
 }
 
+// TestNoopTCCBuilder verifies the noop TCC transaction builder.
+//
+// TestNoopTCCBuilder 验证 TCC 事务构建器的空操作实现。
 func TestNoopTCCBuilder(t *testing.T) {
 	builder := &noopTCCBuilder{}
 
@@ -66,6 +75,9 @@ func TestNoopTCCBuilder(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoopDTM)
 }
 
+// TestNoopXABuilder verifies the noop XA transaction builder.
+//
+// TestNoopXABuilder 验证 XA 事务构建器的空操作实现。
 func TestNoopXABuilder(t *testing.T) {
 	builder := &noopXABuilder{}
 
@@ -78,6 +90,9 @@ func TestNoopXABuilder(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoopDTM)
 }
 
+// TestNoopBarrierHandler verifies the noop barrier handler.
+//
+// TestNoopBarrierHandler 验证屏障处理器的空操作实现。
 func TestNoopBarrierHandler(t *testing.T) {
 	handler := &noopBarrierHandler{}
 
@@ -91,6 +106,9 @@ func TestNoopBarrierHandler(t *testing.T) {
 	assert.True(t, executed)
 }
 
+// TestDTMProvider verifies the DTM provider registration.
+//
+// TestDTMProvider 验证分布式事务管理服务提供者的注册。
 func TestProvider(t *testing.T) {
 	p := NewProvider()
 

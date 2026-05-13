@@ -12,6 +12,9 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// TestNoopSelector_Select_EmptyInstances verifies that selecting from empty instances returns ErrNoAvailable.
+//
+// TestNoopSelector_Select_EmptyInstances 验证从空实例中选择会返回 ErrNoAvailable。
 func TestNoopSelector_Select_EmptyInstances(t *testing.T) {
 	selector := &noopSelector{}
 	ctx := context.Background()
@@ -29,6 +32,9 @@ func TestNoopSelector_Select_EmptyInstances(t *testing.T) {
 	done(ctx, discoverycontract.DoneInfo{})
 }
 
+// TestNoopSelector_Select_WithHealthyInstance verifies that the selector returns the first healthy instance.
+//
+// TestNoopSelector_Select_WithHealthyInstance 验证 selector 返回第一个健康实例。
 func TestNoopSelector_Select_WithHealthyInstance(t *testing.T) {
 	selector := &noopSelector{}
 	ctx := context.Background()
@@ -50,6 +56,9 @@ func TestNoopSelector_Select_WithHealthyInstance(t *testing.T) {
 	done(ctx, discoverycontract.DoneInfo{})
 }
 
+// TestNoopSelector_Select_ForceInstance verifies that the selector respects the ForceInstance option.
+//
+// TestNoopSelector_Select_ForceInstance 验证 selector 遵循 ForceInstance 选项。
 func TestNoopSelector_Select_ForceInstance(t *testing.T) {
 	selector := &noopSelector{}
 	ctx := context.Background()
@@ -71,6 +80,9 @@ func TestNoopSelector_Select_ForceInstance(t *testing.T) {
 	done(ctx, discoverycontract.DoneInfo{})
 }
 
+// TestNoopProvider_Register verifies that the provider registers with correct name and provided keys.
+//
+// TestNoopProvider_Register 验证 provider 以正确的名称和提供的键注册。
 func TestNoopProvider_Register(t *testing.T) {
 	// 测试 Provider 注册逻辑
 	p := NewProvider()

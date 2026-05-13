@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestLoadLocalConfigToViper_RespectsAppBasePath verifies that LoadLocalConfigToViper respects the APP_BASE_PATH environment variable.
+//
+// TestLoadLocalConfigToViper_RespectsAppBasePath 验证 LoadLocalConfigToViper 正确遵循 APP_BASE_PATH 环境变量。
 func TestLoadLocalConfigToViper_RespectsAppBasePath(t *testing.T) {
 	root := t.TempDir()
 	configDir := filepath.Join(root, "config")
@@ -27,6 +30,9 @@ func TestLoadLocalConfigToViper_RespectsAppBasePath(t *testing.T) {
 	require.Equal(t, "app-base", v.GetString("service.name"))
 }
 
+// TestService_Load_MultiFile_EnvDir_AndEnvPlaceholder verifies multi-file loading, environment directory overlays, and environment variable placeholder substitution.
+//
+// TestService_Load_MultiFile_EnvDir_AndEnvPlaceholder 验证多文件加载、环境目录覆盖和环境变量占位符替换。
 func TestService_Load_MultiFile_EnvDir_AndEnvPlaceholder(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "config"), 0o755))

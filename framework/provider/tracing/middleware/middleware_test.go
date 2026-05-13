@@ -74,6 +74,9 @@ func (testTracer) Inject(ctx context.Context, carrier observabilitycontract.Text
 	return nil
 }
 
+// TestTracingHTTPMiddlewareSetsTraceHeader verifies that HTTP middleware injects trace ID into response headers.
+//
+// TestTracingHTTPMiddlewareSetsTraceHeader 验证 HTTP 中间件将 trace ID 注入响应头。
 func TestTracingHTTPMiddlewareSetsTraceHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -107,6 +110,9 @@ func TestTracingHTTPMiddlewareSetsTraceHeader(t *testing.T) {
 	require.Equal(t, "trace-test", w.Header().Get("X-Trace-ID"))
 }
 
+// TestTracingGRPCClientInterceptorInjectsMetadata verifies that gRPC client interceptor injects trace metadata.
+//
+// TestTracingGRPCClientInterceptorInjectsMetadata 验证 gRPC 客户端拦截器注入 trace 元数据。
 func TestTracingGRPCClientInterceptorInjectsMetadata(t *testing.T) {
 	tracer := testTracer{}
 	err := UnaryClientInterceptor(tracer, "svc")(context.Background(), "/demo.Service/Get", nil, nil, nil, func(ctx context.Context, method string, req, reply any, cc *ggrpc.ClientConn, opts ...ggrpc.CallOption) error {
@@ -118,6 +124,9 @@ func TestTracingGRPCClientInterceptorInjectsMetadata(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestTracingGRPCServerInterceptorMarksErrorStatus verifies that gRPC server interceptor marks error status.
+//
+// TestTracingGRPCServerInterceptorMarksErrorStatus 验证 gRPC 服务端拦截器标记错误状态。
 func TestTracingGRPCServerInterceptorMarksErrorStatus(t *testing.T) {
 	tracer := testTracer{}
 	interceptor := UnaryServerInterceptor(tracer, "svc")

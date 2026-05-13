@@ -28,11 +28,17 @@ func (l *loggerStub) With(fields ...observabilitycontract.Field) observabilityco
 	return &loggerStub{fields: copied}
 }
 
+// TestDefaultReturnsNoopWhenUnset verifies that Default returns a noop logger when no default is set.
+//
+// TestDefaultReturnsNoopWhenUnset 验证 Default 在未设置时返回 noop logger。
 func TestDefaultReturnsNoopWhenUnset(t *testing.T) {
 	SetDefault(nil)
 	require.NotNil(t, Default())
 }
 
+// TestSetDefaultStoresLogger verifies that SetDefault stores the logger and Default returns the same instance.
+//
+// TestSetDefaultStoresLogger 验证 SetDefault 存储 logger 且 Default 返回相同实例。
 func TestSetDefaultStoresLogger(t *testing.T) {
 	stub := &loggerStub{}
 	SetDefault(stub)

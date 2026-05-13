@@ -13,6 +13,9 @@ import (
 	"github.com/ngq/gorp/framework/lifecycle"
 )
 
+// TestProvider_Name verifies that the host provider returns the correct name.
+//
+// TestProvider_Name 验证 host provider 返回正确的名称。
 func TestProvider_Name(t *testing.T) {
 	p := NewProvider()
 	if p.Name() != "host" {
@@ -20,6 +23,9 @@ func TestProvider_Name(t *testing.T) {
 	}
 }
 
+// TestProvider_IsDefer verifies that the host provider is not deferrable.
+//
+// TestProvider_IsDefer 验证 host provider 不可延迟加载。
 func TestProvider_IsDefer(t *testing.T) {
 	p := NewProvider()
 	if p.IsDefer() {
@@ -27,6 +33,9 @@ func TestProvider_IsDefer(t *testing.T) {
 	}
 }
 
+// TestProvider_Provides verifies that the host provider provides the host key.
+//
+// TestProvider_Provides 验证 host provider 提供 host key。
 func TestProvider_Provides(t *testing.T) {
 	p := NewProvider()
 	provides := p.Provides()
@@ -35,6 +44,9 @@ func TestProvider_Provides(t *testing.T) {
 	}
 }
 
+// TestDefaultHost_RegisterService verifies that services can be registered and retrieved from the default host.
+//
+// TestDefaultHost_RegisterService 验证服务可以正确注册到默认 host 并从中获取。
 func TestDefaultHost_RegisterService(t *testing.T) {
 	h := NewDefaultHost(nil)
 	svc := &mockHostable{name: "test"}
@@ -49,6 +61,9 @@ func TestDefaultHost_RegisterService(t *testing.T) {
 	}
 }
 
+// TestDefaultHost_RegisterServiceWithPriority verifies that services registered with priority are ordered correctly.
+//
+// TestDefaultHost_RegisterServiceWithPriority 验证带优先级的服务注册能正确排序。
 func TestDefaultHost_RegisterServiceWithPriority(t *testing.T) {
 	h := NewDefaultHost(nil)
 	svc1 := &mockHostable{name: "svc1"}
@@ -63,6 +78,9 @@ func TestDefaultHost_RegisterServiceWithPriority(t *testing.T) {
 	}
 }
 
+// TestDefaultHost_StartStop verifies that the host can start and stop services correctly.
+//
+// TestDefaultHost_StartStop 验证 host 能正确启动和停止服务。
 func TestDefaultHost_StartStop(t *testing.T) {
 	h := NewDefaultHost(nil)
 	svc := &mockHostable{name: "test"}
@@ -90,6 +108,9 @@ func TestDefaultHost_StartStop(t *testing.T) {
 	}
 }
 
+// TestDefaultHost_Start_Idempotent verifies that starting a host multiple times only starts services once.
+//
+// TestDefaultHost_Start_Idempotent 验证多次启动 host 时服务只会被启动一次。
 func TestDefaultHost_Start_Idempotent(t *testing.T) {
 	h := NewDefaultHost(nil)
 	svc := &mockHostable{name: "test"}
@@ -105,6 +126,9 @@ func TestDefaultHost_Start_Idempotent(t *testing.T) {
 	}
 }
 
+// TestDefaultHost_Stop_BeforeStart verifies that stopping a host before starting it does not return an error.
+//
+// TestDefaultHost_Stop_BeforeStart 验证在启动前停止 host 不会返回错误。
 func TestDefaultHost_Stop_BeforeStart(t *testing.T) {
 	h := NewDefaultHost(nil)
 	svc := &mockHostable{name: "test"}
@@ -142,6 +166,9 @@ func (m *mockHostable) Stop(ctx context.Context) error {
 	return m.stopErr
 }
 
+// TestDefaultHost_StartError verifies that the host returns an error when a service fails to start.
+//
+// TestDefaultHost_StartError 验证当服务启动失败时 host 返回错误。
 func TestDefaultHost_StartError(t *testing.T) {
 	h := NewDefaultHost(nil)
 	svc := &mockHostable{name: "test", startErr: errors.New("start error")}
@@ -154,6 +181,9 @@ func TestDefaultHost_StartError(t *testing.T) {
 	}
 }
 
+// TestHTTPService_Name verifies that the HTTP service returns its configured name.
+//
+// TestHTTPService_Name 验证 HTTP 服务返回其配置的名称。
 func TestHTTPService_Name(t *testing.T) {
 	svc := &HTTPService{name: "http"}
 	if svc.Name() != "http" {
@@ -161,6 +191,9 @@ func TestHTTPService_Name(t *testing.T) {
 	}
 }
 
+// TestCronService_Name verifies that the Cron service returns its configured name.
+//
+// TestCronService_Name 验证 Cron 服务返回其配置的名称。
 func TestCronService_Name(t *testing.T) {
 	svc := &CronService{name: "cron"}
 	if svc.Name() != "cron" {

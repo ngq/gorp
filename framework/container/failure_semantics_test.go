@@ -31,6 +31,11 @@ func (p *failingProvider) Boot(runtimecontract.Container) error {
 	return p.bootErr
 }
 
+// TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure verifies that after
+// a provider's Register fails, subsequent load attempts do not retry Register.
+//
+// TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure 验证当服务提供商的
+// Register 失败后，后续加载尝试不会重试 Register。
 func TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0
@@ -55,6 +60,11 @@ func TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure(t *testing.T) {
 	require.Equal(t, 0, booted)
 }
 
+// TestContainer_BootProviderDoesNotRetryAfterBootFailure verifies that after a
+// provider's Boot fails, subsequent boot attempts do not retry Boot.
+//
+// TestContainer_BootProviderDoesNotRetryAfterBootFailure 验证当服务提供商的 Boot
+// 失败后，后续引导尝试不会重试 Boot。
 func TestContainer_BootProviderDoesNotRetryAfterBootFailure(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0

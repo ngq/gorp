@@ -11,6 +11,11 @@ import (
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
 
+// TestServiceIdentityContextHelpers verifies that service identity can be
+// stored in and retrieved from a context using the application helpers.
+//
+// TestServiceIdentityContextHelpers 验证服务标识可以通过应用程序辅助函数
+// 存储到 context 中并从中检索。
 func TestServiceIdentityContextHelpers(t *testing.T) {
 	identity := &securitycontract.ServiceIdentity{
 		ServiceID:   "svc-1",

@@ -25,6 +25,9 @@ func (n *noopLogger) With(...observabilitycontract.Field) observabilitycontract.
 	return n
 }
 
+// TestSafeGoAndWait_ReturnsFirstError verifies that SafeGoAndWait returns the first error encountered.
+//
+// TestSafeGoAndWait_ReturnsFirstError 验证 SafeGoAndWait 返回遇到的第一个错误。
 func TestSafeGoAndWait_ReturnsFirstError(t *testing.T) {
 	c := container.New()
 	c.Bind(observabilitycontract.LogKey, func(runtimecontract.Container) (any, error) { return &noopLogger{}, nil }, true)
@@ -37,6 +40,9 @@ func TestSafeGoAndWait_ReturnsFirstError(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestSafeGoAndWait_RecoversPanic verifies that SafeGoAndWait recovers from panics in goroutines.
+//
+// TestSafeGoAndWait_RecoversPanic 验证 SafeGoAndWait 能从 goroutine 恐慌中恢复。
 func TestSafeGoAndWait_RecoversPanic(t *testing.T) {
 	c := container.New()
 	c.Bind(observabilitycontract.LogKey, func(runtimecontract.Container) (any, error) { return &noopLogger{}, nil }, true)

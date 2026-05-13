@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestNoopTracer verifies noop tracer creates spans and handles inject/extract operations.
+//
+// TestNoopTracer 验证 noop tracer 创建 span 并正确处理 inject/extract 操作。
 func TestNoopTracer(t *testing.T) {
 	tracer := NewNoopTracer()
 
@@ -35,6 +38,9 @@ func TestNoopTracer(t *testing.T) {
 	assert.NotNil(t, ctx2)
 }
 
+// TestNoopSpan verifies noop span operations are safe no-ops.
+//
+// TestNoopSpan 验证 noop span 的各项操作均为安全的无操作。
 func TestNoopSpan(t *testing.T) {
 	span := &NoopSpan{}
 
@@ -69,6 +75,9 @@ func TestNoopSpan(t *testing.T) {
 	assert.NotNil(t, ctx)
 }
 
+// TestDefaultObservability verifies default observability provider initialization with components.
+//
+// TestDefaultObservability 验证可观测性 provider 的初始化，包含 metrics、tracer、logger 和 error reporter。
 func TestDefaultObservability(t *testing.T) {
 	obs := NewDefaultObservability(
 		&PrometheusMetrics{},

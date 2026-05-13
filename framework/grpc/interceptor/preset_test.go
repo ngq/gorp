@@ -67,6 +67,9 @@ func TestDefaultStreamServerInterceptorsStableBase(t *testing.T) {
 	}
 }
 
+// TestDefaultUnaryServerInterceptorsIncludeTracingAndMetadataInStableOrder verifies unary interceptors include tracing and metadata in stable order.
+//
+// TestDefaultUnaryServerInterceptorsIncludeTracingAndMetadataInStableOrder 验证 unary 拦截器按稳定顺序包含追踪和元数据。
 func TestDefaultUnaryServerInterceptorsIncludeTracingAndMetadataInStableOrder(t *testing.T) {
 	set := DefaultUnaryServerInterceptors(DefaultServerPresetOptions{
 		Tracer:             noopTracer{},
@@ -78,6 +81,9 @@ func TestDefaultUnaryServerInterceptorsIncludeTracingAndMetadataInStableOrder(t 
 	}
 }
 
+// TestDefaultStreamServerInterceptorsIncludeMetadataInStableOrder verifies stream interceptors include metadata in stable order.
+//
+// TestDefaultStreamServerInterceptorsIncludeMetadataInStableOrder 验证 stream 拦截器按稳定顺序包含元数据。
 func TestDefaultStreamServerInterceptorsIncludeMetadataInStableOrder(t *testing.T) {
 	set := DefaultStreamServerInterceptors(DefaultServerPresetOptions{
 		MetadataPropagator: noopMetadataPropagator{},
@@ -87,6 +93,9 @@ func TestDefaultStreamServerInterceptorsIncludeMetadataInStableOrder(t *testing.
 	}
 }
 
+// TestChainUnarySkipsNilAndPreservesDeclaredOrder verifies ChainUnary skips nil interceptors and preserves order.
+//
+// TestChainUnarySkipsNilAndPreservesDeclaredOrder 验证 ChainUnary 跳过 nil 拦截器并保持声明顺序。
 func TestChainUnarySkipsNilAndPreservesDeclaredOrder(t *testing.T) {
 	var calls []string
 	first := func(
@@ -124,6 +133,9 @@ func TestChainUnarySkipsNilAndPreservesDeclaredOrder(t *testing.T) {
 	}
 }
 
+// TestChainStreamSkipsNilAndPreservesDeclaredOrder verifies ChainStream skips nil interceptors and preserves order.
+//
+// TestChainStreamSkipsNilAndPreservesDeclaredOrder 验证 ChainStream 跳过 nil 拦截器并保持声明顺序。
 func TestChainStreamSkipsNilAndPreservesDeclaredOrder(t *testing.T) {
 	var calls []string
 	first := func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {

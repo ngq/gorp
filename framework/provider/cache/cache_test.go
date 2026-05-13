@@ -16,6 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCache_Memory_TTL_Del_MGet_Remember verifies memory cache TTL, delete, multi-get, and remember operations.
+//
+// TestCache_Memory_TTL_Del_MGet_Remember 验证内存缓存的 TTL、删除、批量获取和 remember 功能。
 func TestCache_Memory_TTL_Del_MGet_Remember(t *testing.T) {
 	c, cleanup := testinghelper.NewTestContainer(t)
 	defer cleanup()

@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies that the sqlx provider implements ServiceProvider correctly.
+//
+// TestProviderContract 验证 sqlx provider 正确实现了 ServiceProvider 接口。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "orm.sqlx", p.Name())

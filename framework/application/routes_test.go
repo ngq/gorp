@@ -14,6 +14,11 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// TestWithHTTPRoutesComposesWithSetup verifies that WithHTTPRoutes composes
+// with WithSetup and executes them in the correct order.
+//
+// TestWithHTTPRoutesComposesWithSetup 验证 WithHTTPRoutes 与 WithSetup 组合
+// 并按正确顺序执行。
 func TestWithHTTPRoutesComposesWithSetup(t *testing.T) {
 	cfg := runConfig{}
 	seq := make([]string, 0, 2)
@@ -36,6 +41,11 @@ func TestWithHTTPRoutesComposesWithSetup(t *testing.T) {
 	}
 }
 
+// TestWithHTTPRoutesNilRegistrarIsNoOp verifies that passing a nil registrar
+// to WithHTTPRoutes results in a no-op setup function.
+//
+// TestWithHTTPRoutesNilRegistrarIsNoOp 验证向 WithHTTPRoutes 传递 nil 注册器
+// 会导致无操作设置函数。
 func TestWithHTTPRoutesNilRegistrarIsNoOp(t *testing.T) {
 	cfg := runConfig{}
 	WithHTTPRoutes(nil).apply(&cfg)
@@ -47,6 +57,11 @@ func TestWithHTTPRoutesNilRegistrarIsNoOp(t *testing.T) {
 	}
 }
 
+// TestWithHTTPRoutesExecuteInOptionOrder verifies that multiple WithHTTPRoutes
+// options execute their registrars in the order they were applied.
+//
+// TestWithHTTPRoutesExecuteInOptionOrder 验证多个 WithHTTPRoutes 选项
+// 按应用顺序执行其注册器。
 func TestWithHTTPRoutesExecuteInOptionOrder(t *testing.T) {
 	cfg := runConfig{}
 	seq := make([]string, 0, 2)
@@ -66,6 +81,11 @@ func TestWithHTTPRoutesExecuteInOptionOrder(t *testing.T) {
 	}
 }
 
+// TestWithHTTPRoutesWrapsRouteRegistrationError verifies that when a route
+// registrar returns an error, it is wrapped in ErrHTTPRouteRegistrationFailed.
+//
+// TestWithHTTPRoutesWrapsRouteRegistrationError 验证当路由注册器返回错误时，
+// 该错误会被包装在 ErrHTTPRouteRegistrationFailed 中。
 func TestWithHTTPRoutesWrapsRouteRegistrationError(t *testing.T) {
 	cfg := runConfig{}
 	cause := fmt.Errorf("register routes failed")
@@ -81,6 +101,11 @@ func TestWithHTTPRoutesWrapsRouteRegistrationError(t *testing.T) {
 	}
 }
 
+// TestWithHTTPRoutesReturnsRuntimeUnavailableWhenRuntimeIsNil verifies that
+// setup returns ErrHTTPRuntimeUnavailable when the runtime is nil.
+//
+// TestWithHTTPRoutesReturnsRuntimeUnavailableWhenRuntimeIsNil 验证当 runtime
+// 为 nil 时，设置返回 ErrHTTPRuntimeUnavailable。
 func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenRuntimeIsNil(t *testing.T) {
 	cfg := runConfig{}
 	called := false
@@ -97,6 +122,11 @@ func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenRuntimeIsNil(t *testing.T) {
 	}
 }
 
+// TestWithHTTPRoutesReturnsRuntimeUnavailableWhenEngineIsNil verifies that
+// setup returns ErrHTTPRuntimeUnavailable when the router engine is nil.
+//
+// TestWithHTTPRoutesReturnsRuntimeUnavailableWhenEngineIsNil 验证当路由引擎
+// 为 nil 时，设置返回 ErrHTTPRuntimeUnavailable。
 func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenEngineIsNil(t *testing.T) {
 	cfg := runConfig{}
 	called := false
@@ -113,6 +143,11 @@ func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenEngineIsNil(t *testing.T) {
 	}
 }
 
+// TestWithHTTPRoutesReturnsRuntimeUnavailableWhenContainerIsNil verifies that
+// setup returns ErrHTTPRuntimeUnavailable when the container is nil.
+//
+// TestWithHTTPRoutesReturnsRuntimeUnavailableWhenContainerIsNil 验证当容器
+// 为 nil 时，设置返回 ErrHTTPRuntimeUnavailable。
 func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenContainerIsNil(t *testing.T) {
 	cfg := runConfig{}
 	called := false

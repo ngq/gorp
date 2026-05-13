@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies that the local config source provider has correct name, defer behavior, and provided keys.
+//
+// TestProviderContract 验证本地配置源 provider 的名称、延迟加载行为和提供的键。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "configsource.local", p.Name())

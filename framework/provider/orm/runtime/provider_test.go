@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies that the runtime provider implements ServiceProvider correctly.
+//
+// TestProviderContract 验证 runtime provider 正确实现了 ServiceProvider 接口。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "orm.runtime", p.Name())

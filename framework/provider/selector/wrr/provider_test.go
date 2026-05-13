@@ -12,6 +12,9 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// TestWRRSelector_Select_EmptyInstances verifies that selecting from empty instances returns ErrNoAvailable.
+//
+// TestWRRSelector_Select_EmptyInstances 验证从空实例中选择会返回 ErrNoAvailable。
 func TestWRRSelector_Select_EmptyInstances(t *testing.T) {
 	selector := NewWRRSelector()
 	ctx := context.Background()
@@ -24,6 +27,9 @@ func TestWRRSelector_Select_EmptyInstances(t *testing.T) {
 	done(ctx, discoverycontract.DoneInfo{})
 }
 
+// TestWRRSelector_Select_WeightDistribution verifies that instances are selected according to their weight.
+//
+// TestWRRSelector_Select_WeightDistribution 验证实例根据其权重被选中。
 func TestWRRSelector_Select_WeightDistribution(t *testing.T) {
 	selector := NewWRRSelector()
 	ctx := context.Background()
@@ -56,6 +62,9 @@ func TestWRRSelector_Select_WeightDistribution(t *testing.T) {
 	}
 }
 
+// TestWRRSelector_Select_AllSameWeight verifies that instances with equal weight are selected evenly.
+//
+// TestWRRSelector_Select_AllSameWeight 验证具有相同权重的实例被均匀选中。
 func TestWRRSelector_Select_AllSameWeight(t *testing.T) {
 	selector := NewWRRSelector()
 	ctx := context.Background()
@@ -85,6 +94,9 @@ func TestWRRSelector_Select_AllSameWeight(t *testing.T) {
 	}
 }
 
+// TestWRRSelector_Select_ForceInstance verifies that the selector respects the ForceInstance option.
+//
+// TestWRRSelector_Select_ForceInstance 验证 selector 遵循 ForceInstance 选项。
 func TestWRRSelector_Select_ForceInstance(t *testing.T) {
 	selector := NewWRRSelector()
 	ctx := context.Background()
@@ -109,6 +121,9 @@ func TestWRRSelector_Select_ForceInstance(t *testing.T) {
 	}
 }
 
+// TestWRRSelector_CleanupStaleWeights verifies that stale weight entries are cleaned up when instance set changes.
+//
+// TestWRRSelector_CleanupStaleWeights 验证当实例集变更时，陈旧的权重条目被清理。
 func TestWRRSelector_CleanupStaleWeights(t *testing.T) {
 	selector := NewWRRSelector()
 	ctx := context.Background()

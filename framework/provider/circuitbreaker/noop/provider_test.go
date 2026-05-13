@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestNoopCircuitBreaker verifies the noop circuit breaker implementation.
+//
+// TestNoopCircuitBreaker 验证熔断器的空操作实现。
 func TestNoopCircuitBreaker(t *testing.T) {
 	cb := &noopCircuitBreaker{}
 
@@ -40,6 +43,9 @@ func TestNoopCircuitBreaker(t *testing.T) {
 	assert.Equal(t, resiliencecontract.CircuitBreakerStateClosed, state)
 }
 
+// TestNoopRateLimiter verifies the noop rate limiter implementation.
+//
+// TestNoopRateLimiter 验证限流器的空操作实现。
 func TestNoopRateLimiter(t *testing.T) {
 	rl := &noopRateLimiter{}
 
@@ -64,6 +70,9 @@ func TestNoopRateLimiter(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestCircuitBreakerProvider verifies the circuit breaker provider registration.
+//
+// TestCircuitBreakerProvider 验证熔断器服务提供者的注册。
 func TestProvider(t *testing.T) {
 	p := NewProvider()
 

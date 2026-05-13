@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies the Redis provider registration and contract.
+//
+// TestProviderContract 验证 Redis 服务提供者的注册与契约实现。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "redis", p.Name())

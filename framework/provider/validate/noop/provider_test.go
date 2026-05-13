@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies the noop provider implements the Provider interface correctly.
+//
+// TestProviderContract 验证 noop provider 正确实现 Provider 接口。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "validate.noop", p.Name())

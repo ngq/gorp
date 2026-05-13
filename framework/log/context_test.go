@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestWithContextHandlesNilInputs verifies that WithContext handles nil context and nil logger gracefully.
+//
+// TestWithContextHandlesNilInputs 验证 WithContext 能正确处理 nil context 和 nil logger。
 func TestWithContextHandlesNilInputs(t *testing.T) {
 	ctx := WithContext(nil, nil)
 	require.NotNil(t, ctx)
@@ -21,11 +24,17 @@ func TestWithContextHandlesNilInputs(t *testing.T) {
 	require.True(t, ok)
 }
 
+// TestFromContextReturnsFalseWhenMissing verifies that FromContext returns false when no logger is stored in context.
+//
+// TestFromContextReturnsFalseWhenMissing 验证 FromContext 在 context 中没有 logger 时返回 false。
 func TestFromContextReturnsFalseWhenMissing(t *testing.T) {
 	_, ok := FromContext(context.Background())
 	require.False(t, ok)
 }
 
+// TestWithContextFieldsUsesContextLogger verifies that WithContextFields uses logger from context when adding fields.
+//
+// TestWithContextFieldsUsesContextLogger 验证 WithContextFields 在添加字段时使用 context 中的 logger。
 func TestWithContextFieldsUsesContextLogger(t *testing.T) {
 	defaultStub := &loggerStub{}
 	requestStub := &loggerStub{}

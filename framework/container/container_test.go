@@ -35,6 +35,11 @@ func (p *testProvider) Boot(runtimecontract.Container) error {
 	return nil
 }
 
+// TestContainer_NonDeferredProviderLoadsImmediately verifies that a non-deferred
+// provider is loaded and booted immediately upon registration.
+//
+// TestContainer_NonDeferredProviderLoadsImmediately 验证非延迟服务提供商
+// 在注册时立即加载和引导。
 func TestContainer_NonDeferredProviderLoadsImmediately(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0
@@ -50,6 +55,11 @@ func TestContainer_NonDeferredProviderLoadsImmediately(t *testing.T) {
 	require.Equal(t, "ok", v)
 }
 
+// TestContainer_DeferredProviderLoadsOnFirstMake verifies that a deferred
+// provider is loaded and booted only when its key is first requested via Make.
+//
+// TestContainer_DeferredProviderLoadsOnFirstMake 验证延迟服务提供商
+// 仅在首次通过 Make 请求其 key 时才加载和引导。
 func TestContainer_DeferredProviderLoadsOnFirstMake(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0

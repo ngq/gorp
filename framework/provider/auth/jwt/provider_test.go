@@ -31,6 +31,9 @@ func (s *stubConfig) Watch(_ context.Context, _ string) (datacontract.ConfigWatc
 }
 func (s *stubConfig) Reload(_ context.Context) error { return nil }
 
+// TestProviderMeta verifies the JWT provider metadata including name, defer mode, and provided keys.
+//
+// TestProviderMeta 验证 JWT provider 元信息，包括名称、延迟模式及提供的 key 列表。
 func TestProviderMeta(t *testing.T) {
 	p := NewProvider()
 	if p.Name() != "auth.jwt" {
@@ -44,6 +47,9 @@ func TestProviderMeta(t *testing.T) {
 	}
 }
 
+// TestProviderBindJWTService verifies the JWT provider can bind and create a JWTService from config.
+//
+// TestProviderBindJWTService 验证 JWT provider 能从配置绑定并创建 JWTService 实例。
 func TestProviderBindJWTService(t *testing.T) {
 	c := container.New()
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
@@ -66,6 +72,9 @@ func TestProviderBindJWTService(t *testing.T) {
 	}
 }
 
+// TestProviderCompatLegacySecretKey verifies the JWT provider supports legacy secret key "auth.jwt_secret".
+//
+// TestProviderCompatLegacySecretKey 验证 JWT provider 兼容旧版密钥 "auth.jwt_secret"。
 func TestProviderCompatLegacySecretKey(t *testing.T) {
 	c := container.New()
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {

@@ -16,6 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestAuthMiddlewareWritesRequestContext verifies the auth middleware correctly writes JWT claims to request context.
+//
+// TestAuthMiddlewareWritesRequestContext 验证认证中间件正确地将 JWT claims 写入请求上下文。
 func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
@@ -62,6 +65,9 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
+// TestRequestContextHelpers verifies helper functions extract JWT claims, subject ID, and subject type from context.
+//
+// TestRequestContextHelpers 验证辅助函数能从上下文正确提取 JWT claims、subject ID 和 subject type。
 func TestRequestContextHelpers(t *testing.T) {
 	claims := &securitycontract.JWTClaims{
 		SubjectID:   9,
@@ -85,6 +91,9 @@ func TestRequestContextHelpers(t *testing.T) {
 	require.Equal(t, "admin", subjectType)
 }
 
+// TestSubjectIDFromContextNilSafe verifies SubjectIDFromContext returns zero value and false for nil context.
+//
+// TestSubjectIDFromContextNilSafe 验证 SubjectIDFromContext 对 nil 上下文返回零值和 false。
 func TestSubjectIDFromContextNilSafe(t *testing.T) {
 	subjectID, ok := SubjectIDFromContext(nil)
 	require.False(t, ok)

@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies that the provider registers with correct name and provided keys.
+//
+// TestProviderContract 验证 provider 以正确的名称和提供的键注册。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "retry.noop", p.Name())

@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestNoopQueue verifies the noop message queue implementation.
+//
+// TestNoopQueue 验证消息队列的空操作实现。
 func TestNoopQueue(t *testing.T) {
 	queue := &noopQueue{}
 
@@ -28,6 +31,9 @@ func TestNoopQueue(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestNoopPublisher verifies the noop message publisher implementation.
+//
+// TestNoopPublisher 验证消息发布者的空操作实现。
 func TestNoopPublisher(t *testing.T) {
 	publisher := &noopPublisher{}
 
@@ -40,6 +46,9 @@ func TestNoopPublisher(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestNoopSubscriber verifies the noop message subscriber implementation.
+//
+// TestNoopSubscriber 验证消息订阅者的空操作实现。
 func TestNoopSubscriber(t *testing.T) {
 	subscriber := &noopSubscriber{}
 
@@ -55,6 +64,9 @@ func TestNoopSubscriber(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestMessageQueueProvider verifies the message queue provider registration.
+//
+// TestMessageQueueProvider 验证消息队列服务提供者的注册。
 func TestProvider(t *testing.T) {
 	p := NewProvider()
 

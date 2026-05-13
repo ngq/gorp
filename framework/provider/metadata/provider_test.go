@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies metadata default provider registration and contract compliance.
+//
+// TestProviderContract 验证 metadata 默认 provider 的注册与契约实现。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "metadata.default", p.Name())

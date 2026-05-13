@@ -16,6 +16,9 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
+// TestProvider_ProvidesRootKey verifies that the provider declares the root key as its sole provided service.
+//
+// TestProvider_ProvidesRootKey 验证 provider 仅提供 RootKey 作为其服务。
 func TestProvider_ProvidesRootKey(t *testing.T) {
 	p := NewProvider()
 	if got := p.Provides(); len(got) != 1 || got[0] != runtimecontract.RootKey {
@@ -39,6 +42,9 @@ func (s *stubConfig) Watch(context.Context, string) (datacontract.ConfigWatcher,
 }
 func (s *stubConfig) Reload(context.Context) error { return nil }
 
+// TestProvider_DefaultPathsFollowWorkingDir verifies that storage, runtime, and log paths are derived from the base path.
+//
+// TestProvider_DefaultPathsFollowWorkingDir 验证 storage、runtime 和 log 路径从 base path 正确派生。
 func TestProvider_DefaultPathsFollowWorkingDir(t *testing.T) {
 	c := container.New()
 	if err := c.RegisterProvider(NewProvider()); err != nil {
@@ -61,6 +67,9 @@ func TestProvider_DefaultPathsFollowWorkingDir(t *testing.T) {
 	}
 }
 
+// TestProvider_ConfigurablePaths verifies that custom paths from config override the default path behavior.
+//
+// TestProvider_ConfigurablePaths 验证来自配置的 custom paths 能够覆盖默认路径行为。
 func TestProvider_ConfigurablePaths(t *testing.T) {
 	c := container.New()
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {

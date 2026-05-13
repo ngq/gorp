@@ -24,6 +24,10 @@ func (s *senderStub) Send(_ context.Context, msg *integrationcontract.OutboxMess
 	return s.err
 }
 
+// TestMemoryOutboxEmitSyncMarksSent verifies that EmitSync sends message synchronously
+// and marks it as sent with proper status and timestamp.
+//
+// TestMemoryOutboxEmitSyncMarksSent 验证 EmitSync 同步发送消息并正确标记为已发送状态和时间戳。
 func TestMemoryOutboxEmitSyncMarksSent(t *testing.T) {
 	sender := &senderStub{}
 	outbox := NewMemoryOutbox(sender, integrationcontract.OutboxConfig{RetryLimit: 3})
@@ -46,6 +50,10 @@ func TestMemoryOutboxEmitSyncMarksSent(t *testing.T) {
 	}
 }
 
+// TestMemoryOutboxProcessMarksRetryingThenFailed verifies that when sender fails,
+// the message status is marked as failed with retry count and error stored.
+//
+// TestMemoryOutboxProcessMarksRetryingThenFailed 验证当发送器失败时，消息状态标记为失败，并存储重试次数和错误。
 func TestMemoryOutboxProcessMarksRetryingThenFailed(t *testing.T) {
 	sender := &senderStub{err: errors.New("boom")}
 	outbox := NewMemoryOutbox(sender, integrationcontract.OutboxConfig{RetryLimit: 1})
@@ -68,6 +76,10 @@ func TestMemoryOutboxProcessMarksRetryingThenFailed(t *testing.T) {
 	}
 }
 
+// TestMemoryOutboxProcessWithoutSenderFails verifies that Process returns an error
+// when no sender is configured.
+//
+// TestMemoryOutboxProcessWithoutSenderFails 验证 Process 在未配置发送器时返回错误。
 func TestMemoryOutboxProcessWithoutSenderFails(t *testing.T) {
 	outbox := NewMemoryOutbox(nil, integrationcontract.OutboxConfig{RetryLimit: 3})
 	outbox.messages["msg-1"] = &integrationcontract.OutboxMessage{

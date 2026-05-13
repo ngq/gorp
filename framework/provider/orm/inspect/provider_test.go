@@ -15,6 +15,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// TestService_SQLiteTablesAndColumns verifies that the inspector service
+// can correctly query tables and columns from a SQLite database.
+//
+// TestService_SQLiteTablesAndColumns 验证 inspector service 能正确查询 SQLite 数据库的表和列信息。
 func TestService_SQLiteTablesAndColumns(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	require.NoError(t, err)
@@ -50,6 +54,10 @@ func TestService_SQLiteTablesAndColumns(t *testing.T) {
 	require.Equal(t, "'n/a'", *cols[2].DefaultVal)
 }
 
+// TestService_MySQLTablesAndColumns verifies that the inspector service
+// can correctly query tables and columns from a MySQL database using SQL mock.
+//
+// TestService_MySQLTablesAndColumns 验证 inspector service 能正确查询 MySQL 数据库的表和列信息。
 func TestService_MySQLTablesAndColumns(t *testing.T) {
 	rawDB, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -91,6 +99,10 @@ func TestService_MySQLTablesAndColumns(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestService_PostgresTablesAndColumns verifies that the inspector service
+// can correctly query tables and columns from a PostgreSQL database using SQL mock.
+//
+// TestService_PostgresTablesAndColumns 验证 inspector service 能正确查询 PostgreSQL 数据库的表和列信息。
 func TestService_PostgresTablesAndColumns(t *testing.T) {
 	rawDB, mock, err := sqlmock.New()
 	require.NoError(t, err)

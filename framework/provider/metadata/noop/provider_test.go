@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProviderContract verifies metadata noop provider registration and no-op behavior.
+//
+// TestProviderContract 验证 metadata noop provider 的注册与空操作行为。
 func TestProviderContract(t *testing.T) {
 	p := NewProvider()
 	require.Equal(t, "metadata.noop", p.Name())

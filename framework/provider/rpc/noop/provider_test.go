@@ -69,6 +69,9 @@ func TestNoopRegistry(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestProvider verifies that the rpc noop provider provides the correct keys and deferred status.
+//
+// TestProvider 验证 rpc noop provider 提供正确的键和延迟状态。
 func TestProvider(t *testing.T) {
 	p := NewProvider()
 

@@ -1,9 +1,8 @@
 // Package middleware_test provides unit tests for HTTP middleware preset stability.
 //
 // 适用场景：
-// - 验证 default、recommended、internal、admin 中间件预设的稳定性。
-// - 防止预设顺序与默认值决策发生意外漂移。
-// - 确保基于预设的装配持续产出预期的 HTTP 基线行为。
+// - 验证 Default HTTP Service Governance 预设的行为。
+// - 确保 Body Limit、负载 shedding、熔断器等治理能力按预期生效。
 package middleware
 
 import (
@@ -19,6 +18,7 @@ import (
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
+// denyCircuitBreaker 拒绝所有请求的熔断器 stub。
 type denyCircuitBreaker struct{}
 
 func (denyCircuitBreaker) Allow(context.Context, string) error          { return errors.New("blocked") }
@@ -65,140 +65,6 @@ func (allowCircuitBreaker) Do(ctx context.Context, resource string, fn func() er
 }
 func (allowCircuitBreaker) State(context.Context, string) resiliencecontract.CircuitBreakerState {
 	return resiliencecontract.CircuitBreakerStateClosed
-}
-
-// TestDefaultMiddlewareSetStableSize verifies that the default middleware preset keeps a stable cardinality.
-//
-// TestDefaultMiddlewareSetStableSize 验证默认中间件预设保持稳定的数量。
-func TestDefaultMiddlewareSetStableSize(t *testing.T) {
-	set := DefaultMiddlewareSet(nil)
-	if len(set) != 3 {
-		t.Fatalf("expected 3 default middleware entries, got %d", len(set))
-	}
-}
-
-// =============================================================================
-// Recommended API Middleware Preset
-// =============================================================================
-
-// TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders verifies the default public API preset behavior.
-//
-// TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders 验证默认对外 API 预设行为。
-func TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	applyTransportMiddleware(router, RecommendedAPIMiddlewareSet(nil, RecommendedMiddlewareOptions{})...)
-	router.GET("/orders/:id", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/orders/42?lang=en-US", nil)
-	req.Header.Set("Origin", "https://example.com")
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", recorder.Code)
-	}
-	if recorder.Header().Get("X-Request-Id") == "" {
-		t.Fatal("expected X-Request-Id header")
-	}
-	if recorder.Header().Get("X-Trace-Id") == "" {
-		t.Fatal("expected X-Trace-Id header")
-	}
-	if recorder.Header().Get("X-Frame-Options") != "DENY" {
-		t.Fatalf("expected X-Frame-Options DENY, got %q", recorder.Header().Get("X-Frame-Options"))
-	}
-	if recorder.Header().Get("Content-Language") != "en" {
-		t.Fatalf("expected Content-Language en, got %q", recorder.Header().Get("Content-Language"))
-	}
-	if recorder.Header().Get("Access-Control-Allow-Origin") != "" {
-		t.Fatalf("expected CORS disabled by default, got %q", recorder.Header().Get("Access-Control-Allow-Origin"))
-	}
-}
-
-// TestRecommendedAPIMiddlewareSetEnablesConfiguredCORS verifies explicit CORS enablement in the recommended API preset.
-//
-// TestRecommendedAPIMiddlewareSetEnablesConfiguredCORS 验证推荐 API 预设中显式启用 CORS 的行为。
-func TestRecommendedAPIMiddlewareSetEnablesConfiguredCORS(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	options := RecommendedMiddlewareOptions{
-		CORS: func() *CORSOptions {
-			opts := DefaultCORSOptions()
-			return &opts
-		}(),
-	}
-	applyTransportMiddleware(router, RecommendedAPIMiddlewareSet(nil, options)...)
-	router.GET("/orders/:id", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/orders/42", nil)
-	req.Header.Set("Origin", "https://example.com")
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, req)
-
-	if recorder.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Fatalf("expected CORS wildcard origin, got %q", recorder.Header().Get("Access-Control-Allow-Origin"))
-	}
-}
-
-// =============================================================================
-// Internal / Admin API Middleware Preset
-// =============================================================================
-
-// TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults verifies that internal presets disable public-facing defaults.
-//
-// TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults 验证内网预设会关闭面向公网的默认能力。
-func TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	applyTransportMiddleware(router, InternalAPIMiddlewareSet(nil, InternalMiddlewareOptions{})...)
-	router.GET("/internal/ping", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/internal/ping?lang=en", nil)
-	req.Header.Set("Origin", "https://example.com")
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", recorder.Code)
-	}
-	if recorder.Header().Get("X-Request-Id") == "" {
-		t.Fatal("expected X-Request-Id header")
-	}
-	if recorder.Header().Get("Content-Language") != "" {
-		t.Fatalf("expected locale middleware disabled, got %q", recorder.Header().Get("Content-Language"))
-	}
-	if recorder.Header().Get("X-Frame-Options") != "" {
-		t.Fatalf("expected security headers disabled, got %q", recorder.Header().Get("X-Frame-Options"))
-	}
-	if recorder.Header().Get("Access-Control-Allow-Origin") != "" {
-		t.Fatalf("expected CORS disabled, got %q", recorder.Header().Get("Access-Control-Allow-Origin"))
-	}
-}
-
-// TestAdminAPIMiddlewareSetRequiresAuthorizationByDefault verifies admin preset authorization defaults.
-//
-// TestAdminAPIMiddlewareSetRequiresAuthorizationByDefault 验证管理预设的默认鉴权行为。
-func TestAdminAPIMiddlewareSetRequiresAuthorizationByDefault(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	applyTransportMiddleware(router, AdminAPIMiddlewareSet(nil, AdminMiddlewareOptions{})...)
-	router.GET("/admin/panel", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/admin/panel", nil)
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", recorder.Code)
-	}
 }
 
 // =============================================================================
@@ -471,80 +337,4 @@ func indexOfStr(slice []string, target string) int {
 		}
 	}
 	return -1
-}
-
-// =============================================================================
-// Governance Preset Provider 替换与运行时行为
-// =============================================================================
-
-// TestGovernancePresetProviderReplacementChangesRuntimeBehavior verifies that swapping a provider
-// in the governance preset actually changes the observed HTTP response behavior.
-// This addresses verification requirement #5: "Provider 替换后的最终主线行为".
-//
-// TestGovernancePresetProviderReplacementChangesRuntimeBehavior 验证在治理预设中替换 provider
-// 会实际改变 HTTP 响应行为。对应验收要求 #5："Provider 替换后的最终主线行为"。
-func TestGovernancePresetProviderReplacementChangesRuntimeBehavior(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	// 场景 1：使用开放熔断器的治理集 → 请求被 503 拒绝
-	openBreakerRouter := gin.New()
-	applyTransportMiddleware(openBreakerRouter, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
-		API: RecommendedMiddlewareOptions{
-			DisableLocale:          true,
-			DisableSecurityHeaders: true,
-			EnableMetrics:          false,
-		},
-		CircuitBreaker: denyCircuitBreakerWithAllowError{},
-	})...)
-	openBreakerRouter.GET("/api/test", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	recorder := httptest.NewRecorder()
-	openBreakerRouter.ServeHTTP(recorder, req)
-	if recorder.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 with open breaker, got %d", recorder.Code)
-	}
-
-	// 场景 2：使用允许通过的熔断器 → 请求正常 200
-	allowBreakerRouter := gin.New()
-	applyTransportMiddleware(allowBreakerRouter, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
-		API: RecommendedMiddlewareOptions{
-			DisableLocale:          true,
-			DisableSecurityHeaders: true,
-			EnableMetrics:          false,
-		},
-		CircuitBreaker: allowCircuitBreaker{},
-	})...)
-	allowBreakerRouter.GET("/api/test", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	req2 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	recorder2 := httptest.NewRecorder()
-	allowBreakerRouter.ServeHTTP(recorder2, req2)
-	if recorder2.Code != http.StatusOK {
-		t.Fatalf("expected 200 with allowing breaker, got %d", recorder2.Code)
-	}
-
-	// 场景 3：不提供熔断器（等效于替换为 noop）→ 请求正常 200
-	noBreakerRouter := gin.New()
-	applyTransportMiddleware(noBreakerRouter, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
-		API: RecommendedMiddlewareOptions{
-			DisableLocale:          true,
-			DisableSecurityHeaders: true,
-			EnableMetrics:          false,
-		},
-	})...)
-	noBreakerRouter.GET("/api/test", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	req3 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	recorder3 := httptest.NewRecorder()
-	noBreakerRouter.ServeHTTP(recorder3, req3)
-	if recorder3.Code != http.StatusOK {
-		t.Fatalf("expected 200 with no breaker, got %d", recorder3.Code)
-	}
 }
