@@ -227,11 +227,11 @@ func (c *officialPolarisRegistryClient) ensureClients(cfg *PolarisConfig) (polar
 func splitHostPort(addr string) (string, int, error) {
 	host, portString, err := net.SplitHostPort(addr)
 	if err != nil {
-		return "", 0, fmt.Errorf("polaris: invalid address %q: %w", addr, err)
+		return "", 0, fmt.Errorf("registry.polaris: invalid address %q: %w", addr, err)
 	}
 	port, err := net.LookupPort("tcp", portString)
 	if err != nil {
-		return "", 0, fmt.Errorf("polaris: invalid port %q: %w", portString, err)
+		return "", 0, fmt.Errorf("registry.polaris: invalid port %q: %w", portString, err)
 	}
 	return host, port, nil
 }
@@ -292,7 +292,7 @@ func normalizeRegistryPolarisAddresses(raw string) ([]string, error) {
 		if strings.Contains(candidate, "://") {
 			parsed, err := url.Parse(candidate)
 			if err != nil {
-				return nil, fmt.Errorf("polaris: invalid address: %w", err)
+				return nil, fmt.Errorf("registry.polaris: invalid address: %w", err)
 			}
 			if parsed.Host != "" {
 				candidate = parsed.Host
@@ -322,7 +322,7 @@ func translatePolarisRegistryError(err error) error {
 		strings.Contains(message, "timeout"),
 		strings.Contains(message, "no such host"),
 		strings.Contains(message, "unavailable"):
-		return fmt.Errorf("polaris: source unavailable: %w", err)
+		return fmt.Errorf("registry.polaris: source unavailable: %w", err)
 	default:
 		return err
 	}

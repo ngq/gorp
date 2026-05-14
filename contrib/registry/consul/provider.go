@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/ngq/gorp/contrib/internal/baseregistry"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -18,32 +19,22 @@ import (
 )
 
 // Provider 提供 Consul 服务发现实现。
-//
-// 中文说明：
-// - 使用 Consul Agent API 实现服务注册与发现；
-// - 支持健康检查（HTTP/TCP/gRPC）；
-// - 支持服务元数据（版本、权重等）；
-// - 当前已从 framework/provider 真实下沉到 contrib 层。
-type Provider struct{}
-
-func NewProvider() *Provider { return &Provider{} }
-
-func (p *Provider) Name() string       { return "registry.consul" }
-func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{transportcontract.RPCRegistryKey} }
-
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getDiscoveryConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return NewRegistry(cfg)
-	}, true)
-	return nil
+type Provider struct {
+	baseregistry.BaseRegistryProvider
 }
 
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
+// NewProvider creates a new Consul registry provider.
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "registry.consul"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getDiscoveryConfig(c)
+	}
+	p.NewRegistry = func(cfg any) (transportcontract.ServiceRegistry, error) {
+		return NewRegistry(cfg.(*DiscoveryConfig))
+	}
+	return p
+}
 
 // DiscoveryConfig 定义服务发现配置。
 type DiscoveryConfig struct {
@@ -61,15 +52,10 @@ type DiscoveryConfig struct {
 	LoadBalance   string
 }
 
-// getDiscoveryConfig 从容器获取服务发现配置。
 func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
-	cfgAny, err := c.Make(datacontract.ConfigKey)
+	cfg, err := readConfig(c)
 	if err != nil {
 		return nil, err
-	}
-	cfg, ok := cfgAny.(datacontract.Config)
-	if !ok {
-		return nil, errors.New("discovery: invalid config service")
 	}
 
 	discCfg := &DiscoveryConfig{
@@ -92,25 +78,13 @@ func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
 	); token != "" {
 		discCfg.ConsulToken = token
 	}
-	if name := configprovider.GetStringAny(cfg,
-		"discovery.service.name",
-		"discovery.service_name",
-	); name != "" {
-		discCfg.ServiceName = name
-	}
-	if addr := configprovider.GetStringAny(cfg,
-		"discovery.service.addr",
-		"discovery.service.address",
-		"discovery.service_addr",
-	); addr != "" {
-		discCfg.ServiceAddr = addr
-	}
-	if port := configprovider.GetIntAny(cfg,
-		"discovery.service.port",
-		"discovery.service_port",
-	); port > 0 {
-		discCfg.ServicePort = port
-	}
+
+	sc := baseregistry.ReadServiceConfig(cfg)
+	discCfg.ServiceName = sc.ServiceName
+	discCfg.ServiceAddr = sc.ServiceAddr
+	discCfg.ServicePort = sc.ServicePort
+	discCfg.LoadBalance = sc.LoadBalance
+
 	if interval := configprovider.GetStringAny(cfg,
 		"discovery.check.interval",
 		"discovery.check_interval",
@@ -141,16 +115,21 @@ func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
 	); grpc != "" {
 		discCfg.CheckGRPC = grpc
 	}
-	if lb := configprovider.GetStringAny(cfg,
-		"selector.algorithm",
-		"discovery.load_balance",
-	); lb != "" {
-		discCfg.LoadBalance = lb
-	}
 	return discCfg, nil
 }
 
-// Registry 是 Consul 服务发现实现。
+func readConfig(c runtimecontract.Container) (datacontract.Config, error) {
+	cfgAny, err := c.Make(datacontract.ConfigKey)
+	if err != nil {
+		return nil, err
+	}
+	cfg, ok := cfgAny.(datacontract.Config)
+	if !ok {
+		return nil, errors.New("discovery: invalid config service")
+	}
+	return cfg, nil
+}
+
 type Registry struct {
 	cfg        *DiscoveryConfig
 	client     *api.Client
@@ -160,7 +139,6 @@ type Registry struct {
 	closed     bool
 }
 
-// NewRegistry 创建 Consul 服务发现实例。
 func NewRegistry(cfg *DiscoveryConfig) (*Registry, error) {
 	consulCfg := api.DefaultConfig()
 	if cfg.ConsulAddr != "" {
@@ -171,17 +149,16 @@ func NewRegistry(cfg *DiscoveryConfig) (*Registry, error) {
 	}
 	client, err := api.NewClient(consulCfg)
 	if err != nil {
-		return nil, fmt.Errorf("discovery.consul: create client failed: %w", err)
+		return nil, fmt.Errorf("registry.consul: create client failed: %w", err)
 	}
 	return &Registry{cfg: cfg, client: client, agent: client.Agent()}, nil
 }
 
-// Register 注册服务实例。
 func (r *Registry) Register(ctx context.Context, name, addr string, meta map[string]string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed {
-		return errors.New("discovery.consul: registry closed")
+		return errors.New("registry.consul: registry closed")
 	}
 
 	host, port := parseAddr(addr)
@@ -207,13 +184,12 @@ func (r *Registry) Register(ctx context.Context, name, addr string, meta map[str
 		Check:   r.buildHealthCheck(serviceID, host, port),
 	}
 	if err := r.agent.ServiceRegister(registration); err != nil {
-		return fmt.Errorf("discovery.consul: register service failed: %w", err)
+		return fmt.Errorf("registry.consul: register service failed: %w", err)
 	}
 	r.registered.Store(serviceID, name)
 	return nil
 }
 
-// Deregister 注销服务实例。
 func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -223,17 +199,16 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	}
 	serviceID := generateServiceID(name, host, port)
 	if err := r.agent.ServiceDeregister(serviceID); err != nil {
-		return fmt.Errorf("discovery.consul: deregister service failed: %w", err)
+		return fmt.Errorf("registry.consul: deregister service failed: %w", err)
 	}
 	r.registered.Delete(serviceID)
 	return nil
 }
 
-// Discover 发现服务实例。
 func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontract.ServiceInstance, error) {
 	services, _, err := r.client.Health().Service(name, "", true, nil)
 	if err != nil {
-		return nil, fmt.Errorf("discovery.consul: discover service failed: %w", err)
+		return nil, fmt.Errorf("registry.consul: discover service failed: %w", err)
 	}
 	instances := make([]transportcontract.ServiceInstance, 0, len(services))
 	for _, service := range services {
@@ -268,7 +243,6 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontra
 	return instances, nil
 }
 
-// Close 关闭服务发现连接。
 func (r *Registry) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

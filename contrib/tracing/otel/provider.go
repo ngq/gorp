@@ -41,19 +41,21 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		if err != nil {
 			return nil, err
 		}
-		return NewTracerProvider(cfg)
+		tp, err := NewTracerProvider(cfg)
+		if err != nil {
+			return nil, err
+		}
+		c.RegisterCloser(observabilitycontract.TracerProviderKey, &tracerProviderCloser{provider: tp})
+		return tp, nil
 	}, true)
 
 	c.Bind(observabilitycontract.TracerKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getTracingConfig(c)
+		tpAny, err := c.Make(observabilitycontract.TracerProviderKey)
 		if err != nil {
 			return nil, err
 		}
-		provider, err := NewTracerProvider(cfg)
-		if err != nil {
-			return nil, err
-		}
-		return NewTracer(provider, cfg), nil
+		tp := tpAny.(*TracerProviderWrapper)
+		return NewTracer(tp, tp.cfg), nil
 	}, true)
 
 	return nil
@@ -68,7 +70,7 @@ func getTracingConfig(c runtimecontract.Container) (*observabilitycontract.Traci
 	}
 	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return nil, errors.New("tracing: invalid config service")
+		return nil, errors.New("tracing.otel: invalid config service")
 	}
 
 	tracingCfg := &observabilitycontract.TracingConfig{
@@ -127,7 +129,7 @@ func NewTracerProvider(cfg *observabilitycontract.TracingConfig) (*TracerProvide
 	}
 	exporter, err := createExporter(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("tracing: create exporter failed: %w", err)
+		return nil, fmt.Errorf("tracing.otel: create exporter failed: %w", err)
 	}
 	res := createResource(cfg)
 	sampler := createSampler(cfg.SamplingRate)
@@ -156,6 +158,17 @@ func (p *TracerProviderWrapper) Tracer(name string, options ...observabilitycont
 	}
 	tracer := p.provider.Tracer(name, opts...)
 	return &TracerWrapper{tracer: tracer, cfg: p.cfg}
+}
+
+// tracerProviderCloser wraps TracerProviderWrapper.Shutdown as io.Closer for Destroy lifecycle.
+type tracerProviderCloser struct {
+	provider *TracerProviderWrapper
+}
+
+func (c *tracerProviderCloser) Close() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.provider.Shutdown(ctx)
 }
 
 func (p *TracerProviderWrapper) Shutdown(ctx context.Context) error {

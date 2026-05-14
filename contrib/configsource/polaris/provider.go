@@ -6,70 +6,32 @@
 package polaris
 
 import (
-	"errors"
 	"time"
 
+	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供 Polaris 配置中心实现。
-//
-// 中文说明：
-//   - 使用腾讯云 Polaris 配置中心；
-//   - 支持命名空间隔离；
-//   - 支持配置分组管理；
-//   - 支持配置热更新；
-//   - 适用于腾讯云环境和私有化部署。
-//   - 当前状态：部分可用
-//   - 说明：已完成 P2 第一版最小 HTTP 配置闭环，具备 Load / Watch 与 fake client 行为测试；
-//     但当前仍是轮询桥接态，尚未进入完整 Polaris SDK 产品化能力。
-type Provider struct{}
+type Provider struct {
+	baseconfigsource.BaseConfigSourceProvider
+}
 
 // NewProvider creates a new Polaris provider instance.
-//
-// NewProvider 创建新的 Polaris provider 实例。
-func NewProvider() *Provider { return &Provider{} }
-
-// Name returns the provider identifier "configsource.polaris".
-//
-// Name 返回 provider 标识符 "configsource.polaris"。
-func (p *Provider) Name() string { return "configsource.polaris" }
-
-// IsDefer returns true for lazy initialization.
-//
-// IsDefer 返回 true，延迟初始化。
-func (p *Provider) IsDefer() bool { return true }
-
-// Provides returns the contract keys this provider satisfies.
-//
-// Provides 返回此 provider 满足的契约键。
-func (p *Provider) Provides() []string {
-	return []string{datacontract.ConfigSourceKey}
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "configsource.polaris"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getPolarisConfig(c)
+	}
+	p.NewSource = func(cfg any) (datacontract.ConfigSource, error) {
+		return NewConfigSource(cfg.(*PolarisConfig))
+	}
+	return p
 }
-
-// Register binds the Polaris config source to the container.
-//
-// Register 将 Polaris 配置源绑定到容器。
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getPolarisConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return NewConfigSource(cfg)
-	}, true)
-	return nil
-}
-
-// Boot does nothing for lazy providers.
-//
-// Boot 延迟 provider 不需要 boot 操作。
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 // defaultPolarisPollInterval is the default polling interval for config updates.
-//
-// defaultPolarisPollInterval 是配置更新的默认轮询间隔。
 const defaultPolarisPollInterval = 5 * time.Second
 
 // PolarisConfig 定义 Polaris 配置。
@@ -84,17 +46,16 @@ type PolarisConfig struct {
 }
 
 // getPolarisConfig extracts Polaris configuration from the container's config binding.
+// Uses GetStringFallback with configsource.polaris.* as primary path and
+// config.polaris.* as fallback, unifying with other ConfigSource providers.
 //
 // getPolarisConfig 从容器的 config binding 中提取 Polaris 配置。
+// 使用 GetStringFallback，以 configsource.polaris.* 为主路径，
+// config.polaris.* 为回退路径，与其他 ConfigSource provider 统一。
 func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
-	cfgAny, err := c.Make(datacontract.ConfigKey)
+	cfg, err := baseconfigsource.ReadConfig(c)
 	if err != nil {
 		return nil, err
-	}
-
-	cfg, ok := cfgAny.(datacontract.Config)
-	if !ok {
-		return nil, errors.New("polaris: invalid config service")
 	}
 
 	polarisCfg := &PolarisConfig{
@@ -103,30 +64,20 @@ func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
 		WatchRetryInterval: time.Second,
 	}
 
-	if v := cfg.Get("config.polaris.server_address"); v != nil {
-		polarisCfg.ServerAddress = cfg.GetString("config.polaris.server_address")
+	polarisCfg.ServerAddress = baseconfigsource.GetStringFallback(cfg, "polaris", "server_address")
+	polarisCfg.Namespace = baseconfigsource.GetStringFallback(cfg, "polaris", "namespace")
+	if polarisCfg.Namespace == "" {
+		polarisCfg.Namespace = "default"
 	}
-	if v := cfg.Get("config.polaris.namespace"); v != nil {
-		polarisCfg.Namespace = cfg.GetString("config.polaris.namespace")
+	polarisCfg.FileGroup = baseconfigsource.GetStringFallback(cfg, "polaris", "file_group")
+	polarisCfg.FileName = baseconfigsource.GetStringFallback(cfg, "polaris", "file_name")
+	polarisCfg.Token = baseconfigsource.GetStringFallback(cfg, "polaris", "token")
+
+	if d := baseconfigsource.GetDurationSecondsFallback(cfg, "polaris", "poll_interval_seconds"); d > 0 {
+		polarisCfg.PollInterval = d
 	}
-	if v := cfg.Get("config.polaris.file_group"); v != nil {
-		polarisCfg.FileGroup = cfg.GetString("config.polaris.file_group")
-	}
-	if v := cfg.Get("config.polaris.file_name"); v != nil {
-		polarisCfg.FileName = cfg.GetString("config.polaris.file_name")
-	}
-	if v := cfg.Get("config.polaris.token"); v != nil {
-		polarisCfg.Token = cfg.GetString("config.polaris.token")
-	}
-	if v := cfg.Get("config.polaris.poll_interval_seconds"); v != nil {
-		if seconds := cfg.GetInt("config.polaris.poll_interval_seconds"); seconds > 0 {
-			polarisCfg.PollInterval = time.Duration(seconds) * time.Second
-		}
-	}
-	if v := cfg.Get("config.polaris.watch_retry_interval_ms"); v != nil {
-		if ms := cfg.GetInt("config.polaris.watch_retry_interval_ms"); ms > 0 {
-			polarisCfg.WatchRetryInterval = time.Duration(ms) * time.Millisecond
-		}
+	if d := baseconfigsource.GetDurationMillisFallback(cfg, "polaris", "watch_retry_interval_ms"); d > 0 {
+		polarisCfg.WatchRetryInterval = d
 	}
 
 	return polarisCfg, nil

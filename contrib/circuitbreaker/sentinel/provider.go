@@ -64,7 +64,7 @@ func getCircuitBreakerConfig(c runtimecontract.Container) (*resiliencecontract.C
 	}
 	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return nil, errors.New("circuitbreaker: invalid config service")
+		return nil, errors.New("circuitbreaker.sentinel: invalid config service")
 	}
 
 	enabled := true
@@ -155,6 +155,7 @@ func buildCircuitBreakerRule(resource string, current resiliencecontract.Resourc
 }
 
 type resourceState struct {
+	mu           sync.Mutex
 	state        resiliencecontract.CircuitBreakerState
 	lastChanged  time.Time
 	lastFailure  error
@@ -175,7 +176,7 @@ func (cb *SentinelCircuitBreaker) Allow(ctx context.Context, resource string) er
 	entry, blockErr := sentinelEntry(resource)
 	if blockErr != nil {
 		cb.markOpen(resource, blockErr)
-		return fmt.Errorf("circuitbreaker: request blocked: %w", blockErr)
+		return fmt.Errorf("circuitbreaker.sentinel: request blocked: %w", blockErr)
 	}
 	entry.Exit()
 	cb.markHalfOpenIfRecovered(resource)
@@ -184,25 +185,29 @@ func (cb *SentinelCircuitBreaker) Allow(ctx context.Context, resource string) er
 
 func (cb *SentinelCircuitBreaker) RecordSuccess(ctx context.Context, resource string) {
 	state := cb.loadState(resource)
+	state.mu.Lock()
 	state.successCount++
 	state.lastFailure = nil
 	state.state = resiliencecontract.CircuitBreakerStateClosed
 	state.lastChanged = time.Now()
+	state.mu.Unlock()
 }
 
 func (cb *SentinelCircuitBreaker) RecordFailure(ctx context.Context, resource string, err error) {
 	state := cb.loadState(resource)
+	state.mu.Lock()
 	state.failureCount++
 	state.lastFailure = err
 	state.state = resiliencecontract.CircuitBreakerStateOpen
 	state.lastChanged = time.Now()
+	state.mu.Unlock()
 }
 
 func (cb *SentinelCircuitBreaker) Do(ctx context.Context, resource string, fn func() error) error {
 	entry, blockErr := sentinelEntry(resource)
 	if blockErr != nil {
 		cb.markOpen(resource, blockErr)
-		return fmt.Errorf("circuitbreaker: request blocked: %w", blockErr)
+		return fmt.Errorf("circuitbreaker.sentinel: request blocked: %w", blockErr)
 	}
 	defer entry.Exit()
 
@@ -219,10 +224,15 @@ func (cb *SentinelCircuitBreaker) Do(ctx context.Context, resource string, fn fu
 
 func (cb *SentinelCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
 	state := cb.loadState(resource)
-	if state.state == resiliencecontract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
+	state.mu.Lock()
+	result := state.state
+	if result == resiliencecontract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
 		state.state = resiliencecontract.CircuitBreakerStateHalfOpen
+		result = resiliencecontract.CircuitBreakerStateHalfOpen
+		state.lastChanged = time.Now()
 	}
-	return state.state
+	state.mu.Unlock()
+	return result
 }
 
 func (cb *SentinelCircuitBreaker) loadState(resource string) *resourceState {
@@ -233,6 +243,7 @@ func (cb *SentinelCircuitBreaker) loadState(resource string) *resourceState {
 	return actual.(*resourceState)
 }
 
+// shouldHalfOpen must be called with state.mu held.
 func (cb *SentinelCircuitBreaker) shouldHalfOpen(state *resourceState) bool {
 	timeout := cb.cfg.DefaultConfig.Timeout
 	if timeout <= 0 {
@@ -243,17 +254,21 @@ func (cb *SentinelCircuitBreaker) shouldHalfOpen(state *resourceState) bool {
 
 func (cb *SentinelCircuitBreaker) markOpen(resource string, err error) {
 	state := cb.loadState(resource)
+	state.mu.Lock()
 	state.state = resiliencecontract.CircuitBreakerStateOpen
 	state.lastFailure = err
 	state.lastChanged = time.Now()
+	state.mu.Unlock()
 }
 
 func (cb *SentinelCircuitBreaker) markHalfOpenIfRecovered(resource string) {
 	state := cb.loadState(resource)
+	state.mu.Lock()
 	if state.state == resiliencecontract.CircuitBreakerStateOpen && cb.shouldHalfOpen(state) {
 		state.state = resiliencecontract.CircuitBreakerStateHalfOpen
 		state.lastChanged = time.Now()
 	}
+	state.mu.Unlock()
 }
 
 func (cb *SentinelCircuitBreaker) Underlying() any {
@@ -275,7 +290,7 @@ func NewSentinelRateLimiter(cfg *resiliencecontract.CircuitBreakerConfig) *Senti
 func (rl *SentinelRateLimiter) Allow(ctx context.Context, resource string) error {
 	entry, blockErr := sentinelEntry(resource)
 	if blockErr != nil {
-		return fmt.Errorf("ratelimiter: request blocked: %w", blockErr)
+		return fmt.Errorf("circuitbreaker.sentinel: request blocked: %w", blockErr)
 	}
 	entry.Exit()
 	return nil

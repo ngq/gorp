@@ -12,7 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -23,15 +23,15 @@ import (
 //
 // JWTService 使用 HS256 算法实现 securitycontract.JWTService 接口。
 type JWTService struct {
-	secret   string // secret is the signing secret.
-	               //
-	                // secret 签名密钥。
-	issuer   string // issuer is the JWT issuer.
-	               //
-	                // issuer JWT 发行者。
+	secret string // secret is the signing secret.
+	//
+	// secret 签名密钥。
+	issuer string // issuer is the JWT issuer.
+	//
+	// issuer JWT 发行者。
 	audience string // audience is the JWT audience.
-	               //
-	                // audience JWT 受众。
+	//
+	// audience JWT 受众。
 }
 
 // NewJWTService creates a new JWT service instance.
@@ -53,7 +53,7 @@ func NewJWTService(secret, issuer, audience string) *JWTService {
 //	token, err := jwtSvc.Sign(claims)
 func (s *JWTService) Sign(claims securitycontract.JWTClaims) (string, error) {
 	if s.secret == "" {
-		return "", fmt.Errorf("jwt secret is required")
+		return "", errors.New("jwt secret is required")
 	}
 	headerJSON, err := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT"})
 	if err != nil {
@@ -83,35 +83,35 @@ func (s *JWTService) Sign(claims securitycontract.JWTClaims) (string, error) {
 // token 无效、签名不匹配或过期时返回错误。
 func (s *JWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
 	if s.secret == "" {
-		return nil, fmt.Errorf("jwt secret is required")
+		return nil, errors.New("jwt secret is required")
 	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	signingInput := parts[0] + "." + parts[1]
 	h := hmac.New(sha256.New, []byte(s.secret))
 	if _, err := h.Write([]byte(signingInput)); err != nil {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	expectedSig := h.Sum(nil)
 	gotSig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	if !hmac.Equal(gotSig, expectedSig) {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	var claims securitycontract.JWTClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	if claims.SubjectID == 0 || time.Now().Unix() >= claims.ExpiresAt {
-		return nil, fmt.Errorf("invalid token")
+		return nil, errors.New("invalid token")
 	}
 	return &claims, nil
 }

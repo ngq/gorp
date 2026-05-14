@@ -63,7 +63,7 @@ func newOfficialNacosClient(cfg *NacosConfig) (nacosConfigClient, error) {
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("nacos: create config client failed: %w", err)
+		return nil, fmt.Errorf("configsource.nacos: create config client failed: %w", err)
 	}
 
 	return &sdkNacosClient{client: client}, nil
@@ -126,7 +126,7 @@ func (c *sdkNacosClient) PublishConfig(ctx context.Context, cfg *NacosConfig, co
 			return translateNacosError("publish config", res.err)
 		}
 		if !res.ok {
-			return errors.New("nacos: publish config failed")
+			return errors.New("configsource.nacos: publish config failed")
 		}
 		return nil
 	}
@@ -228,7 +228,7 @@ func translateNacosError(action string, err error) error {
 		strings.Contains(message, "404"):
 		return ErrConfigNotFound
 	default:
-		return fmt.Errorf("nacos: %s failed: %w", action, err)
+		return fmt.Errorf("configsource.nacos: %s failed: %w", action, err)
 	}
 }
 

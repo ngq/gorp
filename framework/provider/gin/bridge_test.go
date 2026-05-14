@@ -7,6 +7,7 @@ package gin
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -214,19 +215,27 @@ func TestMixedGinAndAbstractMiddleware(t *testing.T) {
 // mockContainer 实现 runtimecontract.Container 的最小子集。
 type mockContainer struct{}
 
-func (m *mockContainer) IsBind(string) bool                                     { return false }
-func (m *mockContainer) Make(string) (any, error)                               { return nil, nil }
-func (m *mockContainer) MustMake(string) any                                    { return nil }
-func (m *mockContainer) Bind(string, runtimecontract.Factory, bool)             {}
+func (m *mockContainer) IsBind(string) bool                                      { return false }
+func (m *mockContainer) IsBindNamed(string, string) bool                         { return false }
+func (m *mockContainer) Make(string) (any, error)                                { return nil, nil }
+func (m *mockContainer) MakeNamed(string, string) (any, error)                   { return nil, nil }
+func (m *mockContainer) MustMake(string) any                                     { return nil }
+func (m *mockContainer) MustMakeNamed(string, string) any                        { return nil }
+func (m *mockContainer) Bind(string, runtimecontract.Factory, bool)              {}
+func (m *mockContainer) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (m *mockContainer) RegisterCloser(string, io.Closer)                        {}
+func (m *mockContainer) Destroy() error                                          { return nil }
 func (m *mockContainer) RegisterProvider(runtimecontract.ServiceProvider) error  { return nil }
 func (m *mockContainer) RegisterProviders(...runtimecontract.ServiceProvider) error {
 	return nil
 }
+func (m *mockContainer) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
+func (m *mockContainer) DebugPrint() string                                  { return "" }
 
 // nonGinHTTPService 模拟不实现 GINEngineProvider 的 HTTP 服务。
 type nonGinHTTPService struct{}
 
-func (n *nonGinHTTPService) Router() transportcontract.HTTPRouter    { return nil }
-func (n *nonGinHTTPService) Server() *http.Server                    { return nil }
-func (n *nonGinHTTPService) Run() error                              { return nil }
-func (n *nonGinHTTPService) Shutdown(ctx context.Context) error      { return nil }
+func (n *nonGinHTTPService) Router() transportcontract.HTTPRouter { return nil }
+func (n *nonGinHTTPService) Server() *http.Server                 { return nil }
+func (n *nonGinHTTPService) Run() error                           { return nil }
+func (n *nonGinHTTPService) Shutdown(ctx context.Context) error   { return nil }

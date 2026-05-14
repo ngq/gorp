@@ -107,13 +107,13 @@ func (c *httpEurekaClient) Register(ctx context.Context, cfg *EurekaConfig, name
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("eureka: register failed: %w", err)
+		return fmt.Errorf("registry.eureka: register failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Eureka 注册成功返回 204 No Content 或 201 Created 或 200 OK
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("eureka: register failed with status %d", resp.StatusCode)
+		return fmt.Errorf("registry.eureka: register failed with status %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -138,7 +138,7 @@ func (c *httpEurekaClient) Deregister(ctx context.Context, cfg *EurekaConfig, na
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("eureka: deregister failed: %w", err)
+		return fmt.Errorf("registry.eureka: deregister failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -146,7 +146,7 @@ func (c *httpEurekaClient) Deregister(ctx context.Context, cfg *EurekaConfig, na
 		return ErrServiceNotFound
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("eureka: deregister failed with status %d", resp.StatusCode)
+		return fmt.Errorf("registry.eureka: deregister failed with status %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -171,7 +171,7 @@ func (c *httpEurekaClient) Heartbeat(ctx context.Context, cfg *EurekaConfig, nam
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("eureka: heartbeat failed: %w", err)
+		return fmt.Errorf("registry.eureka: heartbeat failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -179,7 +179,7 @@ func (c *httpEurekaClient) Heartbeat(ctx context.Context, cfg *EurekaConfig, nam
 		return ErrServiceNotFound
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("eureka: heartbeat failed with status %d", resp.StatusCode)
+		return fmt.Errorf("registry.eureka: heartbeat failed with status %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ func (c *httpEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("eureka: discover failed: %w", err)
+		return nil, fmt.Errorf("registry.eureka: discover failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -210,17 +210,17 @@ func (c *httpEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name
 		return nil, ErrServiceNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("eureka: discover failed with status %d", resp.StatusCode)
+		return nil, fmt.Errorf("registry.eureka: discover failed with status %d", resp.StatusCode)
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("eureka: read discover response failed: %w", err)
+		return nil, fmt.Errorf("registry.eureka: read discover response failed: %w", err)
 	}
 
 	var payload eurekaDiscoverResponse
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, fmt.Errorf("eureka: decode discover response failed: %w", err)
+		return nil, fmt.Errorf("registry.eureka: decode discover response failed: %w", err)
 	}
 
 	instances := payload.Application.Instance

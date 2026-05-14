@@ -122,11 +122,15 @@ func (s *kafkaSubscriber) wrapConsumerGroup(ctx context.Context, group sarama.Co
 // Kafka does not support direct queue consumption, use SubscribeWithGroup instead.
 // Returns error indicating unsupported operation.
 //
+// ErrConsumeNotSupported is returned when Consume is called on Kafka subscriber.
+// Kafka does not support direct queue consumption, use SubscribeWithGroup instead.
+var ErrConsumeNotSupported = errors.New("messagequeue.kafka: Consume not supported, use SubscribeWithGroup instead")
+
 // Consume 从 topic（作为 queue）消费消息。
 // Kafka 不支持直接 queue 消费，应使用 SubscribeWithGroup。
 // 返回错误表示不支持此操作。
 func (s *kafkaSubscriber) Consume(ctx context.Context, queue string, handler integrationcontract.MessageHandler) error {
-	return fmt.Errorf("messagequeue.kafka: Consume not supported, use SubscribeWithGroup instead")
+	return ErrConsumeNotSupported
 }
 
 // Unsubscribe closes all consumer groups.

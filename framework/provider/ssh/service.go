@@ -8,6 +8,7 @@
 package ssh
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -56,7 +57,7 @@ type clientHandle struct {
 
 func (c *clientHandle) NewSession() (integrationcontract.SSHSession, error) {
 	if c == nil || c.raw == nil {
-		return nil, fmt.Errorf("ssh client is nil")
+		return nil, errors.New("ssh client is nil")
 	}
 	session, err := c.raw.NewSession()
 	if err != nil {
@@ -85,14 +86,14 @@ type sessionHandle struct {
 
 func (s *sessionHandle) CombinedOutput(cmd string) ([]byte, error) {
 	if s == nil || s.raw == nil {
-		return nil, fmt.Errorf("ssh session is nil")
+		return nil, errors.New("ssh session is nil")
 	}
 	return s.raw.CombinedOutput(cmd)
 }
 
 func (s *sessionHandle) Run(cmd string) error {
 	if s == nil || s.raw == nil {
-		return fmt.Errorf("ssh session is nil")
+		return errors.New("ssh session is nil")
 	}
 	return s.raw.Run(cmd)
 }
@@ -121,7 +122,7 @@ func NewService(c runtimecontract.Container) (*Service, error) {
 func (s *Service) Client(hostName string) (integrationcontract.SSHClient, error) {
 	hostName = strings.TrimSpace(hostName)
 	if hostName == "" {
-		return nil, fmt.Errorf("ssh hostName is required")
+		return nil, errors.New("ssh hostName is required")
 	}
 
 	s.mu.Lock()
@@ -211,7 +212,7 @@ func dial(h hostConfig, timeout time.Duration) (*ssh.Client, error) {
 		auth = append(auth, ssh.PublicKeys(signer))
 	}
 	if len(auth) == 0 {
-		return nil, fmt.Errorf("ssh auth not configured: need password or key_path")
+		return nil, errors.New("ssh auth not configured: need password or key_path")
 	}
 
 	cb := ssh.InsecureIgnoreHostKey()

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -28,31 +29,28 @@ const (
 )
 
 var (
-	ErrConfigMapNameRequired = errors.New("kubernetes: configmap_name is required")
-	ErrSetNotSupported       = errors.New("kubernetes: set is not supported")
-	ErrConfigMapNotFound     = errors.New("kubernetes: configmap not found")
-	ErrNotInCluster          = errors.New("kubernetes: not in cluster, please provide api_server or kubeconfig_path")
-	ErrConfigSourceClosed    = errors.New("kubernetes: config source closed")
+	ErrConfigMapNameRequired = errors.New("configsource.kubernetes: configmap_name is required")
+	ErrSetNotSupported       = errors.New("configsource.kubernetes: set is not supported")
+	ErrConfigMapNotFound     = errors.New("configsource.kubernetes: configmap not found")
+	ErrNotInCluster          = errors.New("configsource.kubernetes: not in cluster, please provide api_server or kubeconfig_path")
+	ErrConfigSourceClosed    = errors.New("configsource.kubernetes: config source closed")
 )
 
 // Provider 提供 Kubernetes ConfigMap 配置源实现。
-type Provider struct{}
+type Provider struct {
+	baseconfigsource.BaseConfigSourceProvider
+}
 
-func NewProvider() *Provider                               { return &Provider{} }
-func (p *Provider) Name() string                           { return "configsource.kubernetes" }
-func (p *Provider) IsDefer() bool                          { return true }
-func (p *Provider) Provides() []string                     { return []string{datacontract.ConfigSourceKey} }
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
-
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getKubernetesConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return NewConfigSource(cfg)
-	}, true)
-	return nil
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "configsource.kubernetes"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getKubernetesConfig(c)
+	}
+	p.NewSource = func(cfg any) (datacontract.ConfigSource, error) {
+		return NewConfigSource(cfg.(*KubernetesConfig))
+	}
+	return p
 }
 
 type KubernetesConfig struct {
@@ -70,14 +68,9 @@ type KubernetesConfig struct {
 }
 
 func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error) {
-	cfgAny, err := c.Make(datacontract.ConfigKey)
+	cfg, err := baseconfigsource.ReadConfig(c)
 	if err != nil {
 		return nil, err
-	}
-
-	cfg, ok := cfgAny.(datacontract.Config)
-	if !ok {
-		return nil, errors.New("kubernetes: invalid config service")
 	}
 
 	k8sCfg := &KubernetesConfig{
@@ -87,40 +80,27 @@ func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error)
 		PollInterval: defaultKubernetesConfigPoll,
 	}
 
-	if v := cfg.Get("config.kubernetes.namespace"); v != nil {
-		k8sCfg.Namespace = cfg.GetString("config.kubernetes.namespace")
+	k8sCfg.Namespace = baseconfigsource.GetStringFallback(cfg, "kubernetes", "namespace")
+	if k8sCfg.Namespace == "" {
+		k8sCfg.Namespace = defaultNamespace
 	}
-	if v := cfg.Get("config.kubernetes.configmap_name"); v != nil {
-		k8sCfg.ConfigMapName = cfg.GetString("config.kubernetes.configmap_name")
+	k8sCfg.ConfigMapName = baseconfigsource.GetStringFallback(cfg, "kubernetes", "configmap_name")
+	k8sCfg.DataKey = baseconfigsource.GetStringFallback(cfg, "kubernetes", "data_key")
+	if inCluster, ok := baseconfigsource.GetBoolFallback(cfg, "kubernetes", "in_cluster"); ok {
+		k8sCfg.InCluster = inCluster
 	}
-	if v := cfg.Get("config.kubernetes.data_key"); v != nil {
-		k8sCfg.DataKey = cfg.GetString("config.kubernetes.data_key")
+	k8sCfg.KubeConfigPath = baseconfigsource.GetStringFallback(cfg, "kubernetes", "kubeconfig_path")
+	k8sCfg.APIServer = baseconfigsource.GetStringFallback(cfg, "kubernetes", "api_server")
+	k8sCfg.BearerToken = baseconfigsource.GetStringFallback(cfg, "kubernetes", "bearer_token")
+	k8sCfg.CAFile = baseconfigsource.GetStringFallback(cfg, "kubernetes", "ca_file")
+	if skipVerify, ok := baseconfigsource.GetBoolFallback(cfg, "kubernetes", "insecure_skip_verify"); ok {
+		k8sCfg.InsecureSkipVerify = skipVerify
 	}
-	if v := cfg.Get("config.kubernetes.in_cluster"); v != nil {
-		k8sCfg.InCluster = cfg.GetBool("config.kubernetes.in_cluster")
+	if autoReload, ok := baseconfigsource.GetBoolFallback(cfg, "kubernetes", "auto_reload"); ok {
+		k8sCfg.AutoReload = autoReload
 	}
-	if v := cfg.Get("config.kubernetes.kubeconfig_path"); v != nil {
-		k8sCfg.KubeConfigPath = cfg.GetString("config.kubernetes.kubeconfig_path")
-	}
-	if v := cfg.Get("config.kubernetes.api_server"); v != nil {
-		k8sCfg.APIServer = cfg.GetString("config.kubernetes.api_server")
-	}
-	if v := cfg.Get("config.kubernetes.bearer_token"); v != nil {
-		k8sCfg.BearerToken = cfg.GetString("config.kubernetes.bearer_token")
-	}
-	if v := cfg.Get("config.kubernetes.ca_file"); v != nil {
-		k8sCfg.CAFile = cfg.GetString("config.kubernetes.ca_file")
-	}
-	if v := cfg.Get("config.kubernetes.insecure_skip_verify"); v != nil {
-		k8sCfg.InsecureSkipVerify = cfg.GetBool("config.kubernetes.insecure_skip_verify")
-	}
-	if v := cfg.Get("config.kubernetes.auto_reload"); v != nil {
-		k8sCfg.AutoReload = cfg.GetBool("config.kubernetes.auto_reload")
-	}
-	if v := cfg.Get("config.kubernetes.poll_interval_seconds"); v != nil {
-		if seconds := cfg.GetInt("config.kubernetes.poll_interval_seconds"); seconds > 0 {
-			k8sCfg.PollInterval = time.Duration(seconds) * time.Second
-		}
+	if d := baseconfigsource.GetDurationSecondsFallback(cfg, "kubernetes", "poll_interval_seconds"); d > 0 {
+		k8sCfg.PollInterval = d
 	}
 
 	return k8sCfg, nil
@@ -158,7 +138,7 @@ func NewConfigSourceWithClient(cfg *KubernetesConfig, client configMapClient) (*
 		return nil, ErrConfigMapNameRequired
 	}
 	if client == nil {
-		return nil, errors.New("kubernetes: configmap client is required")
+		return nil, errors.New("configsource.kubernetes: configmap client is required")
 	}
 	return &ConfigSource{
 		config: cfg,
@@ -190,7 +170,7 @@ func (s *ConfigSource) Get(ctx context.Context, key string) (any, error) {
 
 	value, ok := lookupNestedValue(s.cache, key)
 	if !ok {
-		return nil, fmt.Errorf("kubernetes: key %s not found", key)
+		return nil, fmt.Errorf("configsource.kubernetes: key %s not found", key)
 	}
 	return value, nil
 }
@@ -281,7 +261,7 @@ func (s *ConfigSource) decodeConfigMapData(data map[string]string) (map[string]a
 	if s.config.DataKey != "" {
 		raw, ok := data[s.config.DataKey]
 		if !ok {
-			return nil, fmt.Errorf("kubernetes: data key %s not found", s.config.DataKey)
+			return nil, fmt.Errorf("configsource.kubernetes: data key %s not found", s.config.DataKey)
 		}
 		decoded, err := decodeStructuredString(raw)
 		if err != nil {
@@ -353,7 +333,7 @@ func newConfigMapClient(cfg *KubernetesConfig) (configMapClient, error) {
 	}
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return nil, fmt.Errorf("kubernetes: create clientset failed: %w", err)
+		return nil, fmt.Errorf("configsource.kubernetes: create clientset failed: %w", err)
 	}
 	return &clientGoConfigMapClient{client: clientset}, nil
 }
@@ -368,7 +348,7 @@ func (c *clientGoConfigMapClient) LoadConfigMap(ctx context.Context, namespace, 
 		if apierrors.IsNotFound(err) {
 			return nil, ErrConfigMapNotFound
 		}
-		return nil, fmt.Errorf("kubernetes: load configmap failed: %w", err)
+		return nil, fmt.Errorf("configsource.kubernetes: load configmap failed: %w", err)
 	}
 	return cloneStringMap(configMap.Data), nil
 }
@@ -379,7 +359,7 @@ func (c *clientGoConfigMapClient) WatchConfigMap(ctx context.Context, namespace,
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", name).String(),
 		})
 		if err != nil {
-			return fmt.Errorf("kubernetes: watch configmap failed: %w", err)
+			return fmt.Errorf("configsource.kubernetes: watch configmap failed: %w", err)
 		}
 
 		restart, err := consumeConfigMapWatch(ctx, watcher, onUpdate)
@@ -442,7 +422,7 @@ func buildConfigSourceRESTConfig(cfg *KubernetesConfig) (*rest.Config, error) {
 func decodeStructuredString(raw string) (any, error) {
 	var value any
 	if err := yaml.Unmarshal([]byte(raw), &value); err != nil {
-		return nil, fmt.Errorf("kubernetes: decode config content failed: %w", err)
+		return nil, fmt.Errorf("configsource.kubernetes: decode config content failed: %w", err)
 	}
 	return normalizeYAMLValue(value), nil
 }

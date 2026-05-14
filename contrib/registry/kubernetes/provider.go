@@ -8,10 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ngq/gorp/contrib/internal/baseregistry"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	configprovider "github.com/ngq/gorp/framework/provider/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,29 +27,28 @@ import (
 const defaultRegistryPollInterval = 5 * time.Second
 
 var (
-	ErrNotInCluster         = errors.New("kubernetes: not in cluster, please provide master or kubeconfig")
-	ErrServiceNotFound      = errors.New("kubernetes: service endpoints not found")
-	ErrRegistryClosed       = errors.New("kubernetes: registry closed")
-	ErrRegisterNotSupported = errors.New("kubernetes: register is not supported")
+	ErrNotInCluster         = errors.New("registry.kubernetes: not in cluster, please provide master or kubeconfig")
+	ErrServiceNotFound      = errors.New("registry.kubernetes: service endpoints not found")
+	ErrRegistryClosed       = errors.New("registry.kubernetes: registry closed")
+	ErrRegisterNotSupported = errors.New("registry.kubernetes: register is not supported")
 )
 
-type Provider struct{}
+// Provider provides Kubernetes-based service discovery.
+type Provider struct {
+	baseregistry.BaseRegistryProvider
+}
 
-func NewProvider() *Provider                               { return &Provider{} }
-func (p *Provider) Name() string                           { return "registry.kubernetes" }
-func (p *Provider) IsDefer() bool                          { return true }
-func (p *Provider) Provides() []string                     { return []string{transportcontract.RPCRegistryKey} }
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
-
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getKubernetesConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return NewRegistry(cfg)
-	}, true)
-	return nil
+// NewProvider creates a new Kubernetes registry provider.
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "registry.kubernetes"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getKubernetesConfig(c)
+	}
+	p.NewRegistry = func(cfg any) (transportcontract.ServiceRegistry, error) {
+		return NewRegistry(cfg.(*KubernetesConfig))
+	}
+	return p
 }
 
 type KubernetesConfig struct {
@@ -72,7 +73,7 @@ func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error)
 	}
 	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return nil, errors.New("kubernetes: invalid config service")
+		return nil, errors.New("registry.kubernetes: invalid config service")
 	}
 
 	kubeCfg := &KubernetesConfig{
@@ -80,31 +81,22 @@ func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error)
 		InCluster:    true,
 		PollInterval: defaultRegistryPollInterval,
 	}
-	if v := cfg.Get("discovery.kubernetes.kubeconfig"); v != nil {
-		kubeCfg.KubeConfig = cfg.GetString("discovery.kubernetes.kubeconfig")
+	kubeCfg.KubeConfig = configprovider.GetStringAny(cfg, "discovery.kubernetes.kubeconfig")
+	kubeCfg.Namespace = configprovider.GetStringAny(cfg, "discovery.kubernetes.namespace")
+	if kubeCfg.Namespace == "" {
+		kubeCfg.Namespace = "default"
 	}
-	if v := cfg.Get("discovery.kubernetes.namespace"); v != nil {
-		kubeCfg.Namespace = cfg.GetString("discovery.kubernetes.namespace")
+	kubeCfg.Master = configprovider.GetStringAny(cfg, "discovery.kubernetes.master")
+	if inCluster, ok := configprovider.GetBoolAny(cfg, "discovery.kubernetes.in_cluster"); ok {
+		kubeCfg.InCluster = inCluster
 	}
-	if v := cfg.Get("discovery.kubernetes.master"); v != nil {
-		kubeCfg.Master = cfg.GetString("discovery.kubernetes.master")
+	kubeCfg.BearerToken = configprovider.GetStringAny(cfg, "discovery.kubernetes.bearer_token")
+	kubeCfg.CAFile = configprovider.GetStringAny(cfg, "discovery.kubernetes.ca_file")
+	if skipVerify, ok := configprovider.GetBoolAny(cfg, "discovery.kubernetes.insecure_skip_verify"); ok {
+		kubeCfg.InsecureSkipVerify = skipVerify
 	}
-	if v := cfg.Get("discovery.kubernetes.in_cluster"); v != nil {
-		kubeCfg.InCluster = cfg.GetBool("discovery.kubernetes.in_cluster")
-	}
-	if v := cfg.Get("discovery.kubernetes.bearer_token"); v != nil {
-		kubeCfg.BearerToken = cfg.GetString("discovery.kubernetes.bearer_token")
-	}
-	if v := cfg.Get("discovery.kubernetes.ca_file"); v != nil {
-		kubeCfg.CAFile = cfg.GetString("discovery.kubernetes.ca_file")
-	}
-	if v := cfg.Get("discovery.kubernetes.insecure_skip_verify"); v != nil {
-		kubeCfg.InsecureSkipVerify = cfg.GetBool("discovery.kubernetes.insecure_skip_verify")
-	}
-	if v := cfg.Get("discovery.kubernetes.poll_interval_seconds"); v != nil {
-		if seconds := cfg.GetInt("discovery.kubernetes.poll_interval_seconds"); seconds > 0 {
-			kubeCfg.PollInterval = time.Duration(seconds) * time.Second
-		}
+	if seconds := configprovider.GetIntAny(cfg, "discovery.kubernetes.poll_interval_seconds"); seconds > 0 {
+		kubeCfg.PollInterval = time.Duration(seconds) * time.Second
 	}
 	return kubeCfg, nil
 }
@@ -139,7 +131,7 @@ func NewRegistry(cfg *KubernetesConfig) (*Registry, error) {
 
 func NewRegistryWithClient(cfg *KubernetesConfig, client discoveryClient) (*Registry, error) {
 	if client == nil {
-		return nil, errors.New("kubernetes: discovery client is required")
+		return nil, errors.New("registry.kubernetes: discovery client is required")
 	}
 	return &Registry{
 		config:        cfg,
@@ -264,7 +256,7 @@ func newDiscoveryClient(cfg *KubernetesConfig) (discoveryClient, error) {
 	}
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return nil, fmt.Errorf("kubernetes: create clientset failed: %w", err)
+		return nil, fmt.Errorf("registry.kubernetes: create clientset failed: %w", err)
 	}
 	return &clientGoDiscoveryClient{client: clientset}, nil
 }
@@ -279,7 +271,7 @@ func (c *clientGoDiscoveryClient) Discover(ctx context.Context, namespace, name 
 		if apierrors.IsNotFound(err) {
 			return nil, ErrServiceNotFound
 		}
-		return nil, fmt.Errorf("kubernetes: discover endpoints failed: %w", err)
+		return nil, fmt.Errorf("registry.kubernetes: discover endpoints failed: %w", err)
 	}
 	instances := endpointsToInstances(name, endpoints)
 	if len(instances) == 0 {
@@ -294,7 +286,7 @@ func (c *clientGoDiscoveryClient) Watch(ctx context.Context, namespace, name str
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", name).String(),
 		})
 		if err != nil {
-			return fmt.Errorf("kubernetes: watch endpoints failed: %w", err)
+			return fmt.Errorf("registry.kubernetes: watch endpoints failed: %w", err)
 		}
 		restart, err := consumeEndpointsWatch(ctx, name, watcher, onUpdate)
 		if err != nil {

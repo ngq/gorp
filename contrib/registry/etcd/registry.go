@@ -22,7 +22,7 @@ import (
 // ErrRegistryClosed indicates etcd registry closed.
 //
 // ErrRegistryClosed 表示 etcd 注册中心已关闭。
-var ErrRegistryClosed = errors.New("discovery.etcd: registry closed")
+var ErrRegistryClosed = errors.New("registry.etcd: registry closed")
 
 // Registry implements transportcontract.ServiceRegistry with etcd SDK.
 // Supports service registration, discovery with lease TTL keepalive.
@@ -104,7 +104,7 @@ func (r *Registry) Register(ctx context.Context, name, addr string, meta map[str
 func (r *Registry) registerLocked(ctx context.Context, serviceID, name, addr string, meta map[string]string) error {
 	leaseID, err := r.client.Grant(ctx, r.cfg.LeaseTTL)
 	if err != nil {
-		return fmt.Errorf("discovery.etcd: create lease failed: %w", err)
+		return fmt.Errorf("registry.etcd: create lease failed: %w", err)
 	}
 
 	host, port := parseAddr(addr)
@@ -125,14 +125,14 @@ func (r *Registry) registerLocked(ctx context.Context, serviceID, name, addr str
 
 	serviceKey := path.Join(r.cfg.ServicePath, name, serviceID)
 	if err := r.client.Put(ctx, serviceKey, string(serviceData), leaseID); err != nil {
-		return fmt.Errorf("discovery.etcd: put service failed: %w", err)
+		return fmt.Errorf("registry.etcd: put service failed: %w", err)
 	}
 
 	// 启动 keepalive 循环
 	stopCh := make(chan struct{})
 	keepAliveCh, err := r.client.KeepAlive(context.Background(), leaseID)
 	if err != nil {
-		return fmt.Errorf("discovery.etcd: start keepalive failed: %w", err)
+		return fmt.Errorf("registry.etcd: start keepalive failed: %w", err)
 	}
 
 	go r.keepAliveLoop(serviceID, keepAliveCh, stopCh)
@@ -192,7 +192,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontra
 	servicePrefix := path.Join(r.cfg.ServicePath, name) + "/"
 	resp, err := r.client.Get(ctx, servicePrefix, clientv3.WithPrefix())
 	if err != nil {
-		return nil, fmt.Errorf("discovery.etcd: get services failed: %w", err)
+		return nil, fmt.Errorf("registry.etcd: get services failed: %w", err)
 	}
 
 	instances := make([]transportcontract.ServiceInstance, 0, len(resp.Kvs))

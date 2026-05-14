@@ -1,0 +1,25 @@
+linters:
+  enable:
+    - errname
+    - errorlint
+    - wrapcheck
+
+linters-settings:
+  errname:
+    check-type-in-test: false
+  errorlint:
+    errorf: true
+    errorf-multi: true
+    asserts: true
+    comparison: true
+  wrapcheck:
+    ignorePackageGlobs:
+      - github.com/ngq/gorp/*
+      - github.com/ngq/gorp/framework/*
+      - github.com/ngq/gorp/contrib/*
+
+run:
+  timeout: 5m
+  skip-dirs:
+    - vendor
+    - third_party

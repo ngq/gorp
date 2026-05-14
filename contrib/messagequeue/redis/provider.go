@@ -9,71 +9,27 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ngq/gorp/contrib/internal/basemq"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider implements runtimecontract.ServiceProvider for Redis message queue.
-type Provider struct{}
+type Provider struct {
+	basemq.BaseMQProvider
+}
 
 // NewProvider creates a new Redis message queue provider.
-func NewProvider() *Provider { return &Provider{} }
-
-// Name returns the provider name.
-func (p *Provider) Name() string { return "messagequeue.redis" }
-
-// IsDefer returns true for lazy initialization.
-func (p *Provider) IsDefer() bool { return true }
-
-// Provides returns the contract keys this provider satisfies.
-func (p *Provider) Provides() []string {
-	return []string{
-		integrationcontract.MessageQueueKey,
-		integrationcontract.MessagePublisherKey,
-		integrationcontract.MessageSubscriberKey,
-	}
-}
-
-// Register binds the message queue services to the container.
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(integrationcontract.MessageQueueKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getMQConfig(c)
-		if err != nil {
-			return nil, err
-		}
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "messagequeue.redis"
+	p.GetConfig = getMQConfig
+	p.NewQueue = func(cfg *integrationcontract.MessageQueueConfig) (integrationcontract.MessageQueue, error) {
 		return NewQueue(cfg)
-	}, true)
-
-	c.Bind(integrationcontract.MessagePublisherKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getMQConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		queue, err := NewQueue(cfg)
-		if err != nil {
-			return nil, err
-		}
-		return queue.Publisher(), nil
-	}, true)
-
-	c.Bind(integrationcontract.MessageSubscriberKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getMQConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		queue, err := NewQueue(cfg)
-		if err != nil {
-			return nil, err
-		}
-		return queue.Subscriber(), nil
-	}, true)
-
-	return nil
+	}
+	return p
 }
-
-// Boot does nothing for lazy providers.
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 // getMQConfig extracts Redis configuration from the container.
 func getMQConfig(c runtimecontract.Container) (*integrationcontract.MessageQueueConfig, error) {

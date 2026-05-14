@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,12 +41,12 @@ func TestRegistryKeepAliveFailureTriggersReRegister(t *testing.T) {
 
 	err := registry.Register(context.Background(), "user-service", "10.0.0.1:8080", nil)
 	require.NoError(t, err)
-	require.Equal(t, 1, client.grantCalls)
+	require.Equal(t, int32(1), client.grantCalls.Load())
 
 	client.closeCurrentKeepAlive()
 
 	require.Eventually(t, func() bool {
-		return client.grantCalls >= 2 && client.putCalls >= 2
+		return client.grantCalls.Load() >= 2 && client.putCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -67,7 +68,7 @@ func TestRegistryDeregisterStopsReRegister(t *testing.T) {
 	close(keepAliveCh)
 
 	time.Sleep(50 * time.Millisecond)
-	require.Equal(t, 1, client.grantCalls)
+	require.Equal(t, int32(1), client.grantCalls.Load())
 }
 
 func TestRegistryCloseRejectsOperations(t *testing.T) {
@@ -117,9 +118,9 @@ type fakeEtcdRegistryClient struct {
 	putErr            error
 	keepAliveErr      error
 	revokeErr         error
-	grantCalls        int
-	putCalls          int
-	revokeCalls       int
+	grantCalls        atomic.Int32
+	putCalls          atomic.Int32
+	revokeCalls       atomic.Int32
 	nextLeaseID       clientv3.LeaseID
 	currentLeaseID    clientv3.LeaseID
 	keepAliveChannels map[clientv3.LeaseID]chan *clientv3.LeaseKeepAliveResponse
@@ -148,7 +149,7 @@ func (f *fakeEtcdRegistryClient) Grant(ctx context.Context, ttl int64) (clientv3
 	if f.grantErr != nil {
 		return 0, f.grantErr
 	}
-	f.grantCalls++
+	f.grantCalls.Add(1)
 	leaseID := f.nextLeaseID
 	f.nextLeaseID++
 	f.currentLeaseID = leaseID
@@ -161,7 +162,7 @@ func (f *fakeEtcdRegistryClient) Put(ctx context.Context, key, value string, lea
 	if f.putErr != nil {
 		return f.putErr
 	}
-	f.putCalls++
+	f.putCalls.Add(1)
 	f.kv[key] = value
 	return nil
 }
@@ -183,7 +184,7 @@ func (f *fakeEtcdRegistryClient) Revoke(ctx context.Context, leaseID clientv3.Le
 	if f.revokeErr != nil {
 		return f.revokeErr
 	}
-	f.revokeCalls++
+	f.revokeCalls.Add(1)
 	delete(f.keepAliveChannels, leaseID)
 	return nil
 }

@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -63,16 +64,28 @@ func TestGetDiscoveryConfigRejectsInvalidConfigService(t *testing.T) {
 
 type etcdDiscoveryInvalidContainerStub struct{}
 
-func (etcdDiscoveryInvalidContainerStub) Bind(string, runtimecontract.Factory, bool) {}
-func (etcdDiscoveryInvalidContainerStub) IsBind(string) bool { return true }
-func (etcdDiscoveryInvalidContainerStub) Make(string) (any, error) { return 1, nil }
-func (etcdDiscoveryInvalidContainerStub) MustMake(string) any { return 1 }
+func (etcdDiscoveryInvalidContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (etcdDiscoveryInvalidContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (etcdDiscoveryInvalidContainerStub) IsBind(string) bool                                      { return true }
+func (etcdDiscoveryInvalidContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (etcdDiscoveryInvalidContainerStub) Make(string) (any, error)                                { return 1, nil }
+func (etcdDiscoveryInvalidContainerStub) MakeNamed(string, string) (any, error) {
+	return nil, errors.New("not found")
+}
+func (etcdDiscoveryInvalidContainerStub) MustMake(string) any              { return 1 }
+func (etcdDiscoveryInvalidContainerStub) MustMakeNamed(string, string) any { return nil }
+func (etcdDiscoveryInvalidContainerStub) RegisterCloser(string, io.Closer) {}
+func (etcdDiscoveryInvalidContainerStub) Destroy() error                   { return nil }
 func (etcdDiscoveryInvalidContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }
 func (etcdDiscoveryInvalidContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
 	return nil
 }
+func (etcdDiscoveryInvalidContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo {
+	return nil
+}
+func (etcdDiscoveryInvalidContainerStub) DebugPrint() string { return "" }
 
 func TestRegistryCloseWithoutClientPanicsToday(t *testing.T) {
 	r := &Registry{}

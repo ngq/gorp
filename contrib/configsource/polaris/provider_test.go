@@ -3,6 +3,7 @@ package polaris
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -236,7 +237,7 @@ func TestWatchRetriesAfterSourceUnavailable(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected callback after retry")
 	}
-	require.GreaterOrEqual(t, client.watchCalls, 2)
+	require.GreaterOrEqual(t, client.watchCalls.Load(), int32(2))
 }
 
 type fakePolarisConfigClient struct {
@@ -246,7 +247,7 @@ type fakePolarisConfigClient struct {
 	getSnapshots []polarisConfigSnapshot
 	watchErrs    []error
 	watchUpdates chan polarisConfigSnapshot
-	watchCalls   int
+	watchCalls   atomic.Int32
 }
 
 type fakePolarisNativeClient struct {
@@ -284,7 +285,7 @@ func (f *fakePolarisConfigClient) GetConfig(ctx context.Context, cfg *PolarisCon
 }
 
 func (f *fakePolarisConfigClient) WatchConfig(ctx context.Context, cfg *PolarisConfig, lastRevision string, onUpdate func(snapshot polarisConfigSnapshot)) error {
-	f.watchCalls++
+	f.watchCalls.Add(1)
 	if len(f.watchErrs) > 0 {
 		err := f.watchErrs[0]
 		f.watchErrs = f.watchErrs[1:]
@@ -401,10 +402,10 @@ func TestWatchStopsAfterAuthFailed(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return client.watchCalls == 1
+		return client.watchCalls.Load() == 1
 	}, time.Second, 10*time.Millisecond)
 	time.Sleep(50 * time.Millisecond)
-	require.Equal(t, 1, client.watchCalls)
+	require.Equal(t, int32(1), client.watchCalls.Load())
 }
 
 func TestWatchStopsAfterConfigNotFound(t *testing.T) {
@@ -428,10 +429,10 @@ func TestWatchStopsAfterConfigNotFound(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return client.watchCalls == 1
+		return client.watchCalls.Load() == 1
 	}, time.Second, 10*time.Millisecond)
 	time.Sleep(50 * time.Millisecond)
-	require.Equal(t, 1, client.watchCalls)
+	require.Equal(t, int32(1), client.watchCalls.Load())
 }
 
 func TestTranslatePolarisSDKErrorClassifiesFailures(t *testing.T) {

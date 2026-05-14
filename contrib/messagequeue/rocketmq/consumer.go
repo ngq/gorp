@@ -106,11 +106,15 @@ func (s *rocketmqSubscriber) SubscribeWithGroup(ctx context.Context, topic strin
 // RocketMQ does not support this pattern directly; use SubscribeWithGroup instead.
 // This method returns an error explaining the correct usage.
 //
+// ErrConsumeNotSupported is returned when Consume is called on RocketMQ subscriber.
+// RocketMQ does not support direct queue consumption, use SubscribeWithGroup instead.
+var ErrConsumeNotSupported = errors.New("messagequeue.rocketmq: Consume not supported, use SubscribeWithGroup instead")
+
 // Consume 从 topic 消费消息。
 // RocketMQ 不直接支持此模式；应使用 SubscribeWithGroup。
 // 该方法返回错误，说明正确用法。
 func (s *rocketmqSubscriber) Consume(ctx context.Context, queue string, handler integrationcontract.MessageHandler) error {
-	return fmt.Errorf("messagequeue.rocketmq: Consume not supported, use SubscribeWithGroup instead")
+	return ErrConsumeNotSupported
 }
 
 // Unsubscribe shuts down the consumer.

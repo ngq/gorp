@@ -3,6 +3,7 @@ package nacos
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -153,7 +154,7 @@ func TestConfigSourceWatchAfterCloseFails(t *testing.T) {
 	require.NoError(t, source.Close())
 
 	_, err = source.Watch(context.Background(), "")
-	require.EqualError(t, err, "nacos: config source closed")
+	require.EqualError(t, err, "configsource.nacos: config source closed")
 }
 
 func TestConfigSourceSetRejectsDifferentDataID(t *testing.T) {
@@ -166,7 +167,7 @@ func TestConfigSourceSetRejectsDifferentDataID(t *testing.T) {
 	require.NoError(t, err)
 
 	err = source.Set(context.Background(), "other.yaml", map[string]any{"enabled": true})
-	require.EqualError(t, err, "nacos: set only supports data_id app.yaml")
+	require.EqualError(t, err, "configsource.nacos: set only supports data_id app.yaml")
 }
 
 func TestConfigSourceCloseIsIdempotent(t *testing.T) {
@@ -226,7 +227,9 @@ func TestConfigSourceAsProjectsOfficialConfigClientOnDefaultClient(t *testing.T)
 }
 
 type fakeNacosClient struct {
+	mu         sync.Mutex
 	content    string
+	initCh     sync.Once
 	updateCh   chan string
 	getErr     error
 	publishErr error
@@ -236,6 +239,8 @@ func (f *fakeNacosClient) GetConfig(ctx context.Context, cfg *NacosConfig) (stri
 	if f.getErr != nil {
 		return "", f.getErr
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return f.content, nil
 }
 
@@ -243,28 +248,32 @@ func (f *fakeNacosClient) PublishConfig(ctx context.Context, cfg *NacosConfig, c
 	if f.publishErr != nil {
 		return f.publishErr
 	}
+	f.mu.Lock()
 	f.content = content
+	f.mu.Unlock()
 	return nil
 }
 
 func (f *fakeNacosClient) WatchConfig(ctx context.Context, cfg *NacosConfig, onUpdate func(string)) error {
-	if f.updateCh == nil {
+	f.initCh.Do(func() {
 		f.updateCh = make(chan string, 2)
-	}
+	})
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case update := <-f.updateCh:
+			f.mu.Lock()
 			f.content = update
+			f.mu.Unlock()
 			onUpdate(update)
 		}
 	}
 }
 
 func (f *fakeNacosClient) push(update string) {
-	if f.updateCh == nil {
+	f.initCh.Do(func() {
 		f.updateCh = make(chan string, 2)
-	}
+	})
 	f.updateCh <- update
 }

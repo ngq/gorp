@@ -24,22 +24,22 @@ import (
 // ErrNoServerURL indicates Eureka server URL is required.
 //
 // ErrNoServerURL 表示 Eureka 服务端地址必需。
-var ErrNoServerURL = errors.New("eureka: server_url is required")
+var ErrNoServerURL = errors.New("registry.eureka: server_url is required")
 
 // ErrServiceNotFound indicates Eureka service not found.
 //
 // ErrServiceNotFound 表示 Eureka 服务未找到。
-var ErrServiceNotFound = errors.New("eureka: service not found")
+var ErrServiceNotFound = errors.New("registry.eureka: service not found")
 
 // ErrRegistryClosed indicates Eureka registry closed.
 //
 // ErrRegistryClosed 表示 Eureka 注册中心已关闭。
-var ErrRegistryClosed = errors.New("eureka: registry closed")
+var ErrRegistryClosed = errors.New("registry.eureka: registry closed")
 
 // ErrAlreadyRegistered indicates Eureka instance already registered.
 //
 // ErrAlreadyRegistered 表示 Eureka 实例已注册。
-var ErrAlreadyRegistered = errors.New("eureka: instance already registered")
+var ErrAlreadyRegistered = errors.New("registry.eureka: instance already registered")
 
 // ============================================================================
 // 辅助函数

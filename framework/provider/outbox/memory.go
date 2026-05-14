@@ -9,7 +9,7 @@ package outbox
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -106,7 +106,7 @@ func (o *MemoryOutbox) Process(ctx context.Context) error {
 	}
 
 	if o.sender == nil {
-		return fmt.Errorf("outbox sender not configured")
+		return errors.New("outbox sender not configured")
 	}
 
 	for _, msg := range pending {

@@ -27,6 +27,7 @@ package sqlx
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -85,10 +86,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		driver := dbc.Driver
 		dsn := dbc.DSN
 		if driver == "" {
-			return nil, fmt.Errorf("database.driver is required")
+			return nil, errors.New("database.driver is required")
 		}
 		if dsn == "" {
-			return nil, fmt.Errorf("database.dsn is required")
+			return nil, errors.New("database.dsn is required")
 		}
 
 		if normalized, err := normalizeDriver(driver); err != nil {

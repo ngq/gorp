@@ -211,7 +211,7 @@ func RunGRPC(c runtimecontract.Container, logger observabilitycontract.Logger) e
 	}
 	rpcServer, ok := rpcServerAny.(transportcontract.RPCServer)
 	if !ok {
-		return fmt.Errorf("rpc server does not implement transportcontract.RPCServer")
+		return errors.New("rpc server does not implement transportcontract.RPCServer")
 	}
 
 	// 优先尝试通过 host 能力运行

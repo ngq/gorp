@@ -198,7 +198,7 @@ func buildApolloSnapshotContent(cache apolloagcache.CacheInterface) (string, err
 
 	content, err := yaml.Marshal(loaded)
 	if err != nil {
-		return "", fmt.Errorf("apollo: marshal config failed: %w", err)
+		return "", fmt.Errorf("configsource.apollo: marshal config failed: %w", err)
 	}
 	return string(content), nil
 }

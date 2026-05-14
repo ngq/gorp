@@ -9,6 +9,7 @@ package proto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,10 +26,10 @@ import (
 // 支持闭环 proto-first 工作流：proto → 服务实现骨架。
 func (g *Generator) GenService(ctx context.Context, opts integrationcontract.ServiceGenOptions) error {
 	if opts.ProtoFile == "" {
-		return fmt.Errorf("proto file path is required")
+		return errors.New("proto file path is required")
 	}
 	if opts.OutputDir == "" {
-		return fmt.Errorf("output directory is required")
+		return errors.New("output directory is required")
 	}
 
 	// 解析 proto 文件提取服务定义。

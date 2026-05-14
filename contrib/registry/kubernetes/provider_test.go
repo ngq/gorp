@@ -120,7 +120,7 @@ func TestRegistryWatchAfterCloseFails(t *testing.T) {
 	require.NoError(t, registry.Close())
 
 	_, err = registry.Watch(context.Background(), "svc")
-	require.EqualError(t, err, "kubernetes: registry closed")
+	require.EqualError(t, err, "registry.kubernetes: registry closed")
 }
 
 func TestRegistryWatchClosesChannelOnClose(t *testing.T) {

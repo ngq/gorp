@@ -18,22 +18,22 @@ import (
 // ErrNoAddress indicates Polaris address is required.
 //
 // ErrNoAddress 表示 Polaris 地址必需。
-var ErrNoAddress = errors.New("polaris: address is required")
+var ErrNoAddress = errors.New("registry.polaris: address is required")
 
 // ErrServiceNotFound indicates Polaris service not found.
 //
 // ErrServiceNotFound 表示 Polaris 服务未找到。
-var ErrServiceNotFound = errors.New("polaris: service not found")
+var ErrServiceNotFound = errors.New("registry.polaris: service not found")
 
 // ErrRegistryClosed indicates Polaris registry closed.
 //
 // ErrRegistryClosed 表示 Polaris 注册中心已关闭。
-var ErrRegistryClosed = errors.New("polaris: registry closed")
+var ErrRegistryClosed = errors.New("registry.polaris: registry closed")
 
 // ErrAlreadyRegistered indicates Polaris instance already registered.
 //
 // ErrAlreadyRegistered 表示 Polaris 实例已注册。
-var ErrAlreadyRegistered = errors.New("polaris: instance already registered")
+var ErrAlreadyRegistered = errors.New("registry.polaris: instance already registered")
 
 // Registry implements transportcontract.ServiceRegistry with Polaris SDK.
 // Supports service registration, discovery, and watch with caching.
@@ -67,7 +67,7 @@ func NewRegistryWithClient(cfg *PolarisConfig, client polarisRegistryClient) (*R
 		return nil, ErrNoAddress
 	}
 	if client == nil {
-		return nil, errors.New("polaris: registry client is required")
+		return nil, errors.New("registry.polaris: registry client is required")
 	}
 	return &Registry{
 		config:        cfg,

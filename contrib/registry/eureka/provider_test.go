@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestRegistryRegisterUsesClient(t *testing.T) {
 
 	err = registry.Register(context.Background(), "user-service", "10.0.0.1:8080", map[string]string{"version": "v1"})
 	require.NoError(t, err)
-	require.Equal(t, 1, client.registerCalls)
+	require.Equal(t, int32(1), client.registerCalls.Load())
 }
 
 func TestRegistryRegisterRejectsDuplicateInstance(t *testing.T) {
@@ -50,7 +51,7 @@ func TestRegistryDeregisterUsesClient(t *testing.T) {
 
 	err = registry.Deregister(context.Background(), "user-service", "10.0.0.1:8080")
 	require.NoError(t, err)
-	require.Equal(t, 1, client.deregisterCalls)
+	require.Equal(t, int32(1), client.deregisterCalls.Load())
 }
 
 func TestRegistryDiscoverUsesClient(t *testing.T) {
@@ -144,7 +145,7 @@ func TestNewRegistryRequiresServerURL(t *testing.T) {
 func TestNewRegistryRequiresClient(t *testing.T) {
 	registry, err := NewRegistryWithClient(testEurekaConfig(), nil)
 	require.Nil(t, registry)
-	require.EqualError(t, err, "eureka: client is required")
+	require.EqualError(t, err, "registry.eureka: client is required")
 }
 
 func TestRegistryCloseRejectsOperations(t *testing.T) {
@@ -274,7 +275,7 @@ func TestRegistryHeartbeatRunsAfterRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		return client.heartbeatCalls > 0
+		return client.heartbeatCalls.Load() > 0
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -288,13 +289,13 @@ func TestRegistryDeregisterStopsHeartbeat(t *testing.T) {
 	err = registry.Register(context.Background(), "user-service", "10.0.0.1:8080", nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
-		return client.heartbeatCalls > 0
+		return client.heartbeatCalls.Load() > 0
 	}, time.Second, 10*time.Millisecond)
 
-	before := client.heartbeatCalls
+	before := client.heartbeatCalls.Load()
 	require.NoError(t, registry.Deregister(context.Background(), "user-service", "10.0.0.1:8080"))
 	time.Sleep(40 * time.Millisecond)
-	require.Equal(t, before, client.heartbeatCalls)
+	require.Equal(t, before, client.heartbeatCalls.Load())
 }
 
 func TestRegistryHeartbeatNotFoundTriggersReRegister(t *testing.T) {
@@ -311,7 +312,7 @@ func TestRegistryHeartbeatNotFoundTriggersReRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		return client.registerCalls >= 2
+		return client.registerCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -329,9 +330,9 @@ func TestRegistryHeartbeatSourceErrorRetriesWithoutReRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		return client.heartbeatCalls >= 2
+		return client.heartbeatCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
-	require.Equal(t, 1, client.registerCalls)
+	require.Equal(t, int32(1), client.registerCalls.Load())
 }
 
 func TestHTTPEurekaClientWatchRetriesAfterSourceError(t *testing.T) {
@@ -410,7 +411,7 @@ func TestRegistryWatchRetriesAfterClientWatchError(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return client.watchCalls >= 2
+		return client.watchCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
 
 	client.push([]transportcontract.ServiceInstance{
@@ -451,7 +452,7 @@ func TestRegistryWatchStopsOnNonRetryableError(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected watch channel to close")
 	}
-	require.Equal(t, 1, client.watchCalls)
+	require.Equal(t, int32(1), client.watchCalls.Load())
 }
 
 type fakeEurekaClient struct {
@@ -465,25 +466,25 @@ type fakeEurekaClient struct {
 	discoverResults [][]transportcontract.ServiceInstance
 	watchUpdates    chan []transportcontract.ServiceInstance
 	watchErrs       []error
-	registerCalls   int
-	deregisterCalls int
-	heartbeatCalls  int
-	discoverCalls   int
-	watchCalls      int
+	registerCalls   atomic.Int32
+	deregisterCalls atomic.Int32
+	heartbeatCalls  atomic.Int32
+	discoverCalls   atomic.Int32
+	watchCalls      atomic.Int32
 }
 
 func (f *fakeEurekaClient) Register(ctx context.Context, cfg *EurekaConfig, name, addr string, meta map[string]string) error {
-	f.registerCalls++
+	f.registerCalls.Add(1)
 	return f.registerErr
 }
 
 func (f *fakeEurekaClient) Deregister(ctx context.Context, cfg *EurekaConfig, name, addr string) error {
-	f.deregisterCalls++
+	f.deregisterCalls.Add(1)
 	return f.deregisterErr
 }
 
 func (f *fakeEurekaClient) Heartbeat(ctx context.Context, cfg *EurekaConfig, name, addr string) error {
-	f.heartbeatCalls++
+	f.heartbeatCalls.Add(1)
 	if len(f.heartbeatErrs) > 0 {
 		err := f.heartbeatErrs[0]
 		f.heartbeatErrs = f.heartbeatErrs[1:]
@@ -493,7 +494,7 @@ func (f *fakeEurekaClient) Heartbeat(ctx context.Context, cfg *EurekaConfig, nam
 }
 
 func (f *fakeEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name string) ([]transportcontract.ServiceInstance, error) {
-	f.discoverCalls++
+	f.discoverCalls.Add(1)
 	if len(f.discoverErrs) > 0 {
 		err := f.discoverErrs[0]
 		f.discoverErrs = f.discoverErrs[1:]
@@ -515,7 +516,7 @@ func (f *fakeEurekaClient) Discover(ctx context.Context, cfg *EurekaConfig, name
 }
 
 func (f *fakeEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name string, onUpdate func([]transportcontract.ServiceInstance)) error {
-	f.watchCalls++
+	f.watchCalls.Add(1)
 	if len(f.watchErrs) > 0 {
 		err := f.watchErrs[0]
 		f.watchErrs = f.watchErrs[1:]

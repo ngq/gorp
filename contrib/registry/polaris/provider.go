@@ -9,60 +9,30 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ngq/gorp/contrib/internal/baseregistry"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
 // Provider 提供 Polaris 服务发现实现。
-//
-// 中文说明：
-//   - 使用腾讯云 Polaris 实现服务注册与发现；
-//   - 支持服务路由、负载均衡、熔断；
-//   - 适用于腾讯云环境和私有化部署。
-//   - 当前状态：部分可用
-//   - 说明：已完成 P2 第一版最小注册/发现闭环，具备 Register / Deregister / Discover 与 fake client 行为测试；
-//     但当前仍未覆盖完整路由规则、健康检查与 SDK 产品化语义。
-type Provider struct{}
-
-// NewProvider creates a new Polaris provider instance.
-//
-// NewProvider 创建新的 Polaris provider 实例。
-func NewProvider() *Provider { return &Provider{} }
-
-// Name returns the provider identifier "registry.polaris".
-//
-// Name 返回 provider 标识符 "registry.polaris"。
-func (p *Provider) Name() string       { return "registry.polaris" }
-
-// IsDefer returns true for lazy initialization.
-//
-// IsDefer 返回 true，延迟初始化。
-func (p *Provider) IsDefer() bool      { return true }
-
-// Provides returns the contract keys this provider satisfies.
-//
-// Provides 返回此 provider 满足的契约键。
-func (p *Provider) Provides() []string { return []string{transportcontract.RPCRegistryKey} }
-
-// Register binds the Polaris registry to the container.
-//
-// Register 将 Polaris 注册中心绑定到容器。
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getPolarisConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return NewRegistry(cfg)
-	}, true)
-	return nil
+type Provider struct {
+	baseregistry.BaseRegistryProvider
 }
 
-// Boot does nothing for lazy providers.
-//
-// Boot 延迟 provider 不需要 boot 操作。
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
+// NewProvider creates a new Polaris provider instance.
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "registry.polaris"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getPolarisConfig(c)
+	}
+	p.NewRegistry = func(cfg any) (transportcontract.ServiceRegistry, error) {
+		return NewRegistry(cfg.(*PolarisConfig))
+	}
+	return p
+}
 
 // PolarisConfig 定义 Polaris 配置。
 type PolarisConfig struct {
@@ -76,9 +46,6 @@ type PolarisConfig struct {
 	WatchRetryInterval time.Duration
 }
 
-// getPolarisConfig extracts Polaris configuration from the container's config binding.
-//
-// getPolarisConfig 从容器的 config binding 中提取 Polaris 配置。
 func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
 	cfgAny, err := c.Make(datacontract.ConfigKey)
 	if err != nil {
@@ -86,26 +53,21 @@ func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
 	}
 	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return nil, errors.New("polaris: invalid config service")
+		return nil, errors.New("registry.polaris: invalid config service")
 	}
 
 	polarisCfg := &PolarisConfig{
 		Namespace:          "default",
 		WatchRetryInterval: 200 * time.Millisecond,
 	}
-	if v := cfg.Get("discovery.polaris.address"); v != nil {
-		polarisCfg.Address = cfg.GetString("discovery.polaris.address")
+	polarisCfg.Address = configprovider.GetStringAny(cfg, "discovery.polaris.address")
+	polarisCfg.Namespace = configprovider.GetStringAny(cfg, "discovery.polaris.namespace")
+	if polarisCfg.Namespace == "" {
+		polarisCfg.Namespace = "default"
 	}
-	if v := cfg.Get("discovery.polaris.namespace"); v != nil {
-		polarisCfg.Namespace = cfg.GetString("discovery.polaris.namespace")
-	}
-	if v := cfg.Get("discovery.polaris.token"); v != nil {
-		polarisCfg.Token = cfg.GetString("discovery.polaris.token")
-	}
-	if v := cfg.Get("discovery.polaris.watch_retry_interval_ms"); v != nil {
-		if ms := cfg.GetInt("discovery.polaris.watch_retry_interval_ms"); ms > 0 {
-			polarisCfg.WatchRetryInterval = time.Duration(ms) * time.Millisecond
-		}
+	polarisCfg.Token = configprovider.GetStringAny(cfg, "discovery.polaris.token")
+	if ms := configprovider.GetIntAny(cfg, "discovery.polaris.watch_retry_interval_ms"); ms > 0 {
+		polarisCfg.WatchRetryInterval = time.Duration(ms) * time.Millisecond
 	}
 	return polarisCfg, nil
 }

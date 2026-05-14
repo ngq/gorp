@@ -10,6 +10,7 @@ package config
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,7 +102,7 @@ func (s *Service) Load(env string) error {
 // 核心逻辑：发现基础文件、合并环境覆盖、应用环境变量替换。
 func LoadLocalConfigToViper(v *viper.Viper, env, root string) error {
 	if v == nil {
-		return fmt.Errorf("config: viper instance is nil")
+		return errors.New("config: viper instance is nil")
 	}
 	env = NormalizeEnv(env)
 	if strings.TrimSpace(root) == "" {
@@ -313,7 +314,7 @@ type localConfigWatcher struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	service   *Service
-		interval  time.Duration
+	interval  time.Duration
 	mu        sync.RWMutex
 	callbacks map[string][]func(value any)
 	lastState map[string]time.Time

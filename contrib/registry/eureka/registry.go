@@ -32,7 +32,7 @@ type Registry struct {
 
 	// 状态管理
 	mu            sync.RWMutex
-	registered    map[string]map[string]string // 已注册实例的 metadata 缓存
+	registered    map[string]map[string]string  // 已注册实例的 metadata 缓存
 	renewals      map[string]context.CancelFunc // 心跳续租 cancel 函数
 	endpointCache map[string][]transportcontract.ServiceInstance
 	watchCache    map[string]string
@@ -57,7 +57,7 @@ func NewRegistryWithClient(cfg *EurekaConfig, client eurekaClient) (*Registry, e
 		return nil, ErrNoServerURL
 	}
 	if client == nil {
-		return nil, errors.New("eureka: client is required")
+		return nil, errors.New("registry.eureka: client is required")
 	}
 
 	return &Registry{

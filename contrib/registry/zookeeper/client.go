@@ -37,7 +37,7 @@ func newZKBackend(cfg *ZookeeperConfig) (zkBackend, error) {
 	// 连接 Zookeeper 集群
 	conn, _, err := zk.Connect(cfg.Servers, cfg.SessionTimeout)
 	if err != nil {
-		return nil, errors.New("zookeeper: connect failed: " + err.Error())
+		return nil, errors.New("registry.zookeeper: connect failed: " + err.Error())
 	}
 	return &realZKBackend{conn: conn}, nil
 }
@@ -137,7 +137,7 @@ func (b *realZKBackend) WatchChildren(ctx context.Context, target string, onUpda
 				case zk.StateExpired:
 					return zk.ErrSessionExpired
 				case zk.StateAuthFailed:
-					return errors.New("zookeeper: watch session auth failed")
+					return errors.New("registry.zookeeper: watch session auth failed")
 				case zk.StateDisconnected, zk.StateConnecting:
 					return zk.ErrConnectionClosed
 				}

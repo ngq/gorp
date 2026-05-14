@@ -26,6 +26,7 @@ package gorm
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -82,10 +83,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			return nil, err
 		}
 		if dbc.Driver == "" {
-			return nil, fmt.Errorf("database.driver is required")
+			return nil, errors.New("database.driver is required")
 		}
 		if dbc.DSN == "" {
-			return nil, fmt.Errorf("database.dsn is required")
+			return nil, errors.New("database.dsn is required")
 		}
 
 		logAny, err := c.Make(observabilitycontract.LogKey)

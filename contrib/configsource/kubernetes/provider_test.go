@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -154,7 +155,7 @@ func TestConfigSourceWatchAfterCloseFails(t *testing.T) {
 	require.NoError(t, source.Close())
 
 	_, err = source.Watch(context.Background(), "")
-	require.EqualError(t, err, "kubernetes: config source closed")
+	require.EqualError(t, err, "configsource.kubernetes: config source closed")
 }
 
 func TestConfigSourceSetReturnsNotSupported(t *testing.T) {
@@ -205,8 +206,9 @@ func TestConfigSourceAsProjectsNativeClient(t *testing.T) {
 }
 
 type fakeConfigMapClient struct {
+	mu        sync.Mutex
 	data      map[string]string
-	watchOnce syncOnce
+	watchOnce sync.Once
 	updateCh  chan map[string]string
 	loadErr   error
 }
@@ -224,6 +226,8 @@ func (f *fakeConfigMapClient) LoadConfigMap(ctx context.Context, namespace, name
 	if f.loadErr != nil {
 		return nil, f.loadErr
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return cloneStringMapForTest(f.data), nil
 }
 
@@ -242,7 +246,9 @@ func (f *fakeConfigMapClient) WatchConfigMap(ctx context.Context, namespace, nam
 			if errors.Is(f.loadErr, ErrConfigMapNotFound) {
 				continue
 			}
+			f.mu.Lock()
 			f.data = cloneStringMapForTest(update)
+			f.mu.Unlock()
 			onUpdate(cloneStringMapForTest(update))
 		}
 	}
@@ -253,18 +259,6 @@ func (f *fakeConfigMapClient) push(update map[string]string) {
 		f.updateCh = make(chan map[string]string, 2)
 	})
 	f.updateCh <- cloneStringMapForTest(update)
-}
-
-type syncOnce struct {
-	done bool
-}
-
-func (o *syncOnce) Do(fn func()) {
-	if o.done {
-		return
-	}
-	o.done = true
-	fn()
 }
 
 func cloneStringMapForTest(source map[string]string) map[string]string {

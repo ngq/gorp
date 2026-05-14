@@ -12,41 +12,35 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
+	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
-type Provider struct{}
-
-func NewProvider() *Provider { return &Provider{} }
-
-func (p *Provider) Name() string  { return "configsource.etcd" }
-func (p *Provider) IsDefer() bool { return true }
-func (p *Provider) Provides() []string {
-	return []string{datacontract.ConfigSourceKey}
+// Provider implements runtimecontract.ServiceProvider for etcd config source.
+type Provider struct {
+	baseconfigsource.BaseConfigSourceProvider
 }
 
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(datacontract.ConfigSourceKey, func(c runtimecontract.Container) (any, error) {
-		cfg, _ := getConfigSourceConfig(c)
-		return NewSource(cfg)
-	}, true)
-	return nil
+// NewProvider creates a new etcd config source provider.
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "configsource.etcd"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getConfigSourceConfig(c)
+	}
+	p.NewSource = func(cfg any) (datacontract.ConfigSource, error) {
+		return NewSource(cfg.(*datacontract.ConfigSourceConfig))
+	}
+	return p
 }
-
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 func getConfigSourceConfig(c runtimecontract.Container) (*datacontract.ConfigSourceConfig, error) {
-	cfgAny, err := c.Make(datacontract.ConfigKey)
+	cfg, err := baseconfigsource.ReadConfig(c)
 	if err != nil {
 		return nil, err
-	}
-
-	cfg, ok := cfgAny.(datacontract.Config)
-	if !ok {
-		return nil, errors.New("config: invalid config service")
 	}
 
 	sourceCfg := &datacontract.ConfigSourceConfig{Type: datacontract.ConfigSourceEtcd}

@@ -19,42 +19,42 @@ import (
 // ErrServerAddressRequired indicates Polaris server_address is required.
 //
 // ErrServerAddressRequired 表示 Polaris server_address 必需。
-var ErrServerAddressRequired = errors.New("polaris: server_address is required")
+var ErrServerAddressRequired = errors.New("configsource.polaris: server_address is required")
 
 // ErrFileGroupRequired indicates Polaris file_group is required.
 //
 // ErrFileGroupRequired 表示 Polaris file_group 必需。
-var ErrFileGroupRequired = errors.New("polaris: file_group is required")
+var ErrFileGroupRequired = errors.New("configsource.polaris: file_group is required")
 
 // ErrFileNameRequired indicates Polaris file_name is required.
 //
 // ErrFileNameRequired 表示 Polaris file_name 必需。
-var ErrFileNameRequired = errors.New("polaris: file_name is required")
+var ErrFileNameRequired = errors.New("configsource.polaris: file_name is required")
 
 // ErrConfigNotFound indicates Polaris config not found.
 //
 // ErrConfigNotFound 表示 Polaris 配置未找到。
-var ErrConfigNotFound = errors.New("polaris: config not found")
+var ErrConfigNotFound = errors.New("configsource.polaris: config not found")
 
 // ErrAuthFailed indicates Polaris authentication failed.
 //
 // ErrAuthFailed 表示 Polaris 认证失败。
-var ErrAuthFailed = errors.New("polaris: auth failed")
+var ErrAuthFailed = errors.New("configsource.polaris: auth failed")
 
 // ErrSourceUnavailable indicates Polaris source unavailable.
 //
 // ErrSourceUnavailable 表示 Polaris 配置源不可用。
-var ErrSourceUnavailable = errors.New("polaris: source unavailable")
+var ErrSourceUnavailable = errors.New("configsource.polaris: source unavailable")
 
 // ErrSetNotSupported indicates Polaris set is not supported.
 //
 // ErrSetNotSupported 表示 Polaris 不支持 set 操作。
-var ErrSetNotSupported = errors.New("polaris: set is not supported")
+var ErrSetNotSupported = errors.New("configsource.polaris: set is not supported")
 
 // ErrConfigSourceClosed indicates Polaris config source closed.
 //
 // ErrConfigSourceClosed 表示 Polaris 配置源已关闭。
-var ErrConfigSourceClosed = errors.New("polaris: config source closed")
+var ErrConfigSourceClosed = errors.New("configsource.polaris: config source closed")
 
 // polarisConfigClient defines the internal client interface for Polaris operations.
 //
@@ -116,7 +116,7 @@ func NewConfigSourceWithClient(cfg *PolarisConfig, client polarisConfigClient) (
 		return nil, ErrFileNameRequired
 	}
 	if client == nil {
-		return nil, errors.New("polaris: config client is required")
+		return nil, errors.New("configsource.polaris: config client is required")
 	}
 
 	return &ConfigSource{
@@ -161,7 +161,7 @@ func (s *ConfigSource) Get(ctx context.Context, key string) (any, error) {
 
 	value, ok := lookupNestedValue(s.cache, key)
 	if !ok {
-		return nil, fmt.Errorf("polaris: key %s not found", key)
+		return nil, fmt.Errorf("configsource.polaris: key %s not found", key)
 	}
 	return value, nil
 }

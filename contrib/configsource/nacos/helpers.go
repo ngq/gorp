@@ -55,7 +55,7 @@ func encodeContent(value any) (string, error) {
 		// 使用 YAML 编码
 		data, err := yaml.Marshal(value)
 		if err != nil {
-			return "", fmt.Errorf("nacos: encode config content failed: %w", err)
+			return "", fmt.Errorf("configsource.nacos: encode config content failed: %w", err)
 		}
 		return string(data), nil
 	}

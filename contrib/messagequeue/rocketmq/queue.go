@@ -6,6 +6,7 @@
 package rocketmq
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -17,6 +18,9 @@ import (
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
+
+// ErrQueueClosed is returned when operations are attempted on a closed queue.
+var ErrQueueClosed = errors.New("messagequeue.rocketmq: queue closed")
 
 // Queue implements integrationcontract.MessageQueue using rocketmq-client-go SDK.
 // Manages producer and consumer instances, provides publisher/subscriber factories.
@@ -154,7 +158,7 @@ func (q *Queue) createConsumer(group string) (rocketmq.PushConsumer, error) {
 	defer q.mu.Unlock()
 
 	if q.closed {
-		return nil, fmt.Errorf("messagequeue.rocketmq: queue closed")
+		return nil, ErrQueueClosed
 	}
 
 	namesrvAddr := strings.Split(q.cfg.RocketMQNamesrvAddr, ";")

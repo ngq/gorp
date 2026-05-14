@@ -3,6 +3,7 @@ package servicecomb
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ func TestRegistryRegisterUsesClient(t *testing.T) {
 	require.NoError(t, err)
 	err = registry.Register(context.Background(), "user-service", "10.0.0.1:8080", map[string]string{"region": "cn"})
 	require.NoError(t, err)
-	require.Equal(t, 1, client.registerCalls)
+	require.Equal(t, int32(1), client.registerCalls.Load())
 }
 
 func TestRegistryDeregisterUsesClient(t *testing.T) {
@@ -32,7 +33,7 @@ func TestRegistryDeregisterUsesClient(t *testing.T) {
 	require.NoError(t, err)
 	err = registry.Deregister(context.Background(), "user-service", "10.0.0.1:8080")
 	require.NoError(t, err)
-	require.Equal(t, 1, client.deregisterCalls)
+	require.Equal(t, int32(1), client.deregisterCalls.Load())
 }
 
 func TestRegistryRegisterRejectsDuplicateInstance(t *testing.T) {
@@ -114,7 +115,7 @@ func TestRegistryHeartbeatRunsAfterRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		return client.heartbeatCalls > 0
+		return client.heartbeatCalls.Load() > 0
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -128,13 +129,13 @@ func TestRegistryDeregisterStopsHeartbeat(t *testing.T) {
 	err = registry.Register(context.Background(), "user-service", "10.0.0.1:8080", nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
-		return client.heartbeatCalls > 0
+		return client.heartbeatCalls.Load() > 0
 	}, time.Second, 10*time.Millisecond)
 
-	before := client.heartbeatCalls
+	before := client.heartbeatCalls.Load()
 	require.NoError(t, registry.Deregister(context.Background(), "user-service", "10.0.0.1:8080"))
 	time.Sleep(40 * time.Millisecond)
-	require.Equal(t, before, client.heartbeatCalls)
+	require.Equal(t, before, client.heartbeatCalls.Load())
 }
 
 func TestRegistryHeartbeatNotFoundTriggersReRegister(t *testing.T) {
@@ -151,7 +152,7 @@ func TestRegistryHeartbeatNotFoundTriggersReRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		return client.registerCalls >= 2
+		return client.registerCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -350,10 +351,10 @@ type fakeServiceCombClient struct {
 	discoverResult  []transportcontract.ServiceInstance
 	discoverErrs    []error
 	discoverResults [][]transportcontract.ServiceInstance
-	registerCalls   int
-	deregisterCalls int
-	heartbeatCalls  int
-	discoverCalls   int
+	registerCalls   atomic.Int32
+	deregisterCalls atomic.Int32
+	heartbeatCalls  atomic.Int32
+	discoverCalls   atomic.Int32
 }
 
 type fakeNativeServiceCombClient struct {
@@ -366,17 +367,17 @@ func (f *fakeNativeServiceCombClient) Underlying() any {
 }
 
 func (f *fakeServiceCombClient) Register(ctx context.Context, cfg *ServiceCombConfig, name, addr string, meta map[string]string) error {
-	f.registerCalls++
+	f.registerCalls.Add(1)
 	return f.registerErr
 }
 
 func (f *fakeServiceCombClient) Deregister(ctx context.Context, cfg *ServiceCombConfig, name, addr string) error {
-	f.deregisterCalls++
+	f.deregisterCalls.Add(1)
 	return f.deregisterErr
 }
 
 func (f *fakeServiceCombClient) Heartbeat(ctx context.Context, cfg *ServiceCombConfig, name, addr string) error {
-	f.heartbeatCalls++
+	f.heartbeatCalls.Add(1)
 	if len(f.heartbeatErrs) > 0 {
 		err := f.heartbeatErrs[0]
 		f.heartbeatErrs = f.heartbeatErrs[1:]
@@ -386,7 +387,7 @@ func (f *fakeServiceCombClient) Heartbeat(ctx context.Context, cfg *ServiceCombC
 }
 
 func (f *fakeServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]transportcontract.ServiceInstance, error) {
-	f.discoverCalls++
+	f.discoverCalls.Add(1)
 	if len(f.discoverErrs) > 0 {
 		err := f.discoverErrs[0]
 		f.discoverErrs = f.discoverErrs[1:]

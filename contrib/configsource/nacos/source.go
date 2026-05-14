@@ -19,17 +19,17 @@ import (
 // ErrServerAddrRequired indicates Nacos server_addr is required.
 //
 // ErrServerAddrRequired 表示 Nacos server_addr 必需。
-var ErrServerAddrRequired = errors.New("nacos: server_addr is required")
+var ErrServerAddrRequired = errors.New("configsource.nacos: server_addr is required")
 
 // ErrDataIDRequired indicates Nacos data_id is required.
 //
 // ErrDataIDRequired 表示 Nacos data_id 必需。
-var ErrDataIDRequired = errors.New("nacos: data_id is required")
+var ErrDataIDRequired = errors.New("configsource.nacos: data_id is required")
 
 // ErrConfigNotFound indicates Nacos config not found.
 //
 // ErrConfigNotFound 表示 Nacos 配置未找到。
-var ErrConfigNotFound = errors.New("nacos: config not found")
+var ErrConfigNotFound = errors.New("configsource.nacos: config not found")
 
 // defaultNacosPollInterval is the default polling interval for config updates.
 //
@@ -100,7 +100,7 @@ func NewConfigSourceWithClient(cfg *NacosConfig, client nacosConfigClient) (*Con
 		return nil, ErrDataIDRequired
 	}
 	if client == nil {
-		return nil, errors.New("nacos: config client is required")
+		return nil, errors.New("configsource.nacos: config client is required")
 	}
 
 	return &ConfigSource{
@@ -150,7 +150,7 @@ func (s *ConfigSource) Get(ctx context.Context, key string) (any, error) {
 	// 查找嵌套值
 	value, ok := lookupNestedValue(s.cache, key)
 	if !ok {
-		return nil, fmt.Errorf("nacos: key %s not found", key)
+		return nil, fmt.Errorf("configsource.nacos: key %s not found", key)
 	}
 	return value, nil
 }
@@ -166,7 +166,7 @@ func (s *ConfigSource) Set(ctx context.Context, key string, value any) error {
 	// 验证 key 必须为空或等于当前 DataID
 	// Nacos SDK 只支持整体配置更新，不支持单 key 更新
 	if key != "" && key != s.config.DataID {
-		return fmt.Errorf("nacos: set only supports data_id %s", s.config.DataID)
+		return fmt.Errorf("configsource.nacos: set only supports data_id %s", s.config.DataID)
 	}
 
 	// 将值编码为配置内容（YAML 或纯文本）
@@ -224,7 +224,7 @@ func (s *ConfigSource) Watch(ctx context.Context, key string) (datacontract.Conf
 
 	// 检查配置源是否已关闭
 	if s.closed {
-		return nil, errors.New("nacos: config source closed")
+		return nil, errors.New("configsource.nacos: config source closed")
 	}
 
 	// 创建可取消的监听上下文

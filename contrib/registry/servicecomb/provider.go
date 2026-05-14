@@ -8,19 +8,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ngq/gorp/contrib/internal/baseregistry"
 	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/contrib/registry/internal/lifecycle"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	configprovider "github.com/ngq/gorp/framework/provider/config"
 )
 
 var (
-	ErrServerURIRequired = errors.New("servicecomb: server_uri is required")
-	ErrAppIDRequired     = errors.New("servicecomb: app_id is required")
-	ErrServiceNotFound   = errors.New("servicecomb: service not found")
-	ErrRegistryClosed    = errors.New("servicecomb: registry closed")
-	ErrAlreadyRegistered = errors.New("servicecomb: instance already registered")
+	ErrServerURIRequired = errors.New("registry.servicecomb: server_uri is required")
+	ErrAppIDRequired     = errors.New("registry.servicecomb: app_id is required")
+	ErrServiceNotFound   = errors.New("registry.servicecomb: service not found")
+	ErrRegistryClosed    = errors.New("registry.servicecomb: registry closed")
+	ErrAlreadyRegistered = errors.New("registry.servicecomb: instance already registered")
 )
 
 // Provider 提供 ServiceComb 服务发现实现。
@@ -33,25 +35,21 @@ var (
 //   - 当前状态：部分可用
 //   - 说明：已完成 P2 第一版最小注册/发现闭环，具备 Register / Deregister / Discover 与 fake client 行为测试；
 //     但当前仍未覆盖完整心跳、实例治理与 SDK 产品化语义。
-type Provider struct{}
-
-func NewProvider() *Provider           { return &Provider{} }
-func (p *Provider) Name() string       { return "registry.servicecomb" }
-func (p *Provider) IsDefer() bool      { return true }
-func (p *Provider) Provides() []string { return []string{transportcontract.RPCRegistryKey} }
-
-func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(transportcontract.RPCRegistryKey, func(c runtimecontract.Container) (any, error) {
-		cfg, err := getServiceCombConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return NewRegistry(cfg)
-	}, true)
-	return nil
+type Provider struct {
+	baseregistry.BaseRegistryProvider
 }
 
-func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
+func NewProvider() *Provider {
+	p := &Provider{}
+	p.NameStr = "registry.servicecomb"
+	p.GetConfig = func(c runtimecontract.Container) (any, error) {
+		return getServiceCombConfig(c)
+	}
+	p.NewRegistry = func(cfg any) (transportcontract.ServiceRegistry, error) {
+		return NewRegistry(cfg.(*ServiceCombConfig))
+	}
+	return p
+}
 
 type ServiceCombConfig struct {
 	ServerURI             string
@@ -75,7 +73,7 @@ func getServiceCombConfig(c runtimecontract.Container) (*ServiceCombConfig, erro
 	}
 	cfg, ok := cfgAny.(datacontract.Config)
 	if !ok {
-		return nil, errors.New("servicecomb: invalid config service")
+		return nil, errors.New("registry.servicecomb: invalid config service")
 	}
 
 	servicecombCfg := &ServiceCombConfig{
@@ -84,35 +82,25 @@ func getServiceCombConfig(c runtimecontract.Container) (*ServiceCombConfig, erro
 		HeartbeatRetryBackoff: time.Second,
 		WatchInterval:         time.Second,
 	}
-	if v := cfg.Get("discovery.servicecomb.server_uri"); v != nil {
-		servicecombCfg.ServerURI = cfg.GetString("discovery.servicecomb.server_uri")
+	servicecombCfg.ServerURI = configprovider.GetStringAny(cfg, "discovery.servicecomb.server_uri")
+	servicecombCfg.AppID = configprovider.GetStringAny(cfg, "discovery.servicecomb.app_id")
+	servicecombCfg.ServiceName = configprovider.GetStringAny(cfg, "discovery.servicecomb.service_name")
+	servicecombCfg.Version = configprovider.GetStringAny(cfg, "discovery.servicecomb.version")
+	if servicecombCfg.Version == "" {
+		servicecombCfg.Version = "1.0.0"
 	}
-	if v := cfg.Get("discovery.servicecomb.app_id"); v != nil {
-		servicecombCfg.AppID = cfg.GetString("discovery.servicecomb.app_id")
+	servicecombCfg.Environment = configprovider.GetStringAny(cfg, "discovery.servicecomb.environment")
+	if servicecombCfg.Environment == "" {
+		servicecombCfg.Environment = "production"
 	}
-	if v := cfg.Get("discovery.servicecomb.service_name"); v != nil {
-		servicecombCfg.ServiceName = cfg.GetString("discovery.servicecomb.service_name")
+	if seconds := configprovider.GetIntAny(cfg, "discovery.servicecomb.heartbeat_interval_seconds"); seconds > 0 {
+		servicecombCfg.HeartbeatInterval = time.Duration(seconds) * time.Second
 	}
-	if v := cfg.Get("discovery.servicecomb.version"); v != nil {
-		servicecombCfg.Version = cfg.GetString("discovery.servicecomb.version")
+	if ms := configprovider.GetIntAny(cfg, "discovery.servicecomb.heartbeat_retry_backoff_ms"); ms > 0 {
+		servicecombCfg.HeartbeatRetryBackoff = time.Duration(ms) * time.Millisecond
 	}
-	if v := cfg.Get("discovery.servicecomb.environment"); v != nil {
-		servicecombCfg.Environment = cfg.GetString("discovery.servicecomb.environment")
-	}
-	if v := cfg.Get("discovery.servicecomb.heartbeat_interval_seconds"); v != nil {
-		if seconds := cfg.GetInt("discovery.servicecomb.heartbeat_interval_seconds"); seconds > 0 {
-			servicecombCfg.HeartbeatInterval = time.Duration(seconds) * time.Second
-		}
-	}
-	if v := cfg.Get("discovery.servicecomb.heartbeat_retry_backoff_ms"); v != nil {
-		if ms := cfg.GetInt("discovery.servicecomb.heartbeat_retry_backoff_ms"); ms > 0 {
-			servicecombCfg.HeartbeatRetryBackoff = time.Duration(ms) * time.Millisecond
-		}
-	}
-	if v := cfg.Get("discovery.servicecomb.watch_interval_ms"); v != nil {
-		if ms := cfg.GetInt("discovery.servicecomb.watch_interval_ms"); ms > 0 {
-			servicecombCfg.WatchInterval = time.Duration(ms) * time.Millisecond
-		}
+	if ms := configprovider.GetIntAny(cfg, "discovery.servicecomb.watch_interval_ms"); ms > 0 {
+		servicecombCfg.WatchInterval = time.Duration(ms) * time.Millisecond
 	}
 	return servicecombCfg, nil
 }
@@ -154,7 +142,7 @@ func NewRegistryWithClient(cfg *ServiceCombConfig, client serviceCombClient) (*R
 		return nil, ErrAppIDRequired
 	}
 	if client == nil {
-		return nil, errors.New("servicecomb: client is required")
+		return nil, errors.New("registry.servicecomb: client is required")
 	}
 	return &Registry{
 		config:        cfg,

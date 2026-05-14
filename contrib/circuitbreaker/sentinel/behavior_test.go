@@ -3,6 +3,7 @@ package sentinel
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -18,50 +19,66 @@ import (
 
 type cbConfigStub struct{}
 
-func (cbConfigStub) Env() string                                                   { return "test" }
-func (cbConfigStub) Get(string) any                                                { return nil }
-func (cbConfigStub) GetString(string) string                                       { return "" }
-func (cbConfigStub) GetInt(string) int                                             { return 0 }
-func (cbConfigStub) GetBool(string) bool                                           { return false }
-func (cbConfigStub) GetFloat(string) float64                                       { return 0 }
-func (cbConfigStub) Unmarshal(string, any) error                                   { return nil }
+func (cbConfigStub) Env() string                 { return "test" }
+func (cbConfigStub) Get(string) any              { return nil }
+func (cbConfigStub) GetString(string) string     { return "" }
+func (cbConfigStub) GetInt(string) int           { return 0 }
+func (cbConfigStub) GetBool(string) bool         { return false }
+func (cbConfigStub) GetFloat(string) float64     { return 0 }
+func (cbConfigStub) Unmarshal(string, any) error { return nil }
 func (cbConfigStub) Watch(context.Context, string) (datacontract.ConfigWatcher, error) {
 	return nil, nil
 }
-func (cbConfigStub) Reload(context.Context) error                                  { return nil }
+func (cbConfigStub) Reload(context.Context) error { return nil }
 
 type invalidConfigContainerStub struct{}
 
-func (invalidConfigContainerStub) Bind(string, runtimecontract.Factory, bool)          {}
-func (invalidConfigContainerStub) IsBind(string) bool                                  { return true }
-func (invalidConfigContainerStub) Make(string) (any, error)                            { return 1, nil }
-func (invalidConfigContainerStub) MustMake(string) any                                 { return 1 }
+func (invalidConfigContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (invalidConfigContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (invalidConfigContainerStub) IsBind(string) bool                                      { return true }
+func (invalidConfigContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (invalidConfigContainerStub) Make(string) (any, error)                                { return 1, nil }
+func (invalidConfigContainerStub) MakeNamed(string, string) (any, error)                   { return nil, nil }
+func (invalidConfigContainerStub) MustMake(string) any                                     { return 1 }
+func (invalidConfigContainerStub) MustMakeNamed(string, string) any                        { return nil }
+func (invalidConfigContainerStub) RegisterCloser(string, io.Closer)                        {}
+func (invalidConfigContainerStub) Destroy() error                                          { return nil }
 func (invalidConfigContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }
 func (invalidConfigContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
 	return nil
 }
+func (invalidConfigContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
+func (invalidConfigContainerStub) DebugPrint() string                                  { return "" }
 
 type sentinelContainerStub struct {
 	cfg datacontract.Config
 }
 
-func (s sentinelContainerStub) Bind(string, runtimecontract.Factory, bool) {}
-func (s sentinelContainerStub) IsBind(string) bool                  { return true }
+func (s sentinelContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (s sentinelContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (s sentinelContainerStub) IsBind(string) bool                                      { return true }
+func (s sentinelContainerStub) IsBindNamed(string, string) bool                         { return false }
 func (s sentinelContainerStub) Make(key string) (any, error) {
 	if key == datacontract.ConfigKey {
 		return s.cfg, nil
 	}
 	return nil, errors.New("not found")
 }
-func (s sentinelContainerStub) MustMake(string) any                                 { return s.cfg }
+func (s sentinelContainerStub) MakeNamed(string, string) (any, error) { return nil, nil }
+func (s sentinelContainerStub) MustMake(string) any                   { return s.cfg }
+func (s sentinelContainerStub) MustMakeNamed(string, string) any      { return nil }
+func (s sentinelContainerStub) RegisterCloser(string, io.Closer)      {}
+func (s sentinelContainerStub) Destroy() error                        { return nil }
 func (s sentinelContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }
 func (s sentinelContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
 	return nil
 }
+func (s sentinelContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
+func (s sentinelContainerStub) DebugPrint() string                                  { return "" }
 
 func TestGetCircuitBreakerConfigDefaults(t *testing.T) {
 	cfg := cbConfigStub{}

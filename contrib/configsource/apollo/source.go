@@ -19,37 +19,37 @@ import (
 // ErrAppIDRequired indicates Apollo app_id is required.
 //
 // ErrAppIDRequired 表示 Apollo app_id 必需。
-var ErrAppIDRequired = errors.New("apollo: app_id is required")
+var ErrAppIDRequired = errors.New("configsource.apollo: app_id is required")
 
 // ErrMetaRequired indicates Apollo meta_server is required.
 //
 // ErrMetaRequired 表示 Apollo meta_server 必需。
-var ErrMetaRequired = errors.New("apollo: meta_server is required")
+var ErrMetaRequired = errors.New("configsource.apollo: meta_server is required")
 
 // ErrConfigNotFound indicates Apollo config not found.
 //
 // ErrConfigNotFound 表示 Apollo 配置未找到。
-var ErrConfigNotFound = errors.New("apollo: config not found")
+var ErrConfigNotFound = errors.New("configsource.apollo: config not found")
 
 // ErrAuthFailed indicates Apollo authentication failed.
 //
 // ErrAuthFailed 表示 Apollo 认证失败。
-var ErrAuthFailed = errors.New("apollo: auth failed")
+var ErrAuthFailed = errors.New("configsource.apollo: auth failed")
 
 // ErrSourceUnavailable indicates Apollo source unavailable.
 //
 // ErrSourceUnavailable 表示 Apollo 配置源不可用。
-var ErrSourceUnavailable = errors.New("apollo: source unavailable")
+var ErrSourceUnavailable = errors.New("configsource.apollo: source unavailable")
 
 // ErrSetNotSupported indicates Apollo set is not supported.
 //
 // ErrSetNotSupported 表示 Apollo 不支持 set 操作。
-var ErrSetNotSupported = errors.New("apollo: set is not supported")
+var ErrSetNotSupported = errors.New("configsource.apollo: set is not supported")
 
 // ErrConfigSourceClosed indicates Apollo config source closed.
 //
 // ErrConfigSourceClosed 表示 Apollo 配置源已关闭。
-var ErrConfigSourceClosed = errors.New("apollo: config source closed")
+var ErrConfigSourceClosed = errors.New("configsource.apollo: config source closed")
 
 // defaultApolloPollInterval is the default polling interval for config updates.
 //
@@ -113,7 +113,7 @@ func NewConfigSourceWithClient(cfg *ApolloConfig, client apolloConfigClient) (*C
 		return nil, ErrMetaRequired
 	}
 	if client == nil {
-		return nil, errors.New("apollo: config client is required")
+		return nil, errors.New("configsource.apollo: config client is required")
 	}
 
 	return &ConfigSource{
@@ -158,7 +158,7 @@ func (s *ConfigSource) Get(ctx context.Context, key string) (any, error) {
 
 	value, ok := lookupNestedValue(s.cache, key)
 	if !ok {
-		return nil, fmt.Errorf("apollo: key %s not found", key)
+		return nil, fmt.Errorf("configsource.apollo: key %s not found", key)
 	}
 	return value, nil
 }

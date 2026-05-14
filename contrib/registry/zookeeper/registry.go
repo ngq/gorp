@@ -20,22 +20,22 @@ import (
 // ErrNoServers indicates Zookeeper servers are required.
 //
 // ErrNoServers 表示 Zookeeper 服务器地址必需。
-var ErrNoServers = errors.New("zookeeper: no servers configured")
+var ErrNoServers = errors.New("registry.zookeeper: no servers configured")
 
 // ErrServiceNotFound indicates Zookeeper service not found.
 //
 // ErrServiceNotFound 表示 Zookeeper 服务未找到。
-var ErrServiceNotFound = errors.New("zookeeper: service not found")
+var ErrServiceNotFound = errors.New("registry.zookeeper: service not found")
 
 // ErrRegistryClosed indicates Zookeeper registry closed.
 //
 // ErrRegistryClosed 表示 Zookeeper 注册中心已关闭。
-var ErrRegistryClosed = errors.New("zookeeper: registry closed")
+var ErrRegistryClosed = errors.New("registry.zookeeper: registry closed")
 
 // ErrAlreadyRegistered indicates Zookeeper instance already registered.
 //
 // ErrAlreadyRegistered 表示 Zookeeper 实例已注册。
-var ErrAlreadyRegistered = errors.New("zookeeper: instance already registered")
+var ErrAlreadyRegistered = errors.New("registry.zookeeper: instance already registered")
 
 // Registry implements transportcontract.ServiceRegistry with Zookeeper SDK.
 // Supports service registration, discovery, and watch with caching.
@@ -74,7 +74,7 @@ func NewRegistryWithBackend(cfg *ZookeeperConfig, backend zkBackend) (*Registry,
 		return nil, ErrNoServers
 	}
 	if backend == nil {
-		return nil, errors.New("zookeeper: backend is required")
+		return nil, errors.New("registry.zookeeper: backend is required")
 	}
 	return &Registry{
 		config:              cfg,
@@ -106,7 +106,7 @@ func (r *Registry) Register(ctx context.Context, name, addr string, meta map[str
 	// 确保 Zookeeper 服务路径存在
 	servicePath := path.Join(r.config.BasePath, name)
 	if err := r.backend.EnsurePath(servicePath); err != nil {
-		return fmt.Errorf("zookeeper: ensure service path failed: %w", err)
+		return fmt.Errorf("registry.zookeeper: ensure service path failed: %w", err)
 	}
 
 	// 构造服务实例记录
@@ -119,13 +119,13 @@ func (r *Registry) Register(ctx context.Context, name, addr string, meta map[str
 	}
 	payload, err := encodeServiceRecord(record)
 	if err != nil {
-		return fmt.Errorf("zookeeper: encode instance data failed: %w", err)
+		return fmt.Errorf("registry.zookeeper: encode instance data failed: %w", err)
 	}
 
 	// 创建临时节点（Ephemeral ZNode）
 	instancePath := path.Join(servicePath, sanitizeNodeName(addr))
 	if err := r.backend.CreateEphemeral(instancePath, payload); err != nil {
-		return fmt.Errorf("zookeeper: create ephemeral node failed: %w", err)
+		return fmt.Errorf("registry.zookeeper: create ephemeral node failed: %w", err)
 	}
 
 	// 记录已注册实例路径，清理缓存
@@ -159,7 +159,7 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 		if errors.Is(err, errZKNoNode) {
 			return ErrServiceNotFound
 		}
-		return fmt.Errorf("zookeeper: delete instance failed: %w", err)
+		return fmt.Errorf("registry.zookeeper: delete instance failed: %w", err)
 	}
 
 	// 清理本地记录和缓存
@@ -195,7 +195,7 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontra
 		if errors.Is(err, errZKNoNode) {
 			return nil, ErrServiceNotFound
 		}
-		return nil, fmt.Errorf("zookeeper: list instances failed: %w", err)
+		return nil, fmt.Errorf("registry.zookeeper: list instances failed: %w", err)
 	}
 	if len(children) == 0 {
 		return nil, ErrServiceNotFound
@@ -206,12 +206,12 @@ func (r *Registry) Discover(ctx context.Context, name string) ([]transportcontra
 	for _, child := range children {
 		data, getErr := r.backend.Get(path.Join(servicePath, child))
 		if getErr != nil {
-			return nil, fmt.Errorf("zookeeper: read instance failed: %w", getErr)
+			return nil, fmt.Errorf("registry.zookeeper: read instance failed: %w", getErr)
 		}
 
 		record, err := decodeServiceRecord(data)
 		if err != nil {
-			return nil, fmt.Errorf("zookeeper: decode instance failed: %w", err)
+			return nil, fmt.Errorf("registry.zookeeper: decode instance failed: %w", err)
 		}
 		result = append(result, transportcontract.ServiceInstance{
 			ID:       record.ID,

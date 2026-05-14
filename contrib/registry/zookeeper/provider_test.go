@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -203,7 +204,7 @@ func TestRegistryWatchRetriesAfterBackendError(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return backend.watchCalls >= 2
+		return backend.watchCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
 
 	require.NoError(t, backend.Delete(path.Join("/services", "user-service", "10.0.0.1:8080")))
@@ -214,7 +215,7 @@ func TestRegistryWatchRetriesAfterBackendError(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected empty snapshot after retry")
 	}
-	require.GreaterOrEqual(t, backend.watchCalls, 2)
+	require.GreaterOrEqual(t, backend.watchCalls.Load(), int32(2))
 }
 
 func TestRegistryWatchRetriesAfterSessionExpired(t *testing.T) {
@@ -246,7 +247,7 @@ func TestRegistryWatchRetriesAfterSessionExpired(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return backend.watchCalls >= 2
+		return backend.watchCalls.Load() >= 2
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -269,7 +270,7 @@ func TestRegistryWatchStopsOnNonRetryableError(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return backend.watchCalls == 1
+		return backend.watchCalls.Load() == 1
 	}, time.Second, 10*time.Millisecond)
 
 	select {
@@ -353,7 +354,7 @@ type fakeZKBackend struct {
 	closed      bool
 	watchers    map[string][]chan struct{}
 	watchErrs   []error
-	watchCalls  int
+	watchCalls  atomic.Int32
 }
 
 type fakeNativeZKBackend struct {
@@ -435,7 +436,7 @@ func (b *fakeZKBackend) Get(target string) ([]byte, error) {
 
 func (b *fakeZKBackend) WatchChildren(ctx context.Context, target string, onUpdate func()) error {
 	b.mu.Lock()
-	b.watchCalls++
+	b.watchCalls.Add(1)
 	if len(b.watchErrs) > 0 {
 		err := b.watchErrs[0]
 		b.watchErrs = b.watchErrs[1:]

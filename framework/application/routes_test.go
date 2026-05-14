@@ -7,6 +7,7 @@ package application
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
@@ -187,11 +188,19 @@ func (testRouter) Mount(path string, handler http.Handler)                      
 
 type testContainer struct{}
 
-func (testContainer) Bind(key string, factory runtimecontract.Factory, singleton bool) {}
-func (testContainer) IsBind(key string) bool                                           { return false }
-func (testContainer) Make(key string) (any, error)                                     { return nil, nil }
-func (testContainer) MustMake(key string) any                                          { return nil }
-func (testContainer) RegisterProvider(p runtimecontract.ServiceProvider) error         { return nil }
+func (testContainer) Bind(key string, factory runtimecontract.Factory, singleton bool)            {}
+func (testContainer) NamedBind(name, key string, factory runtimecontract.Factory, singleton bool) {}
+func (testContainer) IsBind(key string) bool                                                      { return false }
+func (testContainer) IsBindNamed(name, key string) bool                                           { return false }
+func (testContainer) Make(key string) (any, error)                                                { return nil, nil }
+func (testContainer) MakeNamed(name, key string) (any, error)                                     { return nil, nil }
+func (testContainer) MustMake(key string) any                                                     { return nil }
+func (testContainer) MustMakeNamed(name, key string) any                                          { return nil }
+func (testContainer) RegisterCloser(key string, closer io.Closer)                                 {}
+func (testContainer) Destroy() error                                                              { return nil }
+func (testContainer) RegisterProvider(p runtimecontract.ServiceProvider) error                    { return nil }
 func (testContainer) RegisterProviders(providers ...runtimecontract.ServiceProvider) error {
 	return nil
 }
+func (testContainer) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
+func (testContainer) DebugPrint() string                                  { return "" }

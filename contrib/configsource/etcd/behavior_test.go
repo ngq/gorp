@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -53,16 +54,28 @@ func TestSourceCloseWithoutClientPanicsToday(t *testing.T) {
 
 type etcdConfigInvalidContainerStub struct{}
 
-func (etcdConfigInvalidContainerStub) Bind(string, runtimecontract.Factory, bool) {}
-func (etcdConfigInvalidContainerStub) IsBind(string) bool { return true }
-func (etcdConfigInvalidContainerStub) Make(string) (any, error) { return 1, nil }
-func (etcdConfigInvalidContainerStub) MustMake(string) any { return 1 }
+func (etcdConfigInvalidContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (etcdConfigInvalidContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (etcdConfigInvalidContainerStub) IsBind(string) bool                                      { return true }
+func (etcdConfigInvalidContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (etcdConfigInvalidContainerStub) Make(string) (any, error)                                { return 1, nil }
+func (etcdConfigInvalidContainerStub) MakeNamed(string, string) (any, error) {
+	return nil, errors.New("not found")
+}
+func (etcdConfigInvalidContainerStub) MustMake(string) any              { return 1 }
+func (etcdConfigInvalidContainerStub) MustMakeNamed(string, string) any { return nil }
+func (etcdConfigInvalidContainerStub) RegisterCloser(string, io.Closer) {}
+func (etcdConfigInvalidContainerStub) Destroy() error                   { return nil }
 func (etcdConfigInvalidContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }
 func (etcdConfigInvalidContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
 	return nil
 }
+func (etcdConfigInvalidContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo {
+	return nil
+}
+func (etcdConfigInvalidContainerStub) DebugPrint() string { return "" }
 
 func TestEtcdSourceErrorHelper(t *testing.T) {
 	err := errors.New("boom")

@@ -7,6 +7,7 @@ package proto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,10 +45,10 @@ type ProtoMethod struct {
 // 然后生成包含类型化客户端 struct 和方法的 Go 文件。
 func (g *Generator) GenClient(ctx context.Context, opts integrationcontract.ClientGenOptions) error {
 	if opts.ProtoFile == "" {
-		return fmt.Errorf("proto file path is required")
+		return errors.New("proto file path is required")
 	}
 	if opts.OutputFile == "" {
-		return fmt.Errorf("output file path is required")
+		return errors.New("output file path is required")
 	}
 	if opts.PackageName == "" {
 		// Derive package name from output directory
@@ -78,7 +79,7 @@ func (g *Generator) GenClient(ctx context.Context, opts integrationcontract.Clie
 	}
 
 	if len(services) == 0 {
-		return fmt.Errorf("no services found in proto file")
+		return errors.New("no services found in proto file")
 	}
 
 	// Generate client wrapper code

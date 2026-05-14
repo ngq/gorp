@@ -9,6 +9,7 @@ package error_reporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -116,7 +117,7 @@ func (a *SentryAdapter) ReportSync(ctx context.Context, report *resiliencecontra
 		return nil
 	}
 
-	return fmt.Errorf("sentry adapter not fully implemented, please import github.com/getsentry/sentry-go")
+	return errors.New("sentry adapter not fully implemented, please import github.com/getsentry/sentry-go")
 }
 
 // ReportAsync reports error asynchronously to Sentry.

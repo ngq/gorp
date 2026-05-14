@@ -134,7 +134,7 @@ func normalizePolarisAddresses(raw string) ([]string, error) {
 		if strings.Contains(candidate, "://") {
 			parsed, err := url.Parse(candidate)
 			if err != nil {
-				return nil, fmt.Errorf("polaris: invalid server address: %w", err)
+				return nil, fmt.Errorf("configsource.polaris: invalid server address: %w", err)
 			}
 			if parsed.Host != "" {
 				candidate = parsed.Host
