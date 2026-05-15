@@ -68,6 +68,8 @@ type ValidationError struct {
 // ValidationErrors is a collection of validation failures.
 //
 // ValidationErrors 是校验失败集合。
+//
+//nolint:errname // 命名表示"多个校验错误的集合"，符合语义
 type ValidationErrors []ValidationError
 
 // Error returns the first validation message as the aggregate error text.

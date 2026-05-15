@@ -30,6 +30,13 @@ func (p *Provider) Provides() []string {
 	return []string{transportcontract.MetadataKey, transportcontract.MetadataPropagatorKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop metadata has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop metadata 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(transportcontract.MetadataKey, func(c runtimecontract.Container) (any, error) {
 		return &noopMetadata{}, nil

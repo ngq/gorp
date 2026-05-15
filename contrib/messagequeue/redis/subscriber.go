@@ -70,7 +70,7 @@ func (s *redisSubscriber) Consume(ctx context.Context, queue string, handler int
 		}
 		result, err := s.queue.client.BLPop(ctx, time.Second, queue).Result()
 		if err != nil {
-			if err == redis.Nil {
+			if errors.Is(err, redis.Nil) {
 				continue
 			}
 			return err

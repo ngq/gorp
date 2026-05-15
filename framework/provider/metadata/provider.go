@@ -48,6 +48,13 @@ func (p *Provider) Provides() []string {
 	return []string{transportcontract.MetadataKey, transportcontract.MetadataPropagatorKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Metadata provider depends on Config for propagation configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Metadata provider 依赖 Config 获取传播配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds metadata services to the container.
 // Core logic: Create Metadata instance, create Propagator with config, bind both.
 //

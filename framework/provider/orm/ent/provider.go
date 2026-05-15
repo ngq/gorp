@@ -57,6 +57,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回 Ent 客户端契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.EntClientKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Ent provider depends on Config for database configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Ent provider 依赖 Config 获取数据库配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the Ent client factory to the container.
 // Core logic: Resolve factory from container, call CreateEntClient to get client.
 // Note: Application must bind EntClientFactoryKey before registering this provider.

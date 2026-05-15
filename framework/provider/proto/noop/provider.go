@@ -33,6 +33,13 @@ func (p *Provider) Provides() []string {
 	return []string{integrationcontract.ProtoGeneratorKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop proto generator has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop proto generator 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register 注册 noop ProtoGenerator 服务。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(integrationcontract.ProtoGeneratorKey, func(c runtimecontract.Container) (any, error) {

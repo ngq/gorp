@@ -47,6 +47,13 @@ func (p *Provider) IsDefer() bool { return true }
 // 暴露 RetryKey 用于重试服务。
 func (p *Provider) Provides() []string { return []string{resiliencecontract.RetryKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Retry provider depends on Config for retry configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Retry provider 依赖 Config 获取重试配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the retry factory to the container.
 // Core logic: Read config, create RetryService with policy, bind to container.
 //

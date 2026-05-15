@@ -12,6 +12,9 @@
 package basemq
 
 import (
+	"fmt"
+
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -47,6 +50,15 @@ func (p *BaseMQProvider) Provides() []string {
 	}
 }
 
+// DependsOn returns the keys this provider depends on.
+// BaseMQProvider depends on Config for configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// BaseMQProvider 依赖 Config 获取配置。
+func (p *BaseMQProvider) DependsOn() []string {
+	return []string{datacontract.ConfigKey}
+}
+
 // Register binds MessageQueue, MessagePublisher, and MessageSubscriber to the container.
 // MessageQueue is the single singleton that holds the underlying connection.
 // Publisher and Subscriber are derived from it via c.Make, eliminating the
@@ -77,7 +89,11 @@ func (p *BaseMQProvider) Register(c runtimecontract.Container) error {
 		if err != nil {
 			return nil, err
 		}
-		return mq.(integrationcontract.MessageQueue).Publisher(), nil
+		mqSvc, ok := mq.(integrationcontract.MessageQueue)
+			if !ok {
+				return nil, fmt.Errorf("basemq: expected integrationcontract.MessageQueue, got %T", mq)
+			}
+			return mqSvc.Publisher(), nil
 	}, true)
 
 	c.Bind(integrationcontract.MessageSubscriberKey, func(c runtimecontract.Container) (any, error) {
@@ -85,7 +101,11 @@ func (p *BaseMQProvider) Register(c runtimecontract.Container) error {
 		if err != nil {
 			return nil, err
 		}
-		return mq.(integrationcontract.MessageQueue).Subscriber(), nil
+		mqSvc, ok := mq.(integrationcontract.MessageQueue)
+			if !ok {
+				return nil, fmt.Errorf("basemq: expected integrationcontract.MessageQueue, got %T", mq)
+			}
+			return mqSvc.Subscriber(), nil
 	}, true)
 
 	return nil

@@ -43,6 +43,13 @@ func (p *Provider) Provides() []string {
 	return []string{integrationcontract.MessageQueueKey, integrationcontract.MessagePublisherKey, integrationcontract.MessageSubscriberKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop message queue has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop message queue 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op message queue components to the container.
 //
 // Register 将空消息队列组件绑定到容器。

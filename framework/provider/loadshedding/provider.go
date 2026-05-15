@@ -40,6 +40,13 @@ func (p *Provider) Provides() []string {
 	return []string{resiliencecontract.LoadShedderKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// LoadShedding provider has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// LoadShedding provider 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Requires 返回该 provider 依赖的容器 key 列表（无外部依赖）。
 func (p *Provider) Requires() []string { return nil }
 

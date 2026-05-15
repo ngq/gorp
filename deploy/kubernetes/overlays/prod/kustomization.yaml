@@ -8,6 +8,9 @@ resources:
   - ../../base
   - hpa.yaml
   - ingress.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - servicemonitor.yaml
 
 # 生产环境镜像
 images:
@@ -27,3 +30,4 @@ configMapGenerator:
 # 生产环境部署配置
 patches:
   - path: deployment-patch.yaml
+  - path: topology-spread-patch.yaml

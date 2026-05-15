@@ -40,6 +40,13 @@ func (p *Provider) IsDefer() bool { return true }
 // Provides 返回 DTM 客户端契约键。
 func (p *Provider) Provides() []string { return []string{integrationcontract.DTMKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Noop DTM has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop DTM 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op DTM client to the container.
 //
 // Register 将空 DTM 客户端绑定到容器。

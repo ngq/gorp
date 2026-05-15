@@ -184,7 +184,7 @@ func (m *mapMetadata) Range(f func(key string, values []string) bool) {
 func (m *mapMetadata) Clone() Metadata {
 	data := make(map[string][]string, len(m.data))
 	for k, v := range m.data {
-		data[k] = copySlice(v)
+		data[k] = cloneValues(v)
 	}
 	return &mapMetadata{data: data}
 }
@@ -192,7 +192,7 @@ func (m *mapMetadata) Clone() Metadata {
 func (m *mapMetadata) ToMap() map[string][]string {
 	result := make(map[string][]string, len(m.data))
 	for k, v := range m.data {
-		result[k] = copySlice(v)
+		result[k] = cloneValues(v)
 	}
 	return result
 }
@@ -215,5 +215,22 @@ func copySlice(s []string) []string {
 	}
 	r := make([]string, len(s))
 	copy(r, s)
+	return r
+}
+
+// cloneValues clones a value slice. For single-element slices (the common case
+// from Set), it avoids the overhead of copy() and allocates directly.
+//
+// cloneValues 克隆值切片。对于单元素切片（Set 的常见场景），
+// 跳过 copy() 开销直接分配，减少内存分配次数。
+func cloneValues(v []string) []string {
+	if len(v) == 0 {
+		return nil
+	}
+	if len(v) == 1 {
+		return []string{v[0]}
+	}
+	r := make([]string, len(v))
+	copy(r, v)
 	return r
 }

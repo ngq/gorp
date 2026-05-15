@@ -7,6 +7,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -84,7 +85,8 @@ func (v *stubValidator) RegisterCustom(string, datacontract.CustomValidateFunc) 
 }
 func (v *stubValidator) SetLocale(string) error { return nil }
 func (v *stubValidator) TranslateError(err error) resiliencecontract.AppError {
-	if appErr, ok := err.(resiliencecontract.AppError); ok {
+	var appErr resiliencecontract.AppError
+	if errors.As(err, &appErr) {
 		return appErr
 	}
 	return resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())

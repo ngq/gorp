@@ -51,6 +51,15 @@ func (p *Provider) Provides() []string {
 	return []string{transportcontract.RPCClientKey, transportcontract.RPCServerKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// HTTP RPC depends on Config, Discovery, and Tracer.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// HTTP RPC 依赖 Config、Discovery 和 Tracer。
+func (p *Provider) DependsOn() []string {
+	return []string{datacontract.ConfigKey, transportcontract.RPCRegistryKey, observabilitycontract.TracerKey}
+}
+
 // Register binds HTTP RPC client/server factories to the container.
 // Core logic: Create client with discovery/governance, create server, bind to container.
 //

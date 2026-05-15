@@ -17,6 +17,7 @@ type bootstrapRecordingProvider struct {
 func (p *bootstrapRecordingProvider) Name() string       { return p.name }
 func (p *bootstrapRecordingProvider) IsDefer() bool      { return false }
 func (p *bootstrapRecordingProvider) Provides() []string { return p.provides }
+func (p *bootstrapRecordingProvider) DependsOn() []string { return nil }
 func (p *bootstrapRecordingProvider) Register(c runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":register")
 	for _, key := range p.provides {

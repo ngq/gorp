@@ -41,6 +41,13 @@ func (p *Provider) Provides() []string {
 	return []string{observabilitycontract.TracerKey, observabilitycontract.TracerProviderKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop tracing has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop tracing 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op tracer to the container.
 //
 // Register 将空追踪器绑定到容器。

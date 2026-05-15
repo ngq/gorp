@@ -196,21 +196,25 @@ func TestSingleton_ConcurrentResolutionDifferentKeys(t *testing.T) {
 	}
 }
 
-// TestSingleton_DependentChainNotCircular verifies that A→B (where B has no
-// back-reference to A) is not flagged as circular.
+// TestTransient_CircularDependency verifies that circular dependencies in transient
+// bindings are also detected and returned as friendly errors.
 //
-// TestSingleton_DependentChainNotCircular 验证 A→B（B 不反向引用 A）
-// 不被标记为循环依赖。
-func TestSingleton_DependentChainNotCircular(t *testing.T) {
+// TestTransient_CircularDependency 验证 transient 绑定中的循环依赖也会被检测并返回友好错误。
+func TestTransient_CircularDependency(t *testing.T) {
 	c := New()
-	c.Bind("b", func(runtimecontract.Container) (any, error) {
-		return "b-value", nil
-	}, true)
 	c.Bind("a", func(c runtimecontract.Container) (any, error) {
 		return c.Make("b")
-	}, true)
+	}, false)
+	c.Bind("b", func(c runtimecontract.Container) (any, error) {
+		return c.Make("a")
+	}, false)
 
-	v, err := c.Make("a")
-	require.NoError(t, err)
-	require.Equal(t, "b-value", v)
+	_, err := c.Make("a")
+	require.Error(t, err)
+
+	var cde *runtimecontract.CircularDependencyError
+	require.True(t, errors.As(err, &cde), "expected CircularDependencyError, got: %v", err)
+	require.True(t, errors.Is(err, runtimecontract.ErrCircularDependency))
+	require.Contains(t, cde.Chain, "a")
+	require.Contains(t, cde.Chain, "b")
 }

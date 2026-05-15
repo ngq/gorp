@@ -1,11 +1,15 @@
 // Package wrr provides weighted round-robin load balancing selector.
 // The selector picks instances based on their weight values in metadata.
 // Supported weight values in metadata["weight"]: 100, 80, 50, 20, 10, default 1.
-// Eg:
+// When the instance count exceeds wrrP2CFallbackThreshold (100), it automatically
+// falls back to P2C to avoid O(n) per-selection overhead becoming a CPU hotspot.
 //
 // 加权轮询负载均衡选择器包，提供基于权重的轮询选择算法。
 // 选择器根据实例 metadata 中的权重值进行选择。
 // 支持的 metadata["weight"] 权重值：100, 80, 50, 20, 10，默认为 1。
+// 当实例数量超过 wrrP2CFallbackThreshold (100) 时，自动降级到 P2C，
+// 避免 O(n) 的每次选择开销成为 CPU 热点。
+//
 // Eg:
 //
 //	// 注册 Provider
@@ -23,7 +27,16 @@ import (
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	"github.com/ngq/gorp/framework/provider/selector/p2c"
 )
+
+// wrrP2CFallbackThreshold is the instance count above which WRR falls back to P2C.
+// WRR has O(n) weight computation per selection; at large scale P2C is faster
+// and provides comparable adaptive load balancing.
+//
+// wrrP2CFallbackThreshold 是实例数量阈值，超过此值后 WRR 自动降级到 P2C。
+// WRR 每次选择需要 O(n) 权重计算；大规模场景下 P2C 更快且提供类似的自适应负载均衡。
+const wrrP2CFallbackThreshold = 100
 
 // Provider registers the WRR selector contract.
 //
@@ -51,6 +64,13 @@ func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
 	return []string{discoverycontract.SelectorKey, discoverycontract.SelectorBuilderKey}
 }
+
+// DependsOn returns the keys this provider depends on.
+// WRR selector has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// WRR selector 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
 
 // Register binds the WRR selector factory to the container.
 //
@@ -85,18 +105,17 @@ func (b *wrrBuilder) Build() discoverycontract.Selector {
 }
 
 // WRRSelector implements discoverycontract.Selector with weighted round-robin algorithm.
+// When the instance count exceeds wrrP2CFallbackThreshold, it falls back to P2C
+// to avoid the O(n) per-selection overhead becoming a CPU hotspot.
 //
 // WRRSelector 使用加权轮询算法实现 discoverycontract.Selector 接口。
+// 当实例数量超过 wrrP2CFallbackThreshold 时，自动降级到 P2C，
+// 避免 O(n) 的每次选择开销成为 CPU 热点。
 type WRRSelector struct {
-	mu            sync.Mutex                     // mu protects weight state.
-	                                             //
-	                                              // mu 保护权重状态。
-	currentWeight map[string]float64             // currentWeight tracks dynamic weights per instance.
-	                                             //
-	                                              // currentWeight 跟踪每个实例的动态权重。
-	lastInstances []transportcontract.ServiceInstance // lastInstances caches last seen instances.
-	                                             //
-	                                              // lastInstances 缓存上次看到的实例。
+	mu            sync.Mutex
+	currentWeight map[string]float64
+	lastInstances []transportcontract.ServiceInstance
+	fallback      discoverycontract.Selector // 大实例集的降级选择器。
 }
 
 // NewWRRSelector creates a new WRR selector instance.
@@ -104,15 +123,18 @@ type WRRSelector struct {
 // NewWRRSelector 创建新的加权轮询选择器实例。
 func NewWRRSelector() *WRRSelector {
 	return &WRRSelector{
+		fallback:      p2c.NewP2CSelector(),
 		currentWeight: make(map[string]float64),
 	}
 }
 
 // Select picks an instance using weighted round-robin algorithm.
 // Core logic: Calculate weights, add to current, pick max, subtract total.
+// Falls back to P2C when instance count exceeds wrrP2CFallbackThreshold.
 //
 // Select 使用加权轮询算法选择实例。
 // 核心逻辑：计算权重、累加到当前权重、选择最大值、减去总权重。
+// 实例数量超过 wrrP2CFallbackThreshold 时自动降级到 P2C。
 func (s *WRRSelector) Select(ctx context.Context, instances []transportcontract.ServiceInstance, opts ...discoverycontract.SelectOption) (
 	selected transportcontract.ServiceInstance, done discoverycontract.DoneFunc, err error,
 ) {
@@ -128,6 +150,10 @@ func (s *WRRSelector) Select(ctx context.Context, instances []transportcontract.
 	filtered := s.filterHealthy(instances, options.Filters)
 	if len(filtered) == 0 {
 		return transportcontract.ServiceInstance{}, noopDone, discoverycontract.ErrNoAvailable
+	}
+	// 大实例集降级到 P2C，避免 O(n) 权重计算成为 CPU 热点。
+	if len(filtered) > wrrP2CFallbackThreshold {
+		return s.fallback.Select(ctx, filtered, opts...)
 	}
 
 	s.mu.Lock()

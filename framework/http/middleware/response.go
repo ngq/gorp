@@ -10,6 +10,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -272,7 +273,8 @@ func parseError(err error) (int, string) {
 	if err == nil {
 		return CodeSuccess, "success"
 	}
-	if bizErr, ok := err.(BusinessError); ok {
+	var bizErr BusinessError
+	if errors.As(err, &bizErr) {
 		return bizErr.Code(), bizErr.Message()
 	}
 	return CodeInternalError, err.Error()

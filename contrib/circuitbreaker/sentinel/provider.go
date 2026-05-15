@@ -1,3 +1,27 @@
+// Package sentinel provides Sentinel circuit breaker implementation for gorp.
+//
+// Sentinel 熔断降级 Provider，实现 resiliencecontract.CircuitBreaker 契约。
+// 支持熔断、限流、系统保护规则。
+//
+// 使用示例：
+//
+//  cfg := &CircuitBreakerConfig{
+//      Resource: "my-service",
+//      Strategy: "error_ratio",
+//      Threshold: 0.5,
+//  }
+//  cb, err := NewCircuitBreaker(cfg)
+//  if err != nil {
+//      panic(err)
+//  }
+//
+//  if cb.Allow() {
+//      // 执行请求
+//  } else {
+//      // 熔断降级
+//  }
+//
+// 配置路径：circuitbreaker.sentinel.*
 package sentinel
 
 import (
@@ -5,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sentinel "github.com/alibaba/sentinel-golang/api"
@@ -33,6 +58,13 @@ type Provider struct{}
 func NewProvider() *Provider      { return &Provider{} }
 func (p *Provider) Name() string  { return "circuitbreaker.sentinel" }
 func (p *Provider) IsDefer() bool { return true }
+
+// DependsOn returns the keys this provider depends on.
+// Sentinel circuit breaker depends on Config for rule configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Sentinel circuit breaker 依赖 Config 获取规则配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
 func (p *Provider) Provides() []string {
 	return []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}
 }
@@ -159,8 +191,8 @@ type resourceState struct {
 	state        resiliencecontract.CircuitBreakerState
 	lastChanged  time.Time
 	lastFailure  error
-	successCount int64
-	failureCount int64
+	successCount atomic.Int64
+	failureCount atomic.Int64
 }
 
 type SentinelCircuitBreaker struct {
@@ -185,8 +217,8 @@ func (cb *SentinelCircuitBreaker) Allow(ctx context.Context, resource string) er
 
 func (cb *SentinelCircuitBreaker) RecordSuccess(ctx context.Context, resource string) {
 	state := cb.loadState(resource)
+	state.successCount.Add(1)
 	state.mu.Lock()
-	state.successCount++
 	state.lastFailure = nil
 	state.state = resiliencecontract.CircuitBreakerStateClosed
 	state.lastChanged = time.Now()
@@ -195,8 +227,8 @@ func (cb *SentinelCircuitBreaker) RecordSuccess(ctx context.Context, resource st
 
 func (cb *SentinelCircuitBreaker) RecordFailure(ctx context.Context, resource string, err error) {
 	state := cb.loadState(resource)
+	state.failureCount.Add(1)
 	state.mu.Lock()
-	state.failureCount++
 	state.lastFailure = err
 	state.state = resiliencecontract.CircuitBreakerStateOpen
 	state.lastChanged = time.Now()

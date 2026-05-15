@@ -76,6 +76,9 @@ func (etcdConfigInvalidContainerStub) RegisteredProviders() []runtimecontract.Pr
 	return nil
 }
 func (etcdConfigInvalidContainerStub) DebugPrint() string { return "" }
+func (etcdConfigInvalidContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
 
 func TestEtcdSourceErrorHelper(t *testing.T) {
 	err := errors.New("boom")

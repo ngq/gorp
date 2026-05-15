@@ -6,6 +6,8 @@ package wrr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
@@ -20,7 +22,7 @@ func TestWRRSelector_Select_EmptyInstances(t *testing.T) {
 	ctx := context.Background()
 
 	_, done, err := selector.Select(ctx, nil)
-	if err != discoverycontract.ErrNoAvailable {
+	if !errors.Is(err, discoverycontract.ErrNoAvailable) {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 
@@ -154,5 +156,40 @@ func TestWRRSelector_CleanupStaleWeights(t *testing.T) {
 	// 验证废弃权重已清理（inst2 权重应被删除）
 	if _, exists := selector.currentWeight["inst2:8080"]; exists {
 		t.Errorf("stale weight for inst2 should be cleaned")
+	}
+}
+
+// TestWRRSelector_FallbackToP2CForLargeInstanceSet verifies that WRR falls back
+// to P2C when the instance count exceeds wrrP2CFallbackThreshold.
+//
+// TestWRRSelector_FallbackToP2CForLargeInstanceSet 验证实例数量超过阈值后
+// WRR 自动降级到 P2C，不再使用 WRR 权重计算。
+func TestWRRSelector_FallbackToP2CForLargeInstanceSet(t *testing.T) {
+	selector := NewWRRSelector()
+	ctx := context.Background()
+
+	// 构造超过阈值的实例集
+	instances := make([]transportcontract.ServiceInstance, wrrP2CFallbackThreshold+10)
+	for i := range instances {
+		instances[i] = transportcontract.ServiceInstance{
+			ID:       fmt.Sprintf("inst-%d", i),
+			Address:  fmt.Sprintf("inst-%d:8080", i),
+			Healthy:  true,
+			Metadata: map[string]string{"weight": "100"},
+		}
+	}
+
+	// 大实例集应正常返回实例（降级到 P2C）
+	selected, _, err := selector.Select(ctx, instances)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.ID == "" {
+		t.Error("expected non-empty selected instance")
+	}
+
+	// 降级到 P2C 后，currentWeight 不应被更新
+	if len(selector.currentWeight) != 0 {
+		t.Errorf("expected no WRR weight updates when fallback to P2C, got %d entries", len(selector.currentWeight))
 	}
 }

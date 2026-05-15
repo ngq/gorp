@@ -52,6 +52,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回数据库检查器契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.DBInspectorKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Inspect provider depends on SQLX for database connection.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Inspect provider 依赖 SQLX 获取数据库连接。
+func (p *Provider) DependsOn() []string { return []string{datacontract.SQLXKey} }
+
 // Register binds the inspector service factory to the container.
 // Note: This provider depends on SQLX provider being registered first.
 //

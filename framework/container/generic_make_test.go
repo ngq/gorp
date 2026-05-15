@@ -7,9 +7,13 @@
 package container
 
 import (
+	"context"
+	"io"
 	"testing"
 
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"github.com/stretchr/testify/require"
 )
 
@@ -131,4 +135,122 @@ func TestMakeWith_InterfaceType(t *testing.T) {
 	v, err := MakeWith[*closeFunc](c, "closer")
 	require.NoError(t, err)
 	require.NotNil(t, v)
+}
+
+// TestMakeWith_InterfaceTypeAssertion verifies that interface type assertions work correctly.
+// This is a diagnostic test for the generic type assertion behavior.
+//
+// TestMakeWith_InterfaceTypeAssertion 验证接口类型断言行为正确。
+func TestMakeWith_InterfaceTypeAssertion(t *testing.T) {
+	// Test 1: concrete type to interface assertion (should work)
+	var v any = "hello"
+	_, ok := v.(string)
+	require.True(t, ok, "string assertion should work")
+
+	// Test 2: pointer type to interface assertion
+	var iface any = &closeFunc{}
+	_, ok2 := iface.(io.Closer)
+	require.True(t, ok2, "*closeFunc should implement io.Closer")
+
+	// Test 3: generic MakeWith with interface type
+	c := New()
+	c.Bind("closer", func(runtimecontract.Container) (any, error) {
+		return &closeFunc{}, nil
+	}, true)
+	_, err := MakeWith[io.Closer](c, "closer")
+	require.NoError(t, err, "MakeWith[io.Closer] should work for *closeFunc")
+}
+
+// TestMakeWith_ContractInterface verifies that MakeWith[T] works with contract interface types.
+//
+// TestMakeWith_ContractInterface 验证 MakeWith[T] 可用于契约接口类型。
+func TestMakeWith_ContractInterface(t *testing.T) {
+	c := New()
+	c.Bind("test.key", func(runtimecontract.Container) (any, error) {
+		return &testCloser{}, nil
+	}, true)
+
+	v, err := MakeWith[io.Closer](c, "test.key")
+	require.NoError(t, err)
+	require.NotNil(t, v)
+}
+
+type testCloser struct{}
+
+func (t *testCloser) Close() error { return nil }
+
+// TestMakeWith_DataContractInterface verifies that MakeWith[T] works with datacontract interfaces.
+//
+// TestMakeWith_DataContractInterface 验证 MakeWith[T] 可用于 datacontract 接口类型。
+func TestMakeWith_DataContractInterface(t *testing.T) {
+	// First verify the mock implements the interface
+	var _ datacontract.Redis = (*testRedis)(nil)
+
+	c := New()
+	c.Bind(datacontract.RedisKey, func(runtimecontract.Container) (any, error) {
+		return &testRedis{}, nil
+	}, true)
+
+	// Test direct type assertion
+	v, err := c.Make(datacontract.RedisKey)
+	require.NoError(t, err)
+
+	// Manual type assertion should work
+	redis, ok := v.(datacontract.Redis)
+	require.True(t, ok, "manual type assertion should work")
+	require.NotNil(t, redis)
+
+	// Now test MakeWith
+	redis2, err := MakeWith[datacontract.Redis](c, datacontract.RedisKey)
+	require.NoError(t, err, "MakeWith[datacontract.Redis] should work")
+	require.NotNil(t, redis2)
+}
+
+// TestMakeWith_SecurityContractInterface verifies that MakeWith[T] works with securitycontract interfaces.
+//
+// TestMakeWith_SecurityContractInterface 验证 MakeWith[T] 可用于 securitycontract 接口类型。
+func TestMakeWith_SecurityContractInterface(t *testing.T) {
+	// Verify mock implements the interface
+	var _ securitycontract.JWTService = (*testJWTService)(nil)
+
+	c := New()
+	c.Bind(securitycontract.AuthJWTKey, func(runtimecontract.Container) (any, error) {
+		return &testJWTService{}, nil
+	}, true)
+
+	// Test direct type assertion
+	v, err := c.Make(securitycontract.AuthJWTKey)
+	require.NoError(t, err)
+
+	// Manual type assertion should work
+	jwt, ok := v.(securitycontract.JWTService)
+	require.True(t, ok, "manual type assertion should work for JWTService")
+	require.NotNil(t, jwt)
+
+	// Now test MakeWith
+	jwt2, err := MakeWith[securitycontract.JWTService](c, securitycontract.AuthJWTKey)
+	require.NoError(t, err, "MakeWith[securitycontract.JWTService] should work")
+	require.NotNil(t, jwt2)
+}
+
+type testRedis struct{}
+
+func (t *testRedis) Ping(ctx context.Context) error                                   { return nil }
+func (t *testRedis) Get(ctx context.Context, key string) (string, error)              { return "value", nil }
+func (t *testRedis) Set(ctx context.Context, key, value string, ttlSeconds int) error { return nil }
+func (t *testRedis) Del(ctx context.Context, key string) error                        { return nil }
+func (t *testRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
+	return map[string]string{"k": "v"}, nil
+}
+
+type testJWTService struct{}
+
+func (t *testJWTService) Sign(claims securitycontract.JWTClaims) (string, error) {
+	return "token", nil
+}
+func (t *testJWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
+	return &securitycontract.JWTClaims{}, nil
+}
+func (t *testJWTService) NewClaims(subjectID int64, subjectType, subjectName string, roles []string, ttlSeconds int64) securitycontract.JWTClaims {
+	return securitycontract.JWTClaims{}
 }

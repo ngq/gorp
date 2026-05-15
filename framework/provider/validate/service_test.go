@@ -12,6 +12,7 @@ package validate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -211,8 +212,8 @@ func TestValidatorService_TranslateError(t *testing.T) {
 	}
 
 	// 验证是 AppError
-	appErr, ok := err.(resiliencecontract.AppError)
-	if !ok {
+	var appErr resiliencecontract.AppError
+	if !errors.As(err, &appErr) {
 		t.Error("expected AppError")
 		return
 	}
@@ -252,8 +253,8 @@ func TestValidatorService_JSONTagNameConsistency(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 
-	appErr, ok := err.(resiliencecontract.AppError)
-	if !ok {
+	var appErr resiliencecontract.AppError
+	if !errors.As(err, &appErr) {
 		t.Fatal("expected AppError")
 	}
 
@@ -321,8 +322,8 @@ func TestValidatorService_NoJSONTagFallsBackToGoName(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 
-	appErr, ok := err.(resiliencecontract.AppError)
-	if !ok {
+	var appErr resiliencecontract.AppError
+	if !errors.As(err, &appErr) {
 		t.Fatal("expected AppError")
 	}
 
@@ -381,8 +382,8 @@ func TestValidatorService_ErrorFormatConsistency(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 
-	appErr, ok := err.(resiliencecontract.AppError)
-	if !ok {
+	var appErr resiliencecontract.AppError
+	if !errors.As(err, &appErr) {
 		t.Fatal("expected AppError type")
 	}
 
@@ -444,8 +445,8 @@ func TestValidatorService_TranslateErrorsFalse(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 
-	appErr, ok := err.(resiliencecontract.AppError)
-	if !ok {
+	var appErr resiliencecontract.AppError
+	if !errors.As(err, &appErr) {
 		t.Fatal("expected AppError type")
 	}
 
@@ -487,7 +488,11 @@ func TestValidatorService_LocaleSwitch_ZhToEn(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
-	zhMsg := err.(resiliencecontract.AppError).GetStatus().Message
+	var zhAppErr resiliencecontract.AppError
+	if !errors.As(err, &zhAppErr) {
+		t.Fatal("expected AppError type")
+	}
+	zhMsg := zhAppErr.GetStatus().Message
 
 	// 切换到英文
 	if err := svc.SetLocale("en"); err != nil {
@@ -499,7 +504,11 @@ func TestValidatorService_LocaleSwitch_ZhToEn(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
-	enMsg := err.(resiliencecontract.AppError).GetStatus().Message
+	var enAppErr resiliencecontract.AppError
+	if !errors.As(err, &enAppErr) {
+		t.Fatal("expected AppError type")
+	}
+	enMsg := enAppErr.GetStatus().Message
 
 	// 两条消息不应该相同（中文和英文翻译不同）
 	if zhMsg == enMsg {
@@ -548,7 +557,10 @@ func TestValidatorService_LocaleSwitch_EnDefault(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 
-	appErr := err.(resiliencecontract.AppError)
+	var appErr resiliencecontract.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatal("expected AppError type")
+	}
 	msg := appErr.GetStatus().Message
 
 	// 英文翻译应包含 "required" 关键字

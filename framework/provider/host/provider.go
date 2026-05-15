@@ -55,6 +55,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回主机契约键。
 func (p *Provider) Provides() []string { return []string{runtimecontract.HostKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Host provider has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Host provider 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the host service factory to the container.
 //
 // Register 将主机服务工厂绑定到容器。

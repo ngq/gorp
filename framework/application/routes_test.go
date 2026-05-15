@@ -204,3 +204,4 @@ func (testContainer) RegisterProviders(providers ...runtimecontract.ServiceProvi
 }
 func (testContainer) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
 func (testContainer) DebugPrint() string                                  { return "" }
+func (testContainer) ProviderDAG() runtimecontract.ProviderDAG             { return runtimecontract.ProviderDAG{} }

@@ -24,6 +24,13 @@ func (p *Provider) Provides() []string {
 	return []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop circuit breaker has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop circuit breaker 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(resiliencecontract.CircuitBreakerKey, func(c runtimecontract.Container) (any, error) {
 		return &noopCircuitBreaker{}, nil

@@ -16,9 +16,5 @@ import (
 //
 // MakeConfig 从容器中解析配置能力。
 func MakeConfig(c runtimecontract.Container) (datacontract.Config, error) {
-	v, err := c.Make(datacontract.ConfigKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(datacontract.Config), nil
+	return MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 }

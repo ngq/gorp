@@ -78,6 +78,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回 app provider 暴露的能力 key。
 func (p *Provider) Provides() []string { return []string{runtimecontract.RootKey} }
 
+// DependsOn returns the keys this provider depends on.
+// App provider optionally depends on Config for path configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// App provider 可选依赖 Config 获取路径配置。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the application path service into the container.
 //
 // Register 将应用路径服务绑定到容器。

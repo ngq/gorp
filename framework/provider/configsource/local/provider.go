@@ -54,6 +54,15 @@ func (p *Provider) Provides() []string {
 	return []string{datacontract.ConfigSourceKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Local config source depends on Root for config path.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Local config source 依赖 Root 获取配置路径。
+func (p *Provider) DependsOn() []string {
+	return []string{runtimecontract.RootKey}
+}
+
 // Register binds the local config source factory to the container.
 // Core logic: Create Source instance with config, bind to container.
 //

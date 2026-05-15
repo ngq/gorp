@@ -1,11 +1,10 @@
 # gorp 深度集成测试环境
-# 用于测试 gRPC/etcd/Redis/tracing 等真实 backend 端到端场景
-version: "3.8"
+# 用于测试 gRPC/etcd/Redis/tracing/Consul/Nacos/Kafka 等真实 backend 端到端场景
 
 services:
   # etcd - 服务注册发现测试
   etcd:
-    image: quay.io/coreos/etcd:v3.5
+    image: gcr.io/etcd-development/etcd:v3.5.17
     container_name: gorp-test-etcd
     command: >
       etcd
@@ -25,12 +24,72 @@ services:
     image: redis:7-alpine
     container_name: gorp-test-redis
     ports:
-      - "6379:6379"
+      - "16379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+
+  # Consul - 服务注册发现测试
+  consul:
+    image: hashicorp/consul:1.18
+    container_name: gorp-test-consul
+    command: agent -server -bootstrap-expect=1 -ui -client=0.0.0.0 -bind=0.0.0.0 -data-dir=/consul/data
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Nacos - 服务注册发现测试
+  nacos:
+    image: nacos/nacos-server:v2.3.0
+    container_name: gorp-test-nacos
+    environment:
+      - MODE=standalone
+      - PREFER_HOST_MODE=hostname
+      - EMBEDDED_STORAGE=embedded
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # Zookeeper - Kafka 依赖
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    container_name: gorp-test-zookeeper
+    ports:
+      - "2181:2181"
+
+  # Kafka - 消息队列测试
+  kafka:
+    image: wurstmeister/kafka:latest
+    container_name: gorp-test-kafka
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NUM_PARTITIONS=3
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Mock gRPC Backend - gRPC 全链路测试
   mock-grpc-backend:
@@ -71,6 +130,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      consul:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
       mock-grpc-backend:
         condition: service_started
       jaeger:
@@ -78,6 +143,9 @@ services:
     environment:
       - GORP_TEST_ETCD_ADDR=etcd:2379
       - GORP_TEST_REDIS_ADDR=redis:6379
+      - GORP_TEST_CONSUL_ADDR=consul:8500
+      - GORP_TEST_NACOS_ADDR=nacos:8848
+      - GORP_TEST_KAFKA_ADDR=kafka:9092
       - GORP_TEST_GRPC_BACKEND_ADDR=mock-grpc-backend:50051
       - GORP_TEST_JAEGER_ADDR=jaeger:4317
     volumes:

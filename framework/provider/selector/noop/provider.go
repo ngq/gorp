@@ -42,6 +42,13 @@ func (p *Provider) Provides() []string {
 	return []string{discoverycontract.SelectorKey, discoverycontract.SelectorBuilderKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop selector has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop selector 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op selector to the container.
 //
 // Register 将空选择器绑定到容器。

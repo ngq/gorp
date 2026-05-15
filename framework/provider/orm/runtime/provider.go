@@ -64,6 +64,13 @@ func (p *Provider) Provides() []string {
 	}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Runtime provider depends on Config for backend selection.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Runtime provider 依赖 Config 获取后端选择。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds multiple factories to the container based on backend config.
 // Core logic: Determine backend from config, then bind appropriate implementations.
 //

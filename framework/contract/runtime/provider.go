@@ -37,4 +37,11 @@ type ServiceProvider interface {
 	//
 	// Provides 返回该 provider 可以提供的 key 列表。
 	Provides() []string
+
+	// DependsOn returns the keys that this provider depends on.
+	// Used for dependency graph construction and load order computation.
+	//
+	// DependsOn 返回该 provider 依赖的 key 列表。
+	// 用于构建依赖图和计算加载顺序。
+	DependsOn() []string
 }

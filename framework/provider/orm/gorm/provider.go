@@ -65,6 +65,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回 GORM 契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.GormKey} }
 
+// DependsOn returns the keys this provider depends on.
+// GORM provider depends on Config for database configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// GORM provider 依赖 Config 获取数据库配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the GORM DB factory to the container.
 // Core logic: Parse config, create dialector, open GORM, apply pool settings, start metrics collector.
 //

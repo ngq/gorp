@@ -52,6 +52,15 @@ func (p *Provider) Provides() []string {
 	}
 }
 
+// DependsOn returns the keys this provider depends on.
+// gRPC RPC depends on Config, Discovery, and Tracer.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// gRPC RPC 依赖 Config、Discovery 和 Tracer。
+func (p *Provider) DependsOn() []string {
+	return []string{datacontract.ConfigKey, transportcontract.RPCRegistryKey, observabilitycontract.TracerKey}
+}
+
 // Register binds the gRPC client factory, RPC client, server registrar, and RPC server
 // to the container with singleton lifecycle.
 //

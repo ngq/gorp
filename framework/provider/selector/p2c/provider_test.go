@@ -21,7 +21,7 @@ func TestP2CSelectorSelectEmptyInstances(t *testing.T) {
 	selector := NewP2CSelector()
 
 	_, done, err := selector.Select(context.Background(), nil)
-	if err != discoverycontract.ErrNoAvailable {
+	if !errors.Is(err, discoverycontract.ErrNoAvailable) {
 		t.Fatalf("expected ErrNoAvailable, got %v", err)
 	}
 

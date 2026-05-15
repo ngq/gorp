@@ -51,6 +51,13 @@ func (p *Provider) IsDefer() bool { return false }
 // 暴露 ConfigKey 用于应用级配置访问。
 func (p *Provider) Provides() []string { return []string{datacontract.ConfigKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Config provider has no dependencies - it's a root provider.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Config provider 无依赖，是根 provider。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the config factory to the container.
 // Core logic: Create config instance, bind to container with singleton flag.
 //

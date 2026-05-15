@@ -1,0 +1,19 @@
+# Pod Disruption Budget
+# 确保 voluntary disruptions 时服务可用性
+#
+# 中文说明：
+# - 保证集群维护时至少保持 1 个 Pod 运行；
+# - 支持 Node drain 场景下的服务连续性；
+# - 生产环境必须配置。
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gorp-service-pdb
+  labels:
+    app.kubernetes.io/name: gorp-service
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gorp-service

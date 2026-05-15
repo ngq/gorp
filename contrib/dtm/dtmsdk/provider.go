@@ -40,6 +40,13 @@ func (p *Provider) Provides() []string {
 	return []string{integrationcontract.DTMKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// DTM provider depends on Config for DTM configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// DTM provider 依赖 Config 获取 DTM 配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the DTM client to the container.
 //
 // Register 将 DTM 客户端绑定到容器。

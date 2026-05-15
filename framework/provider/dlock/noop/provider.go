@@ -41,6 +41,13 @@ func (p *Provider) IsDefer() bool { return true }
 // Provides 返回分布式锁契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.DistributedLockKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Noop dlock has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop dlock 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op lock to the container.
 //
 // Register 将空锁绑定到容器。

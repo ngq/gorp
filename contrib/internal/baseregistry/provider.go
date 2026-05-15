@@ -11,6 +11,7 @@
 package baseregistry
 
 import (
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -40,6 +41,15 @@ func (p *BaseRegistryProvider) IsDefer() bool { return true }
 // Provides returns the contract keys this provider satisfies.
 func (p *BaseRegistryProvider) Provides() []string {
 	return []string{transportcontract.RPCRegistryKey}
+}
+
+// DependsOn returns the keys this provider depends on.
+// BaseRegistryProvider depends on Config for configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// BaseRegistryProvider 依赖 Config 获取配置。
+func (p *BaseRegistryProvider) DependsOn() []string {
+	return []string{datacontract.ConfigKey}
 }
 
 // Register binds ServiceRegistry to the container as a lazy singleton.

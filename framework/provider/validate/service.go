@@ -8,6 +8,7 @@ package validate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -175,8 +176,8 @@ func (s *ValidatorService) TranslateError(err error) resiliencecontract.AppError
 		return nil
 	}
 
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
+	var validationErrors validator.ValidationErrors
+	if !errors.As(err, &validationErrors) {
 		return resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())
 	}
 

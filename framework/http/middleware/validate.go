@@ -10,6 +10,7 @@
 package middleware
 
 import (
+	"errors"
 	"reflect"
 
 	"github.com/gin-gonic/gin"
@@ -49,8 +50,8 @@ func validateBoundValue(c transportcontract.HTTPContext, validator datacontract.
 		return nil
 	}
 	if err := validator.Validate(c.Context(), obj); err != nil {
-		appErr, ok := err.(resiliencecontract.AppError)
-		if !ok {
+		var appErr resiliencecontract.AppError
+		if !errors.As(err, &appErr) {
 			appErr = resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())
 		}
 		respondWithError(c, appErr)

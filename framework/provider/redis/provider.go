@@ -49,6 +49,13 @@ func (p *Provider) IsDefer() bool { return false }
 // 暴露 RedisKey 用于 Redis 服务。
 func (p *Provider) Provides() []string { return []string{datacontract.RedisKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Redis provider depends on Config for connection configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Redis provider 依赖 Config 获取连接配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 type config struct {
 	Addr     string `mapstructure:"addr"`
 	Password string `mapstructure:"password"`

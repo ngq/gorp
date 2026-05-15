@@ -1,3 +1,24 @@
+// Package etcd provides etcd service registry implementation for gorp.
+//
+// etcd 注册中心 Provider，实现 transportcontract.ServiceRegistry 契约。
+// 支持服务注册、发现、注销、租约保活。
+//
+// 使用示例：
+//
+//  cfg := &DiscoveryConfig{
+//      EtcdEndpoints: []string{"localhost:2379"},
+//      ServicePath:   "/services/",
+//      LeaseTTL:      10,
+//  }
+//  registry, err := NewRegistry(cfg)
+//  if err != nil {
+//      panic(err)
+//  }
+//  defer registry.Close()
+//
+//  err = registry.Register(ctx, "my-service", "192.168.1.100:8080", nil)
+//
+// 配置路径：discovery.etcd.*
 package etcd
 
 import (

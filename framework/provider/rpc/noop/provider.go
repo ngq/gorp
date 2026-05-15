@@ -46,6 +46,13 @@ func (p *Provider) Provides() []string {
 	}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop RPC has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop RPC 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op RPC components to the container.
 //
 // Register 将空 RPC 组件绑定到容器。

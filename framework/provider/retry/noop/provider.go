@@ -43,6 +43,13 @@ func (p *Provider) Provides() []string {
 	return []string{resiliencecontract.RetryKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop retry has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop retry 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op retry service into the container.
 //
 // Register 将空实现 Retry 服务注册到容器。

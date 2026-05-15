@@ -54,6 +54,13 @@ func (p *Provider) Provides() []string {
 	return []string{discoverycontract.SelectorKey, discoverycontract.SelectorBuilderKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// P2C selector has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// P2C selector 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the P2C selector factory to the container.
 //
 // Register 将 P2C 选择器工厂绑定到容器。

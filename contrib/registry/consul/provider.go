@@ -1,3 +1,24 @@
+// Package consul provides Consul service registry implementation for gorp.
+//
+// Consul 注册中心 Provider，实现 transportcontract.ServiceRegistry 契约。
+// 支持服务注册、发现、注销、健康检查。
+//
+// 使用示例：
+//
+//  cfg := &DiscoveryConfig{
+//      ConsulAddr:    "localhost:8500",
+//      CheckInterval: "10s",
+//      CheckTimeout:  "5s",
+//  }
+//  registry, err := NewRegistry(cfg)
+//  if err != nil {
+//      panic(err)
+//  }
+//  defer registry.Close()
+//
+//  err = registry.Register(ctx, "my-service", "192.168.1.100:8080", nil)
+//
+// 配置路径：discovery.consul.*
 package consul
 
 import (

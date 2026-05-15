@@ -1,3 +1,25 @@
+// Package redis provides Redis-based distributed lock implementation for gorp.
+//
+// Redis 分布式锁 Provider，实现 datacontract.DistributedLock 契约。
+// 支持基于 Redis 的分布式锁获取、释放、续期。
+//
+// 使用示例：
+//
+//  cfg := &LockConfig{
+//      RedisAddr: "localhost:6379",
+//  }
+//  lock, err := NewDistributedLock(cfg)
+//  if err != nil {
+//      panic(err)
+//  }
+//
+//  acquired, err := lock.Acquire(ctx, "my-resource", 10*time.Second)
+//  if acquired {
+//      defer lock.Release(ctx, "my-resource")
+//      // 执行临界区操作
+//  }
+//
+// 配置路径：dlock.redis.*
 package redis
 
 import (
@@ -25,6 +47,13 @@ func (p *Provider) IsDefer() bool { return true }
 func (p *Provider) Provides() []string {
 	return []string{datacontract.DistributedLockKey}
 }
+
+// DependsOn returns the keys this provider depends on.
+// Redis dlock depends on Config for Redis configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Redis dlock 依赖 Config 获取 Redis 配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
 
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.DistributedLockKey, func(c runtimecontract.Container) (any, error) {

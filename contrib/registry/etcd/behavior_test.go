@@ -86,6 +86,9 @@ func (etcdDiscoveryInvalidContainerStub) RegisteredProviders() []runtimecontract
 	return nil
 }
 func (etcdDiscoveryInvalidContainerStub) DebugPrint() string { return "" }
+func (etcdDiscoveryInvalidContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
 
 func TestRegistryCloseWithoutClientPanicsToday(t *testing.T) {
 	r := &Registry{}

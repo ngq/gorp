@@ -6,6 +6,7 @@ package random
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
@@ -20,12 +21,12 @@ func TestRandomSelector_Select_EmptyInstances(t *testing.T) {
 	selector := NewRandomSelector()
 
 	_, _, err := selector.Select(context.Background(), nil)
-	if err != discoverycontract.ErrNoAvailable {
+	if !errors.Is(err, discoverycontract.ErrNoAvailable) {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 
 	_, _, err = selector.Select(context.Background(), []transportcontract.ServiceInstance{})
-	if err != discoverycontract.ErrNoAvailable {
+	if !errors.Is(err, discoverycontract.ErrNoAvailable) {
 		t.Errorf("expected ErrNoAvailable for empty slice, got: %v", err)
 	}
 }
@@ -114,7 +115,7 @@ func TestRandomSelector_Select_AllUnhealthy(t *testing.T) {
 	}
 
 	_, _, err := selector.Select(context.Background(), instances)
-	if err != discoverycontract.ErrNoAvailable {
+	if !errors.Is(err, discoverycontract.ErrNoAvailable) {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 }

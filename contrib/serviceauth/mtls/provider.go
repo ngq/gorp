@@ -26,6 +26,13 @@ func (p *Provider) Provides() []string {
 	return []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// MTLS service auth depends on Config for authentication configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// MTLS service auth 依赖 Config 获取认证配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(securitycontract.ServiceAuthKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getServiceAuthConfig(c)

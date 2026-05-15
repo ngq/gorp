@@ -60,6 +60,13 @@ func (p *Provider) Provides() []string {
 	return []string{securitycontract.AuthJWTKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// JWT provider depends on Config for JWT configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// JWT provider 依赖 Config 获取 JWT 配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the JWT service factory to the container.
 // Core logic: Read secret, issuer, audience from config, create JWTService.
 // Note: Uses fallback secret if not configured (should change in production).

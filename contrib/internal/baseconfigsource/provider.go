@@ -42,6 +42,15 @@ func (p *BaseConfigSourceProvider) Provides() []string {
 	return []string{datacontract.ConfigSourceKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// BaseConfigSourceProvider depends on Config for configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// BaseConfigSourceProvider 依赖 Config 获取配置。
+func (p *BaseConfigSourceProvider) DependsOn() []string {
+	return []string{datacontract.ConfigKey}
+}
+
 // Register binds ConfigSource to the container as a lazy singleton.
 // The source's Close method is registered with the container's Destroy lifecycle.
 //

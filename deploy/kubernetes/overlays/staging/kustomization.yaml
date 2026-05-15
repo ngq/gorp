@@ -6,6 +6,7 @@ namespace: gorp-staging
 
 resources:
   - ../../base
+  - pdb.yaml
 
 # 预发布环境镜像
 images:

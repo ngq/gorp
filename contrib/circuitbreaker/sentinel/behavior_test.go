@@ -51,6 +51,7 @@ func (invalidConfigContainerStub) RegisterProviders(...runtimecontract.ServicePr
 }
 func (invalidConfigContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
 func (invalidConfigContainerStub) DebugPrint() string                                  { return "" }
+func (invalidConfigContainerStub) ProviderDAG() runtimecontract.ProviderDAG            { return runtimecontract.ProviderDAG{} }
 
 type sentinelContainerStub struct {
 	cfg datacontract.Config
@@ -79,6 +80,7 @@ func (s sentinelContainerStub) RegisterProviders(...runtimecontract.ServiceProvi
 }
 func (s sentinelContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
 func (s sentinelContainerStub) DebugPrint() string                                  { return "" }
+func (s sentinelContainerStub) ProviderDAG() runtimecontract.ProviderDAG            { return runtimecontract.ProviderDAG{} }
 
 func TestGetCircuitBreakerConfigDefaults(t *testing.T) {
 	cfg := cbConfigStub{}

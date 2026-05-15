@@ -1,0 +1,29 @@
+# Topology Spread Constraints
+# 控制 Pod 在拓扑域（Zone/Node）间的分布
+#
+# 中文说明：
+# - 确保跨可用区均匀分布；
+# - 提高服务可用性和容灾能力；
+# - 生产环境推荐配置。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gorp-service
+spec:
+  template:
+    spec:
+      topologySpreadConstraints:
+        # 跨可用区均匀分布
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: gorp-service
+        # 跨节点均匀分布
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: gorp-service

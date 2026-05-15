@@ -10,6 +10,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -267,8 +268,8 @@ func ValidateCriticalConfig(cfg datacontract.Config) error {
 //   - "config: app.address is required"
 //   - "config: log.level must be one of [debug info warn error]"
 func formatSectionErrors(section string, err error) []string {
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
+	var validationErrors validator.ValidationErrors
+	if !errors.As(err, &validationErrors) {
 		// 非 ValidationErrors 类型，直接返回原始错误文本
 		// Not a ValidationErrors type, return raw error text
 		return []string{fmt.Sprintf("config: %s: %v", section, err)}

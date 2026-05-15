@@ -8,6 +8,7 @@ package zookeeper
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -37,7 +38,7 @@ func newZKBackend(cfg *ZookeeperConfig) (zkBackend, error) {
 	// 连接 Zookeeper 集群
 	conn, _, err := zk.Connect(cfg.Servers, cfg.SessionTimeout)
 	if err != nil {
-		return nil, errors.New("registry.zookeeper: connect failed: " + err.Error())
+		return nil, fmt.Errorf("registry.zookeeper: connect failed: %w", err)
 	}
 	return &realZKBackend{conn: conn}, nil
 }

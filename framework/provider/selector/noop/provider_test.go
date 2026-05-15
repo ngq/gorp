@@ -6,6 +6,7 @@ package noop
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
@@ -21,7 +22,7 @@ func TestNoopSelector_Select_EmptyInstances(t *testing.T) {
 
 	// 无实例时返回 ErrNoAvailable
 	selected, done, err := selector.Select(ctx, nil)
-	if err != discoverycontract.ErrNoAvailable {
+	if !errors.Is(err, discoverycontract.ErrNoAvailable) {
 		t.Errorf("expected ErrNoAvailable, got: %v", err)
 	}
 	if selected.Address != "" {

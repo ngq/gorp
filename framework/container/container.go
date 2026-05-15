@@ -413,6 +413,12 @@ func (c *Container) RegisterProviders(providers ...runtimecontract.ServiceProvid
 // resolveBinding 解析绑定，对单例执行循环依赖检测。
 func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 	if !b.singleton {
+		if err := c.checkCircularDependency(key); err != nil {
+			return nil, err
+		}
+		gid := goroutineID()
+		c.pushResolvingKey(gid, key)
+		defer c.popResolvingKey(gid)
 		return b.factory(c)
 	}
 
@@ -438,15 +444,8 @@ func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 
 		// Check for circular dependency within this goroutine.
 		// 检查本 goroutine 的循环依赖。
-		gid := goroutineID()
-		if stackVal, ok := c.resolving.Load(gid); ok {
-			stack := stackVal.(*[]string)
-			for _, k := range *stack {
-				if k == key {
-					chain := append(append([]string(nil), *stack...), key)
-					return nil, &runtimecontract.CircularDependencyError{Key: key, Chain: chain}
-				}
-			}
+		if err := c.checkCircularDependency(key); err != nil {
+			return nil, err
 		}
 
 		// Wait for initialization to complete.
@@ -464,17 +463,9 @@ func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 		// Track this key in the per-goroutine resolution stack.
 		// 在 per-goroutine 解析栈中跟踪此 key。
 		gid := goroutineID()
-		stack := c.getOrCreateStack(gid)
-		*stack = append(*stack, key)
-
+		c.pushResolvingKey(gid, key)
 		inst, err := b.factory(c)
-
-		// Pop the key from the resolution stack.
-		// 从解析栈中弹出此 key。
-		*stack = (*stack)[:len(*stack)-1]
-		if len(*stack) == 0 {
-			c.resolving.Delete(gid)
-		}
+		c.popResolvingKey(gid)
 
 		b.mu.Lock()
 		b.inst = inst
@@ -497,6 +488,46 @@ func (c *Container) getOrCreateStack(gid uint64) *[]string {
 	s := make([]string, 0, 8)
 	actual, _ := c.resolving.LoadOrStore(gid, &s)
 	return actual.(*[]string)
+}
+
+// checkCircularDependency checks whether the target key already exists in the current goroutine resolution stack.
+//
+// checkCircularDependency 检查目标 key 是否已存在于当前 goroutine 的解析栈中。
+func (c *Container) checkCircularDependency(key string) error {
+	gid := goroutineID()
+	if stackVal, ok := c.resolving.Load(gid); ok {
+		stack := stackVal.(*[]string)
+		for _, resolvingKey := range *stack {
+			if resolvingKey == key {
+				chain := append(append([]string(nil), *stack...), key)
+				return &runtimecontract.CircularDependencyError{Key: key, Chain: chain}
+			}
+		}
+	}
+	return nil
+}
+
+// pushResolvingKey pushes one key into the current goroutine resolution stack.
+//
+// pushResolvingKey 将一个 key 压入当前 goroutine 的解析栈。
+func (c *Container) pushResolvingKey(gid uint64, key string) {
+	stack := c.getOrCreateStack(gid)
+	*stack = append(*stack, key)
+}
+
+// popResolvingKey pops one key from the current goroutine resolution stack.
+//
+// popResolvingKey 从当前 goroutine 的解析栈弹出一个 key。
+func (c *Container) popResolvingKey(gid uint64) {
+	stackVal, ok := c.resolving.Load(gid)
+	if !ok {
+		return
+	}
+	stack := stackVal.(*[]string)
+	*stack = (*stack)[:len(*stack)-1]
+	if len(*stack) == 0 {
+		c.resolving.Delete(gid)
+	}
 }
 
 func (c *Container) ensureProviderForKey(key string) error {
@@ -525,12 +556,16 @@ func (c *Container) loadProvider(name string) error {
 		c.mu.Unlock()
 		return nil
 	}
-	// Mark loaded before calling Register to make repeated load attempts idempotent.
-	// 在调用 Register 之前先标记 loaded，保证重复装载请求具备幂等语义。
-	st.loaded = true
 	c.mu.Unlock()
 
-	return st.p.Register(c)
+	if err := st.p.Register(c); err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	st.loaded = true
+	c.mu.Unlock()
+	return nil
 }
 
 func (c *Container) bootProvider(name string) error {
@@ -546,12 +581,16 @@ func (c *Container) bootProvider(name string) error {
 		c.mu.Unlock()
 		return nil
 	}
-	// Boot is also guarded for idempotency because a deferred provider may be triggered multiple times.
-	// Boot 同样需要幂等保护，因为延迟 provider 可能被多次触发。
-	st.booted = true
 	c.mu.Unlock()
 
-	return st.p.Boot(c)
+	if err := st.p.Boot(c); err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	st.booted = true
+	c.mu.Unlock()
+	return nil
 }
 
 // goroutineID returns the current goroutine ID for circular dependency tracking.
@@ -575,4 +614,218 @@ func goroutineID() uint64 {
 	}
 	id, _ := strconv.ParseUint(s[:idx], 10, 64)
 	return id
+}
+
+// ProviderDAG builds and returns the provider dependency graph.
+// It analyzes all registered providers, their provides/depends declarations,
+// and computes the recommended load order with cycle detection.
+//
+// ProviderDAG 构建并返回 provider 依赖图。
+// 分析所有已注册的 provider，其 provides/depends 声明，
+// 计算推荐加载顺序并检测循环依赖。
+func (c *Container) ProviderDAG() runtimecontract.ProviderDAG {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	dag := runtimecontract.ProviderDAG{
+		Nodes:     make([]runtimecontract.ProviderDAGNode, 0, len(c.providersByName)),
+		Edges:     make([]runtimecontract.DAGEdge, 0),
+		Cycles:    make([][]string, 0),
+		LoadOrder: make([]string, 0, len(c.providersByName)),
+	}
+
+	// Build node map: provider name -> node.
+	// 构建节点映射：provider 名称 -> 节点。
+	nodeMap := make(map[string]*runtimecontract.ProviderDAGNode)
+	for name, st := range c.providersByName {
+		node := &runtimecontract.ProviderDAGNode{
+			Name:     name,
+			Provides: st.p.Provides(),
+			DependsOn: st.p.DependsOn(),
+			IsDefer:  st.p.IsDefer(),
+			Loaded:   st.loaded,
+			Booted:   st.booted,
+		}
+		nodeMap[name] = node
+		dag.Nodes = append(dag.Nodes, *node)
+	}
+
+	// Build key -> provider name reverse map.
+	// 构建 key -> provider 名称的反向映射。
+	keyToProvider := make(map[string]string)
+	for name, st := range c.providersByName {
+		for _, key := range st.p.Provides() {
+			keyToProvider[key] = name
+		}
+	}
+
+	// Build edges: for each provider's DependsOn, find which provider provides that key.
+	// 构建边：对每个 provider 的 DependsOn，找到提供该 key 的 provider。
+	for name, node := range nodeMap {
+		for _, depKey := range node.DependsOn {
+			edge := runtimecontract.DAGEdge{
+				From: name,
+				Key:  depKey,
+			}
+			// Find which provider provides this key.
+			// 查找哪个 provider 提供这个 key。
+			if providerName, ok := keyToProvider[depKey]; ok {
+				edge.To = providerName
+			} else if _, bound := c.bindings[depKey]; bound {
+				// Key is directly bound, no provider dependency.
+				// key 已直接绑定，无 provider 依赖。
+				edge.To = ""
+			} else if _, deferred := c.deferredByKey[depKey]; deferred {
+				// Key is promised by a deferred provider.
+				// key 由延迟 provider 承诺提供。
+				edge.To = c.deferredByKey[depKey]
+			}
+			if edge.To != "" || edge.To == "" {
+				// Always add edge to show dependency, even if external.
+				// 始终添加边以显示依赖关系，即使是外部依赖。
+				dag.Edges = append(dag.Edges, edge)
+			}
+		}
+	}
+
+	// Detect cycles using DFS.
+	// 使用 DFS 检测循环依赖。
+	visited := make(map[string]bool)
+	inStack := make(map[string]bool)
+	var cyclePath []string
+
+	var dfs func(name string) bool
+	dfs = func(name string) bool {
+		visited[name] = true
+		inStack[name] = true
+		cyclePath = append(cyclePath, name)
+
+		// Find all dependencies of this provider.
+		// 查找此 provider 的所有依赖。
+		for _, edge := range dag.Edges {
+			if edge.From != name || edge.To == "" {
+				continue
+			}
+			if !visited[edge.To] {
+				if dfs(edge.To) {
+					return true
+				}
+			} else if inStack[edge.To] {
+				// Found cycle.
+				// 发现循环。
+				cycleStart := -1
+				for i, n := range cyclePath {
+					if n == edge.To {
+						cycleStart = i
+						break
+					}
+				}
+				if cycleStart >= 0 {
+					cycle := make([]string, len(cyclePath)-cycleStart)
+					copy(cycle, cyclePath[cycleStart:])
+					dag.Cycles = append(dag.Cycles, cycle)
+				}
+				return true
+			}
+		}
+
+		cyclePath = cyclePath[:len(cyclePath)-1]
+		inStack[name] = false
+		return false
+	}
+
+	for name := range nodeMap {
+		if !visited[name] {
+			dfs(name)
+		}
+	}
+
+	// Compute load order using topological sort (Kahn's algorithm).
+	// 使用拓扑排序（Kahn 算法）计算加载顺序。
+	inDegree := make(map[string]int)
+	for name := range nodeMap {
+		inDegree[name] = 0
+	}
+	for _, edge := range dag.Edges {
+		if edge.To != "" {
+			inDegree[edge.To]++ // edge.To is depended by edge.From
+		}
+	}
+
+	// Reverse: edge.From depends on edge.To, so edge.To should be loaded first.
+	// Actually we need to reverse the direction for load order.
+	// 实际上需要反转方向来计算加载顺序。
+	adj := make(map[string][]string) // provider -> providers that depend on it
+	for name := range nodeMap {
+		adj[name] = nil
+	}
+	for _, edge := range dag.Edges {
+		if edge.To != "" {
+			adj[edge.To] = append(adj[edge.To], edge.From)
+		}
+	}
+
+	// Recompute in-degree: count how many providers each provider depends on.
+	// 重新计算入度：统计每个 provider 依赖多少个其他 provider。
+	inDegree = make(map[string]int)
+	for name := range nodeMap {
+		inDegree[name] = 0
+	}
+	for _, edge := range dag.Edges {
+		if edge.To != "" {
+			inDegree[edge.From]++ // edge.From depends on edge.To
+		}
+	}
+
+	// Queue of providers with no dependencies.
+	// 无依赖的 provider 队列。
+	queue := make([]string, 0)
+	for name, deg := range inDegree {
+		if deg == 0 {
+			queue = append(queue, name)
+		}
+	}
+
+	// Sort queue for deterministic output.
+	// 对队列排序以保证输出确定性。
+	sort.Strings(queue)
+
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		dag.LoadOrder = append(dag.LoadOrder, name)
+
+		// Find providers that depend on this one.
+		// 查找依赖此 provider 的其他 provider。
+		for _, edge := range dag.Edges {
+			if edge.To == name {
+				inDegree[edge.From]--
+				if inDegree[edge.From] == 0 {
+					queue = append(queue, edge.From)
+					sort.Strings(queue) // Keep sorted for determinism.
+				}
+			}
+		}
+	}
+
+	// If there are cycles, some providers won't be in LoadOrder.
+	// 如果存在循环，某些 provider 不会出现在 LoadOrder 中。
+	// Add them at the end (they will fail to load anyway).
+	// 将它们追加到末尾（它们本来就无法加载）。
+	if len(dag.LoadOrder) < len(nodeMap) {
+		visited := make(map[string]bool)
+		for _, name := range dag.LoadOrder {
+			visited[name] = true
+		}
+		var remaining []string
+		for name := range nodeMap {
+			if !visited[name] {
+				remaining = append(remaining, name)
+			}
+		}
+		sort.Strings(remaining)
+		dag.LoadOrder = append(dag.LoadOrder, remaining...)
+	}
+
+	return dag
 }

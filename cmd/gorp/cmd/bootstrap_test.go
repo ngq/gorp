@@ -14,6 +14,7 @@ func (p *bootstrapProviderStub) Register(runtimecontract.Container) error { retu
 func (p *bootstrapProviderStub) Boot(runtimecontract.Container) error     { return nil }
 func (p *bootstrapProviderStub) IsDefer() bool                            { return false }
 func (p *bootstrapProviderStub) Provides() []string                       { return nil }
+func (p *bootstrapProviderStub) DependsOn() []string                      { return nil }
 
 func TestRegisterBootstrapProvidersOverridesRuntimeAndExtras(t *testing.T) {
 	old := readBootstrapHooks()

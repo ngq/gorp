@@ -22,6 +22,7 @@ type testProvider struct {
 func (p *testProvider) Name() string       { return "test" }
 func (p *testProvider) IsDefer() bool      { return p.deferLoad }
 func (p *testProvider) Provides() []string { return p.provide }
+func (p *testProvider) DependsOn() []string { return nil }
 func (p *testProvider) Register(c runtimecontract.Container) error {
 	*p.loaded++
 	for _, k := range p.provide {

@@ -1,3 +1,25 @@
+// Package otel provides OpenTelemetry tracing implementation for gorp.
+//
+// OpenTelemetry 链路追踪 Provider，实现 observabilitycontract.Tracer 契约。
+// 支持 OTLP gRPC/HTTP 导出、Stdout 导出、Span 创建和属性设置。
+//
+// 使用示例：
+//
+//  cfg := &TracingConfig{
+//      ServiceName: "my-service",
+//      Exporter:    "otlp-grpc",
+//      Endpoint:    "localhost:4317",
+//  }
+//  tracer, err := NewTracer(cfg)
+//  if err != nil {
+//      panic(err)
+//  }
+//  defer tracer.Close()
+//
+//  ctx, span := tracer.Start(ctx, "operation-name")
+//  defer span.End()
+//
+// 配置路径：tracing.*
 package otel
 
 import (
@@ -35,6 +57,13 @@ func (p *Provider) Provides() []string {
 	return []string{observabilitycontract.TracerKey, observabilitycontract.TracerProviderKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// OTel tracing depends on Config for tracing configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// OTel tracing 依赖 Config 获取追踪配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(observabilitycontract.TracerProviderKey, func(c runtimecontract.Container) (any, error) {
 		cfg, err := getTracingConfig(c)
@@ -54,7 +83,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		if err != nil {
 			return nil, err
 		}
-		tp := tpAny.(*TracerProviderWrapper)
+		tp, ok := tpAny.(*TracerProviderWrapper)
+		if !ok {
+			return nil, fmt.Errorf("tracing.otel: expected *TracerProviderWrapper, got %T", tpAny)
+		}
 		return NewTracer(tp, tp.cfg), nil
 	}, true)
 

@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
@@ -25,9 +26,18 @@ type exportRetryContainerStub struct {
 	retry resiliencecontract.Retry
 }
 
-func (s *exportRetryContainerStub) Bind(string, runtimecontract.Factory, bool) {}
-func (s *exportRetryContainerStub) IsBind(string) bool                         { return true }
-func (s *exportRetryContainerStub) MustMake(key string) any                    { v, _ := s.Make(key); return v }
+func (s *exportRetryContainerStub) Bind(string, runtimecontract.Factory, bool)                      {}
+func (s *exportRetryContainerStub) NamedBind(string, string, runtimecontract.Factory, bool)          {}
+func (s *exportRetryContainerStub) IsBind(string) bool                                               { return true }
+func (s *exportRetryContainerStub) IsBindNamed(string, string) bool                                  { return false }
+func (s *exportRetryContainerStub) MustMake(key string) any                                          { v, _ := s.Make(key); return v }
+func (s *exportRetryContainerStub) MustMakeNamed(string, string) any                                 { return nil }
+func (s *exportRetryContainerStub) RegisterCloser(string, io.Closer)                                 {}
+func (s *exportRetryContainerStub) Destroy() error                                                   { return nil }
+func (s *exportRetryContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo              { return nil }
+func (s *exportRetryContainerStub) DebugPrint() string                                               { return "" }
+func (s *exportRetryContainerStub) ProviderDAG() runtimecontract.ProviderDAG                          { return runtimecontract.ProviderDAG{} }
+func (s *exportRetryContainerStub) MakeNamed(string, string) (any, error)                            { return nil, nil }
 func (s *exportRetryContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }

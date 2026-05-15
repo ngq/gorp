@@ -43,6 +43,13 @@ func (p *Provider) Provides() []string {
 	return []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}
 }
 
+// DependsOn returns the keys this provider depends on.
+// Noop service auth has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop service auth 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op service authenticator to the container.
 //
 // Register 将空服务认证绑定到容器。

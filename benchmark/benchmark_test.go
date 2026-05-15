@@ -68,7 +68,8 @@ func BenchmarkWRRSelector_Select(b *testing.B) {
 			instances := makeInstancesWithWeight(n)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _, _ = selector.Select(context.Background(), instances)
+				_, done, _ := selector.Select(context.Background(), instances)
+				done(context.Background(), discoverycontract.DoneInfo{Err: nil})
 			}
 		})
 	}

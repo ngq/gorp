@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -376,7 +377,7 @@ func runMigrateUp(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintln(cmd.OutOrStdout(), "正在执行迁移...")
 	if err := m.Up(); err != nil {
-		if err == migrate.ErrNoChange {
+		if errors.Is(err, migrate.ErrNoChange) {
 			fmt.Fprintln(cmd.OutOrStdout(), "没有待执行的迁移（已是最新版本）")
 			return nil
 		}
@@ -402,7 +403,7 @@ func runMigrateDown(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintln(cmd.OutOrStdout(), "正在回滚最后一个迁移...")
 	if err := m.Steps(-1); err != nil {
-		if err == migrate.ErrNoChange {
+		if errors.Is(err, migrate.ErrNoChange) {
 			fmt.Fprintln(cmd.OutOrStdout(), "没有可回滚的迁移")
 			return nil
 		}

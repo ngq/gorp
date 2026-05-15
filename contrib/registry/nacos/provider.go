@@ -1,3 +1,25 @@
+// Package nacos provides Nacos service registry implementation for gorp.
+//
+// Nacos 注册中心 Provider，实现 transportcontract.ServiceRegistry 契约。
+// 支持服务注册、发现、注销、权重负载均衡。
+//
+// 使用示例：
+//
+//  cfg := &DiscoveryConfig{
+//      NacosAddr:      "localhost:8848",
+//      NacosNamespace: "public",
+//      NacosGroup:     "DEFAULT_GROUP",
+//      ServiceWeight:  1.0,
+//  }
+//  registry, err := NewRegistry(cfg)
+//  if err != nil {
+//      panic(err)
+//  }
+//  defer registry.Close()
+//
+//  err = registry.Register(ctx, "my-service", "192.168.1.100:8080", nil)
+//
+// 配置路径：discovery.nacos.*
 package nacos
 
 import (

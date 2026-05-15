@@ -64,6 +64,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 声明该 provider 对外提供的服务键。
 func (p *Provider) Provides() []string { return []string{transportcontract.HTTPKey, httpEngineKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Gin provider depends on Config and Log.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Gin provider 依赖 Config 和 Log。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey, observabilitycontract.LogKey} }
+
 // Register binds the Gin engine and HTTP service into the container.
 //
 // Register 将 Gin engine 和 HTTP service 绑定到容器。

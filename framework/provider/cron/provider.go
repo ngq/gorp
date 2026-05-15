@@ -57,6 +57,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回 Cron 服务契约键。
 func (p *Provider) Provides() []string { return []string{runtimecontract.CronKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Cron provider has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Cron provider 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the cron service factory to the container.
 // Core logic: Create Service with second-level parser, bind factory.
 //

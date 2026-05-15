@@ -65,6 +65,13 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides 返回 SQLX 契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.SQLXKey} }
 
+// DependsOn returns the keys this provider depends on.
+// SQLX provider depends on Config for database configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// SQLX provider 依赖 Config 获取数据库配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the SQLX DB factory to the container.
 // Core logic: Parse config, normalize driver, open connection, apply pool settings.
 //

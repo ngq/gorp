@@ -49,6 +49,13 @@ func (p *Provider) IsDefer() bool      { return false }
 // 暴露 LogKey 用于日志服务。
 func (p *Provider) Provides() []string { return []string{observabilitycontract.LogKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Log provider depends on Config for log configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Log provider 依赖 Config 获取日志配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
 // Register binds the log factory to the container.
 // Core logic: Read config, configure zap logger with sink, bind singleton.
 //

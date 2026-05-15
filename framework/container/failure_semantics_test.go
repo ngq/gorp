@@ -22,6 +22,7 @@ type failingProvider struct {
 func (p *failingProvider) Name() string       { return "failing" }
 func (p *failingProvider) IsDefer() bool      { return false }
 func (p *failingProvider) Provides() []string { return nil }
+func (p *failingProvider) DependsOn() []string { return nil }
 func (p *failingProvider) Register(runtimecontract.Container) error {
 	*p.loaded++
 	return p.registerErr
@@ -31,12 +32,12 @@ func (p *failingProvider) Boot(runtimecontract.Container) error {
 	return p.bootErr
 }
 
-// TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure verifies that after
-// a provider's Register fails, subsequent load attempts do not retry Register.
+// TestContainer_LoadProviderRetriesAfterRegisterFailure verifies that after
+// a provider's Register fails, subsequent load attempts still retry Register.
 //
-// TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure 验证当服务提供商的
-// Register 失败后，后续加载尝试不会重试 Register。
-func TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure(t *testing.T) {
+// TestContainer_LoadProviderRetriesAfterRegisterFailure 验证当服务提供商的
+// Register 失败后，后续加载尝试仍会重试 Register。
+func TestContainer_LoadProviderRetriesAfterRegisterFailure(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0
 	p := &failingProvider{
@@ -53,19 +54,19 @@ func TestContainer_LoadProviderDoesNotRetryAfterRegisterFailure(t *testing.T) {
 	require.Equal(t, 1, loaded)
 	require.Equal(t, 0, booted)
 
-	// 再次触发 loadProvider，不应该重复执行 Register
+	// 再次触发 loadProvider，应该再次执行 Register
 	err = c.loadProvider(p.Name())
-	require.NoError(t, err)
-	require.Equal(t, 1, loaded)
+	require.EqualError(t, err, "register failed")
+	require.Equal(t, 2, loaded)
 	require.Equal(t, 0, booted)
 }
 
-// TestContainer_BootProviderDoesNotRetryAfterBootFailure verifies that after a
-// provider's Boot fails, subsequent boot attempts do not retry Boot.
+// TestContainer_BootProviderRetriesAfterBootFailure verifies that after a
+// provider's Boot fails, subsequent boot attempts still retry Boot.
 //
-// TestContainer_BootProviderDoesNotRetryAfterBootFailure 验证当服务提供商的 Boot
-// 失败后，后续引导尝试不会重试 Boot。
-func TestContainer_BootProviderDoesNotRetryAfterBootFailure(t *testing.T) {
+// TestContainer_BootProviderRetriesAfterBootFailure 验证当服务提供商的 Boot
+// 失败后，后续引导尝试仍会重试 Boot。
+func TestContainer_BootProviderRetriesAfterBootFailure(t *testing.T) {
 	c := New()
 	loaded, booted := 0, 0
 	p := &failingProvider{
@@ -81,9 +82,9 @@ func TestContainer_BootProviderDoesNotRetryAfterBootFailure(t *testing.T) {
 	require.Equal(t, 0, loaded)
 	require.Equal(t, 1, booted)
 
-	// 再次触发 bootProvider，不应该重复执行 Boot
+	// 再次触发 bootProvider，应该再次执行 Boot
 	err = c.bootProvider(p.Name())
-	require.NoError(t, err)
+	require.EqualError(t, err, "boot failed")
 	require.Equal(t, 0, loaded)
-	require.Equal(t, 1, booted)
+	require.Equal(t, 2, booted)
 }

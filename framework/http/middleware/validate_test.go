@@ -12,6 +12,7 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -124,8 +125,8 @@ func (rv *realValidator) TranslateError(err error) resiliencecontract.AppError {
 	if err == nil {
 		return nil
 	}
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
+	var validationErrors validator.ValidationErrors
+	if !errors.As(err, &validationErrors) {
 		return resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())
 	}
 

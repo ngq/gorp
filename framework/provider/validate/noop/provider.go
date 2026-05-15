@@ -40,6 +40,13 @@ func (p *Provider) IsDefer() bool { return true }
 // Provides 返回验证器契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.ValidatorKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Noop validator has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop validator 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op validator to the container.
 //
 // Register 将空验证器绑定到容器。

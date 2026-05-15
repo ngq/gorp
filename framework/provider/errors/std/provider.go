@@ -9,6 +9,7 @@ package std
 
 import (
 	"context"
+	"errors"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -186,7 +187,8 @@ func (h *errorHandler) WrapError(ctx context.Context, err error, code int, reaso
 	}
 
 	// 如果已经是 AppError，添加原因
-	if appErr, ok := err.(resiliencecontract.AppError); ok {
+	var appErr resiliencecontract.AppError
+	if errors.As(err, &appErr) {
 		return appErr.WithCause(err)
 	}
 

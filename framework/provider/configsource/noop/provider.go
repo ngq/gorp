@@ -40,6 +40,13 @@ func (p *Provider) IsDefer() bool { return true }
 // Provides 返回配置源契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.ConfigSourceKey} }
 
+// DependsOn returns the keys this provider depends on.
+// Noop config source has no dependencies.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Noop config source 无依赖。
+func (p *Provider) DependsOn() []string { return nil }
+
 // Register binds the no-op config source to the container.
 //
 // Register 将空配置源绑定到容器。

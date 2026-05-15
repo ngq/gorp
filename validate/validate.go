@@ -35,6 +35,8 @@ type ValidationError = datacontract.ValidationError
 // ValidationErrors is the top-level alias of the validation errors contract.
 //
 // ValidationErrors 是校验错误集合契约的顶层别名。
+//
+//nolint:errname // 类型别名，原始定义在 datacontract 包
 type ValidationErrors = datacontract.ValidationErrors
 
 // CustomValidateFunc is the top-level alias of the custom validate callback contract.

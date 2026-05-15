@@ -10,6 +10,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -112,7 +113,7 @@ func (s *memoryStore) MGet(ctx context.Context, keys ...string) (map[string]stri
 	for _, k := range keys {
 		v, err := s.Get(ctx, k)
 		if err != nil {
-			if err == datacontract.ErrCacheMiss {
+		if errors.Is(err, datacontract.ErrCacheMiss) {
 				continue
 			}
 			return nil, err

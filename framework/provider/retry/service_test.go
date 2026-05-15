@@ -172,7 +172,7 @@ func TestRetryService_Do_ContextCancel(t *testing.T) {
 	})
 
 	// 验证 context 被取消或重试次数减少
-	if err != context.Canceled && callCount >= 10 {
+	if !errors.Is(err, context.Canceled) && callCount >= 10 {
 		t.Logf("context cancellation test: err=%v, callCount=%d", err, callCount)
 	}
 }

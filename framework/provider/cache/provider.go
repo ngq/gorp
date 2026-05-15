@@ -22,6 +22,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -55,6 +56,13 @@ func (p *Provider) IsDefer() bool { return false }
 //
 // Provides 返回缓存契约键。
 func (p *Provider) Provides() []string { return []string{datacontract.CacheKey} }
+
+// DependsOn returns the keys this provider depends on.
+// Cache provider depends on Config for cache configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// Cache provider 依赖 Config 获取缓存配置。
+func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
 
 // config holds the cache configuration.
 //
@@ -182,7 +190,7 @@ func (s *service) Remember(ctx context.Context, key string, ttl time.Duration, f
 	if err == nil {
 		return v, nil
 	}
-	if err != datacontract.ErrCacheMiss {
+	if !errors.Is(err, datacontract.ErrCacheMiss) {
 		return "", err
 	}
 

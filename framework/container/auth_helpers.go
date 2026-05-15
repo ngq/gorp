@@ -16,6 +16,5 @@ import (
 //
 // MustMakeJWTService 解析 JWT 服务，失败时 panic。
 func MustMakeJWTService(c runtimecontract.Container) securitycontract.JWTService {
-	v := c.MustMake(securitycontract.AuthJWTKey)
-	return v.(securitycontract.JWTService)
+	return MustMakeWith[securitycontract.JWTService](c, securitycontract.AuthJWTKey)
 }

@@ -1,0 +1,65 @@
+# Prometheus ServiceMonitor
+# Prometheus Operator 用于自动发现和监控服务
+#
+# 中文说明：
+# - 自动发现 gorp-service Pod；
+# - 配置 metrics 抓取路径和端口；
+# - 支持 Prometheus Operator 部署场景。
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gorp-service-monitor
+  labels:
+    app.kubernetes.io/name: gorp-service
+    app.kubernetes.io/component: monitor
+    release: prometheus  # Prometheus Operator 的 label selector
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gorp-service
+  namespaceSelector:
+    matchNames:
+      - gorp-prod
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          targetLabel: app
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_version]
+          targetLabel: version
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+---
+# Prometheus PodMonitor
+# 直接监控 Pod，不依赖 Service
+#
+# 中文说明：
+# - 用于没有 Service 的场景；
+# - 支持 sidecar 模式的 metrics exporter。
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: gorp-service-pod-monitor
+  labels:
+    app.kubernetes.io/name: gorp-service
+    app.kubernetes.io/component: monitor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gorp-service
+  namespaceSelector:
+    matchNames:
+      - gorp-prod
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true

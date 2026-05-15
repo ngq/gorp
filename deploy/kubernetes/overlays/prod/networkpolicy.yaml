@@ -1,0 +1,111 @@
+# Network Policy
+# 限制 Pod 的网络入站和出站流量
+#
+# 中文说明：
+# - 只允许来自 Ingress Controller 的 HTTP/gRPC 流量；
+# - 只允许访问必要的后端服务；
+# - 生产环境安全基线配置。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gorp-service-netpol
+  labels:
+    app.kubernetes.io/name: gorp-service
+    app.kubernetes.io/component: netpol
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gorp-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 允许来自 Ingress Controller 的流量
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - name: http
+          port: 8080
+          protocol: TCP
+        - name: grpc
+          port: 9090
+          protocol: TCP
+    # 允许来自同一命名空间的内部流量
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gorp-service
+      ports:
+        - name: http
+          port: 8080
+          protocol: TCP
+        - name: grpc
+          port: 9090
+          protocol: TCP
+    # 允许健康检查探针
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - name: http
+          port: 8080
+          protocol: TCP
+  egress:
+    # 允许 DNS 解析
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - name: dns
+          port: 53
+          protocol: UDP
+        - name: dns-tcp
+          port: 53
+          protocol: TCP
+    # 允许访问外部数据库
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - name: mysql
+          port: 3306
+          protocol: TCP
+        - name: postgres
+          port: 5432
+          protocol: TCP
+        - name: redis
+          port: 6379
+          protocol: TCP
+    # 允许访问服务注册中心（同集群内）
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: etcd
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nacos
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: consul
+      ports:
+        - name: etcd
+          port: 2379
+          protocol: TCP
+        - name: nacos
+          port: 8848
+          protocol: TCP
+        - name: consul
+          port: 8500
+          protocol: TCP

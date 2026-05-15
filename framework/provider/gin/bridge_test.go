@@ -231,6 +231,7 @@ func (m *mockContainer) RegisterProviders(...runtimecontract.ServiceProvider) er
 }
 func (m *mockContainer) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
 func (m *mockContainer) DebugPrint() string                                  { return "" }
+func (m *mockContainer) ProviderDAG() runtimecontract.ProviderDAG             { return runtimecontract.ProviderDAG{} }
 
 // nonGinHTTPService 模拟不实现 GINEngineProvider 的 HTTP 服务。
 type nonGinHTTPService struct{}

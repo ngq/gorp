@@ -7,6 +7,8 @@ package host
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 
@@ -51,7 +53,7 @@ func (s *HTTPService) Name() string { return s.name }
 // Start 在后台启动 HTTP 服务器。
 func (s *HTTPService) Start(ctx context.Context) error {
 	go func() {
-		if err := s.http.Run(); err != nil && err != http.ErrServerClosed {
+		if err := s.http.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		}
 	}()
 	return nil
@@ -107,7 +109,7 @@ func (s *CronService) Stop(ctx context.Context) error {
 	case <-stopped.Done():
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("cron stop context done: %w", ctx.Err())
 	}
 }
 
@@ -164,6 +166,6 @@ func (s *GRPCService) Stop(ctx context.Context) error {
 		return nil
 	case <-ctx.Done():
 		s.server.Stop()
-		return ctx.Err()
+		return fmt.Errorf("grpc stop context done: %w", ctx.Err())
 	}
 }

@@ -97,6 +97,13 @@ type Container interface {
 	//
 	// DebugPrint 返回容器状态的人类可读快照，用于诊断。
 	DebugPrint() string
+
+	// ProviderDAG returns the provider dependency graph for visualization and analysis.
+	// Useful for debugging provider load order and detecting circular dependencies.
+	//
+	// ProviderDAG 返回 provider 依赖图，用于可视化和分析。
+	// 用于调试 provider 加载顺序和检测循环依赖。
+	ProviderDAG() ProviderDAG
 }
 
 // ProviderInfo describes a registered provider's state.
@@ -107,6 +114,37 @@ type ProviderInfo struct {
 	Loaded  bool
 	Booted  bool
 	IsDefer bool
+}
+
+// ProviderDAGNode represents a node in the provider dependency graph.
+//
+// ProviderDAGNode 表示 provider 依赖图中的一个节点。
+type ProviderDAGNode struct {
+	Name       string   // Provider 名称
+	Provides   []string // 提供的契约键
+	DependsOn  []string // 依赖的契约键
+	IsDefer    bool     // 是否延迟加载
+	Loaded     bool     // 是否已加载
+	Booted     bool     // 是否已启动
+}
+
+// ProviderDAG represents the provider dependency graph.
+//
+// ProviderDAG 表示 provider 依赖图。
+type ProviderDAG struct {
+	Nodes    []ProviderDAGNode // 所有节点
+	Edges    []DAGEdge         // 依赖边
+	Cycles   [][]string        // 检测到的循环依赖
+	LoadOrder []string         // 推荐加载顺序
+}
+
+// DAGEdge represents a dependency edge in the DAG.
+//
+// DAGEdge 表示 DAG 中的依赖边。
+type DAGEdge struct {
+	From string // 依赖方 provider
+	To   string // 被依赖方 provider（可能为空，表示依赖外部绑定）
+	Key  string // 依赖的契约键
 }
 
 // Factory creates one service value from the container.

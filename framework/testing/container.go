@@ -70,7 +70,9 @@ func NewTestContainer(t *testing.T) (runtimecontract.Container, cleanupFunc) {
 
 	rAny, err := c.Make(datacontract.RedisKey)
 	require.NoError(t, err)
-	require.NoError(t, rAny.(datacontract.Redis).Ping(ctx))
+	redisSvc, ok := rAny.(datacontract.Redis)
+	require.True(t, ok, "expected datacontract.Redis, got %T", rAny)
+	require.NoError(t, redisSvc.Ping(ctx))
 
 	return c, func() {
 		mr.Close()

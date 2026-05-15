@@ -1,10 +1,12 @@
 // Package container provides runtime dependency injection container for gorp framework.
 // This file exposes strongly typed helper accessors for common capabilities.
-// Lets higher-level code fetch DB, Redis, Logger without type assertions.
+// All helpers delegate to the generic MakeWith[T] / MustMakeWith[T] functions,
+// eliminating bare type assertions and providing type-mismatch error messages.
 //
 // 容器包提供 gorp 框架的运行时依赖注入容器实现。
 // 本文件在通用运行时容器之上暴露强类型辅助访问入口。
-// 让上层代码获取 DB、Redis、Logger 等常见能力时无需类型断言。
+// 所有 helper 委托给泛型 MakeWith[T] / MustMakeWith[T]，
+// 消除裸类型断言，并在类型不匹配时提供可读错误信息。
 package container
 
 import (
@@ -32,165 +34,105 @@ func MakeDBRuntime(c runtimecontract.Container) (any, error) {
 //
 // MakeRedis 从容器中解析 Redis 能力。
 func MakeRedis(c runtimecontract.Container) (datacontract.Redis, error) {
-	v, err := c.Make(datacontract.RedisKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(datacontract.Redis), nil
+	return MakeWith[datacontract.Redis](c, datacontract.RedisKey)
 }
 
 // MakeCache resolves the cache capability from the container.
 //
 // MakeCache 从容器中解析缓存能力。
 func MakeCache(c runtimecontract.Container) (datacontract.Cache, error) {
-	v, err := c.Make(datacontract.CacheKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(datacontract.Cache), nil
+	return MakeWith[datacontract.Cache](c, datacontract.CacheKey)
 }
 
 // MakeGormDB resolves the Gorm database handle from the container.
 //
 // MakeGormDB 从容器中解析 Gorm 数据库句柄。
 func MakeGormDB(c runtimecontract.Container) (*gormdb.DB, error) {
-	v, err := c.Make(datacontract.GormKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(*gormdb.DB), nil
+	return MakeWith[*gormdb.DB](c, datacontract.GormKey)
 }
 
 // MakeSQLX resolves the SQLX database handle from the container.
 //
 // MakeSQLX 从容器中解析 SQLX 数据库句柄。
 func MakeSQLX(c runtimecontract.Container) (*sqlx.DB, error) {
-	v, err := c.Make(datacontract.SQLXKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(*sqlx.DB), nil
+	return MakeWith[*sqlx.DB](c, datacontract.SQLXKey)
 }
 
 // MakeMessagePublisher resolves the message publisher from the container.
 //
 // MakeMessagePublisher 从容器中解析消息发布能力。
 func MakeMessagePublisher(c runtimecontract.Container) (integrationcontract.MessagePublisher, error) {
-	v, err := c.Make(integrationcontract.MessagePublisherKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(integrationcontract.MessagePublisher), nil
+	return MakeWith[integrationcontract.MessagePublisher](c, integrationcontract.MessagePublisherKey)
 }
 
 // MakeMessageSubscriber resolves the message subscriber from the container.
 //
 // MakeMessageSubscriber 从容器中解析消息订阅能力。
 func MakeMessageSubscriber(c runtimecontract.Container) (integrationcontract.MessageSubscriber, error) {
-	v, err := c.Make(integrationcontract.MessageSubscriberKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(integrationcontract.MessageSubscriber), nil
+	return MakeWith[integrationcontract.MessageSubscriber](c, integrationcontract.MessageSubscriberKey)
 }
 
 // MakeDistributedLock resolves the distributed lock capability from the container.
 //
 // MakeDistributedLock 从容器中解析分布式锁能力。
 func MakeDistributedLock(c runtimecontract.Container) (datacontract.DistributedLock, error) {
-	v, err := c.Make(datacontract.DistributedLockKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(datacontract.DistributedLock), nil
+	return MakeWith[datacontract.DistributedLock](c, datacontract.DistributedLockKey)
 }
 
 // MakeGRPCConnFactory resolves the gRPC connection factory from the container.
 //
 // MakeGRPCConnFactory 从容器中解析 gRPC 连接工厂。
 func MakeGRPCConnFactory(c runtimecontract.Container) (transportcontract.GRPCConnFactory, error) {
-	v, err := c.Make(transportcontract.GRPCConnFactoryKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(transportcontract.GRPCConnFactory), nil
+	return MakeWith[transportcontract.GRPCConnFactory](c, transportcontract.GRPCConnFactoryKey)
 }
 
 // MakeGRPCServerRegistrar resolves the gRPC server registrar from the container.
 //
 // MakeGRPCServerRegistrar 从容器中解析 gRPC 服务注册器。
 func MakeGRPCServerRegistrar(c runtimecontract.Container) (transportcontract.GRPCServerRegistrar, error) {
-	v, err := c.Make(transportcontract.GRPCServerRegistrarKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(transportcontract.GRPCServerRegistrar), nil
+	return MakeWith[transportcontract.GRPCServerRegistrar](c, transportcontract.GRPCServerRegistrarKey)
 }
 
 // MakeCron resolves the cron capability from the container.
 //
 // MakeCron 从容器中解析 cron 能力。
 func MakeCron(c runtimecontract.Container) (runtimecontract.Cron, error) {
-	v, err := c.Make(runtimecontract.CronKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(runtimecontract.Cron), nil
+	return MakeWith[runtimecontract.Cron](c, runtimecontract.CronKey)
 }
 
 // MakeLogger resolves the logger capability from the container.
 //
 // MakeLogger 从容器中解析日志能力。
 func MakeLogger(c runtimecontract.Container) (observabilitycontract.Logger, error) {
-	v, err := c.Make(observabilitycontract.LogKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(observabilitycontract.Logger), nil
+	return MakeWith[observabilitycontract.Logger](c, observabilitycontract.LogKey)
 }
 
 // MakeValidator resolves the validator capability from the container.
 //
 // MakeValidator 从容器中解析校验器能力。
 func MakeValidator(c runtimecontract.Container) (datacontract.Validator, error) {
-	v, err := c.Make(datacontract.ValidatorKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(datacontract.Validator), nil
+	return MakeWith[datacontract.Validator](c, datacontract.ValidatorKey)
 }
 
 // MakeRetry resolves the retry capability from the container.
 //
 // MakeRetry 从容器中解析重试能力。
 func MakeRetry(c runtimecontract.Container) (resiliencecontract.Retry, error) {
-	v, err := c.Make(resiliencecontract.RetryKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(resiliencecontract.Retry), nil
+	return MakeWith[resiliencecontract.Retry](c, resiliencecontract.RetryKey)
 }
 
 // MakeHost resolves the host capability from the container.
 //
 // MakeHost 从容器中解析 host 能力。
 func MakeHost(c runtimecontract.Container) (runtimecontract.Host, error) {
-	v, err := c.Make(runtimecontract.HostKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(runtimecontract.Host), nil
+	return MakeWith[runtimecontract.Host](c, runtimecontract.HostKey)
 }
 
 // MakeHTTP resolves the HTTP service from the container.
 //
 // MakeHTTP 从容器中解析 HTTP 服务。
 func MakeHTTP(c runtimecontract.Container) (transportcontract.HTTP, error) {
-	v, err := c.Make(transportcontract.HTTPKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(transportcontract.HTTP), nil
+	return MakeWith[transportcontract.HTTP](c, transportcontract.HTTPKey)
 }
 
 // MakeHTTPRouter resolves the HTTP router facade from the container.
@@ -208,16 +150,14 @@ func MakeHTTPRouter(c runtimecontract.Container) (transportcontract.HTTPRouter, 
 //
 // MustMakeLogger 解析日志能力，失败时 panic。
 func MustMakeLogger(c runtimecontract.Container) observabilitycontract.Logger {
-	v := c.MustMake(observabilitycontract.LogKey)
-	return v.(observabilitycontract.Logger)
+	return MustMakeWith[observabilitycontract.Logger](c, observabilitycontract.LogKey)
 }
 
 // MustMakeGorm resolves the Gorm database handle and panics on failure.
 //
 // MustMakeGorm 解析 Gorm 数据库句柄，失败时 panic。
 func MustMakeGorm(c runtimecontract.Container) *gormdb.DB {
-	v := c.MustMake(datacontract.GormKey)
-	return v.(*gormdb.DB)
+	return MustMakeWith[*gormdb.DB](c, datacontract.GormKey)
 }
 
 // MustMakeHTTPRouter resolves the HTTP router facade and panics on failure.
@@ -232,80 +172,70 @@ func MustMakeHTTPRouter(c runtimecontract.Container) transportcontract.HTTPRoute
 //
 // MustMakeHTTP 解析 HTTP 服务，失败时 panic。
 func MustMakeHTTP(c runtimecontract.Container) transportcontract.HTTP {
-	v := c.MustMake(transportcontract.HTTPKey)
-	return v.(transportcontract.HTTP)
+	return MustMakeWith[transportcontract.HTTP](c, transportcontract.HTTPKey)
 }
 
 // MustMakeMessagePublisher resolves the message publisher and panics on failure.
 //
 // MustMakeMessagePublisher 解析消息发布能力，失败时 panic。
 func MustMakeMessagePublisher(c runtimecontract.Container) integrationcontract.MessagePublisher {
-	v := c.MustMake(integrationcontract.MessagePublisherKey)
-	return v.(integrationcontract.MessagePublisher)
+	return MustMakeWith[integrationcontract.MessagePublisher](c, integrationcontract.MessagePublisherKey)
 }
 
 // MustMakeMessageSubscriber resolves the message subscriber and panics on failure.
 //
 // MustMakeMessageSubscriber 解析消息订阅能力，失败时 panic。
 func MustMakeMessageSubscriber(c runtimecontract.Container) integrationcontract.MessageSubscriber {
-	v := c.MustMake(integrationcontract.MessageSubscriberKey)
-	return v.(integrationcontract.MessageSubscriber)
+	return MustMakeWith[integrationcontract.MessageSubscriber](c, integrationcontract.MessageSubscriberKey)
 }
 
 // MustMakeDistributedLock resolves the distributed lock capability and panics on failure.
 //
 // MustMakeDistributedLock 解析分布式锁能力，失败时 panic。
 func MustMakeDistributedLock(c runtimecontract.Container) datacontract.DistributedLock {
-	v := c.MustMake(datacontract.DistributedLockKey)
-	return v.(datacontract.DistributedLock)
+	return MustMakeWith[datacontract.DistributedLock](c, datacontract.DistributedLockKey)
 }
 
 // MustMakeGRPCConnFactory resolves the gRPC connection factory and panics on failure.
 //
 // MustMakeGRPCConnFactory 解析 gRPC 连接工厂，失败时 panic。
 func MustMakeGRPCConnFactory(c runtimecontract.Container) transportcontract.GRPCConnFactory {
-	v := c.MustMake(transportcontract.GRPCConnFactoryKey)
-	return v.(transportcontract.GRPCConnFactory)
+	return MustMakeWith[transportcontract.GRPCConnFactory](c, transportcontract.GRPCConnFactoryKey)
 }
 
 // MustMakeGRPCServerRegistrar resolves the gRPC server registrar and panics on failure.
 //
 // MustMakeGRPCServerRegistrar 解析 gRPC 服务注册器，失败时 panic。
 func MustMakeGRPCServerRegistrar(c runtimecontract.Container) transportcontract.GRPCServerRegistrar {
-	v := c.MustMake(transportcontract.GRPCServerRegistrarKey)
-	return v.(transportcontract.GRPCServerRegistrar)
+	return MustMakeWith[transportcontract.GRPCServerRegistrar](c, transportcontract.GRPCServerRegistrarKey)
 }
 
 // MustMakeValidator resolves the validator capability and panics on failure.
 //
 // MustMakeValidator 解析校验器能力，失败时 panic。
 func MustMakeValidator(c runtimecontract.Container) datacontract.Validator {
-	v := c.MustMake(datacontract.ValidatorKey)
-	return v.(datacontract.Validator)
+	return MustMakeWith[datacontract.Validator](c, datacontract.ValidatorKey)
 }
 
 // MustMakeRetry resolves the retry capability and panics on failure.
 //
 // MustMakeRetry 解析重试能力，失败时 panic。
 func MustMakeRetry(c runtimecontract.Container) resiliencecontract.Retry {
-	v := c.MustMake(resiliencecontract.RetryKey)
-	return v.(resiliencecontract.Retry)
+	return MustMakeWith[resiliencecontract.Retry](c, resiliencecontract.RetryKey)
 }
 
 // MustMakeConfig resolves the config capability and panics on failure.
 //
 // MustMakeConfig 解析配置能力，失败时 panic。
 func MustMakeConfig(c runtimecontract.Container) datacontract.Config {
-	v := c.MustMake(datacontract.ConfigKey)
-	return v.(datacontract.Config)
+	return MustMakeWith[datacontract.Config](c, datacontract.ConfigKey)
 }
 
 // MustMakeCache resolves the cache capability and panics on failure.
 //
 // MustMakeCache 解析缓存能力，失败时 panic。
 func MustMakeCache(c runtimecontract.Container) datacontract.Cache {
-	v := c.MustMake(datacontract.CacheKey)
-	return v.(datacontract.Cache)
+	return MustMakeWith[datacontract.Cache](c, datacontract.CacheKey)
 }
 
 // PingDBRuntime performs a best-effort health check against different DB runtime shapes.
@@ -329,7 +259,7 @@ func PingDBRuntime(dbAny any) error {
 		return db.Ping()
 	default:
 		// Unknown runtime shapes are treated as non-pingable rather than hard failures.
-		// 未知运行时形态按“不可 ping 但不报错”处理，避免额外制造硬失败。
+		// 未知运行时形态按"不可 ping 但不报错"处理，避免额外制造硬失败。
 		return nil
 	}
 }

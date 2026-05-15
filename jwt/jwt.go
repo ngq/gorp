@@ -7,6 +7,7 @@ import (
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	"github.com/ngq/gorp/framework/container"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	frameworkjwt "github.com/ngq/gorp/framework/provider/auth/jwt"
 )
@@ -23,11 +24,7 @@ type JWTService = securitycontract.JWTService
 // Make returns the business JWT service from the container.
 // Make 从容器获取业务 JWT 服务。
 func Make(c runtimecontract.Container) (securitycontract.JWTService, error) {
-	v, err := c.Make(securitycontract.AuthJWTKey)
-	if err != nil {
-		return nil, err
-	}
-	return v.(securitycontract.JWTService), nil
+	return container.MakeWith[securitycontract.JWTService](c, securitycontract.AuthJWTKey)
 }
 
 // MustMake returns the business JWT service from the container and panics on failure.

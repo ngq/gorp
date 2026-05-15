@@ -1,0 +1,14 @@
+# Pod Disruption Budget (Staging)
+# 确保 voluntary disruptions 时服务可用性
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gorp-service-pdb
+  labels:
+    app.kubernetes.io/name: gorp-service
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gorp-service
