@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	if err := gorp.Run("{{.Name}}", gorp.HTTP(),
+	if err := gorp.Run("{{.Name}}",
 {{- if .IsMicroserviceMode }}
 		gorp.WithMicroserviceMode(),
 {{- else if .IsGinFirstMode }}

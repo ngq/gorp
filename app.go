@@ -9,10 +9,15 @@
 // Eg:
 //
 //	gorp.Run("my-service",
-//	    gorp.HTTP(),
 //	    gorp.WithProviders(configprovider.NewProvider()),
 //	    gorp.WithHTTPRoutes(registerRoutes),
 //	)
+//
+// HTTP is enabled by default. Use gorp.HTTP() only when you need HTTPServiceOptions.
+// Use gorp.WithoutHTTP() to explicitly disable the HTTP mainline.
+//
+// HTTP 默认已启用。仅当需要传入 HTTPServiceOptions 时才调用 gorp.HTTP()。
+// 使用 gorp.WithoutHTTP() 可显式关闭 HTTP 主线。
 package gorp
 
 import (
@@ -183,8 +188,12 @@ func Build(serviceName string, options ...Option) (*HTTPRuntime, error) {
 }
 
 // HTTP declares that the default HTTP mainline should be used.
+// HTTP declares HTTP service options. The HTTP mainline is enabled by default,
+// so calling HTTP() without arguments is unnecessary. Use HTTP() only when you
+// need to pass HTTPServiceOptions. Use WithoutHTTP() to explicitly disable HTTP.
 //
-// HTTP 声明使用默认 HTTP 主线。
+// HTTP 声明 HTTP 服务选项。HTTP 主线默认已启用，无参调用 HTTP() 是冗余的。
+// 仅当需要传入 HTTPServiceOptions 时才调用。使用 WithoutHTTP() 可显式关闭 HTTP 主线。
 func HTTP(opts ...HTTPServiceOptions) Option {
 	return application.HTTP(opts...)
 }

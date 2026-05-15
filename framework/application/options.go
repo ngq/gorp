@@ -9,10 +9,15 @@
 // Eg:
 //
 //	application.Run("my-service",
-//	    application.HTTP(),
 //	    application.WithProviders(configprovider.NewProvider()),
 //	    application.WithHTTPRoutes(registerRoutes),
 //	)
+//
+// HTTP is enabled by default. Use HTTP() only when you need HTTPServiceOptions.
+// Use WithoutHTTP() to explicitly disable the HTTP mainline.
+//
+// HTTP 默认已启用。仅当需要传入 HTTPServiceOptions 时才调用 HTTP()。
+// 使用 WithoutHTTP() 可显式关闭 HTTP 主线。
 package application
 
 import (
@@ -21,12 +26,18 @@ import (
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
-// HTTP declares that the default HTTP mainline should be used.
+// HTTP declares HTTP service options. The HTTP mainline is enabled by default,
+// so calling HTTP() without arguments is unnecessary. Use HTTP() only when you
+// need to pass HTTPServiceOptions (e.g. to disable built-in Redis/Gorm, or
+// override governance settings). Use WithoutHTTP() to explicitly disable HTTP.
 //
-// HTTP 声明使用默认 HTTP 主线。
+// HTTP 声明 HTTP 服务选项。HTTP 主线默认已启用，无参调用 HTTP() 是冗余的。
+// 仅当需要传入 HTTPServiceOptions 时才调用（例如禁用内置 Redis/Gorm，或覆盖治理配置）。
+// 使用 WithoutHTTP() 可显式关闭 HTTP 主线。
 //
 // Example:
 //
+//	// 传参时才需要调用 HTTP() / Only needed when passing options:
 //	application.HTTP(application.HTTPServiceOptions{
 //	    DisableRedis: true,
 //	})

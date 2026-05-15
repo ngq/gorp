@@ -80,10 +80,14 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		}
 	}
 	c.Bind(resiliencecontract.CircuitBreakerKey, func(c runtimecontract.Container) (any, error) {
-		return NewSentinelCircuitBreaker(cfg), nil
+		cb := NewSentinelCircuitBreaker(cfg)
+		c.RegisterCloser(resiliencecontract.CircuitBreakerKey, cb)
+		return cb, nil
 	}, true)
 	c.Bind(resiliencecontract.RateLimiterKey, func(c runtimecontract.Container) (any, error) {
-		return NewSentinelRateLimiter(cfg), nil
+		rl := NewSentinelRateLimiter(cfg)
+		c.RegisterCloser(resiliencecontract.RateLimiterKey, rl)
+		return rl, nil
 	}, true)
 	return nil
 }
@@ -307,6 +311,16 @@ func (cb *SentinelCircuitBreaker) Underlying() any {
 	return sentinel.GlobalSlotChain()
 }
 
+// Close releases resources held by the circuit breaker.
+// It clears all internal state entries so they can be garbage collected.
+func (cb *SentinelCircuitBreaker) Close() error {
+	cb.states.Range(func(key, _ any) bool {
+		cb.states.Delete(key)
+		return true
+	})
+	return nil
+}
+
 func (cb *SentinelCircuitBreaker) As(target any) bool {
 	return internalnative.As(cb.Underlying(), target)
 }
@@ -375,6 +389,12 @@ func (rl *SentinelRateLimiter) Underlying() any {
 
 func (rl *SentinelRateLimiter) As(target any) bool {
 	return internalnative.As(rl.Underlying(), target)
+}
+
+// Close is a no-op for the rate limiter.
+// The underlying Sentinel engine is a global singleton managed by the Provider lifecycle.
+func (rl *SentinelRateLimiter) Close() error {
+	return nil
 }
 
 type sentinelReservation struct{ ok bool }

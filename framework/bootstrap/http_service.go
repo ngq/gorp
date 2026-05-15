@@ -204,6 +204,9 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 
 	RegisterHealthCheck(rt.Router, serviceName)
 	RegisterGovernanceInspectEndpoints(rt.Router, rt.GovernanceSummary)
+	if cronSvc, err := container.MakeCron(rt.Container); err == nil {
+		RegisterCronInspectEndpoints(rt.Router, cronSvc)
+	}
 	if !opts.DisableMetrics {
 		RegisterMetricsEndpoint(rt.Router)
 		rt.Router.Use(httpmiddleware.MetricsMiddleware())

@@ -278,11 +278,15 @@ func (r *Registry) Close() error {
 		return nil
 	}
 	r.closed = true
-	// 停止所有心跳续租
+
+	// 停止所有心跳续租（renewals 受 r.mu 保护，需加锁）
+	r.mu.Lock()
 	for key, cancel := range r.renewals {
 		cancel()
 		delete(r.renewals, key)
 	}
+	r.mu.Unlock()
+
 	// 停止所有 watch
 	for _, cancel := range r.watchCancels {
 		cancel()

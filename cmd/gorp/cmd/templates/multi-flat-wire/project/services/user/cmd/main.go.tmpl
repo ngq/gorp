@@ -15,7 +15,6 @@ import (
 func main() {
 	if err := gorp.Run(
 		"user-service",
-		gorp.HTTP(),
 {{- if .IsMicroserviceMode }}
 		gorp.WithMicroserviceMode(),
 {{- else if .IsGinFirstMode }}

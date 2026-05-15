@@ -32,7 +32,7 @@ func TestGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	text := string(content)
 
 	require.Contains(t, text, "gorp.Run(")
-	require.Contains(t, text, "gorp.HTTP()")
+	require.NotContains(t, text, "gorp.HTTP()")
 	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
@@ -229,7 +229,7 @@ func TestMultiFlatWireTemplateUsesApplicationEntrypointAndKeepsWireInCmdLayer(t 
 	require.NoError(t, err)
 	text := string(content)
 	require.Contains(t, text, "gorp.Run(")
-	require.Contains(t, text, "gorp.HTTP()")
+	require.NotContains(t, text, "gorp.HTTP()")
 	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
@@ -270,7 +270,7 @@ func TestReleaseGoLayoutTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	text := string(content)
 
 	require.Contains(t, text, "gorp.Run(")
-	require.Contains(t, text, "gorp.HTTP()")
+	require.NotContains(t, text, "gorp.HTTP()")
 	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithMigrate(migrate)")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
@@ -332,7 +332,7 @@ func TestReleaseProjectTemplateUsesApplicationRunEntrypoint(t *testing.T) {
 	text := string(content)
 
 	require.Contains(t, text, "gorp.Run(")
-	require.Contains(t, text, "gorp.HTTP()")
+	require.NotContains(t, text, "gorp.HTTP()")
 	require.Contains(t, text, "gorp.WithMonolithMode()")
 	require.Contains(t, text, "gorp.WithSetup(setup)")
 	require.NotContains(t, text, "frameworkbootstrap.BootHTTPService(")
