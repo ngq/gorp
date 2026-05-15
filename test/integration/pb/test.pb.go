@@ -15,6 +15,7 @@ import (
 //
 // HelloRequest 表示简单的 hello 请求。
 type HelloRequest struct {
+	// 名字
 	Name string
 }
 

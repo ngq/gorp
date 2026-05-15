@@ -90,6 +90,11 @@ type Migrator interface {
 	// AutoMigrate executes schema auto migration for the given models.
 	//
 	// AutoMigrate 对给定模型执行自动迁移。
+	//
+	// ⚠ 适用范围：仅限开发/测试环境。生产环境请使用版本化迁移工具（如 golang-migrate）。
+	// 原因：AutoMigrate 直接 ALTER TABLE，存在丢数据、锁表风险，无法回滚，无法追踪历史。
+	// 开发期：改 model → 重启服务 → 表结构自动同步，快速迭代。
+	// 生产期：用 golang-migrate 管理版本化迁移文件，review SQL，支持 up/down。
 	AutoMigrate(dst ...any) error
 }
 

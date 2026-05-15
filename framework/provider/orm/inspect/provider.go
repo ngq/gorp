@@ -101,6 +101,13 @@ func (s *Service) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
+// Driver returns the database driver name.
+//
+// Driver 返回数据库驱动名称。
+func (s *Service) Driver() string {
+	return s.driver
+}
+
 // Tables returns all table names in the database.
 // Core logic: Query driver-specific system tables (sqlite_master, information_schema.tables).
 //
@@ -192,6 +199,7 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 				NotNull:    r.NotNull == 1,
 				PrimaryKey: r.PK == 1,
 				DefaultVal: d,
+				Comment:    "", // SQLite 原生不支持列注释，保留空字符串。
 			})
 		}
 		return out, nil
@@ -204,6 +212,7 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 			DefaultVal sql.NullString `db:"column_default"`
 			Extra      sql.NullString `db:"extra"`
 			Ordinal    int            `db:"ordinal_position"`
+			Comment    string         `db:"column_comment"`
 		}
 		rows := make([]row, 0)
 		if err := s.db.SelectContext(ctx, &rows, `
@@ -214,7 +223,8 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 				column_key,
 				column_default,
 				extra,
-				ordinal_position
+				ordinal_position,
+				column_comment
 			FROM information_schema.columns
 			WHERE table_schema = DATABASE()
 			  AND table_name = ?
@@ -235,6 +245,7 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 				NotNull:    r.Nullable == "NO",
 				PrimaryKey: r.Key.Valid && r.Key.String == "PRI",
 				DefaultVal: d,
+				Comment:    r.Comment,
 			})
 		}
 		return out, nil
@@ -246,6 +257,7 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 			DefaultVal sql.NullString `db:"column_default"`
 			Ordinal    int            `db:"ordinal_position"`
 			IsPrimary  bool           `db:"is_primary"`
+			Comment    string         `db:"column_comment"`
 		}
 		rows := make([]row, 0)
 		if err := s.db.SelectContext(ctx, &rows, `
@@ -266,8 +278,11 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 					  AND tc.table_schema = c.table_schema
 					  AND tc.table_name = c.table_name
 					  AND kcu.column_name = c.column_name
-				) AS is_primary
+				) AS is_primary,
+				COALESCE(col_description(cls.oid, c.ordinal_position::int), '') AS column_comment
 			FROM information_schema.columns c
+			JOIN pg_class cls ON cls.relname = c.table_name
+			                  AND cls.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)
 			WHERE c.table_schema = current_schema()
 			  AND c.table_name = $1
 			ORDER BY c.ordinal_position
@@ -287,6 +302,7 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 				NotNull:    r.Nullable == "NO",
 				PrimaryKey: r.IsPrimary,
 				DefaultVal: d,
+				Comment:    r.Comment,
 			})
 		}
 		return out, nil

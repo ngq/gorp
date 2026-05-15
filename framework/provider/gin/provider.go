@@ -62,7 +62,9 @@ func (p *Provider) IsDefer() bool { return false }
 // Provides declares the services exported by this provider.
 //
 // Provides 声明该 provider 对外提供的服务键。
-func (p *Provider) Provides() []string { return []string{transportcontract.HTTPKey, httpEngineKey} }
+func (p *Provider) Provides() []string {
+	return []string{transportcontract.HTTPKey, httpEngineKey, transportcontract.MiddlewareRegistryKey}
+}
 
 // DependsOn returns the keys this provider depends on.
 // Gin provider depends on Config and Log.
@@ -71,9 +73,9 @@ func (p *Provider) Provides() []string { return []string{transportcontract.HTTPK
 // Gin provider 依赖 Config 和 Log。
 func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey, observabilitycontract.LogKey} }
 
-// Register binds the Gin engine and HTTP service into the container.
+// Register binds the Gin engine, HTTP service, and middleware registry into the container.
 //
-// Register 将 Gin engine 和 HTTP service 绑定到容器。
+// Register 将 Gin engine、HTTP service 和中间件注册表绑定到容器。
 //
 // Example:
 //
@@ -82,6 +84,15 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	if !c.IsBind(transportcontract.HTTPResponderKey) {
 		c.Bind(transportcontract.HTTPResponderKey, func(runtimecontract.Container) (any, error) {
 			return httpmiddleware.NewDefaultResponder(), nil
+		}, true)
+	}
+
+	// 注册中间件注册表，供 proto 注解驱动的自动中间件挂载使用。
+	// 用户通过 registry.Register("auth", jwtMiddleware) 注册具名中间件，
+	// 生成的路由代码通过 registry.Lookup("auth") 自动查找。
+	if !c.IsBind(transportcontract.MiddlewareRegistryKey) {
+		c.Bind(transportcontract.MiddlewareRegistryKey, func(runtimecontract.Container) (any, error) {
+			return httpmiddleware.NewMiddlewareRegistry(), nil
 		}, true)
 	}
 

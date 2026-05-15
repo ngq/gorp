@@ -1,0 +1,66 @@
+// Package gorp provides custom proto options for gorp framework.
+// These options enable declarative middleware, authentication, and authorization.
+//
+// Package gorp 提供 gorp 框架的自定义 proto 选项。
+// 这些选项支持声明式中间件、认证和授权。
+syntax = "proto3";
+
+package gorp;
+
+option go_package = "github.com/ngq/gorp/api/proto/gorp;gorp";
+
+import "google/protobuf/descriptor.proto";
+
+// Extend google.protobuf.MethodOptions to add gorp-specific options.
+// 扩展 google.protobuf.MethodOptions 添加 gorp 特定选项。
+extend google.protobuf.MethodOptions {
+  // Auth configuration for the method.
+  // 方法的认证配置。
+  optional AuthOption auth = 50000;
+
+  // Middleware names to apply to this method.
+  // 应用于此方法的中间件名称列表。
+  repeated string middleware = 50001;
+
+  // Rate limit configuration for the method.
+  // 方法的限流配置。
+  optional RateLimitOption rate_limit = 50002;
+}
+
+// AuthOption defines authentication and authorization requirements.
+//
+// AuthOption 定义认证和授权要求。
+message AuthOption {
+  // Require authentication. If true, request must have valid auth token.
+  // 要求认证。为 true 时，请求必须有有效的认证 token。
+  bool required = 1;
+
+  // Required roles. User must have at least one of these roles.
+  // 要求的角色。用户必须拥有至少一个这些角色。
+  repeated string roles = 2;
+
+  // Required permissions. User must have all of these permissions.
+  // 要求的权限。用户必须拥有所有这些权限。
+  repeated string permissions = 3;
+
+  // Skip authentication even if globally required.
+  // 即使全局要求认证，也跳过认证。
+  bool skip = 4;
+}
+
+// RateLimitOption defines rate limiting configuration.
+//
+// RateLimitOption 定义限流配置。
+message RateLimitOption {
+  // Maximum requests per second.
+  // 每秒最大请求数。
+  int32 requests_per_second = 1;
+
+  // Maximum requests per minute.
+  // 每分钟最大请求数。
+  int32 requests_per_minute = 2;
+
+  // Rate limit key. Can be "ip", "user_id", or custom key.
+  // 限流键。可以是 "ip"、"user_id" 或自定义键。
+  string key = 3;
+}

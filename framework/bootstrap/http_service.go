@@ -22,6 +22,7 @@ import (
 	"github.com/ngq/gorp/framework"
 	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -35,6 +36,7 @@ import (
 	"google.golang.org/grpc"
 
 	gormpkg "gorm.io/gorm"
+	"github.com/jmoiron/sqlx"
 )
 
 var (
@@ -213,6 +215,111 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 	}
 
 	return RunHTTP(rt.Container, rt.Logger)
+}
+
+// GetGorm returns the Gorm database handle.
+// Panics if Gorm is not available (DisableGorm=true).
+//
+// GetGorm 返回 Gorm 数据库句柄。
+// 如果 Gorm 不可用（DisableGorm=true）则 panic。
+func (rt *HTTPServiceRuntime) GetGorm() *gormpkg.DB {
+	if rt.DB == nil {
+		panic("Gorm database not available: DisableGorm is true")
+	}
+	return rt.DB
+}
+
+// GetSQLX returns the SQLX database handle.
+// Panics if SQLX is not available.
+//
+// GetSQLX 返回 SQLX 数据库句柄。
+// 如果 SQLX 不可用则 panic。
+func (rt *HTTPServiceRuntime) GetSQLX() *sqlx.DB {
+	return container.GetSQLXOrPanic(rt.Container)
+}
+
+// GetRedis returns the Redis capability.
+// Panics if Redis is not available (DisableRedis=true).
+//
+// GetRedis 返回 Redis 能力。
+// 如果 Redis 不可用（DisableRedis=true）则 panic。
+func (rt *HTTPServiceRuntime) GetRedis() datacontract.Redis {
+	if rt.Redis == nil {
+		panic("Redis not available: DisableRedis is true")
+	}
+	return rt.Redis
+}
+
+// GetDB returns both Gorm and SQLX database handles.
+// Panics if either is not available.
+//
+// GetDB 返回 Gorm 和 SQLX 数据库句柄。
+// 如果任一不可用则 panic。
+func (rt *HTTPServiceRuntime) GetDB() (*gormpkg.DB, *sqlx.DB) {
+	return rt.GetGorm(), rt.GetSQLX()
+}
+
+// GetCache returns the cache capability.
+// Panics if cache is not available.
+//
+// GetCache 返回缓存能力。
+// 如果缓存不可用则 panic。
+func (rt *HTTPServiceRuntime) GetCache() datacontract.Cache {
+	return container.GetCacheOrPanic(rt.Container)
+}
+
+// GetCron returns the cron capability.
+// Panics if cron is not available.
+//
+// GetCron 返回定时任务能力。
+// 如果定时任务不可用则 panic。
+func (rt *HTTPServiceRuntime) GetCron() runtimecontract.Cron {
+	return container.GetCronOrPanic(rt.Container)
+}
+
+// GetValidator returns the validator capability.
+// Panics if validator is not available.
+//
+// GetValidator 返回参数校验能力。
+// 如果参数校验不可用则 panic。
+func (rt *HTTPServiceRuntime) GetValidator() datacontract.Validator {
+	return container.GetValidatorOrPanic(rt.Container)
+}
+
+// GetDistributedLock returns the distributed lock capability.
+// Panics if distributed lock is not available.
+//
+// GetDistributedLock 返回分布式锁能力。
+// 如果分布式锁不可用则 panic。
+func (rt *HTTPServiceRuntime) GetDistributedLock() datacontract.DistributedLock {
+	return container.GetDistributedLockOrPanic(rt.Container)
+}
+
+// GetRetry returns the retry capability.
+// Panics if retry is not available.
+//
+// GetRetry 返回重试策略能力。
+// 如果重试策略不可用则 panic。
+func (rt *HTTPServiceRuntime) GetRetry() resiliencecontract.Retry {
+	return container.GetRetryOrPanic(rt.Container)
+}
+
+// GetMessagePublisher returns the message publisher capability.
+// Panics if message publisher is not available.
+//
+// GetMessagePublisher 返回消息发布能力。
+// 如果消息发布不可用则 panic。
+func (rt *HTTPServiceRuntime) GetMessagePublisher() integrationcontract.MessagePublisher {
+	return container.GetMessagePublisherOrPanic(rt.Container)
+}
+
+// GetMessageSubscriber returns the message subscriber capability.
+// Panics if message subscriber is not available.
+//
+// GetMessageSubscriber 返回消息订阅能力。
+// 如果消息订阅不可用则 panic。
+func (rt *HTTPServiceRuntime) GetMessageSubscriber() integrationcontract.MessageSubscriber {
+	return container.GetMessageSubscriberOrPanic(rt.Container)
 }
 
 // AutoMigrateModels runs Gorm auto-migration when DB runtime is available.

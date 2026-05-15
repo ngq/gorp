@@ -34,6 +34,20 @@ type ProtoMethod struct {
 	ResponseType string
 	InputStream  bool
 	OutputStream bool
+	// HTTP routing info from google.api.http annotation.
+	// HTTP 路由信息，从 google.api.http 注解解析。
+	HTTPMethod string // GET, POST, PUT, DELETE, PATCH
+	HTTPPath   string // /v1/users/{id}
+	HTTPBody   string // "*" or field name for body mapping
+	// Auth and middleware info from gorp options.
+	// 认证和中间件信息，从 gorp 选项解析。
+	AuthRequired   bool     // 是否要求认证
+	AuthRoles      []string // 要求的角色
+	AuthSkip       bool     // 跳过认证
+	Middleware     []string // 中间件名称列表
+	RateLimitRPS   int32    // 每秒请求数限制
+	RateLimitRPM   int32    // 每分钟请求数限制
+	RateLimitKey   string   // 限流键
 }
 
 // GenClient generates typed RPC client wrapper from proto file.
@@ -104,9 +118,11 @@ func (g *Generator) GenClient(ctx context.Context, opts integrationcontract.Clie
 
 // parseProtoFile parses a proto file and extracts service definitions.
 // Uses regex-based parsing for simplicity and portability.
+// Also parses google.api.http annotations for HTTP routing.
 //
 // parseProtoFile 解析 proto 文件并提取服务定义。
 // 使用基于正则的解析以保持简单和可移植性。
+// 同时解析 google.api.http 注解获取 HTTP 路由信息。
 func parseProtoFile(protoFile string) ([]ProtoService, error) {
 	content, err := os.ReadFile(protoFile)
 	if err != nil {
@@ -114,16 +130,18 @@ func parseProtoFile(protoFile string) ([]ProtoService, error) {
 	}
 
 	services := []ProtoService{}
+	contentStr := string(content)
 
 	// Regex patterns for service and method definitions
 	// 用于匹配 service 和 method 定义的正则模式
-	// 注意：service 匹配使用非贪婪模式，允许 rpc 方法体内包含 {}。
+	// 匹配 service 块，包含方法定义
 	servicePattern := regexp.MustCompile(`service\s+(\w+)\s*\{([\s\S]*?)\n\}`)
-	methodPattern := regexp.MustCompile(`rpc\s+(\w+)\s*\(\s*(stream\s+)?(\w+)\s*\)\s*returns\s*\(\s*(stream\s+)?(\w+)\s*\)`)
+	// 匹配 rpc 方法定义，包括方法体（option 块）
+	methodPattern := regexp.MustCompile(`rpc\s+(\w+)\s*\(\s*(stream\s+)?(\w+)\s*\)\s*returns\s*\(\s*(stream\s+)?(\w+)\s*\)\s*(\{([^}]*)\})?;?`)
 
 	// Find all services
 	// 查找所有服务
-	serviceMatches := servicePattern.FindAllStringSubmatch(string(content), -1)
+	serviceMatches := servicePattern.FindAllStringSubmatch(contentStr, -1)
 	for _, svcMatch := range serviceMatches {
 		serviceName := svcMatch[1]
 		serviceBody := svcMatch[2]
@@ -140,13 +158,32 @@ func parseProtoFile(protoFile string) ([]ProtoService, error) {
 			requestType := methodMatch[3]
 			outputStream := strings.TrimSpace(methodMatch[4]) != ""
 			responseType := methodMatch[5]
+			methodBody := methodMatch[7] // 可能为空
+
+			// Parse google.api.http annotation from method body
+			// 从方法体解析 google.api.http 注解
+			httpMethod, httpPath, httpBody := parseHTTPAnnotation(methodBody)
+
+			// Parse gorp auth/middleware options from method body
+			// 从方法体解析 gorp 认证/中间件选项
+			authRequired, authRoles, authSkip, middleware, rateLimitRPS, rateLimitRPM, rateLimitKey := parseGorpOptions(methodBody)
 
 			methods = append(methods, ProtoMethod{
-				Name:         methodName,
-				RequestType:  requestType,
-				ResponseType: responseType,
-				InputStream:  inputStream,
-				OutputStream: outputStream,
+				Name:          methodName,
+				RequestType:   requestType,
+				ResponseType:  responseType,
+				InputStream:   inputStream,
+				OutputStream:  outputStream,
+				HTTPMethod:    httpMethod,
+				HTTPPath:      httpPath,
+				HTTPBody:      httpBody,
+				AuthRequired:  authRequired,
+				AuthRoles:     authRoles,
+				AuthSkip:      authSkip,
+				Middleware:    middleware,
+				RateLimitRPS:  rateLimitRPS,
+				RateLimitRPM:  rateLimitRPM,
+				RateLimitKey:  rateLimitKey,
 			})
 		}
 
@@ -157,6 +194,145 @@ func parseProtoFile(protoFile string) ([]ProtoService, error) {
 	}
 
 	return services, nil
+}
+
+// parseHTTPAnnotation parses google.api.http annotation from rpc method body.
+// Returns HTTP method, path, and body field name.
+//
+// parseHTTPAnnotation 从 rpc 方法体解析 google.api.http 注解。
+// 返回 HTTP 方法、路径和 body 字段名。
+func parseHTTPAnnotation(methodBody string) (httpMethod, httpPath, httpBody string) {
+	if methodBody == "" {
+		return "", "", ""
+	}
+
+	// 匹配 google.api.http 注解块
+	// option (google.api.http) = { get: "/v1/users/{id}" };
+	httpPattern := regexp.MustCompile(`\(google\.api\.http\)\s*=\s*\{([^}]+)\}`)
+	httpMatch := httpPattern.FindStringSubmatch(methodBody)
+	if len(httpMatch) < 2 {
+		return "", "", ""
+	}
+
+	httpBlock := httpMatch[1]
+
+	// 解析 HTTP 方法：get/post/put/delete/patch
+	// 格式：get: "/v1/users/{id}" 或 post: "/v1/users" body: "*"
+	methodPatterns := []struct {
+		method string
+		regex  *regexp.Regexp
+	}{
+		{"GET", regexp.MustCompile(`get:\s*"([^"]+)"`)},
+		{"POST", regexp.MustCompile(`post:\s*"([^"]+)"`)},
+		{"PUT", regexp.MustCompile(`put:\s*"([^"]+)"`)},
+		{"DELETE", regexp.MustCompile(`delete:\s*"([^"]+)"`)},
+		{"PATCH", regexp.MustCompile(`patch:\s*"([^"]+)"`)},
+	}
+
+	for _, mp := range methodPatterns {
+		if match := mp.regex.FindStringSubmatch(httpBlock); len(match) >= 2 {
+			httpMethod = mp.method
+			httpPath = match[1]
+			break
+		}
+	}
+
+	// 解析 body 字段：body: "*" 或 body: "user"
+	bodyPattern := regexp.MustCompile(`body:\s*"([^"]+)"`)
+	if match := bodyPattern.FindStringSubmatch(httpBlock); len(match) >= 2 {
+		httpBody = match[1]
+	}
+
+	return httpMethod, httpPath, httpBody
+}
+
+// parseGorpOptions parses gorp custom options from rpc method body.
+// Returns auth and middleware configuration.
+//
+// parseGorpOptions 从 rpc 方法体解析 gorp 自定义选项。
+// 返回认证和中间件配置。
+func parseGorpOptions(methodBody string) (authRequired bool, authRoles []string, authSkip bool, middleware []string, rateLimitRPS, rateLimitRPM int32, rateLimitKey string) {
+	if methodBody == "" {
+		return false, nil, false, nil, 0, 0, ""
+	}
+
+	// 解析 (gorp.auth) 选项
+	// option (gorp.auth) = { required: true, roles: ["admin", "user"] };
+	authPattern := regexp.MustCompile(`\(gorp\.auth\)\s*=\s*\{([^}]+)\}`)
+	if authMatch := authPattern.FindStringSubmatch(methodBody); len(authMatch) >= 2 {
+		authBlock := authMatch[1]
+
+		// 解析 required: true/false
+		if match := regexp.MustCompile(`required:\s*(true|false)`).FindStringSubmatch(authBlock); len(match) >= 2 {
+			authRequired = match[1] == "true"
+		}
+
+		// 解析 roles: ["admin", "user"]
+		rolesPattern := regexp.MustCompile(`roles:\s*\[([^\]]*)\]`)
+		if match := rolesPattern.FindStringSubmatch(authBlock); len(match) >= 2 {
+			roleStrs := regexp.MustCompile(`"([^"]+)"`).FindAllStringSubmatch(match[1], -1)
+			for _, r := range roleStrs {
+				authRoles = append(authRoles, r[1])
+			}
+		}
+
+		// 解析 skip: true/false
+		if match := regexp.MustCompile(`skip:\s*(true|false)`).FindStringSubmatch(authBlock); len(match) >= 2 {
+			authSkip = match[1] == "true"
+		}
+	}
+
+	// 解析 middleware 选项
+	// option (gorp.middleware) = "auth", "logging";
+	// 或 option (gorp.middleware) = ["auth", "logging"];
+	middlewarePattern := regexp.MustCompile(`\(gorp\.middleware\)\s*=\s*(?:"([^"]+)"|\[([^\]]*)\])`)
+	if match := middlewarePattern.FindStringSubmatch(methodBody); len(match) >= 2 {
+		if match[1] != "" {
+			// 单个中间件："auth"
+			middleware = []string{match[1]}
+		} else if match[2] != "" {
+			// 多个中间件：["auth", "logging"]
+			mwStrs := regexp.MustCompile(`"([^"]+)"`).FindAllStringSubmatch(match[2], -1)
+			for _, mw := range mwStrs {
+				middleware = append(middleware, mw[1])
+			}
+		}
+	}
+
+	// 解析 rate_limit 选项
+	// option (gorp.rate_limit) = { requests_per_second: 100 };
+	rateLimitPattern := regexp.MustCompile(`\(gorp\.rate_limit\)\s*=\s*\{([^}]+)\}`)
+	if match := rateLimitPattern.FindStringSubmatch(methodBody); len(match) >= 2 {
+		rateBlock := match[1]
+
+		// 解析 requests_per_second
+		if m := regexp.MustCompile(`requests_per_second:\s*(\d+)`).FindStringSubmatch(rateBlock); len(m) >= 2 {
+			rateLimitRPS = parseInt32(m[1])
+		}
+
+		// 解析 requests_per_minute
+		if m := regexp.MustCompile(`requests_per_minute:\s*(\d+)`).FindStringSubmatch(rateBlock); len(m) >= 2 {
+			rateLimitRPM = parseInt32(m[1])
+		}
+
+		// 解析 key
+		if m := regexp.MustCompile(`key:\s*"([^"]+)"`).FindStringSubmatch(rateBlock); len(m) >= 2 {
+			rateLimitKey = m[1]
+		}
+	}
+
+	return authRequired, authRoles, authSkip, middleware, rateLimitRPS, rateLimitRPM, rateLimitKey
+}
+
+// parseInt32 parses a string to int32.
+func parseInt32(s string) int32 {
+	var n int32
+	for _, c := range s {
+		if c >= '0' && c <= '9' {
+			n = n*10 + int32(c-'0')
+		}
+	}
+	return n
 }
 
 // generateClientWrapperCode generates Go code for typed RPC client wrapper.

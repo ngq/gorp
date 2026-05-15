@@ -35,6 +35,12 @@ type ProtoGenerator interface {
 	// GenService 从 proto 文件生成 HTTP handler、gRPC service skeleton 和路由注册。
 	// 支持闭环 proto-first 工作流：proto → 服务实现骨架。
 	GenService(ctx context.Context, opts ServiceGenOptions) error
+	// GenOpenAPI generates OpenAPI/Swagger documentation from proto file.
+	// Parses proto annotations (google.api.http) and generates OpenAPI 3.0 spec.
+	//
+	// GenOpenAPI 从 proto 文件生成 OpenAPI/Swagger 文档。
+	// 解析 proto 注解 (google.api.http) 并生成 OpenAPI 3.0 规范。
+	GenOpenAPI(ctx context.Context, opts OpenAPIGenOptions) error
 }
 
 // ProtoGenOptions describes generation from proto files.
@@ -187,6 +193,61 @@ type ServiceGenOptions struct {
 	// RegisterRoutes indicates whether to generate route registration code.
 	// RegisterRoutes 是否生成路由注册代码。
 	RegisterRoutes bool
+
+	// ImportPaths are additional import paths for proto resolution.
+	// ImportPaths 是 proto 解析的额外 import 路径。
+	ImportPaths []string
+
+	// IncludeValidation indicates whether to include request validation in HTTP handlers.
+	// When true, generated handlers will call validator.Validate() on request objects.
+	// Requires the proto to use protoc-gen-validate annotations or implement Validate() method.
+	// IncludeValidation 是否在 HTTP handler 中包含请求校验。
+	// 为 true 时，生成的 handler 会调用 validator.Validate() 校验请求对象。
+	// 要求 proto 使用 protoc-gen-validate 注解或实现 Validate() 方法。
+	IncludeValidation bool
+}
+
+// OpenAPIGenOptions describes OpenAPI documentation generation options.
+//
+// OpenAPIGenOptions 描述 OpenAPI 文档生成的选项。
+type OpenAPIGenOptions struct {
+	// ProtoFile is the path to the proto file to parse.
+	// ProtoFile 是要解析的 proto 文件路径。
+	ProtoFile string
+
+	// OutputFile is the path to write the generated OpenAPI spec (YAML or JSON).
+	// OutputFile 是写入生成的 OpenAPI 规范的路径（YAML 或 JSON）。
+	OutputFile string
+
+	// Title is the API title for the OpenAPI info section.
+	// Title 是 OpenAPI info 部分的 API 标题。
+	Title string
+
+	// Description is the API description for the OpenAPI info section.
+	// Description 是 OpenAPI info 部分的 API 描述。
+	Description string
+
+	// Version is the API version for the OpenAPI info section.
+	// Version 是 OpenAPI info 部分的 API 版本。
+	Version string
+
+	// BasePath is the base path for all API endpoints.
+	// BasePath 是所有 API 端点的基础路径。
+	BasePath string
+
+	// Host is the API host.
+	// Host 是 API 的主机地址。
+	Host string
+
+	// Schemes are the supported schemes (http, https).
+	// Schemes 是支持的协议（http, https）。
+	Schemes []string
+
+	// ServiceName specifies which service to generate docs for.
+	// Empty means generate for all services in the proto file.
+	// ServiceName 指定要生成文档的服务。
+	// 空表示为 proto 文件中的所有服务生成。
+	ServiceName string
 
 	// ImportPaths are additional import paths for proto resolution.
 	// ImportPaths 是 proto 解析的额外 import 路径。

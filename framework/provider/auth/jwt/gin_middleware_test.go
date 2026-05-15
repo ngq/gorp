@@ -238,3 +238,173 @@ func TestAuthMiddlewareRejectsNilJWTService(t *testing.T) {
 
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
+
+// TestAuthMiddlewareSkipPaths verifies that SkipPaths option allows bypassing auth for specified paths.
+//
+// TestAuthMiddlewareSkipPaths 验证 SkipPaths 选项允许跳过指定路径的认证。
+func TestAuthMiddlewareSkipPaths(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(jwtSvc, "", WithSkipPaths("/api/v1/auth/login", "/api/v1/auth/register"))(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.POST("/api/v1/auth/login", func(c *gin.Context) {
+		c.JSON(http.StatusOK, map[string]any{"token": "fake"})
+	})
+	r.POST("/api/v1/auth/register", func(c *gin.Context) {
+		c.JSON(http.StatusOK, map[string]any{"id": 1})
+	})
+	r.GET("/api/v1/users/me", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	// 白名单路径：不带 token 也应通过。
+	t.Run("skip_path_login", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	// 白名单路径：不带 token 也应通过。
+	t.Run("skip_path_register", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	// 非白名单路径：不带 token 应被拒绝。
+	t.Run("protected_path_no_token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	// 非白名单路径：带有效 token 应通过。
+	t.Run("protected_path_with_token", func(t *testing.T) {
+		claims := jwtSvc.NewClaims(1, "user", "alice", []string{"user"}, 60)
+		token, err := jwtSvc.Sign(claims)
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+// TestAuthMiddlewareRequiredRoles verifies that WithRequiredRoles option enforces role-based access.
+//
+// TestAuthMiddlewareRequiredRoles 验证 WithRequiredRoles 选项强制角色校验。
+func TestAuthMiddlewareRequiredRoles(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(jwtSvc, "", WithRequiredRoles("admin"))(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.GET("/admin/dashboard", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	// 普通用户 token（无 admin 角色）应被 403 拒绝。
+	t.Run("non_admin_rejected", func(t *testing.T) {
+		claims := jwtSvc.NewClaims(1, "user", "alice", []string{"user"}, 60)
+		token, err := jwtSvc.Sign(claims)
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodGet, "/admin/dashboard", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusForbidden, w.Code)
+	})
+
+	// admin 用户 token 应通过。
+	t.Run("admin_allowed", func(t *testing.T) {
+		claims := jwtSvc.NewClaims(2, "user", "bob", []string{"admin"}, 60)
+		token, err := jwtSvc.Sign(claims)
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodGet, "/admin/dashboard", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+// TestAuthMiddlewareSkipPathsWithSubjectType verifies SkipPaths works together with subjectType check.
+//
+// TestAuthMiddlewareSkipPathsWithSubjectType 验证 SkipPaths 与 subjectType 检查同时生效。
+func TestAuthMiddlewareSkipPathsWithSubjectType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
+		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
+		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
+		wrapped := AuthMiddleware(jwtSvc, "user", WithSkipPaths("/public/ping"))(func(inner transportcontract.HTTPContext) {
+			if inner != nil && inner.Request() != nil {
+				c.Request = inner.Request()
+			}
+			c.Next()
+		})
+		if wrapped != nil {
+			wrapped(httpCtx)
+		}
+	})
+	r.GET("/public/ping", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	r.GET("/protected/me", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	// 白名单路径无需任何认证。
+	t.Run("skip_path_no_token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/public/ping", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	// 非白名单路径，subjectType 不匹配应被 403 拒绝。
+	t.Run("wrong_subject_type", func(t *testing.T) {
+		claims := jwtSvc.NewClaims(1, "admin", "root", []string{"admin"}, 60)
+		token, err := jwtSvc.Sign(claims)
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodGet, "/protected/me", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusForbidden, w.Code)
+	})
+}
