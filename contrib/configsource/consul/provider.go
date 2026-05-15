@@ -170,6 +170,9 @@ func (s *Source) Close() error {
 		watcher.Stop()
 		return true
 	})
+	// NOTE: Consul api.Client does not expose a Close() method.
+	// The underlying HTTP connections are released by the Go runtime's
+	// garbage collector when the Client becomes unreachable.
 	return nil
 }
 

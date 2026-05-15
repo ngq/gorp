@@ -26,6 +26,7 @@ type GovernanceProviderDefaults struct {
 	DTM             string
 	MessageQueue    string
 	DistributedLock string
+	WebSocket       string
 }
 
 // DefaultGovernanceProviderDefaults returns the default provider backend bundle for one governance mode.
@@ -49,6 +50,7 @@ func DefaultGovernanceProviderDefaults(mode resiliencecontract.GovernanceMode) G
 		DTM:             "noop",
 		MessageQueue:    "noop",
 		DistributedLock: "noop",
+		WebSocket:       "noop",
 	}
 
 	if features.Discovery {

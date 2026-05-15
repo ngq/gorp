@@ -32,6 +32,7 @@ func SelectedMicroserviceProviders(cfg datacontract.Config) []runtimecontract.Se
 	providers = append(providers, SelectDTMProvider(cfg))
 	providers = append(providers, SelectMessageQueueProvider(cfg))
 	providers = append(providers, SelectDistributedLockProvider(cfg))
+	providers = append(providers, SelectWebSocketProvider(cfg))
 	return providers
 }
 
@@ -95,6 +96,7 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 		SelectDTMProvider(cfg),
 		SelectMessageQueueProvider(cfg),
 		SelectDistributedLockProvider(cfg),
+		SelectWebSocketProvider(cfg),
 	}
 	for _, p := range selectedProviders {
 		if p == nil {
@@ -426,4 +428,22 @@ func getConfigString(cfg datacontract.Config, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+// SelectWebSocketProvider selects the WebSocket provider from config and enable flags.
+//
+// SelectWebSocketProvider 根据配置与开关状态选择 WebSocket provider。
+func SelectWebSocketProvider(cfg datacontract.Config) runtimecontract.ServiceProvider {
+	backend := governanceProviderOverride(cfg, "websocket")
+	if backend == "" {
+		backend = getConfigString(cfg, "websocket.backend", "websocket.type")
+	}
+	enabled := cfg != nil && cfg.GetBool("websocket.enabled")
+	if backend == "" && enabled {
+		backend = "gws"
+	}
+	if backend == "" {
+		backend = DefaultGovernanceProviderDefaults(DetectGovernanceMode(cfg)).WebSocket
+	}
+	return providerFromMap(webSocketProviderFactories, backend, "noop")
 }

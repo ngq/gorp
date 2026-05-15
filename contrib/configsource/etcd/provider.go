@@ -206,6 +206,7 @@ type etcdWatcher struct {
 	source    *Source
 	key       string
 	ctx       context.Context
+	cancelMu  sync.Mutex
 	cancel    context.CancelFunc
 	watchCh   clientv3.WatchChan
 	callbacks sync.Map
@@ -216,6 +217,8 @@ func (w *etcdWatcher) OnChange(key string, callback func(value any)) {
 }
 
 func (w *etcdWatcher) Stop() error {
+	w.cancelMu.Lock()
+	defer w.cancelMu.Unlock()
 	if w.cancel != nil {
 		w.cancel()
 	}
@@ -224,8 +227,12 @@ func (w *etcdWatcher) Stop() error {
 
 func (w *etcdWatcher) startWatch(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
+
+	w.cancelMu.Lock()
 	w.cancel = cancel
 	w.watchCh = w.source.client.Watch(ctx, w.key)
+	w.cancelMu.Unlock()
+
 	go w.watchLoop()
 }
 

@@ -487,6 +487,7 @@ func governanceProviderMap(defaults GovernanceProviderDefaults) map[string]strin
 		"dtm":              defaults.DTM,
 		"message_queue":    defaults.MessageQueue,
 		"distributed_lock": defaults.DistributedLock,
+		"websocket":        defaults.WebSocket,
 	}
 }
 
@@ -549,6 +550,7 @@ func buildGovernanceProviderDecisions(cfg datacontract.Config, mode resilienceco
 		{Name: "dtm", Factories: dtmProviderFactories, Fallback: "noop", ModeDefault: defaults.DTM, ConfigKeys: []string{"dtm.backend", "dtm.type", "dtm.driver"}, ConfigEnabled: dtmEnabledFromConfig, ConfigEnabledValue: "dtmsdk", FallbackReason: "provider backend fell back to noop dtm"},
 		{Name: "message_queue", Factories: messageQueueProviderFactories, Fallback: "noop", ModeDefault: defaults.MessageQueue, ConfigKeys: []string{"message_queue.backend", "message_queue.type"}, ConfigEnabled: messageQueueEnabledFromConfig, ConfigEnabledValue: "redis", FallbackReason: "provider backend fell back to noop message queue"},
 		{Name: "distributed_lock", Factories: distributedLockProviderFactories, Fallback: "noop", ModeDefault: defaults.DistributedLock, ConfigKeys: []string{"distributed_lock.backend", "distributed_lock.type"}, ConfigEnabled: distributedLockEnabledFromConfig, ConfigEnabledValue: "redis", FallbackReason: "provider backend fell back to noop distributed lock"},
+		{Name: "websocket", Factories: webSocketProviderFactories, Fallback: "noop", ModeDefault: defaults.WebSocket, ConfigKeys: []string{"websocket.backend", "websocket.type"}, ConfigEnabled: webSocketEnabledFromConfig, ConfigEnabledValue: "gws", FallbackReason: "provider backend fell back to noop websocket"},
 	}
 
 	decisions := make(map[string]GovernanceProviderDecision, len(specs))
@@ -680,6 +682,9 @@ func messageQueueEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 
 func distributedLockEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 	return "distributed_lock.enabled", cfg != nil && cfg.GetBool("distributed_lock.enabled")
+}
+func webSocketEnabledFromConfig(cfg datacontract.Config) (string, bool) {
+	return "websocket.enabled", cfg != nil && cfg.GetBool("websocket.enabled")
 }
 func retryEnabledFromConfig(cfg datacontract.Config) (string, bool) {
 	return "retry.enabled", cfg != nil && cfg.GetBool("retry.enabled")

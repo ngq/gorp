@@ -37,6 +37,7 @@ import (
 // 核心逻辑：持有 viper 实例、委托 Get/Unmarshal 操作。
 type Service struct {
 	env    string
+	mu     sync.RWMutex
 	v      *viper.Viper
 	source datacontract.ConfigSource // 配置源（可选）
 }
@@ -70,6 +71,7 @@ func (s *Service) Env() string { return s.env }
 // 顺序：本地文件 + 配置源 + 环境变量。
 // 核心逻辑：规范化环境名、加载基础文件、合并环境覆盖、应用环境变量。
 func (s *Service) Load(env string) error {
+	s.mu.Lock()
 	s.env = NormalizeEnv(env)
 
 	root := projectRoot()
@@ -90,6 +92,7 @@ func (s *Service) Load(env string) error {
 	}
 
 	s.v = v
+	s.mu.Unlock()
 	return nil
 }
 
@@ -264,13 +267,35 @@ func projectRoot() string {
 	return wd
 }
 
-func (s *Service) Get(key string) any          { return s.v.Get(key) }
-func (s *Service) GetString(key string) string { return s.v.GetString(key) }
-func (s *Service) GetInt(key string) int       { return s.v.GetInt(key) }
-func (s *Service) GetBool(key string) bool     { return s.v.GetBool(key) }
-func (s *Service) GetFloat(key string) float64 { return s.v.GetFloat64(key) }
+func (s *Service) Get(key string) any {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.v.Get(key)
+}
+func (s *Service) GetString(key string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.v.GetString(key)
+}
+func (s *Service) GetInt(key string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.v.GetInt(key)
+}
+func (s *Service) GetBool(key string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.v.GetBool(key)
+}
+func (s *Service) GetFloat(key string) float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.v.GetFloat64(key)
+}
 
 func (s *Service) Unmarshal(key string, out any) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.v.UnmarshalKey(key, out)
 }
 
@@ -282,8 +307,11 @@ func (s *Service) Unmarshal(key string, out any) error {
 // 对于本地文件源，使用轻量轮询监听配置文件变化并自动重载。
 // 核心逻辑：存在配置源时委托给配置源，否则轮询本地文件并发出 key 变更回调。
 func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
-	if s.source != nil {
-		return s.source.Watch(ctx, key)
+	s.mu.RLock()
+	source := s.source
+	s.mu.RUnlock()
+	if source != nil {
+		return source.Watch(ctx, key)
 	}
 	return newLocalConfigWatcher(ctx, s, key, 500*time.Millisecond), nil
 }
@@ -294,16 +322,21 @@ func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWat
 // Reload 强制重新加载配置。
 // 核心逻辑：先从远程源重新加载，然后重新加载本地文件。
 func (s *Service) Reload(ctx context.Context) error {
+	s.mu.RLock()
+	source := s.source
+	s.mu.RUnlock()
+
 	// 从远程配置源拉取（如果存在）
-	if s.source != nil {
-		remoteCfg, err := s.source.Load(ctx)
+	if source != nil {
+		remoteCfg, err := source.Load(ctx)
 		if err != nil {
 			return fmt.Errorf("config: load from source failed: %w", err)
 		}
-		// 合并远程配置到 viper
+		s.mu.Lock()
 		for k, v := range remoteCfg {
 			s.v.Set(k, v)
 		}
+		s.mu.Unlock()
 	}
 
 	// 重新加载本地文件

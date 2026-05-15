@@ -316,10 +316,28 @@ func (r *Registry) Close() error {
 	}
 	r.closed = true
 
-	r.registered.Range(func(key, value any) bool {
+	var errs []error
+	r.registered.Range(func(key, _ any) bool {
+		serviceID := key.(string)
+		// serviceID format: "{name}-{host}-{port}"
+		name, host, port := parseServiceID(serviceID)
+		_, err := r.namingClient.DeregisterInstance(vo.DeregisterInstanceParam{
+			ServiceName: name,
+			GroupName:   r.cfg.NacosGroup,
+			Ip:          host,
+			Port:        uint64(port),
+			Ephemeral:   true,
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("deregister %s: %w", serviceID, err))
+		}
+		r.registered.Delete(key)
 		return true
 	})
 
+	if len(errs) > 0 {
+		return fmt.Errorf("registry.nacos: close with %d errors: %w", len(errs), errors.Join(errs...))
+	}
 	return nil
 }
 
@@ -361,4 +379,26 @@ func parseNacosPort(addr string) uint64 {
 
 func generateServiceID(name, host string, port int) string {
 	return fmt.Sprintf("%s-%s-%d", name, host, port)
+}
+
+// parseServiceID parses a serviceID back into name, host and port.
+// It splits from the right to handle hostnames that may contain hyphens.
+func parseServiceID(id string) (name, host string, port int) {
+	lastDash := strings.LastIndex(id, "-")
+	if lastDash < 0 {
+		return id, "", 0
+	}
+	portStr := id[lastDash+1:]
+	p, err := strconv.Atoi(portStr)
+	if err != nil {
+		return id, "", 0
+	}
+	remaining := id[:lastDash]
+	secondLastDash := strings.LastIndex(remaining, "-")
+	if secondLastDash < 0 {
+		return remaining, "", p
+	}
+	name = remaining[:secondLastDash]
+	host = remaining[secondLastDash+1:]
+	return name, host, p
 }

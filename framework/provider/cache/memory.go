@@ -64,7 +64,10 @@ func (s *memoryStore) Get(ctx context.Context, key string) (string, error) {
 	}
 	if !item.expired.IsZero() && time.Now().After(item.expired) {
 		s.mu.Lock()
-		delete(s.m, key)
+		// Re-check: another goroutine may have Set a new non-expired value for this key.
+		if current, ok := s.m[key]; ok && current.expired.Equal(item.expired) {
+			delete(s.m, key)
+		}
 		s.mu.Unlock()
 		return "", datacontract.ErrCacheMiss
 	}

@@ -23,8 +23,8 @@ import (
 func main() {
 	if err := gorp.Run(
 		"{{.Name}}",
-		gorp.HTTP(),
 {{- if .IsMicroserviceMode }}
+		gorp.GRPC(),
 		gorp.WithMicroserviceMode(),
 {{- else if .IsGinFirstMode }}
 		gorp.WithGinFirstMode(),

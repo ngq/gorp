@@ -49,7 +49,9 @@ type binding struct {
 
 type providerState struct {
 	p      runtimecontract.ServiceProvider
+	loadMu sync.Mutex
 	loaded bool
+	bootMu sync.Mutex
 	booted bool
 }
 
@@ -551,20 +553,17 @@ func (c *Container) loadProvider(name string) error {
 		return fmt.Errorf("provider not registered: %s", name)
 	}
 
-	c.mu.Lock()
+	st.loadMu.Lock()
+	defer st.loadMu.Unlock()
 	if st.loaded {
-		c.mu.Unlock()
 		return nil
 	}
-	c.mu.Unlock()
 
 	if err := st.p.Register(c); err != nil {
 		return err
 	}
 
-	c.mu.Lock()
 	st.loaded = true
-	c.mu.Unlock()
 	return nil
 }
 
@@ -576,20 +575,17 @@ func (c *Container) bootProvider(name string) error {
 		return fmt.Errorf("provider not registered: %s", name)
 	}
 
-	c.mu.Lock()
+	st.bootMu.Lock()
+	defer st.bootMu.Unlock()
 	if st.booted {
-		c.mu.Unlock()
 		return nil
 	}
-	c.mu.Unlock()
 
 	if err := st.p.Boot(c); err != nil {
 		return err
 	}
 
-	c.mu.Lock()
 	st.booted = true
-	c.mu.Unlock()
 	return nil
 }
 

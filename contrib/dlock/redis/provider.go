@@ -178,6 +178,8 @@ func (l *Lock) Unlock(ctx context.Context, key string) error {
 	if !ok {
 		return errors.New("dlock: lock not held")
 	}
+	// Delete from heldLocks first to prevent watchdog from renewing an unlocked key.
+	l.heldLocks.Delete(fullKey)
 	l.stopWatchdog(fullKey)
 	script := `
 		if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -190,8 +192,7 @@ func (l *Lock) Unlock(ctx context.Context, key string) error {
 	if err != nil {
 		return fmt.Errorf("dlock: unlock failed: %w", err)
 	}
-	l.heldLocks.Delete(fullKey)
-	if result.(int64) == 0 {
+	if n, ok := result.(int64); !ok || n == 0 {
 		return errors.New("dlock: lock not owned")
 	}
 	return nil
@@ -214,7 +215,7 @@ func (l *Lock) Renew(ctx context.Context, key string, ttl time.Duration) error {
 	if err != nil {
 		return fmt.Errorf("dlock: renew failed: %w", err)
 	}
-	if result.(int64) == 0 {
+	if n, ok := result.(int64); !ok || n == 0 {
 		return errors.New("dlock: lock not owned")
 	}
 	return nil

@@ -344,8 +344,9 @@ func (r *Registry) tryReRegister(serviceID string, stopCh chan struct{}) {
 // isClosed 检查注册中心是否已关闭。
 func (r *Registry) isClosed() bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.closed
+	closed := r.closed
+	r.mu.Unlock()
+	return closed
 }
 
 // applyLoadBalance applies load balance strategy to instances.

@@ -34,6 +34,7 @@ import (
 	serviceauthmtls "github.com/ngq/gorp/contrib/serviceauth/mtls"
 	serviceauthtoken "github.com/ngq/gorp/contrib/serviceauth/token"
 	tracingotel "github.com/ngq/gorp/contrib/tracing/otel"
+	wsgws "github.com/ngq/gorp/contrib/websocket/gws"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	circuitbreakernoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
 	configsourcelocal "github.com/ngq/gorp/framework/provider/configsource/local"
@@ -55,6 +56,7 @@ import (
 	selectorwrr "github.com/ngq/gorp/framework/provider/selector/wrr"
 	serviceauthnoop "github.com/ngq/gorp/framework/provider/serviceauth/noop"
 	tracingnoop "github.com/ngq/gorp/framework/provider/tracing/noop"
+	wsnoop "github.com/ngq/gorp/framework/provider/websocket/noop"
 )
 
 type providerFactory func() runtimecontract.ServiceProvider
@@ -151,6 +153,13 @@ func RegisterRetryProviderFactory(key string, factory providerFactory) {
 	retryProviderFactories.register(key, factory)
 }
 
+// RegisterWebSocketProviderFactory registers a WebSocket provider factory.
+//
+// RegisterWebSocketProviderFactory 注册 WebSocket provider factory。
+func RegisterWebSocketProviderFactory(key string, factory providerFactory) {
+	webSocketProviderFactories.register(key, factory)
+}
+
 var (
 	configSourceProviderFactories = providerFactoryRegistry{
 		"consul":     func() runtimecontract.ServiceProvider { return configsourceconsul.NewProvider() },
@@ -242,6 +251,11 @@ var (
 		"default": func() runtimecontract.ServiceProvider { return retryprovider.NewProvider() },
 		"noop":    func() runtimecontract.ServiceProvider { return retrynoop.NewProvider() },
 		"":        func() runtimecontract.ServiceProvider { return retrynoop.NewProvider() },
+	}
+	webSocketProviderFactories = providerFactoryRegistry{
+		"gws":  func() runtimecontract.ServiceProvider { return wsgws.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return wsnoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return wsnoop.NewProvider() },
 	}
 )
 
