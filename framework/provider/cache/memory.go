@@ -10,6 +10,8 @@ package cache
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -193,4 +195,191 @@ func (s *memoryStore) MGet(ctx context.Context, keys ...string) (map[string]stri
 	}
 
 	return out, nil
+}
+
+// MSet writes multiple key-value pairs at once.
+//
+// MSet 批量写入多个键值对。
+func (s *memoryStore) MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error {
+	_ = ctx
+
+	var exp time.Time
+	if ttl > 0 {
+		exp = time.Now().Add(ttl)
+	}
+
+	s.mu.Lock()
+	for key, value := range kvs {
+		s.m[key] = memItem{v: value, expired: exp}
+	}
+	s.mu.Unlock()
+	return nil
+}
+
+// memoryBinaryStore implements BinaryCache using an in-memory map with TTL support.
+//
+// memoryBinaryStore 使用内存 map 实现二进制安全缓存，支持 TTL 过期。
+type memoryBinaryStore struct {
+	mu     sync.RWMutex
+	m      map[string]memBinaryItem
+	stopCh chan struct{}
+}
+
+type memBinaryItem struct {
+	v       []byte
+	expired time.Time
+}
+
+func newMemoryBinaryStore() *memoryBinaryStore {
+	s := &memoryBinaryStore{
+		m:      make(map[string]memBinaryItem),
+		stopCh: make(chan struct{}),
+	}
+	go s.cleanup()
+	return s
+}
+
+func (s *memoryBinaryStore) Close() error {
+	select {
+	case <-s.stopCh:
+	default:
+		close(s.stopCh)
+	}
+	return nil
+}
+
+func (s *memoryBinaryStore) cleanup() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			now := time.Now()
+			for k, item := range s.m {
+				if !item.expired.IsZero() && now.After(item.expired) {
+					delete(s.m, k)
+				}
+			}
+			s.mu.Unlock()
+		}
+	}
+}
+
+func (s *memoryBinaryStore) Get(ctx context.Context, key string) ([]byte, error) {
+	_ = ctx
+
+	s.mu.RLock()
+	item, ok := s.m[key]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, datacontract.ErrCacheMiss
+	}
+	if !item.expired.IsZero() && time.Now().After(item.expired) {
+		s.mu.Lock()
+		if current, ok := s.m[key]; ok && current.expired.Equal(item.expired) {
+			delete(s.m, key)
+		}
+		s.mu.Unlock()
+		return nil, datacontract.ErrCacheMiss
+	}
+	return item.v, nil
+}
+
+func (s *memoryBinaryStore) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	_ = ctx
+
+	var exp time.Time
+	if ttl > 0 {
+		exp = time.Now().Add(ttl)
+	}
+
+	s.mu.Lock()
+	s.m[key] = memBinaryItem{v: value, expired: exp}
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *memoryBinaryStore) Del(ctx context.Context, key string) error {
+	_ = ctx
+	s.mu.Lock()
+	delete(s.m, key)
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *memoryBinaryStore) MGet(ctx context.Context, keys ...string) (map[string][]byte, error) {
+	_ = ctx
+
+	s.mu.RLock()
+	out := make(map[string][]byte, len(keys))
+	now := time.Now()
+	for _, k := range keys {
+		item, ok := s.m[k]
+		if !ok {
+			continue
+		}
+		if !item.expired.IsZero() && now.After(item.expired) {
+			continue
+		}
+		out[k] = item.v
+	}
+	s.mu.RUnlock()
+
+	var expired []string
+	s.mu.RLock()
+	for _, k := range keys {
+		if item, ok := s.m[k]; ok && !item.expired.IsZero() && now.After(item.expired) {
+			expired = append(expired, k)
+		}
+	}
+	s.mu.RUnlock()
+	if len(expired) > 0 {
+		s.mu.Lock()
+		for _, k := range expired {
+			if current, ok := s.m[k]; ok && !current.expired.IsZero() && now.After(current.expired) {
+				delete(s.m, k)
+			}
+		}
+		s.mu.Unlock()
+	}
+
+	return out, nil
+}
+
+func (s *memoryBinaryStore) MSet(ctx context.Context, kvs map[string][]byte, ttl time.Duration) error {
+	_ = ctx
+
+	var exp time.Time
+	if ttl > 0 {
+		exp = time.Now().Add(ttl)
+	}
+
+	s.mu.Lock()
+	for key, value := range kvs {
+		s.m[key] = memBinaryItem{v: value, expired: exp}
+	}
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *memoryBinaryStore) Remember(ctx context.Context, key string, ttl time.Duration, fn func(context.Context) ([]byte, error)) ([]byte, error) {
+	v, err := s.Get(ctx, key)
+	if err == nil {
+		return v, nil
+	}
+	if !errors.Is(err, datacontract.ErrCacheMiss) {
+		return nil, err
+	}
+
+	computed, err := fn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if setErr := s.Set(ctx, key, computed, ttl); setErr != nil {
+		slog.Warn("cache: Remember failed to Set computed value", "key", key, "error", setErr)
+	}
+	return computed, nil
 }

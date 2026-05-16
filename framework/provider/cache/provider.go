@@ -7,6 +7,7 @@
 //
 // 缓存服务包，提供统一的缓存抽象，支持 Redis 和内存两种驱动。
 // Eg:
+//
 //	// 在 bootstrap 中注册缓存 Provider
 //	app.Register(cache.NewProvider())
 //
@@ -139,6 +140,10 @@ type cacheDriver interface {
 	//
 	// MGet 批量获取多个键的值。
 	MGet(ctx context.Context, keys ...string) (map[string]string, error)
+	// MSet writes multiple key-value pairs at once.
+	//
+	// MSet 批量写入多个键值对。
+	MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error
 }
 
 // service wraps cacheDriver to implement datacontract.Cache.
@@ -176,6 +181,13 @@ func (s *service) MGet(ctx context.Context, keys ...string) (map[string]string, 
 	return s.d.MGet(ctx, keys...)
 }
 
+// MSet writes multiple key-value pairs at once.
+//
+// MSet 批量写入多个键值对。
+func (s *service) MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error {
+	return s.d.MSet(ctx, kvs, ttl)
+}
+
 // Remember implements the "cache-aside" pattern: get from cache, or compute and cache.
 // Eg:
 //
@@ -203,3 +215,76 @@ func (s *service) Remember(ctx context.Context, key string, ttl time.Duration, f
 	}
 	return computed, nil
 }
+
+// BinaryCacheProvider registers the binary cache capability.
+//
+// BinaryCacheProvider 注册二进制缓存能力。
+type BinaryCacheProvider struct{}
+
+// NewBinaryCacheProvider creates a new binary cache provider instance.
+//
+// NewBinaryCacheProvider 创建新的二进制缓存 Provider 实例。
+func NewBinaryCacheProvider() *BinaryCacheProvider { return &BinaryCacheProvider{} }
+
+// Name returns the provider name "binary_cache".
+//
+// Name 返回 Provider 名称 "binary_cache"。
+func (p *BinaryCacheProvider) Name() string { return "binary_cache" }
+
+// IsDefer returns false, binary cache should be initialized immediately.
+//
+// IsDefer 返回 false，二进制缓存服务应立即初始化。
+func (p *BinaryCacheProvider) IsDefer() bool { return false }
+
+// Provides returns the binary cache contract key.
+//
+// Provides 返回二进制缓存契约键。
+func (p *BinaryCacheProvider) Provides() []string { return []string{datacontract.BinaryCacheKey} }
+
+// DependsOn returns the keys this provider depends on.
+// BinaryCacheProvider depends on Config for cache configuration.
+//
+// DependsOn 返回该 provider 依赖的 key。
+// BinaryCacheProvider 依赖 Config 获取缓存配置。
+func (p *BinaryCacheProvider) DependsOn() []string { return []string{datacontract.ConfigKey} }
+
+// Register binds the binary cache service factory to the container.
+//
+// Register 将二进制缓存服务工厂绑定到容器。
+func (p *BinaryCacheProvider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.BinaryCacheKey, func(c runtimecontract.Container) (any, error) {
+		cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
+		if err != nil {
+			return nil, err
+		}
+
+		var cc config
+		_ = cfg.Unmarshal("cache", &cc)
+		driver := strings.TrimSpace(cc.Driver)
+		if driver == "" {
+			driver = strings.TrimSpace(os.Getenv("CACHE_DRIVER"))
+		}
+		if driver == "" {
+			driver = "redis"
+		}
+
+		switch strings.ToLower(driver) {
+		case "memory", "mem", "inmemory":
+			return newMemoryBinaryStore(), nil
+		case "redis":
+			r, err := container.MakeWith[datacontract.Redis](c, datacontract.RedisKey)
+			if err != nil {
+				return nil, err
+			}
+			return newRedisBinaryCache(r), nil
+		default:
+			return nil, fmt.Errorf("invalid cache.driver: %s", driver)
+		}
+	}, true)
+	return nil
+}
+
+// Boot is a no-op for binary cache provider.
+//
+// Boot 二进制缓存 Provider 无启动逻辑。
+func (p *BinaryCacheProvider) Boot(runtimecontract.Container) error { return nil }

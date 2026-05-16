@@ -157,3 +157,18 @@ func (s *service) MGet(ctx context.Context, keys ...string) (map[string]string, 
 	}
 	return out, nil
 }
+
+func (s *service) MSet(ctx context.Context, kvs map[string]string) error {
+	if len(kvs) == 0 {
+		return nil
+	}
+	vals := make([]any, 0, len(kvs)*2)
+	for k, v := range kvs {
+		vals = append(vals, k, v)
+	}
+	return s.c.MSet(ctx, vals...).Err()
+}
+
+func (s *service) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	return s.c.Expire(ctx, key, ttl).Err()
+}

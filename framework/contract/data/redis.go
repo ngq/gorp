@@ -66,4 +66,14 @@ type Redis interface {
 	//
 	// MGet 一次调用读取多个字符串值。
 	MGet(ctx context.Context, keys ...string) (map[string]string, error)
+
+	// MSet writes multiple string values in one call.
+	//
+	// MSet 一次调用写入多个字符串值。
+	MSet(ctx context.Context, kvs map[string]string) error
+
+	// Expire sets a TTL on an existing key.
+	//
+	// Expire 为已存在的 key 设置 TTL。
+	Expire(ctx context.Context, key string, ttl time.Duration) error
 }
