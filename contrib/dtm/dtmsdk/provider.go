@@ -26,7 +26,7 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns the provider identifier "dtm.sdk".
 //
 // Name 返回 provider 标识符 "dtm.sdk"。
-func (p *Provider) Name() string  { return "dtm.sdk" }
+func (p *Provider) Name() string { return "dtm.sdk" }
 
 // IsDefer returns true for lazy initialization.
 //
@@ -56,7 +56,13 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		if err != nil {
 			return nil, err
 		}
-		return NewDTMClient(cfg)
+		client, err := NewDTMClient(cfg)
+		if err != nil {
+			return nil, err
+		}
+		// Register closer to close HTTP client connections on container destroy.
+		c.RegisterCloser(integrationcontract.DTMKey, client)
+		return client, nil
 	}, true)
 	return nil
 }

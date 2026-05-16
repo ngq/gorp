@@ -11,13 +11,36 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"net/http"
 )
 
+// errBindFuncNotConfigured is returned by Bind/BindJSON/BindQuery when the
+// underlying binding function has not been set, so callers cannot silently
+// operate on a zero-valued target object.
+//
+// errBindFuncNotConfigured 在绑定函数未配置时由 Bind/BindJSON/BindQuery 返回，
+// 避免调用方误以为绑定成功而对零值对象进行操作。
+var errBindFuncNotConfigured = errors.New("bind function not configured")
+
 // HTTPContext defines the transport-layer HTTP request context abstraction.
+//
+// Future improvement: Consider splitting into smaller interfaces for ISP compliance:
+//
+//	HTTPRequestReader  - Request(), GetHeader(), Param(), Query(), etc.
+//	HTTPResponseWriter - JSON(), String(), XML(), Data(), Status(), etc.
+//	HTTPMiddlewareContext - Get(), Set(), Abort(), Next(), etc.
+//	HTTPContext composes the above + Bind().
 //
 // HTTPContext 定义 transport 层 HTTP 请求上下文抽象。
 // 包含中间件所需的 Get/Set/Abort/Next 方法，支持认证中间件等场景。
+//
+// 未来改进：考虑拆分为更小的接口以符合接口隔离原则：
+//
+//	HTTPRequestReader  - Request(), GetHeader(), Param(), Query() 等
+//	HTTPResponseWriter - JSON(), String(), XML(), Data(), Status() 等
+//	HTTPMiddlewareContext - Get(), Set(), Abort(), Next() 等
+//	HTTPContext 组合上述接口 + Bind()
 type HTTPContext interface {
 	Context() context.Context
 	SetContext(ctx context.Context)
@@ -121,12 +144,12 @@ type DefaultHTTPContext struct {
 	routePathFunc  func() string
 	statusReadFunc func() int
 	// 中间件相关函数
-	getFunc        func(string) any
-	setFunc        func(string, any)
-	abortFunc      func(int)
-	abortJSONFunc  func(int, any)
-	isAbortedFunc  func() bool
-	nextFunc       func()
+	getFunc       func(string) any
+	setFunc       func(string, any)
+	abortFunc     func(int)
+	abortJSONFunc func(int, any)
+	isAbortedFunc func() bool
+	nextFunc      func()
 }
 
 // NewDefaultHTTPContext creates a default transport HTTP context.
@@ -235,31 +258,47 @@ func (c *DefaultHTTPContext) Header(key, value string) {
 }
 
 // BindJSON binds a JSON payload into the target object.
+// Returns an error when the binding function is not configured, so callers
+// cannot silently operate on a zero-valued target.
 //
 // BindJSON 将 JSON 载荷绑定到目标对象。
+// 绑定函数未配置时返回错误，避免调用方误以为绑定成功。
 func (c *DefaultHTTPContext) BindJSON(obj any) error {
-	if c == nil || c.bindJSONFunc == nil {
-		return nil
+	if c == nil {
+		return errBindFuncNotConfigured
+	}
+	if c.bindJSONFunc == nil {
+		return errBindFuncNotConfigured
 	}
 	return c.bindJSONFunc(obj)
 }
 
 // BindQuery binds query parameters into the target object.
+// Returns an error when the binding function is not configured.
 //
 // BindQuery 将查询参数绑定到目标对象。
+// 绑定函数未配置时返回错误。
 func (c *DefaultHTTPContext) BindQuery(obj any) error {
-	if c == nil || c.bindQueryFunc == nil {
-		return nil
+	if c == nil {
+		return errBindFuncNotConfigured
+	}
+	if c.bindQueryFunc == nil {
+		return errBindFuncNotConfigured
 	}
 	return c.bindQueryFunc(obj)
 }
 
 // Bind binds a generic request payload into the target object.
+// Returns an error when the binding function is not configured.
 //
 // Bind 将通用请求载荷绑定到目标对象。
+// 绑定函数未配置时返回错误。
 func (c *DefaultHTTPContext) Bind(obj any) error {
-	if c == nil || c.bindFunc == nil {
-		return nil
+	if c == nil {
+		return errBindFuncNotConfigured
+	}
+	if c.bindFunc == nil {
+		return errBindFuncNotConfigured
 	}
 	return c.bindFunc(obj)
 }

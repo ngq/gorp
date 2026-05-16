@@ -9,18 +9,24 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // SelectedMicroserviceProviders returns the config-selected microservice capability providers.
+// Does NOT process governance.disable/enable/providers.* overrides.
+// For governance-aware selection, use SelectedMicroserviceProvidersWithOptions.
 //
 // SelectedMicroserviceProviders 返回由配置选择出的微服务能力 provider 集合。
+// 不处理 governance.disable/enable/providers.* 覆盖。
+// 需要治理覆盖的场景请使用 SelectedMicroserviceProvidersWithOptions。
 func SelectedMicroserviceProviders(cfg datacontract.Config) []runtimecontract.ServiceProvider {
 	mode := DetectGovernanceMode(cfg)
-	providers := make([]runtimecontract.ServiceProvider, 0, 10)
+	providers := make([]runtimecontract.ServiceProvider, 0, 12)
 	providers = append(providers, SelectDiscoveryProviderWithMode(cfg, mode))
 	providers = append(providers, SelectSelectorProviderWithMode(cfg, mode))
 	providers = append(providers, SelectRPCProviderWithMode(cfg, mode))
@@ -29,10 +35,37 @@ func SelectedMicroserviceProviders(cfg datacontract.Config) []runtimecontract.Se
 	providers = append(providers, SelectServiceAuthProviderWithMode(cfg, mode))
 	providers = append(providers, SelectCircuitBreakerProviderWithMode(cfg, mode))
 	providers = append(providers, SelectLoadSheddingProviderWithMode(cfg, mode))
+	providers = append(providers, SelectRetryProviderWithMode(cfg, mode))
 	providers = append(providers, SelectDTMProvider(cfg))
 	providers = append(providers, SelectMessageQueueProvider(cfg))
 	providers = append(providers, SelectDistributedLockProvider(cfg))
 	providers = append(providers, SelectWebSocketProvider(cfg))
+	return providers
+}
+
+// SelectedMicroserviceProvidersWithOptions returns governance-aware microservice providers.
+// Processes governance.disable, governance.enable, and governance.providers.* overrides
+// before selecting providers.
+//
+// SelectedMicroserviceProvidersWithOptions 返回带治理覆盖的微服务 provider 集合。
+// 选择 provider 前处理 governance.disable、governance.enable 和 governance.providers.* 覆盖。
+func SelectedMicroserviceProvidersWithOptions(cfg datacontract.Config, disabled, enabled []string, providerOverrides map[string]string) []runtimecontract.ServiceProvider {
+	overlayCfg := overlayGovernanceConfig(cfg, disabled, enabled, providerOverrides)
+	mode := DetectGovernanceMode(overlayCfg)
+	providers := make([]runtimecontract.ServiceProvider, 0, 12)
+	providers = append(providers, SelectDiscoveryProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectSelectorProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectRPCProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectTracingProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectMetadataProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectServiceAuthProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectCircuitBreakerProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectLoadSheddingProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectRetryProviderWithMode(overlayCfg, mode))
+	providers = append(providers, SelectDTMProvider(overlayCfg))
+	providers = append(providers, SelectMessageQueueProvider(overlayCfg))
+	providers = append(providers, SelectDistributedLockProvider(overlayCfg))
+	providers = append(providers, SelectWebSocketProvider(overlayCfg))
 	return providers
 }
 
@@ -54,11 +87,10 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 	if c == nil || !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}
-	cfgAny, err := c.Make(datacontract.ConfigKey)
+	cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("bootstrap: failed to resolve config for provider selection: %w", err)
 	}
-	cfg, _ := cfgAny.(datacontract.Config)
 	cfg = overlayGovernanceConfig(cfg, disabled, enabled, providerOverrides)
 
 	configSourceProvider := SelectConfigSourceProvider(cfg)
@@ -70,7 +102,7 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 			if err := c.RegisterProvider(configSourceProvider); err != nil {
 				return err
 			}
-			if cfgSvc, ok := cfgAny.(datacontract.Config); ok {
+			if cfgSvc, ok := cfg.(datacontract.Config); ok {
 				if err := cfgSvc.Reload(context.Background()); err != nil {
 					return err
 				}
@@ -331,7 +363,6 @@ func SelectLoadSheddingProviderWithMode(cfg datacontract.Config, mode resilience
 	}
 	return providerFromMap(loadShedderProviderFactories, backend, "noop")
 }
-
 
 // SelectRetryProvider selects the retry provider from config.
 //

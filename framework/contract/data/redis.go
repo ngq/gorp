@@ -9,7 +9,11 @@
 // - 在集成和中间件之间共享 Redis 相关常量。
 package data
 
-import "context"
+import (
+	"context"
+	"strings"
+	"time"
+)
 
 // RedisKey is the container key for the Redis capability.
 //
@@ -20,6 +24,19 @@ const RedisKey = "framework.redis"
 //
 // RedisNilString 是 Redis 客户端返回空值时的标准字符串表示。
 const RedisNilString = "redis: nil"
+
+// IsRedisNil checks whether the given error represents a Redis nil (key not found) response.
+// This is more robust than raw string matching and should be used instead of
+// strings.Contains(err.Error(), RedisNilString).
+//
+// IsRedisNil 检查给定错误是否为 Redis nil（键不存在）响应。
+// 比直接字符串匹配更健壮，应优先使用。
+func IsRedisNil(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), RedisNilString)
+}
 
 // Redis defines the minimal Redis operations exposed by the framework.
 //
@@ -35,10 +52,10 @@ type Redis interface {
 	// Get 按 key 读取字符串值。
 	Get(ctx context.Context, key string) (string, error)
 
-	// Set writes a string value with a TTL in seconds.
+	// Set writes a string value with a TTL.
 	//
-	// Set 按秒级 TTL 写入字符串值。
-	Set(ctx context.Context, key string, value string, ttlSeconds int) error
+	// Set 按 TTL 写入字符串值。
+	Set(ctx context.Context, key string, value string, ttl time.Duration) error
 
 	// Del deletes a key.
 	//

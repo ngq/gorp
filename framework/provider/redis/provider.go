@@ -14,6 +14,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -69,11 +70,10 @@ type config struct {
 // 核心逻辑：读取配置、创建带指标 hook 的 Redis client、绑定服务。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.RedisKey, func(c runtimecontract.Container) (any, error) {
-		cfgAny, err := c.Make(datacontract.ConfigKey)
+		cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 		if err != nil {
 			return nil, err
 		}
-		cfg := cfgAny.(datacontract.Config)
 
 		rc := config{
 			Addr:     cfg.GetString("redis.addr"),
@@ -91,7 +91,11 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		})
 		client.AddHook(NewRedisMetricsHook())
 
-		return &service{c: client}, nil
+		svc := &service{c: client}
+		// Register closer to close Redis client on container destroy.
+		// 注册 closer 以在容器销毁时关闭 Redis 客户端。
+		c.RegisterCloser(datacontract.RedisKey, svc)
+		return svc, nil
 	}, true)
 	return nil
 }
@@ -107,6 +111,16 @@ type service struct {
 	c *redis.Client
 }
 
+// Close closes the Redis client connection. Implements io.Closer.
+//
+// Close 关闭 Redis 客户端连接。实现 io.Closer。
+func (s *service) Close() error {
+	if s.c != nil {
+		return s.c.Close()
+	}
+	return nil
+}
+
 func (s *service) Ping(ctx context.Context) error {
 	return s.c.Ping(ctx).Err()
 }
@@ -115,11 +129,7 @@ func (s *service) Get(ctx context.Context, key string) (string, error) {
 	return s.c.Get(ctx, key).Result()
 }
 
-func (s *service) Set(ctx context.Context, key, value string, ttlSeconds int) error {
-	var ttl time.Duration
-	if ttlSeconds > 0 {
-		ttl = time.Duration(ttlSeconds) * time.Second
-	}
+func (s *service) Set(ctx context.Context, key, value string, ttl time.Duration) error {
 	return s.c.Set(ctx, key, value, ttl).Err()
 }
 

@@ -31,10 +31,10 @@ import (
 // mockRedis implements datacontract.Redis
 type mockRedis struct{}
 
-func (m *mockRedis) Ping(ctx context.Context) error                                   { return nil }
-func (m *mockRedis) Get(ctx context.Context, key string) (string, error)              { return "value", nil }
-func (m *mockRedis) Set(ctx context.Context, key, value string, ttlSeconds int) error { return nil }
-func (m *mockRedis) Del(ctx context.Context, key string) error                        { return nil }
+func (m *mockRedis) Ping(ctx context.Context) error                                      { return nil }
+func (m *mockRedis) Get(ctx context.Context, key string) (string, error)                 { return "value", nil }
+func (m *mockRedis) Set(ctx context.Context, key, value string, ttl time.Duration) error { return nil }
+func (m *mockRedis) Del(ctx context.Context, key string) error                           { return nil }
 func (m *mockRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
@@ -42,9 +42,9 @@ func (m *mockRedis) MGet(ctx context.Context, keys ...string) (map[string]string
 // mockCache implements datacontract.Cache
 type mockCache struct{}
 
-func (m *mockCache) Get(ctx context.Context, key string) (string, error)              { return "value", nil }
+func (m *mockCache) Get(ctx context.Context, key string) (string, error)                 { return "value", nil }
 func (m *mockCache) Set(ctx context.Context, key, value string, ttl time.Duration) error { return nil }
-func (m *mockCache) Del(ctx context.Context, key string) error                        { return nil }
+func (m *mockCache) Del(ctx context.Context, key string) error                           { return nil }
 func (m *mockCache) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
@@ -66,11 +66,13 @@ func (m *mockLogger) With(fields ...observabilitycontract.Field) observabilityco
 // mockValidator implements datacontract.Validator
 type mockValidator struct{}
 
-func (m *mockValidator) Validate(ctx context.Context, v any) error                         { return nil }
-func (m *mockValidator) ValidateVar(ctx context.Context, v any, tag string) error           { return nil }
-func (m *mockValidator) RegisterCustom(name string, fn datacontract.CustomValidateFunc) error { return nil }
-func (m *mockValidator) SetLocale(locale string) error                                      { return nil }
-func (m *mockValidator) TranslateError(err error) resiliencecontract.AppError               { return nil }
+func (m *mockValidator) Validate(ctx context.Context, v any) error                { return nil }
+func (m *mockValidator) ValidateVar(ctx context.Context, v any, tag string) error { return nil }
+func (m *mockValidator) RegisterCustom(name string, fn datacontract.CustomValidateFunc) error {
+	return nil
+}
+func (m *mockValidator) SetLocale(locale string) error                        { return nil }
+func (m *mockValidator) TranslateError(err error) resiliencecontract.AppError { return nil }
 
 // mockRetry implements resiliencecontract.Retry
 type mockRetry struct{}
@@ -90,10 +92,10 @@ func (m *mockRetry) IsRetryable(err error) bool { return false }
 // mockHTTP implements transportcontract.HTTP
 type mockHTTP struct{}
 
-func (m *mockHTTP) Router() transportcontract.HTTPRouter       { return nil }
-func (m *mockHTTP) Server() *http.Server                        { return nil }
-func (m *mockHTTP) Run() error                                  { return nil }
-func (m *mockHTTP) Shutdown(ctx context.Context) error          { return nil }
+func (m *mockHTTP) Router() transportcontract.HTTPRouter { return nil }
+func (m *mockHTTP) Server() *http.Server                 { return nil }
+func (m *mockHTTP) Run() error                           { return nil }
+func (m *mockHTTP) Shutdown(ctx context.Context) error   { return nil }
 
 // mockMessagePublisher implements integrationcontract.MessagePublisher
 type mockMessagePublisher struct{}
@@ -118,7 +120,7 @@ func (m *mockDistributedLock) Lock(ctx context.Context, key string, ttlSeconds i
 func (m *mockDistributedLock) TryLock(ctx context.Context, key string, ttlSeconds int64) (bool, error) {
 	return true, nil
 }
-func (m *mockDistributedLock) Unlock(ctx context.Context, key string) error         { return nil }
+func (m *mockDistributedLock) Unlock(ctx context.Context, key string) error           { return nil }
 func (m *mockDistributedLock) Renew(ctx context.Context, key string, ttl int64) error { return nil }
 func (m *mockDistributedLock) IsLocked(ctx context.Context, key string) (bool, error) {
 	return true, nil
@@ -164,13 +166,13 @@ func (m *mockJWTService) NewClaims(subjectID int64, subjectType, subjectName str
 // mockConfig implements datacontract.Config
 type mockConfig struct{}
 
-func (m *mockConfig) Env() string                            { return "test" }
-func (m *mockConfig) Get(key string) any                     { return nil }
-func (m *mockConfig) GetString(key string) string            { return "" }
-func (m *mockConfig) GetInt(key string) int                  { return 0 }
-func (m *mockConfig) GetBool(key string) bool                { return false }
-func (m *mockConfig) GetFloat(key string) float64            { return 0 }
-func (m *mockConfig) Unmarshal(key string, out any) error    { return nil }
+func (m *mockConfig) Env() string                         { return "test" }
+func (m *mockConfig) Get(key string) any                  { return nil }
+func (m *mockConfig) GetString(key string) string         { return "" }
+func (m *mockConfig) GetInt(key string) int               { return 0 }
+func (m *mockConfig) GetBool(key string) bool             { return false }
+func (m *mockConfig) GetFloat(key string) float64         { return 0 }
+func (m *mockConfig) Unmarshal(key string, out any) error { return nil }
 func (m *mockConfig) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
 	return nil, nil
 }
@@ -631,9 +633,9 @@ type providerNamesTestProvider struct {
 	nameStr string
 }
 
-func (p *providerNamesTestProvider) Name() string                                  { return p.nameStr }
-func (p *providerNamesTestProvider) IsDefer() bool                                 { return false }
-func (p *providerNamesTestProvider) Provides() []string                            { return []string{} }
-func (p *providerNamesTestProvider) DependsOn() []string                           { return nil }
-func (p *providerNamesTestProvider) Register(c runtimecontract.Container) error    { return nil }
-func (p *providerNamesTestProvider) Boot(c runtimecontract.Container) error       { return nil }
+func (p *providerNamesTestProvider) Name() string                               { return p.nameStr }
+func (p *providerNamesTestProvider) IsDefer() bool                              { return false }
+func (p *providerNamesTestProvider) Provides() []string                         { return []string{} }
+func (p *providerNamesTestProvider) DependsOn() []string                        { return nil }
+func (p *providerNamesTestProvider) Register(c runtimecontract.Container) error { return nil }
+func (p *providerNamesTestProvider) Boot(c runtimecontract.Container) error     { return nil }

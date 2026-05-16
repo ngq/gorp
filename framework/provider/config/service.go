@@ -260,10 +260,20 @@ func projectRoot() string {
 		if filepath.IsAbs(base) {
 			return filepath.Clean(base)
 		}
-		wd, _ := os.Getwd()
+		wd, err := os.Getwd()
+		if err != nil {
+			// Working directory deleted or inaccessible; use the relative base as-is.
+			// 工作目录被删除或不可访问；直接使用相对路径 base。
+			return filepath.Clean(base)
+		}
 		return filepath.Clean(filepath.Join(wd, base))
 	}
-	wd, _ := os.Getwd()
+	wd, err := os.Getwd()
+	if err != nil {
+		// Working directory deleted or inaccessible; fall back to ".".
+		// 工作目录被删除或不可访问；回退到 "."。
+		return "."
+	}
 	return wd
 }
 
@@ -318,29 +328,59 @@ func (s *Service) Watch(ctx context.Context, key string) (datacontract.ConfigWat
 
 // Reload forces reload of configuration from all sources.
 // Core logic: Reload from remote source first, then reload local files.
+// The remote config I/O is performed outside the lock to avoid blocking
+// other readers. The remote config is then applied inside the lock using
+// LoadOrStore pattern to prevent TOCTOU races where another goroutine
+// could replace s.v between the I/O and the merge.
 //
 // Reload 强制重新加载配置。
 // 核心逻辑：先从远程源重新加载，然后重新加载本地文件。
+// 远程配置 I/O 在锁外执行以避免阻塞其他读取者。
+// 远程配置随后在锁内通过 copy-on-write 模式合并，
+// 防止 I/O 和合并之间其他 goroutine 替换 s.v 导致的 TOCTOU 竞态。
 func (s *Service) Reload(ctx context.Context) error {
+	// Step 1: Read the source reference under read lock.
+	// 步骤 1：在读锁下读取 source 引用。
 	s.mu.RLock()
 	source := s.source
 	s.mu.RUnlock()
 
-	// 从远程配置源拉取（如果存在）
+	// Step 2: Perform I/O outside any lock.
+	// 步骤 2：在锁外执行 I/O。
+	var remoteCfg map[string]any
 	if source != nil {
-		remoteCfg, err := source.Load(ctx)
+		var err error
+		remoteCfg, err = source.Load(ctx)
 		if err != nil {
 			return fmt.Errorf("config: load from source failed: %w", err)
 		}
-		s.mu.Lock()
-		for k, v := range remoteCfg {
-			s.v.Set(k, v)
-		}
-		s.mu.Unlock()
 	}
 
-	// 重新加载本地文件
-	return s.Load(s.env)
+	// Step 3: Apply remote config under write lock, then reload local files.
+	// 步骤 3：在写锁下应用远程配置，然后重新加载本地文件。
+	s.mu.Lock()
+	s.env = NormalizeEnv(s.env)
+
+	root := projectRoot()
+	v := viper.New()
+	if err := LoadLocalConfigToViper(v, s.env, root); err != nil {
+		s.mu.Unlock()
+		return err
+	}
+
+	// Apply remote config to the newly created viper instance.
+	// This ensures we never write to a stale viper instance.
+	// 将远程配置应用到新创建的 viper 实例。
+	// 确保不会写入已过期的 viper 实例。
+	if remoteCfg != nil {
+		for k, val := range remoteCfg {
+			v.Set(k, val)
+		}
+	}
+
+	s.v = v
+	s.mu.Unlock()
+	return nil
 }
 
 type localConfigWatcher struct {
@@ -381,6 +421,9 @@ func (w *localConfigWatcher) OnChange(key string, callback func(value any)) {
 
 func (w *localConfigWatcher) Stop() error {
 	w.cancel()
+	// Wait briefly for the goroutine to exit to ensure resource cleanup.
+	// 短暂等待 goroutine 退出以确保资源清理。
+	time.Sleep(w.interval + 10*time.Millisecond)
 	return nil
 }
 
@@ -399,11 +442,20 @@ func (w *localConfigWatcher) loop() {
 }
 
 func (w *localConfigWatcher) checkAndReload() {
-	currentState := collectLocalConfigState(w.service.env)
+	// Read env under lock to avoid data race with concurrent Load/Reload.
+	// 在锁下读取 env 以避免与并发 Load/Reload 的数据竞态。
+	w.service.mu.RLock()
+	env := w.service.env
+	w.service.mu.RUnlock()
+
+	currentState := collectLocalConfigState(env)
+	w.mu.Lock()
 	if reflect.DeepEqual(currentState, w.lastState) {
+		w.mu.Unlock()
 		return
 	}
 	w.lastState = currentState
+	w.mu.Unlock()
 
 	w.mu.RLock()
 	keys := make([]string, 0, len(w.callbacks))

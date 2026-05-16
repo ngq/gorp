@@ -92,9 +92,14 @@ func MakeAppService[T any](c runtimecontract.Container, key string) (T, error) {
 }
 
 // MustMakeAppService resolves an app service by key and panics on failure.
+// Uses comma-ok type assertion for a descriptive panic message on mismatch.
 //
 // MustMakeAppService 按 key 解析 app service，失败时 panic。
+// 使用 comma-ok 类型断言，在类型不匹配时给出描述性 panic 信息。
 func MustMakeAppService[T any](c runtimecontract.Container, key string) T {
-	v := c.MustMake(key)
-	return v.(T)
+	v, err := MakeAppService[T](c, key)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

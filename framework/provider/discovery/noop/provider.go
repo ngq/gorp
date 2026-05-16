@@ -80,11 +80,13 @@ func (r *noopRegistry) Deregister(_ context.Context, _, _ string) error {
 	return nil
 }
 
-// Discover returns nil (no instances found).
+// Discover returns an empty slice (no instances found).
+// Returns empty slice instead of nil for consistent `len()` behavior.
 //
-// Discover 返回 nil（未找到实例）。
+// Discover 返回空 slice（未找到实例）。
+// 返回空 slice 而非 nil，确保 `len()` 行为一致。
 func (r *noopRegistry) Discover(_ context.Context, _ string) ([]transportcontract.ServiceInstance, error) {
-	return nil, nil
+	return []transportcontract.ServiceInstance{}, nil
 }
 
 // Close does nothing and returns nil.

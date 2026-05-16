@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -132,11 +133,10 @@ func (s *Service) Client(hostName string) (integrationcontract.SSHClient, error)
 	}
 	s.mu.Unlock()
 
-	cfgAny, err := s.c.Make(datacontract.ConfigKey)
+	cfg, err := container.MakeWith[datacontract.Config](s.c, datacontract.ConfigKey)
 	if err != nil {
 		return nil, err
 	}
-	cfg := cfgAny.(datacontract.Config)
 
 	var sc sshConfig
 	if err := cfg.Unmarshal("ssh", &sc); err != nil {

@@ -32,10 +32,23 @@ var ErrBarrierGID = errors.New("dtm: barrier gid is required")
 var ErrBarrierCallback = errors.New("dtm: barrier callback is required")
 
 // barrierHandler implements integrationcontract.BarrierHandler.
-// Executes business callback with barrier protection.
+// Executes business callback WITHOUT database-level idempotent protection.
+// The current implementation only validates parameters and delegates to the callback directly.
+// For production use cases requiring true barrier protection (e.g., SAGA/TCC idempotency),
+// integrate the official DTM SDK (github.com/dtm-labs/client) which provides
+// database-backed barrier tables for preventing duplicate execution.
+//
+// ⚠ WARNING: This is a lightweight framework adapter — it does NOT create barrier tables
+// or check for duplicate branch execution. Branch retries will cause the business callback
+// to execute multiple times.
 //
 // barrierHandler 实现 integrationcontract.BarrierHandler。
-// 在 barrier 保护下执行业务回调。
+// 当前实现不包含数据库层面的幂等保护，仅做参数校验后直接回调。
+// 生产环境需要真正的 barrier 保护（如 SAGA/TCC 幂等），请集成 DTM 官方 SDK
+// (github.com/dtm-labs/client)，它会创建 barrier 表防止重复执行。
+//
+// ⚠ 警告：这是轻量级框架适配器——不会创建 barrier 表，也不会检查分支重复执行。
+// 分支重试会导致业务回调重复执行。
 type barrierHandler struct {
 	client    *DTMClient
 	transType string
@@ -50,11 +63,16 @@ type BarrierContext struct {
 	GID       string
 }
 
-// Call executes the business callback with barrier protection.
-// Implements integrationcontract.BarrierHandler.Call.
+// Call executes the business callback WITHOUT database-level barrier protection.
+// The current implementation only validates parameters and delegates to the callback.
+// For true idempotent protection, integrate the official DTM SDK.
 //
-// Call 在 barrier 保护下执行业务回调。
-// 实现 integrationcontract.BarrierHandler.Call。
+// ⚠ WARNING: Branch retries will cause fn to execute multiple times.
+//
+// Call 在无数据库 barrier 保护下执行业务回调。
+// 当前实现仅做参数校验后直接回调。需要真正幂等保护请集成 DTM 官方 SDK。
+//
+// ⚠ 警告：分支重试会导致 fn 重复执行。
 func (h *barrierHandler) Call(ctx context.Context, fn func(db any) error) error {
 	_ = ctx
 	if strings.TrimSpace(h.transType) == "" {

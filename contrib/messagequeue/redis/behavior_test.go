@@ -35,7 +35,7 @@ func TestUnsubscribeClearsSubscriptions(t *testing.T) {
 		"a": func() { called++ },
 		"b": func() { called++ },
 	}}}
-	require.NoError(t, sub.Unsubscribe())
+	require.NoError(t, sub.UnsubscribeAll())
 	require.Equal(t, 2, called)
 	require.Empty(t, sub.queue.subs)
 }

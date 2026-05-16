@@ -132,7 +132,11 @@ func (s *Source) Set(ctx context.Context, key string, value any) error {
 	case []byte:
 		data = v
 	default:
-		data, _ = json.Marshal(v)
+		var marshalErr error
+		data, marshalErr = json.Marshal(v)
+		if marshalErr != nil {
+			return fmt.Errorf("consul: failed to marshal value for key %s: %w", fullKey, marshalErr)
+		}
 	}
 	pair := &api.KVPair{Key: fullKey, Value: data}
 	_, err := s.kv.Put(pair, nil)
@@ -206,6 +210,10 @@ func (w *consulWatcher) Stop() error {
 
 func (w *consulWatcher) watchLoop(ctx context.Context) {
 	var lastIndex uint64
+	var retryDelay time.Duration
+	const baseDelay = time.Second
+	const maxDelay = 30 * time.Second
+
 	for {
 		select {
 		case <-w.stopCh:
@@ -216,9 +224,25 @@ func (w *consulWatcher) watchLoop(ctx context.Context) {
 		}
 		pair, meta, err := w.source.kv.Get(w.key, &api.QueryOptions{WaitIndex: lastIndex, WaitTime: 30 * time.Second})
 		if err != nil {
-			time.Sleep(5 * time.Second)
+			// Exponential backoff on errors: 1s, 2s, 4s, 8s, 16s, 30s (max)
+			if retryDelay < baseDelay {
+				retryDelay = baseDelay
+			}
+			select {
+			case <-w.stopCh:
+				return
+			case <-ctx.Done():
+				return
+			case <-time.After(retryDelay):
+			}
+			retryDelay = retryDelay * 2
+			if retryDelay > maxDelay {
+				retryDelay = maxDelay
+			}
 			continue
 		}
+		// Success — reset retry delay
+		retryDelay = 0
 		if meta.LastIndex > lastIndex {
 			lastIndex = meta.LastIndex
 			var value any

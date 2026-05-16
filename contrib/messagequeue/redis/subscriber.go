@@ -82,8 +82,8 @@ func (s *redisSubscriber) Consume(ctx context.Context, queue string, handler int
 	}
 }
 
-// Unsubscribe cancels all active subscriptions.
-func (s *redisSubscriber) Unsubscribe() error {
+// UnsubscribeAll cancels all active subscriptions.
+func (s *redisSubscriber) UnsubscribeAll() error {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
 	for _, cancel := range s.queue.subs {

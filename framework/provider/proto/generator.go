@@ -1170,13 +1170,41 @@ func (g *Generator) generateMethod(buf *bytes.Buffer, method integrationcontract
 }
 
 // formatProtoFile 格式化 proto 文件。
+// Uses buf format if available; gracefully degrades when buf is not installed.
 func (g *Generator) formatProtoFile(path string) {
-	// 使用 buf format 格式化（如果可用）
 	cmd := exec.Command("buf", "format", "-w", path)
-	cmd.Run() // 忽略错误
+	if err := cmd.Run(); err != nil {
+		// buf not installed or format failed — non-fatal, the proto file is still valid.
+		// buf 未安装或格式化失败——非致命，proto 文件仍然有效。
+		fmt.Printf("[proto:info] buf format skipped for %s: %v\n", path, err)
+	}
 }
 
 // GetConfig 获取当前配置。
 func (g *Generator) GetConfig() *integrationcontract.ProtoGeneratorConfig {
 	return g.cfg
+}
+
+// isValidGoIdentifier 检查字符串是否为有效的 Go 标识符。
+// 有效的 Go 标识符格式：[A-Za-z_][A-Za-z0-9_]*
+func isValidGoIdentifier(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+
+	// 检查第一个字符
+	firstChar := name[0]
+	if !(firstChar >= 'A' && firstChar <= 'Z') && !(firstChar >= 'a' && firstChar <= 'z') && firstChar != '_' {
+		return false
+	}
+
+	// 检查后续字符
+	for i := 1; i < len(name); i++ {
+		char := name[i]
+		if !(char >= 'A' && char <= 'Z') && !(char >= 'a' && char <= 'z') && !(char >= '0' && char <= '9') && char != '_' {
+			return false
+		}
+	}
+
+	return true
 }

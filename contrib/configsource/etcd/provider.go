@@ -142,7 +142,11 @@ func (s *Source) Set(ctx context.Context, key string, value any) error {
 	case []byte:
 		data = v
 	default:
-		data, _ = json.Marshal(v)
+		var marshalErr error
+		data, marshalErr = json.Marshal(v)
+		if marshalErr != nil {
+			return fmt.Errorf("etcd: failed to marshal value for key %s: %w", fullKey, marshalErr)
+		}
 	}
 
 	_, err := s.client.Put(ctx, fullKey, string(data))

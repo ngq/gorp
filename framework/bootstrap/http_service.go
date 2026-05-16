@@ -35,13 +35,13 @@ import (
 	redisProvider "github.com/ngq/gorp/framework/provider/redis"
 	"google.golang.org/grpc"
 
-	gormpkg "gorm.io/gorm"
 	"github.com/jmoiron/sqlx"
+	gormpkg "gorm.io/gorm"
 )
 
 var (
-	buildHTTPProvidersFunc                        = buildHTTPProviders
-	registerSelectedMicroserviceProvidersWithMode = RegisterSelectedMicroserviceProvidersWithMode
+	buildHTTPProvidersFunc                               = buildHTTPProviders
+	registerSelectedMicroserviceProvidersWithMode        = RegisterSelectedMicroserviceProvidersWithMode
 	registerSelectedMicroserviceProvidersWithOptionsFunc = registerSelectedMicroserviceProvidersWithOptions
 )
 
@@ -49,14 +49,14 @@ var (
 //
 // HTTPServiceOptions 描述默认 HTTP 主线的 bootstrap 选项。
 type HTTPServiceOptions struct {
-	ExtraProviders []runtimecontract.ServiceProvider
-	DisableRedis   bool
-	DisableGorm    bool
-	DisableMetrics bool
-	EnablePprof    bool
-	GovernanceMode string
-	GovernanceDisable  []string
-	GovernanceEnable   []string
+	ExtraProviders      []runtimecontract.ServiceProvider
+	DisableRedis        bool
+	DisableGorm         bool
+	DisableMetrics      bool
+	EnablePprof         bool
+	GovernanceMode      string
+	GovernanceDisable   []string
+	GovernanceEnable    []string
 	GovernanceProviders map[string]string
 }
 
@@ -66,15 +66,15 @@ type HTTPServiceOptions struct {
 // HTTPServiceRuntime 承载启动回调阶段使用的 HTTP runtime 状态。
 // 在微服务模式下，同时承载 gRPC 服务器实例供服务注册使用。
 type HTTPServiceRuntime struct {
-	App         *framework.Application
-	Container   runtimecontract.Container
-	Logger      observabilitycontract.Logger
-	Router      transportcontract.HTTPRouter
-	DB          *gormpkg.DB
-	Redis       datacontract.Redis
-	JWT         securitycontract.JWTService
-	Config      datacontract.Config
-	ServiceName string
+	App               *framework.Application
+	Container         runtimecontract.Container
+	Logger            observabilitycontract.Logger
+	Router            transportcontract.HTTPRouter
+	DB                *gormpkg.DB
+	Redis             datacontract.Redis
+	JWT               securitycontract.JWTService
+	Config            datacontract.Config
+	ServiceName       string
 	GovernanceMode    resiliencecontract.GovernanceMode
 	GovernanceSummary GovernanceSummary
 
@@ -524,6 +524,14 @@ func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.L
 		logger.Info("shutdown signal received")
 	case err := <-errCh:
 		if err != nil {
+			// HTTP 服务器启动失败，优雅关闭已启动的 gRPC 服务器
+			if rpcServer != nil {
+				stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer stopCancel()
+				if stopErr := rpcServer.Stop(stopCtx); stopErr != nil {
+					logger.Info(fmt.Sprintf("grpc server stop failed during cleanup: %v", stopErr))
+				}
+			}
 			return err
 		}
 		return nil

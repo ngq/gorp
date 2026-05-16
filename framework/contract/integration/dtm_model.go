@@ -9,6 +9,8 @@
 // - 让事务相关 DTO 可在 provider 和工具链之间复用。
 package integration
 
+import "time"
+
 // TransactionInfo describes one distributed transaction snapshot.
 //
 // TransactionInfo 描述一份分布式事务快照。
@@ -16,9 +18,29 @@ type TransactionInfo struct {
 	GID             string
 	Status          string
 	TransactionType string
-	CreateTime      int64
-	UpdateTime      int64
+	CreateTime      int64 // Unix timestamp. Use CreateTimeTime() for time.Time.
+	UpdateTime      int64 // Unix timestamp. Use UpdateTimeTime() for time.Time.
 	Steps           []TransactionStep
+}
+
+// CreateTimeTime converts CreateTime unix timestamp to time.Time.
+//
+// CreateTimeTime 将 CreateTime unix 时间戳转换为 time.Time。
+func (t *TransactionInfo) CreateTimeTime() time.Time {
+	if t.CreateTime == 0 {
+		return time.Time{}
+	}
+	return time.Unix(t.CreateTime, 0)
+}
+
+// UpdateTimeTime converts UpdateTime unix timestamp to time.Time.
+//
+// UpdateTimeTime 将 UpdateTime unix 时间戳转换为 time.Time。
+func (t *TransactionInfo) UpdateTimeTime() time.Time {
+	if t.UpdateTime == 0 {
+		return time.Time{}
+	}
+	return time.Unix(t.UpdateTime, 0)
 }
 
 // TransactionStep describes one branch or step in a transaction.

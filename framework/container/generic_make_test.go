@@ -10,6 +10,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -235,10 +236,10 @@ func TestMakeWith_SecurityContractInterface(t *testing.T) {
 
 type testRedis struct{}
 
-func (t *testRedis) Ping(ctx context.Context) error                                   { return nil }
-func (t *testRedis) Get(ctx context.Context, key string) (string, error)              { return "value", nil }
-func (t *testRedis) Set(ctx context.Context, key, value string, ttlSeconds int) error { return nil }
-func (t *testRedis) Del(ctx context.Context, key string) error                        { return nil }
+func (t *testRedis) Ping(ctx context.Context) error                                      { return nil }
+func (t *testRedis) Get(ctx context.Context, key string) (string, error)                 { return "value", nil }
+func (t *testRedis) Set(ctx context.Context, key, value string, ttl time.Duration) error { return nil }
+func (t *testRedis) Del(ctx context.Context, key string) error                           { return nil }
 func (t *testRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }

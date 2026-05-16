@@ -33,6 +33,7 @@ func (p *rabbitPublisher) Publish(ctx context.Context, topic string, message []b
 	if err != nil {
 		return err
 	}
+	defer ch.Close()
 
 	cfg := &integrationcontract.PublishConfig{}
 	for _, opt := range options {
@@ -41,9 +42,6 @@ func (p *rabbitPublisher) Publish(ctx context.Context, topic string, message []b
 
 	// Publish to exchange (or direct to queue if no exchange)
 	exchange := p.queue.cfg.RabbitMQExchange
-	if exchange == "" {
-		exchange = "" // Direct publishing uses empty exchange
-	}
 
 	return ch.PublishWithContext(
 		ctx,
@@ -70,6 +68,7 @@ func (p *rabbitPublisher) PublishWithDelay(ctx context.Context, topic string, me
 	if err != nil {
 		return err
 	}
+	defer ch.Close()
 
 	exchange := p.queue.cfg.RabbitMQExchange
 
@@ -101,6 +100,7 @@ func (p *rabbitPublisher) PublishWithPriority(ctx context.Context, topic string,
 	if err != nil {
 		return err
 	}
+	defer ch.Close()
 
 	exchange := p.queue.cfg.RabbitMQExchange
 
@@ -130,6 +130,7 @@ func (p *rabbitPublisher) Send(ctx context.Context, queue string, message []byte
 	if err != nil {
 		return err
 	}
+	defer ch.Close()
 
 	cfg := &integrationcontract.PublishConfig{}
 	for _, opt := range options {
@@ -186,14 +187,15 @@ func (p *rabbitPublisher) As(target any) bool {
 }
 
 // NativePublisher implements NativePublisherProvider interface.
-// Returns the underlying *amqp.Channel for publishing.
+// Returns the underlying *amqp.Connection for advanced publishing.
+// Callers should create and close their own channels from this connection.
 //
 // NativePublisher 实现 NativePublisherProvider 接口。
-// 返回底层 *amqp.Channel 用于发布。
+// 返回底层 *amqp.Connection 用于高级发布操作。
+// 调用方应从该连接创建和关闭自己的 channel。
 func (p *rabbitPublisher) NativePublisher() any {
-	ch, err := p.queue.getChannel()
-	if err != nil {
+	if p == nil || p.queue == nil || p.queue.conn == nil {
 		return nil
 	}
-	return ch
+	return p.queue.conn
 }

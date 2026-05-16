@@ -5,10 +5,9 @@
 package noop
 
 import (
+	"context"
 	"errors"
-	"net"
 	"net/http"
-	"time"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -37,7 +36,7 @@ func (p *Provider) DependsOn() []string { return nil }
 // Register binds the no-op WebSocket factory to the container.
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(transportcontract.WebSocketKey, func(c runtimecontract.Container) (any, error) {
-		return &noopWebSocket{}, nil
+		return &noopWebSocketServer{}, nil
 	}, true)
 	return nil
 }
@@ -45,37 +44,51 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 // Boot initializes the provider. No additional startup logic required.
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
-// noopWebSocket implements transportcontract.WebSocket with no-op methods.
-type noopWebSocket struct{}
+// noopWebSocketServer implements transportcontract.WebSocketServer with no-op methods.
+type noopWebSocketServer struct{}
 
-var _ transportcontract.WebSocket = (*noopWebSocket)(nil)
+var _ transportcontract.WebSocketServer = (*noopWebSocketServer)(nil)
 
-func (n *noopWebSocket) Upgrade(http.ResponseWriter, *http.Request, transportcontract.WebSocketHandler) (transportcontract.WebSocketConn, error) {
+func (n *noopWebSocketServer) Upgrade(http.ResponseWriter, *http.Request, transportcontract.WebSocketHandler) (transportcontract.WebSocketConn, error) {
 	return nil, errors.New("websocket: not configured (noop provider)")
 }
 
-func (n *noopWebSocket) NewClient(transportcontract.WebSocketHandler, *transportcontract.WebSocketClientOptions) (transportcontract.WebSocketConn, error) {
-	return nil, errors.New("websocket: not configured (noop provider)")
+func (n *noopWebSocketServer) NewBroadcaster() transportcontract.WebSocketBroadcaster {
+	return &noopBroadcaster{}
 }
+
+func (n *noopWebSocketServer) Connections() []transportcontract.WebSocketConn {
+	return nil
+}
+
+func (n *noopWebSocketServer) Count() int { return 0 }
+
+func (n *noopWebSocketServer) Shutdown(context.Context) error { return nil }
 
 // noopConn implements transportcontract.WebSocketConn with no-op methods.
 type noopConn struct{}
 
 var _ transportcontract.WebSocketConn = (*noopConn)(nil)
 
-func (c *noopConn) WriteText([]byte) error       { return errors.New("websocket: noop connection") }
-func (c *noopConn) WriteBinary([]byte) error      { return errors.New("websocket: noop connection") }
-func (c *noopConn) WriteClose(int, string) error  { return errors.New("websocket: noop connection") }
-func (c *noopConn) SetDeadline(time.Time) error    { return errors.New("websocket: noop connection") }
-func (c *noopConn) RemoteAddr() net.Addr          { return nil }
-func (c *noopConn) Session() transportcontract.WebSocketSession { return &noopSession{} }
-func (c *noopConn) Close() error                   { return nil }
+func (c *noopConn) WriteString(string) error   { return errors.New("websocket: noop connection") }
+func (c *noopConn) WriteBinary([]byte) error   { return errors.New("websocket: noop connection") }
+func (c *noopConn) Close(int, string) error    { return nil }
+func (c *noopConn) Context() context.Context   { return context.Background() }
+func (c *noopConn) SetContext(context.Context) {}
+func (c *noopConn) RemoteAddr() string         { return "" }
+func (c *noopConn) LocalAddr() string          { return "" }
+func (c *noopConn) RawConn() any               { return nil }
 
-// noopSession implements transportcontract.WebSocketSession with no-op methods.
-type noopSession struct{}
+// noopBroadcaster implements transportcontract.WebSocketBroadcaster with no-op methods.
+type noopBroadcaster struct{}
 
-var _ transportcontract.WebSocketSession = (*noopSession)(nil)
+var _ transportcontract.WebSocketBroadcaster = (*noopBroadcaster)(nil)
 
-func (s *noopSession) Load(any) (any, bool) { return nil, false }
-func (s *noopSession) Store(any, any)       {}
-func (s *noopSession) Delete(any)           {}
+func (b *noopBroadcaster) BroadcastString(string) error { return nil }
+func (b *noopBroadcaster) BroadcastBinary([]byte) error { return nil }
+func (b *noopBroadcaster) BroadcastStringExcept(string, transportcontract.WebSocketConn) error {
+	return nil
+}
+func (b *noopBroadcaster) BroadcastBinaryExcept([]byte, transportcontract.WebSocketConn) error {
+	return nil
+}

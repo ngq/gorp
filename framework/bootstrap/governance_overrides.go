@@ -101,6 +101,7 @@ func loadGovernanceProviderOverrides(cfg datacontract.Config) map[string]string 
 		"dtm",
 		"message_queue",
 		"distributed_lock",
+		"websocket",
 	}
 
 	overrides := make(map[string]string)

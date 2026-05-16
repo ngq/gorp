@@ -28,6 +28,7 @@ package runtime
 import (
 	"os"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -101,11 +102,11 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	//
 	// 绑定 DBRuntimeKey：根据后端返回适当的数据库客户端。
 	c.Bind(datacontract.DBRuntimeKey, func(c runtimecontract.Container) (any, error) {
-		backendAny, err := c.Make(datacontract.ORMBackendKey)
+		backend, err := container.MakeWith[string](c, datacontract.ORMBackendKey)
 		if err != nil {
 			return c.Make(datacontract.GormKey)
 		}
-		switch datacontract.NormalizeBackendName(backendAny.(string)) {
+		switch datacontract.NormalizeBackendName(backend) {
 		case datacontract.RuntimeBackendSQLX:
 			return c.Make(datacontract.SQLXKey)
 		case datacontract.RuntimeBackendEnt:
@@ -121,8 +122,8 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	//
 	// 绑定 MigratorKey：返回 GORM 用于迁移（Ent 无迁移器）。
 	c.Bind(datacontract.MigratorKey, func(c runtimecontract.Container) (any, error) {
-		backendAny, err := c.Make(datacontract.ORMBackendKey)
-		if err == nil && datacontract.NormalizeBackendName(backendAny.(string)) == datacontract.RuntimeBackendEnt {
+		backend, err := container.MakeWith[string](c, datacontract.ORMBackendKey)
+		if err == nil && datacontract.NormalizeBackendName(backend) == datacontract.RuntimeBackendEnt {
 			return nil, os.ErrInvalid
 		}
 		return c.Make(datacontract.GormKey)

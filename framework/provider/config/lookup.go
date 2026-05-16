@@ -115,6 +115,10 @@ func GetIntAny(cfg datacontract.Config, keys ...string) int {
 			return n
 		case int64:
 			return int(n)
+		case uint:
+			return int(n)
+		case uint64:
+			return int(n)
 		case float64:
 			return int(n)
 		case string:
@@ -180,7 +184,22 @@ func GetStringSliceAny(cfg datacontract.Config, keys ...string) []string {
 		case []any:
 			out := make([]string, 0, len(arr))
 			for _, item := range arr {
-				out = append(out, fmt.Sprintf("%v", item))
+				switch v := item.(type) {
+				case string:
+					if v != "" {
+						out = append(out, v)
+					}
+				case fmt.Stringer:
+					s := v.String()
+					if s != "" {
+						out = append(out, s)
+					}
+				default:
+					s := fmt.Sprintf("%v", item)
+					if s != "" && s != "<nil>" && s != "map[]" && s != "[]" {
+						out = append(out, s)
+					}
+				}
 			}
 			if len(out) > 0 {
 				return out

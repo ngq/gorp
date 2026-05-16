@@ -81,9 +81,10 @@ func BuildGovernanceSummaryWithModeOverride(cfg datacontract.Config, mode resili
 		Enabled:          mergeGovernanceEnabled(configOverrides.Enabled, codeOverrides.Enabled),
 		ProviderBackends: mergeGovernanceProviderBackends(configOverrides.ProviderBackends, codeOverrides.ProviderBackends),
 	}
-	// 先关闭再开启：同一 feature 同时在 disable 和 enable 中时，disable 生效
-	features := applyGovernanceFeatureDisables(defaultFeatures, mergedOverrides.Disabled)
-	features = applyGovernanceFeatureEnables(features, mergedOverrides.Enabled)
+	// 先开启再关闭：同一 feature 同时在 enable 和 disable 中时，disable 生效。
+	// 这与 buildGovernanceFeatureDecisions 的优先级一致（disable > enable）。
+	features := applyGovernanceFeatureEnables(defaultFeatures, mergedOverrides.Enabled)
+	features = applyGovernanceFeatureDisables(features, mergedOverrides.Disabled)
 	modeSource, modeReason := governanceModeDecision(configView, modeOverride)
 	featureDecisions := buildGovernanceFeatureDecisions(mode, defaultFeatures, configOverrides.Disabled, codeOverrides.Disabled, configOverrides.Enabled, codeOverrides.Enabled)
 	providerDecisions := buildGovernanceProviderDecisions(configView, mode, configOverrides, codeOverrides)
@@ -805,6 +806,7 @@ func governanceProviderNames() []string {
 		"dtm",
 		"message_queue",
 		"distributed_lock",
+		"websocket",
 	}
 }
 
@@ -878,6 +880,8 @@ func governanceTrackedConfigKeys() []string {
 		"distributed_lock.enabled",
 		"distributed_lock.backend",
 		"distributed_lock.type",
+		"websocket.enabled",
+		"websocket.backend",
 	}
 }
 

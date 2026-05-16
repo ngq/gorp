@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -71,7 +72,9 @@ func (p *Provider) Provides() []string {
 //
 // DependsOn 返回该 provider 依赖的 key。
 // Gin provider 依赖 Config 和 Log。
-func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey, observabilitycontract.LogKey} }
+func (p *Provider) DependsOn() []string {
+	return []string{datacontract.ConfigKey, observabilitycontract.LogKey}
+}
 
 // Register binds the Gin engine, HTTP service, and middleware registry into the container.
 //
@@ -113,8 +116,13 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	}, true)
 
 	c.Bind(transportcontract.HTTPKey, func(c runtimecontract.Container) (any, error) {
-		cfgAny, _ := c.Make(datacontract.ConfigKey)
-		cfg, _ := cfgAny.(datacontract.Config)
+		// Config is optional — HTTP server uses defaults when config is absent
+		var cfg datacontract.Config
+		if c.IsBind(datacontract.ConfigKey) {
+			if resolved, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey); err == nil {
+				cfg = resolved
+			}
+		}
 
 		addr := ":8080"
 		readTimeout := 15 * time.Second
@@ -136,11 +144,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			}
 		}
 
-		engineAny, err := c.Make(httpEngineKey)
+		engine, err := container.MakeWith[*gin.Engine](c, httpEngineKey)
 		if err != nil {
 			return nil, err
 		}
-		engine := engineAny.(*gin.Engine)
 
 		log := getLogger(c)
 		srv := &http.Server{

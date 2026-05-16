@@ -167,7 +167,7 @@ func (s *noopSubscriber) Consume(ctx context.Context, queue string, handler inte
 
 // Unsubscribe does nothing and returns nil.
 //
-// Unsubscribe 不执行任何操作并返回 nil。
-func (s *noopSubscriber) Unsubscribe() error {
+// UnsubscribeAll 不执行任何操作并返回 nil。
+func (s *noopSubscriber) UnsubscribeAll() error {
 	return nil
 }

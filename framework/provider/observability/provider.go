@@ -30,14 +30,14 @@ func NewProvider(config observabilitycontract.ObservabilityConfig) *Provider {
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string       { return "observability" }
+func (p *Provider) Name() string { return "observability" }
 
 // IsDefer indicates observability should not defer loading.
 // Must be available early for metrics and tracing.
 //
 // IsDefer 表示可观测性不应延迟加载。
 // 必须尽早可用以支持指标和追踪。
-func (p *Provider) IsDefer() bool      { return false }
+func (p *Provider) IsDefer() bool { return false }
 
 // Provides returns the capability keys this provider exposes.
 // Exposes ObservabilityKey for unified observability service.
@@ -66,7 +66,7 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 
 		var tracer observabilitycontract.Tracer
 		if p.config.TracingEnabled {
-			tracer = NewNoopTracer()
+			tracer = NewPrometheusTracer() // 启用时使用真实 tracer
 		} else {
 			tracer = NewNoopTracer()
 		}

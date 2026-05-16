@@ -84,6 +84,20 @@ func (z *Logger) With(fields ...observabilitycontract.Field) observabilitycontra
 	return &Logger{l: z.l.With(toZapFields(fields)...)}
 }
 
+// Close syncs buffered logs and releases resources.
+// Implements io.Closer for container lifecycle management.
+// Must be called before process exit to flush remaining log entries.
+//
+// Close 刷新缓冲日志并释放资源。
+// 实现 io.Closer 供容器生命周期管理。
+// 进程退出前必须调用以确保剩余日志条目落盘。
+func (z *Logger) Close() error {
+	if z.l == nil {
+		return nil
+	}
+	return z.l.Sync()
+}
+
 func toZapFields(fields []observabilitycontract.Field) []zap.Field {
 	out := make([]zap.Field, 0, len(fields))
 	for _, f := range fields {

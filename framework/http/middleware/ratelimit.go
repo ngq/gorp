@@ -11,6 +11,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -92,15 +93,28 @@ func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string)
 }
 
 // IPKeyFunc extracts a client-IP-based rate-limit key from the request.
+// X-Forwarded-For and X-Real-IP headers are ONLY trusted when the request
+// originates from a trusted proxy (see SetTrustedProxies in ip_filter.go).
+// Otherwise, RemoteAddr is used directly to prevent spoofing.
 //
 // IPKeyFunc 从请求中提取基于客户端 IP 的限流 key。
+// X-Forwarded-For 和 X-Real-IP 头仅在请求来自可信代理时才会被信任
+//（见 ip_filter.go 中的 SetTrustedProxies）。
+// 否则直接使用 RemoteAddr，以防止伪造绕过限流。
 func IPKeyFunc(c *gin.Context) string {
-	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-		return xff
+	remoteAddr := c.Request.RemoteAddr
+
+	if isFromTrustedProxy(remoteAddr) {
+		if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+			// Take only the first IP from the comma-separated list
+			parts := strings.SplitN(xff, ",", 2)
+			return strings.TrimSpace(parts[0])
+		}
+		if xri := c.GetHeader("X-Real-IP"); xri != "" {
+			return strings.TrimSpace(xri)
+		}
 	}
-	if xri := c.GetHeader("X-Real-IP"); xri != "" {
-		return xri
-	}
+
 	return c.ClientIP()
 }
 

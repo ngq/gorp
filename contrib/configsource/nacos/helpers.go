@@ -18,9 +18,11 @@ import (
 // 该函数尝试将配置内容解析为结构化数据：
 //   - 如果内容是 YAML 格式，解析为 map[string]any
 //   - 如果内容是纯文本，将文本作为 dataID key 的值存储
+//
 // 参数：
 //   - content: 配置内容字符串
 //   - dataID: Nacos 数据 ID，用于纯文本场景的 key
+//
 // 返回：
 //   - 解析后的 map[string]any
 //   - 解析错误（如果 YAML 解析失败）
@@ -67,6 +69,7 @@ func encodeContent(value any) (string, error) {
 // yaml.v3 解码时会将某些类型转换为非标准类型：
 //   - map[any]any -> map[string]any（key 转为字符串）
 //   - 保持 []any 和基本类型不变
+//
 // 该函数递归处理嵌套结构，确保所有 map 的 key 都是 string 类型。
 func normalizeYAMLValue(value any) any {
 	switch typed := value.(type) {
@@ -118,6 +121,7 @@ func decodeStructuredContent(content string) (any, error) {
 // 参数：
 //   - data: 配置数据 map
 //   - path: 点分隔的路径字符串，空路径返回整个 map
+//
 // 返回：
 //   - 找到的值
 //   - 是否找到（bool）
@@ -145,15 +149,20 @@ func lookupNestedValue(data map[string]any, path string) (any, bool) {
 	return current, true
 }
 
-// cloneMap creates a shallow copy of a map.
+// cloneMap creates a deep copy of a map.
+// Nested maps are recursively copied to prevent shared-reference mutations.
 //
-// cloneMap 创建 map 的浅拷贝。
-// 该函数用于防止外部代码修改缓存，返回一个新的 map，
-// 但不深拷贝嵌套的值（嵌套值仍然共享引用）。
+// cloneMap 创建 map 的深拷贝。
+// 嵌套 map 递归拷贝，防止共享引用导致的并发数据竞争。
 func cloneMap(source map[string]any) map[string]any {
 	result := make(map[string]any, len(source))
 	for key, value := range source {
-		result[key] = value
+		switch v := value.(type) {
+		case map[string]any:
+			result[key] = cloneMap(v)
+		default:
+			result[key] = value
+		}
 	}
 	return result
 }

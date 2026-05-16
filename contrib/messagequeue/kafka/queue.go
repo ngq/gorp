@@ -6,7 +6,9 @@
 package kafka
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/IBM/sarama"
@@ -21,13 +23,14 @@ import (
 // Queue 使用 IBM/sarama SDK 实现 integrationcontract.MessageQueue。
 // 管理 sarama client、sync producer 和 consumer groups。
 type Queue struct {
-	cfg            *integrationcontract.MessageQueueConfig
-	client         sarama.Client
-	syncProducer   sarama.SyncProducer
-	asyncProducer  sarama.AsyncProducer // optional, for high-throughput scenarios
-	consumerGroups map[string]sarama.ConsumerGroup
-	mu             sync.Mutex
-	closed         bool
+	cfg               *integrationcontract.MessageQueueConfig
+	client            sarama.Client
+	syncProducer      sarama.SyncProducer
+	asyncProducer     sarama.AsyncProducer // optional, for high-throughput scenarios
+	consumerGroups    map[string]sarama.ConsumerGroup
+	consumerGroupRefs map[string]int
+	mu                sync.Mutex
+	closed            bool
 }
 
 // NewQueue creates a new Kafka Queue instance.
@@ -80,10 +83,12 @@ func (q *Queue) Subscriber() integrationcontract.MessageSubscriber {
 // Close closes all Kafka resources.
 // Implements integrationcontract.MessageQueue.Close.
 // Closes consumer groups, producers, and client in order.
+// Logs warnings for non-fatal close errors and returns the first critical error.
 //
 // Close 关闭所有 Kafka 资源。
 // 实现 integrationcontract.MessageQueue.Close。
 // 按顺序关闭 consumer groups、producers 和 client。
+// 对非致命关闭错误记录警告，返回第一个关键错误。
 func (q *Queue) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -92,28 +97,42 @@ func (q *Queue) Close() error {
 	}
 	q.closed = true
 
+	var errs []error
+
 	// Close consumer groups first
 	// 先关闭 consumer groups
 	for _, group := range q.consumerGroups {
-		group.Close()
+		if err := group.Close(); err != nil {
+			slog.Warn("messagequeue.kafka: close consumer group failed", "error", err)
+			errs = append(errs, err)
+		}
 	}
 	q.consumerGroups = nil
 
 	// Close producers
 	// 关闭 producers
 	if q.syncProducer != nil {
-		q.syncProducer.Close()
+		if err := q.syncProducer.Close(); err != nil {
+			slog.Warn("messagequeue.kafka: close sync producer failed", "error", err)
+			errs = append(errs, err)
+		}
 	}
 	if q.asyncProducer != nil {
-		q.asyncProducer.Close()
+		if err := q.asyncProducer.Close(); err != nil {
+			slog.Warn("messagequeue.kafka: close async producer failed", "error", err)
+			errs = append(errs, err)
+		}
 	}
 
 	// Close client last
 	// 最后关闭 client
 	if q.client != nil {
-		return q.client.Close()
+		if err := q.client.Close(); err != nil {
+			errs = append(errs, err)
+		}
+		return errors.Join(errs...)
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // Underlying returns the underlying sarama.Client for advanced usage.

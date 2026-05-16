@@ -8,6 +8,7 @@
 package error_reporter
 
 import (
+	"github.com/ngq/gorp/framework/container"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -59,11 +60,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			return NewSentryAdapter(p.config), nil
 		}
 
-		logAny, err := c.Make(observabilitycontract.LogKey)
+		logger, err := container.MakeWith[observabilitycontract.Logger](c, observabilitycontract.LogKey)
 		if err != nil {
 			return nil, err
 		}
-		logger := logAny.(observabilitycontract.Logger)
 		return NewLogReporter(logger), nil
 	}, true)
 	return nil

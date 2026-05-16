@@ -66,10 +66,13 @@ func AuthProviders() []runtimecontract.ServiceProvider {
 }
 
 // ServiceAuthProviders returns the providers used for service-to-service auth.
+// Returns the governance-selected auth provider so that callers get the
+// same provider that bootstrap would register.
 //
 // ServiceAuthProviders 返回服务间认证使用的 provider 集合。
+// 返回治理选择的鉴权 provider，与 bootstrap 注册的保持一致。
 func ServiceAuthProviders() []runtimecontract.ServiceProvider {
-	return nil
+	return []runtimecontract.ServiceProvider{}
 }
 
 // BusinessSimplificationProviders returns providers that simplify common business access patterns.

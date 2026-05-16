@@ -61,7 +61,13 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		if err != nil {
 			return nil, err
 		}
-		return NewLock(cfg)
+		lock, err := NewLock(cfg)
+		if err != nil {
+			return nil, err
+		}
+		// Register closer to stop watchdog goroutines and close Redis client on container destroy.
+		c.RegisterCloser(datacontract.DistributedLockKey, lock)
+		return lock, nil
 	}, true)
 	return nil
 }
@@ -248,6 +254,8 @@ func (l *Lock) startWatchdog(fullKey string, ttl time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
+		consecutiveFailures := 0
+		const maxConsecutiveFailures = 3
 		for {
 			select {
 			case <-ctx.Done():
@@ -255,7 +263,19 @@ func (l *Lock) startWatchdog(fullKey string, ttl time.Duration) {
 			case <-ticker.C:
 				renewCtx, done := context.WithTimeout(context.Background(), time.Second)
 				lockKey := strings.TrimPrefix(fullKey, l.cfg.KeyPrefix)
-				_ = l.Renew(renewCtx, lockKey, ttl)
+				if err := l.Renew(renewCtx, lockKey, ttl); err != nil {
+					consecutiveFailures++
+					fmt.Printf("[dlock:warn] watchdog renew failed for key %s (attempt %d/%d): %v\n",
+						fullKey, consecutiveFailures, maxConsecutiveFailures, err)
+					if consecutiveFailures >= maxConsecutiveFailures {
+						fmt.Printf("[dlock:error] watchdog giving up on key %s after %d consecutive failures; lock may expire\n",
+							fullKey, maxConsecutiveFailures)
+						done()
+						return
+					}
+				} else {
+					consecutiveFailures = 0
+				}
 				done()
 			}
 		}
@@ -273,4 +293,33 @@ func generateToken() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// Close stops all watchdog goroutines and closes the Redis client.
+// Implements io.Closer for container lifecycle management.
+//
+// Close 停止所有 watchdog goroutine 并关闭 Redis 客户端。
+// 实现 io.Closer 供容器生命周期管理。
+func (l *Lock) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.closed {
+		return nil
+	}
+	l.closed = true
+
+	// Stop all watchdog goroutines
+	l.watchdog.Range(func(key, value any) bool {
+		if cancel, ok := value.(context.CancelFunc); ok {
+			cancel()
+		}
+		l.watchdog.Delete(key)
+		return true
+	})
+
+	// Close Redis client
+	if l.client != nil {
+		return l.client.Close()
+	}
+	return nil
 }

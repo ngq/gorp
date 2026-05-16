@@ -170,13 +170,17 @@ func (g *Generator) generateProtoFromRoutes(routes []integrationcontract.RouteDe
 
 	// 解析 Handler 类型（如果提供了 HandlerFile）
 	handlerTypes := make(map[string]*HandlerTypeInfo)
+	var handlerErr error
 	if opts.HandlerFile != "" {
 		parser := NewHandlerParser()
 		handlerNames := make([]string, len(routes))
 		for i, route := range routes {
 			handlerNames[i] = route.HandlerName
 		}
-		handlerTypes, _ = parser.ParseHandlers(opts.HandlerFile, handlerNames)
+		handlerTypes, handlerErr = parser.ParseHandlers(opts.HandlerFile, handlerNames)
+		if handlerErr != nil {
+			fmt.Printf("[proto:warn] failed to parse handler types from %s: %v\n", opts.HandlerFile, handlerErr)
+		}
 	}
 
 	// 头部

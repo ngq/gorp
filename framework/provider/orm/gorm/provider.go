@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -79,11 +80,10 @@ func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey
 // 核心逻辑：解析配置、创建 dialector、打开 GORM、应用连接池设置、启动指标采集器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.GormKey, func(c runtimecontract.Container) (any, error) {
-		cfgAny, err := c.Make(datacontract.ConfigKey)
+		cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 		if err != nil {
 			return nil, err
 		}
-		cfg := cfgAny.(datacontract.Config)
 
 		var dbc datacontract.DBConfig
 		if err := cfg.Unmarshal("database", &dbc); err != nil {
@@ -96,11 +96,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			return nil, errors.New("database.dsn is required")
 		}
 
-		logAny, err := c.Make(observabilitycontract.LogKey)
+		logger, err := container.MakeWith[observabilitycontract.Logger](c, observabilitycontract.LogKey)
 		if err != nil {
 			return nil, err
 		}
-		logger := logAny.(observabilitycontract.Logger)
 
 		var (
 			dialector gorm.Dialector

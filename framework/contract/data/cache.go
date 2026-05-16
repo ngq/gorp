@@ -27,7 +27,15 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // Cache defines the common cache operations exposed by the framework.
 //
+// Future improvements:
+//   - Consider changing value type from string to []byte for binary-safe caching.
+//   - Consider adding MSet for batch write symmetry with MGet.
+//
 // Cache 定义框架对外暴露的通用缓存操作。
+//
+// 未来改进：
+//   - 考虑将值类型从 string 改为 []byte 以支持二进制安全缓存。
+//   - 考虑添加 MSet 以与 MGet 批量读取对称。
 type Cache interface {
 	// Get reads a cached string value by key.
 	//

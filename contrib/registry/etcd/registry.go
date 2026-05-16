@@ -34,7 +34,7 @@ type Registry struct {
 	client etcdRegistryClient
 
 	registered sync.Map
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	closed     bool
 }
 
@@ -340,12 +340,14 @@ func (r *Registry) tryReRegister(serviceID string, stopCh chan struct{}) {
 }
 
 // isClosed checks if registry is closed.
+// Uses RLock for read-only access to avoid blocking other readers.
 //
 // isClosed 检查注册中心是否已关闭。
+// 使用 RLock 进行只读访问，避免阻塞其他读取者。
 func (r *Registry) isClosed() bool {
-	r.mu.Lock()
+	r.mu.RLock()
 	closed := r.closed
-	r.mu.Unlock()
+	r.mu.RUnlock()
 	return closed
 }
 

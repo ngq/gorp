@@ -8,9 +8,9 @@
 package bootstrap
 
 import (
+	"fmt"
+
 	circuitbreakersentinel "github.com/ngq/gorp/contrib/circuitbreaker/sentinel"
-	loadsheddingprovider "github.com/ngq/gorp/framework/provider/loadshedding"
-	loadsheddingnoop "github.com/ngq/gorp/framework/provider/loadshedding/noop"
 	configsourceapollo "github.com/ngq/gorp/contrib/configsource/apollo"
 	configsourceconsul "github.com/ngq/gorp/contrib/configsource/consul"
 	configsourceetcd "github.com/ngq/gorp/contrib/configsource/etcd"
@@ -19,9 +19,9 @@ import (
 	configsourcepolaris "github.com/ngq/gorp/contrib/configsource/polaris"
 	dlockredis "github.com/ngq/gorp/contrib/dlock/redis"
 	dtmsdk "github.com/ngq/gorp/contrib/dtm/dtmsdk"
-	mqredis "github.com/ngq/gorp/contrib/messagequeue/redis"
 	mqkafka "github.com/ngq/gorp/contrib/messagequeue/kafka"
 	mqrabbitmq "github.com/ngq/gorp/contrib/messagequeue/rabbitmq"
+	mqredis "github.com/ngq/gorp/contrib/messagequeue/redis"
 	mqrocketmq "github.com/ngq/gorp/contrib/messagequeue/rocketmq"
 	discoveryconsul "github.com/ngq/gorp/contrib/registry/consul"
 	discoveryetcd "github.com/ngq/gorp/contrib/registry/etcd"
@@ -34,7 +34,6 @@ import (
 	serviceauthmtls "github.com/ngq/gorp/contrib/serviceauth/mtls"
 	serviceauthtoken "github.com/ngq/gorp/contrib/serviceauth/token"
 	tracingotel "github.com/ngq/gorp/contrib/tracing/otel"
-	wsgws "github.com/ngq/gorp/contrib/websocket/gws"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	circuitbreakernoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
 	configsourcelocal "github.com/ngq/gorp/framework/provider/configsource/local"
@@ -42,6 +41,8 @@ import (
 	discoverynoop "github.com/ngq/gorp/framework/provider/discovery/noop"
 	dlocknoop "github.com/ngq/gorp/framework/provider/dlock/noop"
 	dtmnoop "github.com/ngq/gorp/framework/provider/dtm/noop"
+	loadsheddingprovider "github.com/ngq/gorp/framework/provider/loadshedding"
+	loadsheddingnoop "github.com/ngq/gorp/framework/provider/loadshedding/noop"
 	mqnoop "github.com/ngq/gorp/framework/provider/messagequeue/noop"
 	metadatadefault "github.com/ngq/gorp/framework/provider/metadata"
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
@@ -146,6 +147,7 @@ func RegisterTracingProviderFactory(key string, factory providerFactory) {
 func RegisterMetadataProviderFactory(key string, factory providerFactory) {
 	metadataProviderFactories.register(key, factory)
 }
+
 // RegisterRetryProviderFactory registers a retry provider factory.
 //
 // RegisterRetryProviderFactory 注册重试 provider factory。
@@ -253,7 +255,6 @@ var (
 		"":        func() runtimecontract.ServiceProvider { return retrynoop.NewProvider() },
 	}
 	webSocketProviderFactories = providerFactoryRegistry{
-		"gws":  func() runtimecontract.ServiceProvider { return wsgws.NewProvider() },
 		"noop": func() runtimecontract.ServiceProvider { return wsnoop.NewProvider() },
 		"":     func() runtimecontract.ServiceProvider { return wsnoop.NewProvider() },
 	}
@@ -268,6 +269,10 @@ func providerFromMap(factories map[string]providerFactory, key string, fallback 
 	if factory, ok := factories[fallback]; ok {
 		return factory()
 	}
+	// When neither the requested key nor the fallback exists, return a noop-like
+	// indicator. Log a warning so users can trace configuration typos.
+	// 当请求 key 和 fallback 都不存在时，记录警告帮助用户排查配置拼写错误。
+	fmt.Printf("[gorp:warn] providerFromMap: unknown backend %q (fallback %q also absent); check config for typos\n", key, fallback)
 	return nil
 }
 

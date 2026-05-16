@@ -24,15 +24,17 @@ var ErrQueueClosed = errors.New("messagequeue.rocketmq: queue closed")
 
 // Queue implements integrationcontract.MessageQueue using rocketmq-client-go SDK.
 // Manages producer and consumer instances, provides publisher/subscriber factories.
+// Each subscription group gets its own consumer instance to avoid resource leaks.
 //
 // Queue 使用 rocketmq-client-go SDK 实现 integrationcontract.MessageQueue。
 // 管理 producer 和 consumer 实例，提供 publisher/subscriber 工厂。
+// 每个订阅组拥有独立的 consumer 实例以避免资源泄漏。
 type Queue struct {
-	cfg      *integrationcontract.MessageQueueConfig
-	producer rocketmq.Producer
-	consumer rocketmq.PushConsumer
-	mu       sync.Mutex
-	closed   bool
+	cfg       *integrationcontract.MessageQueueConfig
+	producer  rocketmq.Producer
+	consumers map[string]rocketmq.PushConsumer
+	mu        sync.Mutex
+	closed    bool
 }
 
 // NewQueue creates a new RocketMQ Queue instance.
@@ -62,8 +64,9 @@ func NewQueue(cfg *integrationcontract.MessageQueueConfig) (*Queue, error) {
 	}
 
 	return &Queue{
-		cfg:      cfg,
-		producer: p,
+		cfg:       cfg,
+		producer:  p,
+		consumers: make(map[string]rocketmq.PushConsumer),
 	}, nil
 }
 
@@ -101,9 +104,10 @@ func (q *Queue) Close() error {
 		q.producer.Shutdown()
 	}
 
-	// Close consumer
-	if q.consumer != nil {
-		q.consumer.Shutdown()
+	// Close all consumers
+	for group, c := range q.consumers {
+		c.Shutdown()
+		delete(q.consumers, group)
 	}
 
 	return nil
@@ -161,6 +165,11 @@ func (q *Queue) createConsumer(group string) (rocketmq.PushConsumer, error) {
 		return nil, ErrQueueClosed
 	}
 
+	// Reuse existing consumer for the same group
+	if c, ok := q.consumers[group]; ok {
+		return c, nil
+	}
+
 	namesrvAddr := strings.Split(q.cfg.RocketMQNamesrvAddr, ";")
 
 	c, err := rocketmq.NewPushConsumer(
@@ -173,5 +182,6 @@ func (q *Queue) createConsumer(group string) (rocketmq.PushConsumer, error) {
 		return nil, fmt.Errorf("messagequeue.rocketmq: create consumer failed: %w", err)
 	}
 
+	q.consumers[group] = c
 	return c, nil
 }

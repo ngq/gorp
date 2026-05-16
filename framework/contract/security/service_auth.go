@@ -13,6 +13,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 const (
@@ -95,20 +97,18 @@ type ServiceAuthConfig struct {
 }
 
 // ServiceProvider defines the provider registration surface needed by service auth providers.
+// Reuses the runtime contract's ServiceProvider to avoid duplicate, incompatible definitions.
 //
 // ServiceProvider 定义服务鉴权 provider 所需的 provider 注册接口面。
-type ServiceProvider interface {
-	Name() string
-	Register(Container) error
-	Boot(Container) error
-	IsDefer() bool
-	Provides() []string
-}
+// 复用 runtime 契约的 ServiceProvider，避免重复且不兼容的定义。
+type ServiceProvider = runtimecontract.ServiceProvider
 
 // Container defines the minimal container surface needed by service auth providers.
+// Reuses the runtime contract's Container for type compatibility.
 //
 // Container 定义服务鉴权 provider 所需的最小容器接口面。
-type Container interface{}
+// 复用 runtime 契约的 Container，确保类型兼容。
+type Container = runtimecontract.Container
 
 // ServiceAuthProvider defines the provider contract for creating service authenticators.
 //

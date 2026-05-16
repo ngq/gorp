@@ -176,12 +176,12 @@ func (c *Container) RegisterProvider(p runtimecontract.ServiceProvider) error {
 	}
 	st := &providerState{p: p}
 	c.providersByName[name] = st
-	c.mu.Unlock()
 
 	if p.IsDefer() {
-		c.mu.Lock()
 		// Deferred providers advertise their keys first and only load when one of those keys is requested.
+		// Register deferred keys within the same lock that registered the provider to prevent TOCTOU race.
 		// 延迟 provider 先声明自己能提供的 key，等这些 key 真被请求时再装载。
+		// 在注册 provider 的同一把锁内注册延迟 key，防止 TOCTOU 竞态。
 		for _, key := range p.Provides() {
 			if _, exists := c.deferredByKey[key]; !exists {
 				c.deferredByKey[key] = name
@@ -190,6 +190,7 @@ func (c *Container) RegisterProvider(p runtimecontract.ServiceProvider) error {
 		c.mu.Unlock()
 		return nil
 	}
+	c.mu.Unlock()
 
 	if err := c.loadProvider(name); err != nil {
 		return err
@@ -246,23 +247,27 @@ func (c *Container) MakeNamed(name, key string) (any, error) {
 }
 
 // MustMake resolves a service by key and panics on failure.
+// The panic message includes the key name for easier debugging.
 //
 // MustMake 按 key 解析服务，失败时直接 panic。
+// panic 信息包含 key 名称以便调试。
 func (c *Container) MustMake(key string) any {
 	v, err := c.Make(key)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("container: MustMake(%q): %v", key, err))
 	}
 	return v
 }
 
 // MustMakeNamed resolves a named service by name and key and panics on failure.
+// The panic message includes the name and key for easier debugging.
 //
 // MustMakeNamed 按名称和 key 解析命名服务，失败时直接 panic。
+// panic 信息包含 name 和 key 以便调试。
 func (c *Container) MustMakeNamed(name, key string) any {
 	v, err := c.MakeNamed(name, key)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("container: MustMakeNamed(name=%q, key=%q): %v", name, key, err))
 	}
 	return v
 }
@@ -466,17 +471,46 @@ func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 		// 在 per-goroutine 解析栈中跟踪此 key。
 		gid := goroutineID()
 		c.pushResolvingKey(gid, key)
-		inst, err := b.factory(c)
+
+		// Use recover to protect against factory panics.
+		// Without this, a panic would leave b.done unclosed forever,
+		// causing all subsequent goroutines to block indefinitely on <-done.
+		// 使用 recover 防止工厂 panic。
+		// 否则 panic 会导致 b.done 永远不关闭，
+		// 所有后续 goroutine 将在 <-done 处永久阻塞。
+		var inst any
+		var err error
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("container: singleton factory panic for key %q: %v", key, r)
+				}
+			}()
+			inst, err = b.factory(c)
+		}()
 		c.popResolvingKey(gid)
 
 		b.mu.Lock()
+		if err != nil {
+			// Do not cache error instances; reset state so the next call can retry.
+			// The done channel is still closed so waiters are unblocked,
+			// but they will see state=singletonUninit and re-attempt initialization.
+			// 不缓存错误实例；重置状态使下次调用可重试。
+			// done channel 仍然被关闭以解除等待者阻塞，
+			// 但等待者会看到 state=singletonUninit 并重新尝试初始化。
+			b.inst = nil
+			b.err = err
+			b.state.Store(uint32(singletonUninit))
+			close(b.done)
+			b.mu.Unlock()
+			return nil, err
+		}
 		b.inst = inst
-		b.err = err
+		b.err = nil
 		b.state.Store(uint32(singletonInited))
 		close(b.done)
 		b.mu.Unlock()
-
-		return inst, err
+		return inst, nil
 	}
 }
 
@@ -635,12 +669,12 @@ func (c *Container) ProviderDAG() runtimecontract.ProviderDAG {
 	nodeMap := make(map[string]*runtimecontract.ProviderDAGNode)
 	for name, st := range c.providersByName {
 		node := &runtimecontract.ProviderDAGNode{
-			Name:     name,
-			Provides: st.p.Provides(),
+			Name:      name,
+			Provides:  st.p.Provides(),
 			DependsOn: st.p.DependsOn(),
-			IsDefer:  st.p.IsDefer(),
-			Loaded:   st.loaded,
-			Booted:   st.booted,
+			IsDefer:   st.p.IsDefer(),
+			Loaded:    st.loaded,
+			Booted:    st.booted,
 		}
 		nodeMap[name] = node
 		dag.Nodes = append(dag.Nodes, *node)

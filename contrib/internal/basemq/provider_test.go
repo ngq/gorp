@@ -51,7 +51,7 @@ func (mockSubscriber) SubscribeWithGroup(_ context.Context, _, _ string, _ integ
 func (mockSubscriber) Consume(_ context.Context, _ string, _ integrationcontract.MessageHandler) error {
 	return nil
 }
-func (mockSubscriber) Unsubscribe() error { return nil }
+func (mockSubscriber) UnsubscribeAll() error { return nil }
 
 func TestBaseMQProvider_RegisterDerivesPublisherFromQueue(t *testing.T) {
 	var queue *mockQueue

@@ -82,7 +82,7 @@ func RequireAnyRole(roles ...string) transportcontract.HTTPMiddleware {
 		}
 		roleSet := claimsRoleSet(claims)
 		for _, role := range required {
-			if _, ok := roleSet[role]; ok {
+			if _, ok := roleSet[strings.ToLower(role)]; ok {
 				return nil
 			}
 		}
@@ -101,7 +101,7 @@ func RequireAllRoles(roles ...string) transportcontract.HTTPMiddleware {
 		}
 		roleSet := claimsRoleSet(claims)
 		for _, role := range required {
-			if _, ok := roleSet[role]; !ok {
+			if _, ok := roleSet[strings.ToLower(role)]; !ok {
 				return ErrForbidden("required role is missing")
 			}
 		}
@@ -120,34 +120,38 @@ func claimsFromHTTPContext(c transportcontract.HTTPContext) (*securitycontract.J
 }
 
 // claimsRoleSet normalizes role values into a set for quick membership checks.
+// Uses strings.ToLower to ensure consistency with EqualFold comparisons.
 //
 // claimsRoleSet 把角色列表归一化为集合，便于快速判断是否命中。
+// 使用 strings.ToLower 确保与 EqualFold 比较一致。
 func claimsRoleSet(claims *securitycontract.JWTClaims) map[string]struct{} {
 	set := make(map[string]struct{})
 	if claims == nil {
 		return set
 	}
 	for _, role := range claims.Roles {
-		role = strings.ToLower(strings.TrimSpace(role))
+		role = strings.TrimSpace(role)
 		if role == "" {
 			continue
 		}
-		set[role] = struct{}{}
+		set[strings.ToLower(role)] = struct{}{}
 	}
 	return set
 }
 
 // normalizeRequiredValues normalizes required subject or role values for comparisons.
+// Uses strings.ToLower to ensure consistency with EqualFold comparisons.
 //
 // normalizeRequiredValues 统一规范 subject 或 role 的目标值，便于比较。
+// 使用 strings.ToLower 确保与 EqualFold 比较一致。
 func normalizeRequiredValues(values []string) []string {
 	normalized := make([]string, 0, len(values))
 	for _, value := range values {
-		value = strings.ToLower(strings.TrimSpace(value))
+		value = strings.TrimSpace(value)
 		if value == "" {
 			continue
 		}
-		normalized = append(normalized, value)
+		normalized = append(normalized, strings.ToLower(value))
 	}
 	return normalized
 }

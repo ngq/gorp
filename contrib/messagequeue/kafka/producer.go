@@ -84,13 +84,15 @@ func (p *kafkaPublisher) PublishWithPriority(ctx context.Context, topic string, 
 		return errors.New("messagequeue.kafka: producer not initialized")
 	}
 
-	// Use priority as partition key for consistent routing
-	// 使用 priority 作为分区键实现一致路由
+	// Use priority as a message key for consistent routing within the topic.
+	// Do NOT use priority as a partition number — partition count varies by cluster
+	// and priority > partition count would cause errors.
+	// 将 priority 作为消息键实现 topic 内的一致路由。
+	// 不将 priority 作为分区号——分区数因集群而异，priority > 分区数会报错。
 	msg := &sarama.ProducerMessage{
-		Topic:     topic,
-		Key:       sarama.ByteEncoder(fmt.Sprintf("priority-%d", priority)),
-		Value:     sarama.ByteEncoder(message),
-		Partition: int32(priority), // Optional: direct to specific partition
+		Topic: topic,
+		Key:   sarama.ByteEncoder(fmt.Sprintf("priority-%d", priority)),
+		Value: sarama.ByteEncoder(message),
 	}
 
 	_, _, err := p.queue.syncProducer.SendMessage(msg)

@@ -96,7 +96,7 @@ type DatabaseConfigSchema struct {
 // Validated only when tracing.enabled=true; skipped when absent or disabled.
 type TracingConfigSchema struct {
 	// Backend 是追踪后端，启用时必填，可选值：otel / zipkin / noop。
-	Backend string `validate:"required,oneof=otel zipkin noop" mapstructure:"backend"`
+	Backend string `validate:"required,oneof=otel otlp grpc http stdout noop" mapstructure:"backend"`
 
 	// ServiceName 是追踪服务名，启用时必填。
 	ServiceName string `validate:"required" mapstructure:"service_name"`

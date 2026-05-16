@@ -14,8 +14,10 @@ import (
 )
 
 // TestIPAllowlistAndDenylist verifies allowlist pass-through and denylist blocking behavior.
+// Uses RemoteAddr directly since X-Forwarded-For is not trusted by default.
 //
 // TestIPAllowlistAndDenylist 验证 allowlist 放行与 denylist 拦截行为。
+// 直接使用 RemoteAddr，因为 X-Forwarded-For 默认不被信任。
 func TestIPAllowlistAndDenylist(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -26,7 +28,7 @@ func TestIPAllowlistAndDenylist(t *testing.T) {
 	})
 
 	allowReq := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	allowReq.Header.Set("X-Forwarded-For", "10.1.2.3")
+	allowReq.RemoteAddr = "10.1.2.3:12345"
 	allowRecorder := httptest.NewRecorder()
 	allowRouter.ServeHTTP(allowRecorder, allowReq)
 
@@ -41,12 +43,69 @@ func TestIPAllowlistAndDenylist(t *testing.T) {
 	})
 
 	denyReq := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	denyReq.Header.Set("X-Forwarded-For", "10.1.2.3")
+	denyReq.RemoteAddr = "10.1.2.3:12345"
 	denyRecorder := httptest.NewRecorder()
 	denyRouter.ServeHTTP(denyRecorder, denyReq)
 
 	if denyRecorder.Code != http.StatusForbidden {
 		t.Fatalf("expected denylist request 403, got %d", denyRecorder.Code)
+	}
+}
+
+// TestIPAllowlistWithTrustedProxies verifies X-Forwarded-For is used when trusted proxies are configured.
+//
+// TestIPAllowlistWithTrustedProxies 验证配置可信代理后 X-Forwarded-For 被正确使用。
+func TestIPAllowlistWithTrustedProxies(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// Configure trusted proxy
+	SetTrustedProxies([]string{"127.0.0.1"})
+	defer SetTrustedProxies(nil)
+
+	allowRouter := gin.New()
+	applyTransportMiddleware(allowRouter, IPAllowlist("10.0.0.0/8"))
+	allowRouter.GET("/admin", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	allowReq := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	allowReq.RemoteAddr = "127.0.0.1:12345"
+	allowReq.Header.Set("X-Forwarded-For", "10.1.2.3")
+	allowRecorder := httptest.NewRecorder()
+	allowRouter.ServeHTTP(allowRecorder, allowReq)
+
+	if allowRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected allowlist request with trusted proxy 204, got %d", allowRecorder.Code)
+	}
+}
+
+// TestIPAllowlistRejectsSpoofedXFF verifies X-Forwarded-For is ignored when no trusted proxy.
+//
+// TestIPAllowlistRejectsSpoofedXFF 验证无可信代理时 X-Forwarded-For 被忽略。
+func TestIPAllowlistRejectsSpoofedXFF(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// No trusted proxies configured — XFF should be ignored
+	// 未配置可信代理——XFF 应被忽略
+
+	allowRouter := gin.New()
+	applyTransportMiddleware(allowRouter, IPAllowlist("10.0.0.0/8"))
+	allowRouter.GET("/admin", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	// Request from 192.168.x.x with spoofed XFF claiming to be 10.x.x.x
+	// 来自 192.168.x.x 的请求，伪造 XFF 声称来自 10.x.x.x
+	allowReq := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	allowReq.RemoteAddr = "192.168.1.1:12345"
+	allowReq.Header.Set("X-Forwarded-For", "10.1.2.3")
+	allowRecorder := httptest.NewRecorder()
+	allowRouter.ServeHTTP(allowRecorder, allowReq)
+
+	// Should be forbidden because XFF is ignored and real IP is 192.168.1.1
+	// 应被拒绝，因为 XFF 被忽略，真实 IP 为 192.168.1.1
+	if allowRecorder.Code != http.StatusForbidden {
+		t.Fatalf("expected spoofed XFF request 403, got %d", allowRecorder.Code)
 	}
 }
 

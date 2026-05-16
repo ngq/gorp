@@ -29,11 +29,30 @@ const (
 )
 
 // IdempotencyStore stores idempotent responses for later replay.
+// The Reserve/Commit pattern eliminates the TOCTOU race between Check and Set:
+// Reserve atomically reserves a key (preventing duplicate processing) or returns
+// the previously stored response; Commit finalizes the stored response.
 //
 // IdempotencyStore 用于存储幂等响应，以便后续回放。
+// Reserve/Commit 模式消除了 Check 和 Set 之间的 TOCTOU 竞态：
+// Reserve 原子地预留一个 key（防止重复处理）或返回已存储的响应；
+// Commit 最终确认存储的响应。
 type IdempotencyStore interface {
-	Check(key string) (exists bool, response *IdempotencyResponse)
-	Set(key string, response *IdempotencyResponse, ttl time.Duration)
+	// Reserve atomically attempts to reserve the key for processing.
+	// Returns (false, cachedResponse) if the key already exists — the caller
+	// should replay cachedResponse to the client.
+	// Returns (true, nil) if the key was successfully reserved — the caller
+	// should proceed with processing and then call Commit.
+	//
+	// Reserve 原子地尝试预留 key 进行处理。
+	// 如果 key 已存在则返回 (false, cachedResponse) —— 调用方应回放 cachedResponse。
+	// 如果 key 成功预留则返回 (true, nil) —— 调用方应继续处理并调用 Commit。
+	Reserve(key string, ttl time.Duration) (reserved bool, response *IdempotencyResponse)
+
+	// Commit stores the final response for a previously reserved key.
+	//
+	// Commit 为之前预留的 key 存储最终响应。
+	Commit(key string, response *IdempotencyResponse, ttl time.Duration)
 }
 
 // IdempotencyResponse is the cached response payload used for replay.
@@ -47,8 +66,10 @@ type IdempotencyResponse struct {
 }
 
 // MemoryIdempotencyStore is an in-memory idempotency response store.
+// Uses sync.Map.LoadOrStore for atomic Reserve, eliminating TOCTOU races.
 //
 // MemoryIdempotencyStore 是一个内存型幂等响应存储。
+// 使用 sync.Map.LoadOrStore 实现原子 Reserve，消除 TOCTOU 竞态。
 type MemoryIdempotencyStore struct {
 	data sync.Map
 }
@@ -56,6 +77,7 @@ type MemoryIdempotencyStore struct {
 type idempotencyEntry struct {
 	response  *IdempotencyResponse
 	expiresAt time.Time
+	committed bool // false = reserved (placeholder), true = final response stored
 }
 
 type idempotencyResponseWriter struct {
@@ -107,27 +129,62 @@ func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
 	return store
 }
 
-// Check looks up a cached idempotent response by key.
+// Reserve atomically reserves a key or returns the cached response.
+// Uses sync.Map.LoadOrStore to guarantee that only one goroutine wins
+// the reservation for a given key, eliminating TOCTOU races.
 //
-// Check 按幂等键查询已缓存的响应。
-func (s *MemoryIdempotencyStore) Check(key string) (bool, *IdempotencyResponse) {
-	value, ok := s.data.Load(key)
-	if !ok {
-		return false, nil
+// Reserve 原子地预留 key 或返回已缓存的响应。
+// 使用 sync.Map.LoadOrStore 保证只有一个 goroutine 赢得给定 key 的预留，
+// 消除 TOCTOU 竞态。
+func (s *MemoryIdempotencyStore) Reserve(key string, ttl time.Duration) (bool, *IdempotencyResponse) {
+	placeholder := &idempotencyEntry{
+		response:  nil,
+		expiresAt: time.Now().Add(ttl),
+		committed: false,
 	}
-	entry := value.(*idempotencyEntry)
+	actual, loaded := s.data.LoadOrStore(key, placeholder)
+	entry := actual.(*idempotencyEntry)
+
+	if !loaded {
+		// We successfully reserved this key.
+		// 我们成功预留了此 key。
+		return true, nil
+	}
+
+	// Key already exists. Check if expired.
+	// Key 已存在。检查是否过期。
 	if time.Now().After(entry.expiresAt) {
+		// Entry is expired. Try to replace it with our placeholder.
+		// 条目已过期。尝试用我们的占位符替换。
 		s.data.Delete(key)
+		// Retry reservation (could lose to another goroutine, so use LoadOrStore again).
+		actual2, loaded2 := s.data.LoadOrStore(key, placeholder)
+		if !loaded2 {
+			return true, nil
+		}
+		entry = actual2.(*idempotencyEntry)
+	}
+
+	if !entry.committed {
+		// Key is reserved but not yet committed. Another request is processing.
+		// Return a pending indicator so the caller can wait or reject.
+		// Key 已预留但尚未提交。另一个请求正在处理中。
+		// 返回 pending 指示，调用方可等待或拒绝。
 		return false, nil
 	}
-	return true, entry.response
+
+	return false, entry.response
 }
 
-// Set stores a cached idempotent response with TTL.
+// Commit stores the final response for a previously reserved key.
 //
-// Set 按 TTL 存储一条幂等响应记录。
-func (s *MemoryIdempotencyStore) Set(key string, response *IdempotencyResponse, ttl time.Duration) {
-	s.data.Store(key, &idempotencyEntry{response: response, expiresAt: time.Now().Add(ttl)})
+// Commit 为之前预留的 key 存储最终响应。
+func (s *MemoryIdempotencyStore) Commit(key string, response *IdempotencyResponse, ttl time.Duration) {
+	s.data.Store(key, &idempotencyEntry{
+		response:  response,
+		expiresAt: time.Now().Add(ttl),
+		committed: true,
+	})
 }
 
 // cleanup removes expired entries from the in-memory store.
@@ -137,9 +194,10 @@ func (s *MemoryIdempotencyStore) cleanup() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
+		now := time.Now()
 		s.data.Range(func(key, value any) bool {
 			entry := value.(*idempotencyEntry)
-			if time.Now().After(entry.expiresAt) {
+			if now.After(entry.expiresAt) {
 				s.data.Delete(key)
 			}
 			return true
@@ -172,9 +230,21 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 			return
 		}
 
-		exists, response := store.Check(key)
-		if exists {
-			writeCachedIdempotencyResponse(newHTTPContext(c), response)
+		// Atomic reserve: only one goroutine wins for each key.
+		// 原子预留：每个 key 只有一个 goroutine 胜出。
+		reserved, response := store.Reserve(key, ttl)
+		if !reserved {
+			if response != nil {
+				writeCachedIdempotencyResponse(newHTTPContext(c), response)
+			} else {
+				// Another request is processing this key (reserved but not committed).
+				// Return 409 Conflict to tell the client to retry later.
+				// 另一个请求正在处理此 key（已预留但未提交）。
+				// 返回 409 Conflict 告知客户端稍后重试。
+				c.JSON(http.StatusConflict, map[string]string{
+					"error": "idempotency key is being processed",
+				})
+			}
 			c.Abort()
 			return
 		}
@@ -184,8 +254,16 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 		c.Next()
 		c.Writer = recorder.ResponseWriter
 
+		// Only cache successful responses (status < 400).
+		// Failed responses are NOT cached so that the client can retry
+		// and potentially succeed on the next attempt.
+		// If you need to cache all responses regardless of status,
+		// implement a custom IdempotencyStore with different Commit logic.
+		// 仅缓存成功响应（状态码 < 400）。
+		// 失败响应不缓存，以便客户端重试后可能成功。
+		// 如果需要缓存所有响应（无论状态码），请实现自定义 IdempotencyStore。
 		if recorder.Status() < 400 {
-			store.Set(key, captureIdempotencyResponse(c, recorder), ttl)
+			store.Commit(key, captureIdempotencyResponse(c, recorder), ttl)
 		}
 	}
 }
@@ -226,9 +304,19 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HT
 				return
 			}
 
-			exists, response := store.Check(key)
-			if exists && response != nil {
-				writeCachedIdempotencyResponse(c, response)
+			// Atomic reserve: only one goroutine wins for each key.
+			// 原子预留：每个 key 只有一个 goroutine 胜出。
+			reserved, response := store.Reserve(key, ttl)
+			if !reserved {
+				if response != nil {
+					writeCachedIdempotencyResponse(c, response)
+				} else {
+					// Another request is processing this key.
+					// 另一个请求正在处理此 key。
+					c.JSON(http.StatusConflict, map[string]string{
+						"error": "idempotency key is being processed",
+					})
+				}
 				if gc, ok := unwrapGinContext(c); ok {
 					gc.Abort()
 				}
@@ -243,7 +331,7 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HT
 				}
 				gc.Writer = recorder.ResponseWriter
 				if recorder.Status() > 0 && recorder.Status() < 400 {
-					store.Set(key, captureIdempotencyResponse(gc, recorder), ttl)
+					store.Commit(key, captureIdempotencyResponse(gc, recorder), ttl)
 				}
 				return
 			}
@@ -252,7 +340,7 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HT
 				next(c)
 			}
 			if status := c.ResponseStatus(); status > 0 && status < 400 {
-				store.Set(key, &IdempotencyResponse{StatusCode: status}, ttl)
+				store.Commit(key, &IdempotencyResponse{StatusCode: status}, ttl)
 			}
 		}
 	}

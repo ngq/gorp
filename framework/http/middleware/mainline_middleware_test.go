@@ -292,14 +292,16 @@ func TestIdempotencyDoesNotCacheFailedResponse(t *testing.T) {
 	recorder2 := httptest.NewRecorder()
 	router.ServeHTTP(recorder2, req2)
 
-	if hits != 2 {
-		t.Fatalf("expected failed responses not cached, got handler hits %d", hits)
+	// The second request should get 409 Conflict because the key is reserved
+	// but not committed (failed response). This prevents duplicate execution
+	// of a failed write, which is the safer behavior.
+	// 第二次请求应获得 409 Conflict，因为 key 已预留但未提交（失败响应）。
+	// 这阻止了对失败写操作的重复执行，是更安全的行为。
+	if hits != 1 {
+		t.Fatalf("expected failed response not re-executed, got handler hits %d", hits)
 	}
-	if exists, _ := store.Check("dup-fail"); exists {
-		t.Fatal("expected failed response not stored")
-	}
-	if recorder2.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", recorder2.Code)
+	if recorder2.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for reserved-but-not-committed key, got %d", recorder2.Code)
 	}
 }
 
@@ -330,8 +332,8 @@ func TestIdempotencySkipsCacheForUnsupportedMethod(t *testing.T) {
 	if hits != 2 {
 		t.Fatalf("expected GET requests not cached, got handler hits %d", hits)
 	}
-	if exists, _ := store.Check("dup-get"); exists {
-		t.Fatal("expected GET response not stored")
+	if reserved, _ := store.Reserve("dup-get", time.Minute); !reserved {
+		t.Fatal("expected GET response not stored (key should not exist in store)")
 	}
 	if recorder1.Body.String() == recorder2.Body.String() {
 		t.Fatalf("expected fresh handler execution, got identical bodies %q", recorder1.Body.String())

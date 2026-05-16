@@ -49,8 +49,11 @@ type DistributedLock interface {
 	IsLocked(ctx context.Context, key string) (bool, error)
 
 	// WithLock executes the callback while holding the lock.
+	// Guarantees that the lock is released after fn returns (even on panic),
+	// using deferred unlock semantics.
 	//
 	// WithLock 在持有锁期间执行回调。
+	// 保证在 fn 返回后（即使 panic）自动释放锁，使用 defer unlock 语义。
 	WithLock(ctx context.Context, key string, ttl time.Duration, fn func() error) error
 }
 

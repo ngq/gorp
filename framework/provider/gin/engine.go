@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -100,17 +101,18 @@ func attachHTTPTransportMiddleware(engine *gin.Engine, c runtimecontract.Contain
 }
 
 // getConfig loads the config contract from the container when available.
+// Falls back to nil when config service is not bound or type mismatch.
 //
 // getConfig 在可用时从容器中加载 config 契约。
+// 配置服务未绑定或类型不匹配时返回 nil。
 func getConfig(c runtimecontract.Container) datacontract.Config {
 	if !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}
-	v, err := c.Make(datacontract.ConfigKey)
+	cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 	if err != nil {
 		return nil
 	}
-	cfg, _ := v.(datacontract.Config)
 	return cfg
 }
 

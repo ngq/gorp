@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -39,6 +40,32 @@ func DefaultCORSOptions() CORSOptions {
 func CORS(opts CORSOptions) transportcontract.HTTPMiddleware {
 	if len(opts.AllowOrigins) == 0 {
 		opts = DefaultCORSOptions()
+	}
+
+	// Validate: AllowCredentials + wildcard origin is rejected by browsers.
+	// Auto-correct by removing the wildcard and logging a warning.
+	// 校验：AllowCredentials + 通配符源 会被浏览器拒绝。
+	// 自动修正为移除通配符并记录警告。
+	if opts.AllowCredentials {
+		hasWildcard := false
+		filtered := make([]string, 0, len(opts.AllowOrigins))
+		for _, o := range opts.AllowOrigins {
+			if strings.TrimSpace(o) == "*" {
+				hasWildcard = true
+			} else {
+				filtered = append(filtered, o)
+			}
+		}
+		if hasWildcard {
+			slog.Warn("cors: AllowCredentials=true with AllowOrigins=[\"*\"] is not supported by browsers; removing wildcard origin")
+			if len(filtered) > 0 {
+				opts.AllowOrigins = filtered
+			} else {
+				// No valid origins left; disable credentials as fallback.
+				// 没有有效的源；禁用 credentials 作为回退。
+				opts.AllowCredentials = false
+			}
+		}
 	}
 
 	allowMethods := strings.Join(opts.AllowMethods, ", ")

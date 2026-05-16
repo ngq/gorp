@@ -12,6 +12,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -38,8 +39,49 @@ type DBConfig struct {
 	MaxOpenConns int `mapstructure:"max_open_conns"`
 	MaxIdleConns int `mapstructure:"max_idle_conns"`
 
+	// ConnMaxLifetime is the maximum amount of time a connection may be reused.
+	// Stored as string (e.g. "30s", "5m") for mapstructure compatibility;
+	// use ParseConnMaxLifetime() to convert to time.Duration.
+	//
+	// ConnMaxLifetime 是连接可复用的最长时间。
+	// 以字符串存储（如 "30s"、"5m"）以兼容 mapstructure；
+	// 使用 ParseConnMaxLifetime() 转换为 time.Duration。
 	ConnMaxLifetime string `mapstructure:"conn_max_lifetime"`
+	// ConnMaxIdleTime is the maximum amount of time a connection may be idle.
+	// Stored as string; use ParseConnMaxIdleTime() to convert to time.Duration.
+	//
+	// ConnMaxIdleTime 是连接可空闲的最长时间。
+	// 以字符串存储；使用 ParseConnMaxIdleTime() 转换为 time.Duration。
 	ConnMaxIdleTime string `mapstructure:"conn_max_idletime"`
+}
+
+// ParseConnMaxLifetime parses ConnMaxLifetime string to time.Duration.
+// Returns defaultVal if the string is empty or unparseable.
+//
+// ParseConnMaxLifetime 将 ConnMaxLifetime 字符串解析为 time.Duration。
+// 字符串为空或不可解析时返回 defaultVal。
+func (c *DBConfig) ParseConnMaxLifetime(defaultVal time.Duration) time.Duration {
+	return parseDuration(c.ConnMaxLifetime, defaultVal)
+}
+
+// ParseConnMaxIdleTime parses ConnMaxIdleTime string to time.Duration.
+// Returns defaultVal if the string is empty or unparseable.
+//
+// ParseConnMaxIdleTime 将 ConnMaxIdleTime 字符串解析为 time.Duration。
+// 字符串为空或不可解析时返回 defaultVal。
+func (c *DBConfig) ParseConnMaxIdleTime(defaultVal time.Duration) time.Duration {
+	return parseDuration(c.ConnMaxIdleTime, defaultVal)
+}
+
+func parseDuration(s string, defaultVal time.Duration) time.Duration {
+	if s == "" {
+		return defaultVal
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return defaultVal
+	}
+	return d
 }
 
 // RuntimeBackend identifies the database runtime backend.
@@ -122,8 +164,12 @@ type GormDB interface {
 //
 // SQLX 定义最小 SQLX 执行能力。
 type SQLX interface {
-	// ExecContext executes a SQL statement through SQLX.
+	// SQLXExecContext executes a SQL statement through SQLX.
+	// Named SQLXExecContext (not ExecContext) to avoid signature conflict
+	// with SQLExecutor.ExecContext which returns (sql.Result, error).
 	//
-	// ExecContext 通过 SQLX 执行 SQL 语句。
-	ExecContext(ctx context.Context, query string, args ...any) (any, error)
+	// SQLXExecContext 通过 SQLX 执行 SQL 语句。
+	// 命名为 SQLXExecContext（而非 ExecContext）以避免与
+	// SQLExecutor.ExecContext 的返回值签名冲突。
+	SQLXExecContext(ctx context.Context, query string, args ...any) (any, error)
 }

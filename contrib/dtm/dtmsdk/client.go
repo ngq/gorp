@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -74,6 +75,18 @@ func (c *DTMClient) Underlying() any {
 // As 尝试将 DTMClient 转换为目标类型。
 func (c *DTMClient) As(target any) bool {
 	return internalnative.As(c, target)
+}
+
+// Close closes the underlying HTTP client connections.
+// Implements io.Closer for container lifecycle management.
+//
+// Close 关闭底层 HTTP 客户端连接。
+// 实现 io.Closer 供容器生命周期管理。
+func (c *DTMClient) Close() error {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
+	}
+	return nil
 }
 
 // HTTPClient returns the underlying HTTP client for advanced usage.
@@ -314,9 +327,11 @@ func marshalPayload(payload any) (string, error) {
 }
 
 // urlEncodeGID encodes gid for URL query parameter.
+// Uses url.QueryEscape to prevent URL injection when gid contains special characters
+// like &, ?, # that could alter the request path or parameters.
 //
 // urlEncodeGID 对 gid 进行 URL 编码。
+// 使用 url.QueryEscape 防止 gid 中包含 &、?、# 等特殊字符导致的 URL 注入。
 func urlEncodeGID(gid string) string {
-	// Simple URL encoding - in real implementation would use url.QueryEscape
-	return gid // For simplicity, assuming gid doesn't need encoding
+	return url.QueryEscape(gid)
 }

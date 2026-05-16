@@ -8,14 +8,16 @@ package websocket
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/lxzan/gws"
-	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 const (
@@ -66,12 +68,15 @@ func (p *Provider) Name() string {
 }
 
 // Register registers WebSocket service into container.
+// Also registers a closer to gracefully shutdown connections on container destroy.
 //
 // Register 将 WebSocket 服务注册到容器。
+// 同时注册 closer，在容器销毁时优雅关闭连接。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(transportcontract.WebSocketKey, func(c runtimecontract.Container) (any, error) {
 		return NewServerWithConfig(p.config), nil
 	}, true)
+	c.RegisterCloser(transportcontract.WebSocketKey, &websocketCloser{c: c})
 	return nil
 }
 
@@ -82,13 +87,36 @@ func (p *Provider) Boot(c runtimecontract.Container) error {
 	return nil
 }
 
+// IsDefer reports whether the provider should be deferred.
+//
+// IsDefer 返回该 provider 是否应延迟加载。
+func (p *Provider) IsDefer() bool {
+	return false
+}
+
+// Provides returns the keys that this provider provides.
+//
+// Provides 返回该 provider 提供的 key 列表。
+func (p *Provider) Provides() []string {
+	return []string{string(transportcontract.WebSocketKey)}
+}
+
+// DependsOn returns the keys that this provider depends on.
+//
+// DependsOn 返回该 provider 依赖的 key 列表。
+func (p *Provider) DependsOn() []string {
+	return nil
+}
+
 // Server implements WebSocketServer interface using gws.
 //
 // Server 使用 gws 实现 WebSocketServer 接口。
 type Server struct {
-	mu     sync.RWMutex
-	conns  map[*gws.Conn]context.Context
-	config *transportcontract.WebSocketConfig
+	mu           sync.RWMutex
+	conns        map[*gws.Conn]context.Context
+	config       *transportcontract.WebSocketConfig
+	stopCh       chan struct{}           // 信号通道，用于停止心跳检测 goroutine
+	lastActivity map[*gws.Conn]time.Time // 每个连接的最后活跃时间
 }
 
 // NewServer creates a new WebSocket server with default config.
@@ -107,10 +135,17 @@ func NewServerWithConfig(config *transportcontract.WebSocketConfig) *Server {
 			ParallelEnabled: true,
 		}
 	}
-	return &Server{
-		conns:  make(map[*gws.Conn]context.Context),
-		config: config,
+	s := &Server{
+		conns:        make(map[*gws.Conn]context.Context),
+		config:       config,
+		stopCh:       make(chan struct{}),
+		lastActivity: make(map[*gws.Conn]time.Time),
 	}
+	// 启动心跳检测 goroutine
+	if config.ReadTimeout > 0 {
+		go s.healthCheck()
+	}
+	return s
 }
 
 // buildServerOption builds gws.ServerOption from WebSocketConfig.
@@ -177,7 +212,8 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request, handler transpo
 	}
 
 	s.mu.Lock()
-	s.conns[socket] = context.Background()
+	s.conns[socket] = r.Context()
+	s.lastActivity[socket] = time.Now()
 	s.mu.Unlock()
 
 	// Start read loop in a separate goroutine
@@ -218,16 +254,39 @@ func (s *Server) Count() int {
 }
 
 // Shutdown gracefully closes all connections.
+// Respects context cancellation/timeout and does not hold lock during I/O.
 //
 // Shutdown 优雅关闭所有连接。
+// 尊重上下文取消/超时，不在 I/O 期间持锁。
 func (s *Server) Shutdown(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// 停止心跳检测 goroutine
+	select {
+	case <-s.stopCh:
+		// 已关闭
+	default:
+		close(s.stopCh)
+	}
 
+	// 持锁收集连接，然后释放锁
+	s.mu.Lock()
+	conns := make([]*gws.Conn, 0, len(s.conns))
 	for socket := range s.conns {
-		socket.WriteClose(1000, nil)
+		conns = append(conns, socket)
 	}
 	s.conns = make(map[*gws.Conn]context.Context)
+	s.lastActivity = make(map[*gws.Conn]time.Time)
+	s.mu.Unlock()
+
+	// 不持锁发送关闭帧
+	for _, socket := range conns {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			socket.WriteClose(1000, nil)
+		}
+	}
+
 	return nil
 }
 
@@ -238,6 +297,57 @@ func (s *Server) removeConn(socket *gws.Conn) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.conns, socket)
+	delete(s.lastActivity, socket)
+}
+
+// updateActivity updates the last activity time for a connection.
+//
+// updateActivity 更新连接的最后活跃时间。
+func (s *Server) updateActivity(socket *gws.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.lastActivity[socket]; ok {
+		s.lastActivity[socket] = time.Now()
+	}
+}
+
+// healthCheck periodically checks for stale connections and closes them.
+// Runs as a goroutine when ReadTimeout is configured.
+//
+// healthCheck 定期检查过期连接并关闭它们。
+// 当配置了 ReadTimeout 时以 goroutine 方式运行。
+func (s *Server) healthCheck() {
+	ticker := time.NewTicker(s.config.ReadTimeout / 2)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			s.closeStaleConnections()
+		}
+	}
+}
+
+// closeStaleConnections closes connections that have exceeded ReadTimeout.
+//
+// closeStaleConnections 关闭超过 ReadTimeout 的连接。
+func (s *Server) closeStaleConnections() {
+	now := time.Now()
+	var staleConns []*gws.Conn
+
+	s.mu.RLock()
+	for socket, lastTime := range s.lastActivity {
+		if now.Sub(lastTime) > s.config.ReadTimeout {
+			staleConns = append(staleConns, socket)
+		}
+	}
+	s.mu.RUnlock()
+
+	for _, socket := range staleConns {
+		socket.WriteClose(1000, nil)
+	}
 }
 
 // connAdapter adapts gws.Conn to WebSocketConn interface.
@@ -263,10 +373,11 @@ func (c *connAdapter) WriteBinary(data []byte) error {
 }
 
 // Close closes the connection with a close code and reason.
+// Does not call removeConn here; OnClose callback handles removal to avoid double-delete.
 //
 // Close 关闭连接，可指定关闭码和原因。
+// 不在此处调用 removeConn，由 OnClose 回调统一负责删除，避免双重删除。
 func (c *connAdapter) Close(code int, reason string) error {
-	c.server.removeConn(c.socket)
 	return c.socket.WriteClose(uint16(code), []byte(reason))
 }
 
@@ -339,8 +450,15 @@ func (b *broadcasterAdapter) BroadcastString(message string) error {
 	broadcaster := gws.NewBroadcaster(gws.OpcodeText, payload)
 	defer broadcaster.Close()
 
+	total := len(b.server.conns)
+	var errs []error
 	for socket := range b.server.conns {
-		_ = broadcaster.Broadcast(socket)
+		if err := broadcaster.Broadcast(socket); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("websocket: %d of %d connections failed: %w", len(errs), total, errors.Join(errs...))
 	}
 	return nil
 }
@@ -355,8 +473,15 @@ func (b *broadcasterAdapter) BroadcastBinary(data []byte) error {
 	broadcaster := gws.NewBroadcaster(gws.OpcodeBinary, data)
 	defer broadcaster.Close()
 
+	total := len(b.server.conns)
+	var errs []error
 	for socket := range b.server.conns {
-		_ = broadcaster.Broadcast(socket)
+		if err := broadcaster.Broadcast(socket); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("websocket: %d of %d connections failed: %w", len(errs), total, errors.Join(errs...))
 	}
 	return nil
 }
@@ -368,13 +493,24 @@ func (b *broadcasterAdapter) BroadcastStringExcept(message string, excludeConn t
 	b.server.mu.RLock()
 	defer b.server.mu.RUnlock()
 
-	excludeSocket := excludeConn.(*connAdapter).socket
-	payload := []byte(message)
+	adapter, ok := excludeConn.(*connAdapter)
+	if !ok {
+		return fmt.Errorf("websocket: exclude conn is not a server connection")
+	}
+	excludeSocket := adapter.socket
+	broadcaster := gws.NewBroadcaster(gws.OpcodeText, []byte(message))
 
+	total := len(b.server.conns) - 1
+	var errs []error
 	for socket := range b.server.conns {
 		if socket != excludeSocket {
-			socket.WriteMessage(gws.OpcodeText, payload)
+			if err := broadcaster.Broadcast(socket); err != nil {
+				errs = append(errs, err)
+			}
 		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("websocket: %d of %d connections failed: %w", len(errs), total, errors.Join(errs...))
 	}
 	return nil
 }
@@ -386,12 +522,24 @@ func (b *broadcasterAdapter) BroadcastBinaryExcept(data []byte, excludeConn tran
 	b.server.mu.RLock()
 	defer b.server.mu.RUnlock()
 
-	excludeSocket := excludeConn.(*connAdapter).socket
+	adapter, ok := excludeConn.(*connAdapter)
+	if !ok {
+		return fmt.Errorf("websocket: exclude conn is not a server connection")
+	}
+	excludeSocket := adapter.socket
+	broadcaster := gws.NewBroadcaster(gws.OpcodeBinary, data)
 
+	total := len(b.server.conns) - 1
+	var errs []error
 	for socket := range b.server.conns {
 		if socket != excludeSocket {
-			socket.WriteMessage(gws.OpcodeBinary, data)
+			if err := broadcaster.Broadcast(socket); err != nil {
+				errs = append(errs, err)
+			}
 		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("websocket: %d of %d connections failed: %w", len(errs), total, errors.Join(errs...))
 	}
 	return nil
 }
@@ -425,6 +573,7 @@ func (a *eventHandlerAdapter) OnClose(socket *gws.Conn, err error) {
 //
 // OnPing 在收到 ping 帧时调用。
 func (a *eventHandlerAdapter) OnPing(socket *gws.Conn, payload []byte) {
+	a.server.updateActivity(socket)
 	socket.WritePong(payload)
 }
 
@@ -432,14 +581,14 @@ func (a *eventHandlerAdapter) OnPing(socket *gws.Conn, payload []byte) {
 //
 // OnPong 在收到 pong 帧时调用。
 func (a *eventHandlerAdapter) OnPong(socket *gws.Conn, payload []byte) {
-	// Default pong handler does nothing
-	// 默认 pong 处理器不做任何操作
+	a.server.updateActivity(socket)
 }
 
 // OnMessage is called when a message is received.
 //
 // OnMessage 在收到消息时调用。
 func (a *eventHandlerAdapter) OnMessage(socket *gws.Conn, message *gws.Message) {
+	a.server.updateActivity(socket)
 	conn := &connAdapter{socket: socket, server: a.server}
 
 	// Convert gws opcode to standard message type
@@ -478,6 +627,7 @@ type Client struct {
 // connWrapper 包装 gws.Conn 以实现 WebSocketConn。
 type connWrapper struct {
 	socket *gws.Conn
+	ctx    context.Context
 }
 
 // NewClient creates a new WebSocket client connection.
@@ -603,6 +753,9 @@ func (c *connWrapper) Close(code int, reason string) error {
 //
 // Context 返回连接上下文。
 func (c *connWrapper) Context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
 	return context.Background()
 }
 
@@ -610,8 +763,7 @@ func (c *connWrapper) Context() context.Context {
 //
 // SetContext 设置连接上下文。
 func (c *connWrapper) SetContext(ctx context.Context) {
-	// Client connection doesn't support context storage
-	// 客户端连接不支持上下文存储
+	c.ctx = ctx
 }
 
 // RemoteAddr returns the remote address.
@@ -723,4 +875,23 @@ func NewClientWithTLS(handler transportcontract.WebSocketHandler, config *transp
 // DefaultParallelGolimit 返回默认并行 goroutine 限制。
 func DefaultParallelGolimit() int {
 	return runtime.NumCPU()
+}
+
+// websocketCloser implements io.Closer to gracefully shutdown WebSocket server on container destroy.
+//
+// websocketCloser 实现 io.Closer，在容器销毁时优雅关闭 WebSocket 服务器。
+type websocketCloser struct {
+	c runtimecontract.Container
+}
+
+func (wc *websocketCloser) Close() error {
+	serverAny, err := wc.c.Make(transportcontract.WebSocketKey)
+	if err != nil {
+		return nil
+	}
+	server, ok := serverAny.(*Server)
+	if !ok {
+		return nil
+	}
+	return server.Shutdown(context.Background())
 }

@@ -9,7 +9,6 @@ package cache
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -20,8 +19,8 @@ import (
 // redisCache 使用 Redis 后端实现缓存驱动。
 type redisCache struct {
 	r datacontract.Redis // r is the Redis client.
-	                     //
-	                      // r Redis 客户端。
+	//
+	// r Redis 客户端。
 }
 
 // newRedisCache creates a new Redis-based cache instance.
@@ -39,7 +38,7 @@ func newRedisCache(r datacontract.Redis) *redisCache {
 func (c *redisCache) Get(ctx context.Context, key string) (string, error) {
 	v, err := c.r.Get(ctx, key)
 	if err != nil {
-		if strings.Contains(err.Error(), datacontract.RedisNilString) {
+		if datacontract.IsRedisNil(err) {
 			return "", datacontract.ErrCacheMiss
 		}
 		return "", err
@@ -51,7 +50,7 @@ func (c *redisCache) Get(ctx context.Context, key string) (string, error) {
 //
 // Set 存储键值对并设置过期时间。
 func (c *redisCache) Set(ctx context.Context, key, value string, ttl time.Duration) error {
-	return c.r.Set(ctx, key, value, int(ttl.Seconds()))
+	return c.r.Set(ctx, key, value, ttl)
 }
 
 // Del deletes a key from Redis.

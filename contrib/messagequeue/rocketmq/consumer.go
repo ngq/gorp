@@ -93,11 +93,16 @@ func (s *rocketmqSubscriber) SubscribeWithGroup(ctx context.Context, topic strin
 		return nil, fmt.Errorf("messagequeue.rocketmq: start consumer failed: %w", err)
 	}
 
-	// Store consumer reference (optional, for management)
-	s.queue.consumer = c
+	// Store consumer reference in the consumers map (keyed by group)
+	s.queue.mu.Lock()
+	s.queue.consumers[group] = c
+	s.queue.mu.Unlock()
 
 	// Return unsubscribe function
 	return func() error {
+		s.queue.mu.Lock()
+		delete(s.queue.consumers, group)
+		s.queue.mu.Unlock()
 		return c.Shutdown()
 	}, nil
 }
@@ -117,36 +122,40 @@ func (s *rocketmqSubscriber) Consume(ctx context.Context, queue string, handler 
 	return ErrConsumeNotSupported
 }
 
-// Unsubscribe shuts down the consumer.
+// Unsubscribe shuts down all consumers.
 // Implements integrationcontract.MessageSubscriber.Unsubscribe.
-// Only shuts down the stored consumer reference.
 //
-// Unsubscribe 关闭 consumer。
-// 实现 integrationcontract.MessageSubscriber.Unsubscribe。
-// 仅关闭存储的 consumer 引用。
-func (s *rocketmqSubscriber) Unsubscribe() error {
+// UnsubscribeAll 关闭所有 consumer。
+// 实现 integrationcontract.MessageSubscriber.UnsubscribeAll。
+func (s *rocketmqSubscriber) UnsubscribeAll() error {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
-	if s.queue.consumer != nil {
-		return s.queue.consumer.Shutdown()
+	var firstErr error
+	for group, c := range s.queue.consumers {
+		if err := c.Shutdown(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		delete(s.queue.consumers, group)
 	}
-	return nil
+	return firstErr
 }
 
-// Underlying returns the underlying rocketmq.PushConsumer.
+// Underlying returns the first underlying rocketmq.PushConsumer.
 // This allows users to access native SDK capabilities directly.
-// Note: Each subscription creates its own consumer, so this returns
-// the last consumer created via SubscribeWithGroup.
+// Note: Returns the first consumer found; for specific consumer access,
+// use NativeSubscriber().
 //
-// Underlying 返回底层 rocketmq.PushConsumer。
+// Underlying 返回第一个底层 rocketmq.PushConsumer。
 // 这允许用户直接访问原生 SDK 能力。
-// 注意：每个订阅创建自己的 consumer，因此这里返回
-// 通过 SubscribeWithGroup 创建的最后一个 consumer。
+// 注意：返回找到的第一个 consumer；如需访问特定 consumer 请用 NativeSubscriber()。
 func (s *rocketmqSubscriber) Underlying() any {
 	if s == nil || s.queue == nil {
 		return nil
 	}
-	return s.queue.consumer
+	for _, c := range s.queue.consumers {
+		return c
+	}
+	return nil
 }
 
 // As attempts to cast the underlying consumer to the target type.
@@ -155,10 +164,13 @@ func (s *rocketmqSubscriber) Underlying() any {
 // As 尝试将底层 consumer 转换为目标类型。
 // 使用内部 native.As 辅助函数进行类型转换。
 func (s *rocketmqSubscriber) As(target any) bool {
-	if s == nil || s.queue == nil || s.queue.consumer == nil {
+	if s == nil || s.queue == nil {
 		return false
 	}
-	return internalnative.As(s.queue.consumer, target)
+	for _, c := range s.queue.consumers {
+		return internalnative.As(c, target)
+	}
+	return false
 }
 
 // NativeSubscriber implements NativeSubscriberProvider interface.

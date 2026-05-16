@@ -27,6 +27,25 @@ type rabbitSubscriber struct {
 	mu        sync.Mutex
 }
 
+// channelOnce wraps a channel with its close-once guard to prevent
+// the double-close race between the consume goroutine's defer and
+// the unsubscribe function.
+//
+// channelOnce 包装 channel 及其一次性关闭守卫，
+// 防止消费 goroutine 的 defer 和取消订阅函数之间的双重关闭竞态。
+type channelOnce struct {
+	ch    *amqp.Channel
+	close sync.Once
+}
+
+func (co *channelOnce) Close() error {
+	var err error
+	co.close.Do(func() {
+		err = co.ch.Close()
+	})
+	return err
+}
+
 // Subscribe subscribes to a topic using queue binding.
 // Implements integrationcontract.MessageSubscriber.Subscribe.
 //
@@ -123,8 +142,9 @@ func (s *rabbitSubscriber) SubscribeWithGroup(ctx context.Context, topic string,
 	}
 
 	// Handle messages in background
+	wrappedCh := &channelOnce{ch: ch}
 	go func() {
-		defer ch.Close()
+		defer wrappedCh.Close()
 		for {
 			select {
 			case <-subCtx.Done():
@@ -153,7 +173,7 @@ func (s *rabbitSubscriber) SubscribeWithGroup(ctx context.Context, topic string,
 
 	return func() error {
 		cancel()
-		return ch.Close()
+		return wrappedCh.Close()
 	}, nil
 }
 
@@ -218,9 +238,9 @@ func (s *rabbitSubscriber) Consume(ctx context.Context, queue string, handler in
 // Unsubscribe cancels all active subscriptions.
 // Implements integrationcontract.MessageSubscriber.Unsubscribe.
 //
-// Unsubscribe 取消所有活跃订阅。
-// 实现 integrationcontract.MessageSubscriber.Unsubscribe。
-func (s *rabbitSubscriber) Unsubscribe() error {
+// UnsubscribeAll 取消所有活跃订阅。
+// 实现 integrationcontract.MessageSubscriber.UnsubscribeAll。
+func (s *rabbitSubscriber) UnsubscribeAll() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, cancel := range s.cancelMap {
@@ -251,16 +271,17 @@ func (s *rabbitSubscriber) As(target any) bool {
 }
 
 // NativeSubscriber implements NativeSubscriberProvider interface.
-// Returns a channel for subscription operations.
+// Returns the underlying *amqp.Connection for advanced subscription operations.
+// Callers should create and close their own channels from this connection.
 //
 // NativeSubscriber 实现 NativeSubscriberProvider 接口。
-// 返回 channel 用于订阅操作。
+// 返回底层 *amqp.Connection 用于高级订阅操作。
+// 调用方应从该连接创建和关闭自己的 channel。
 func (s *rabbitSubscriber) NativeSubscriber() any {
-	ch, err := s.queue.getChannel()
-	if err != nil {
+	if s == nil || s.queue == nil || s.queue.conn == nil {
 		return nil
 	}
-	return ch
+	return s.queue.conn
 }
 
 // extractAMQPHeaders converts amqp.Table to map[string]string.

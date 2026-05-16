@@ -38,6 +38,18 @@ func (g *Generator) GenService(ctx context.Context, opts integrationcontract.Ser
 		return fmt.Errorf("parse proto file failed: %w", err)
 	}
 
+	// 校验所有服务名和方法名的标识符合法性，防止代码注入。
+	for _, svc := range services {
+		if !isValidGoIdentifier(svc.Name) {
+			return fmt.Errorf("invalid service name %q: must match [A-Za-z_][A-Za-z0-9_]*", svc.Name)
+		}
+		for _, m := range svc.Methods {
+			if !isValidGoIdentifier(m.Name) {
+				return fmt.Errorf("invalid method name %q in service %q: must match [A-Za-z_][A-Za-z0-9_]*", m.Name, svc.Name)
+			}
+		}
+	}
+
 	// 如果指定了服务名则过滤。
 	if opts.ServiceName != "" {
 		filtered := []ProtoService{}
@@ -765,7 +777,7 @@ func methodToHTTP(name string) (string, string) {
 	case strings.HasPrefix(name, "Get"):
 		return "GET", "/" + strings.ToLower(strings.TrimPrefix(name, "Get")) + "/:id"
 	case strings.HasPrefix(name, "List"):
-		return "GET", ""
+		return "GET", "/" + strings.ToLower(strings.TrimPrefix(name, "List")) + "/list"
 	case strings.HasPrefix(name, "Update"):
 		return "PUT", "/" + strings.ToLower(strings.TrimPrefix(name, "Update")) + "/:id"
 	case strings.HasPrefix(name, "Delete"):

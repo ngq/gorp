@@ -134,8 +134,10 @@ func CSRF(opts CSRFOptions) transportcontract.HTTPMiddleware {
 			// 非安全方法：校验 token
 			// 优先从请求头获取，其次从表单字段获取
 			submittedToken := c.GetHeader(opts.HeaderName)
-			if submittedToken == "" && req.FormValue(opts.FormFieldName) != "" {
-				submittedToken = req.FormValue(opts.FormFieldName)
+			if submittedToken == "" {
+				if formValue := req.FormValue(opts.FormFieldName); formValue != "" {
+					submittedToken = formValue
+				}
 			}
 
 			if submittedToken == "" || !secureCompare(submittedToken, storedToken) {
@@ -168,7 +170,8 @@ func isSafeMethod(method string) bool {
 //
 // 中文说明：
 // - 将 token 写入响应 cookie，供后续请求携带；
-// - SameSite 默认 Lax，防止跨站请求携带 cookie（但允许顶级导航）。
+// - SameSite 默认 Lax，防止跨站请求携带 cookie（但允许顶级导航）；
+// - 使用 Add 而非 Set 避免覆盖其他中间件设置的 Set-Cookie 头。
 func setCSRFCookie(c transportcontract.HTTPContext, token string, opts CSRFOptions) {
 	cookie := &http.Cookie{
 		Name:     opts.CookieName,
@@ -178,7 +181,13 @@ func setCSRFCookie(c transportcontract.HTTPContext, token string, opts CSRFOptio
 		HttpOnly: opts.CookieHTTPOnly,
 		SameSite: opts.CookieSameSite,
 	}
-	c.Header("Set-Cookie", cookie.String())
+	// Use Add instead of Set to avoid overwriting other Set-Cookie headers.
+	// 使用 Add 而非 Set 避免覆盖其他 Set-Cookie 头。
+	if gc, ok := unwrapGinContext(c); ok {
+		gc.Writer.Header().Add("Set-Cookie", cookie.String())
+	} else {
+		c.Header("Set-Cookie", cookie.String())
+	}
 }
 
 // secureCompare 使用恒定时间比较防止时序攻击。
@@ -193,10 +202,19 @@ func secureCompare(a, b string) bool {
 //
 // 中文说明：
 // - 使用 crypto/rand 生成密码学安全的随机 token；
+// - 如果系统熵源不可用，则 panic（这是不可恢复的安全错误）；
 // - 编码为 hex 字符串返回。
 func generateCSRFToken(length int) string {
 	buf := make([]byte, length)
-	_, _ = rand.Read(buf)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand.Read failure means the system entropy source is unavailable.
+		// Using all-zero bytes as a CSRF token is a critical security vulnerability,
+		// so we must fail loudly rather than silently degrade.
+		// crypto/rand.Read 失败意味着系统熵源不可用。
+		// 使用全零字节作为 CSRF token 是严重安全漏洞，
+		// 必须显式失败而非静默降级。
+		panic("csrf: failed to generate secure random token: " + err.Error())
+	}
 	return hex.EncodeToString(buf)
 }
 

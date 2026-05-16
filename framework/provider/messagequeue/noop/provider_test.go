@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/ngq/gorp/framework/container"
+	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +69,7 @@ func TestNoopSubscriber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, unsub)
 
-	err = subscriber.Unsubscribe()
+	err = subscriber.UnsubscribeAll()
 	assert.NoError(t, err)
 }
 
@@ -125,4 +125,3 @@ func TestProvider_RegisterAndResolve(t *testing.T) {
 	_, ok = sub.(integrationcontract.MessageSubscriber)
 	assert.True(t, ok, "expected MessageSubscriber interface from container")
 }
-

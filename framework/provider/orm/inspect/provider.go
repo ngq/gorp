@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 
@@ -66,11 +67,10 @@ func (p *Provider) DependsOn() []string { return []string{datacontract.SQLXKey} 
 // 注意：此 Provider 依赖 SQLX Provider 先注册。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.DBInspectorKey, func(c runtimecontract.Container) (any, error) {
-		v, err := c.Make(datacontract.SQLXKey)
+		db, err := container.MakeWith[*sqlx.DB](c, datacontract.SQLXKey)
 		if err != nil {
 			return nil, err
 		}
-		db := v.(*sqlx.DB)
 		driver := db.DriverName()
 		return &Service{db: db, driver: driver}, nil
 	}, true)
@@ -86,12 +86,12 @@ func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 //
 // Service 实现 datacontract.DBInspector 接口。
 type Service struct {
-	db     *sqlx.DB // db is the underlying database connection.
-	              //
-	               // db 底层数据库连接。
-	driver string   // driver is the database driver name.
-	              //
-	               // driver 数据库驱动名称。
+	db *sqlx.DB // db is the underlying database connection.
+	//
+	// db 底层数据库连接。
+	driver string // driver is the database driver name.
+	//
+	// driver 数据库驱动名称。
 }
 
 // Ping checks database connectivity.

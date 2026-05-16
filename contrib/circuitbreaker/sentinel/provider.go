@@ -28,6 +28,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -120,6 +121,45 @@ func getCircuitBreakerConfig(c runtimecontract.Container) (*resiliencecontract.C
 			Interval:              1 * time.Second,
 		},
 	}
+
+	// Load per-resource config from circuit_breaker.resources map in config.
+	// Each key under circuit_breaker.resources is treated as a resource name,
+	// with nested fields: threshold, min_request_count, timeout, interval, strategy.
+	if resources := cfg.Get("circuit_breaker.resources"); resources != nil {
+		if resMap, ok := resources.(map[string]any); ok {
+			for name, val := range resMap {
+				if sub, ok := val.(map[string]any); ok {
+					rc := cbCfg.DefaultConfig // start from defaults
+					if v, ok := sub["threshold"]; ok {
+						if f, ok := v.(float64); ok {
+							rc.Threshold = f
+						}
+					}
+					if v, ok := sub["min_request_count"]; ok {
+						if f, ok := v.(float64); ok {
+							rc.MinRequestCount = int64(f)
+						}
+					}
+					if v, ok := sub["timeout"]; ok {
+						if s, ok := v.(string); ok {
+							if d, err := time.ParseDuration(s); err == nil {
+								rc.Timeout = d
+							}
+						}
+					}
+					if v, ok := sub["interval"]; ok {
+						if s, ok := v.(string); ok {
+							if d, err := time.ParseDuration(s); err == nil {
+								rc.Interval = d
+							}
+						}
+					}
+					cbCfg.ResourceConfigs[name] = rc
+				}
+			}
+		}
+	}
+
 	return cbCfg, nil
 }
 
@@ -182,7 +222,7 @@ func buildCircuitBreakerRule(resource string, current resiliencecontract.Resourc
 
 	return &sentinelcb.Rule{
 		Resource:         resource,
-		Strategy:         sentinelcb.ErrorRatio,
+		Strategy:         sentinelcb.ErrorRatio, // Default strategy; per-resource strategy not yet in ResourceConfig
 		RetryTimeoutMs:   uint32(retryTimeout),
 		MinRequestAmount: uint64(minRequest),
 		StatIntervalMs:   uint32(interval.Milliseconds()),
@@ -403,3 +443,21 @@ func (r *sentinelReservation) OK() bool             { return r.ok }
 func (r *sentinelReservation) Delay() time.Duration { return 0 }
 func (r *sentinelReservation) Cancel()              {}
 func (r *sentinelReservation) CancelAt(time.Time)   {}
+
+// mapSentinelStrategy converts a string strategy name to the corresponding
+// sentinel Rule Strategy constant. Falls back to ErrorRatio for unknown values.
+//
+// mapSentinelStrategy 将字符串策略名映射为 sentinel Rule Strategy 常量。
+// 未知值回退为 ErrorRatio。
+func mapSentinelStrategy(strategy string) sentinelcb.Strategy {
+	switch strings.ToLower(strings.TrimSpace(strategy)) {
+	case "error_count", "errorcount":
+		return sentinelcb.ErrorCount
+	case "slow_request_ratio", "slowrequestratio", "slow_request":
+		return sentinelcb.SlowRequestRatio
+	case "error_ratio", "errorratio", "":
+		return sentinelcb.ErrorRatio
+	default:
+		return sentinelcb.ErrorRatio
+	}
+}

@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -341,6 +342,14 @@ func (r *Registry) Close() error {
 	return nil
 }
 
+// applyLoadBalance applies load balance strategy to instances.
+// Note: The registry layer only reorders instances for initial selection preference.
+// The actual per-request weighted/round-robin selection is performed by the
+// Selector provider (WRR/P2C) at the RPC layer.
+//
+// applyLoadBalance 对实例应用负载均衡策略。
+// 注意：注册中心层仅对实例重新排序以表达初始选择偏好。
+// 实际的逐请求加权/轮询选择由 Selector provider（WRR/P2C）在 RPC 层执行。
 func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstance) []transportcontract.ServiceInstance {
 	switch r.cfg.LoadBalance {
 	case "random":
@@ -348,6 +357,13 @@ func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstanc
 			instances[i], instances[j] = instances[j], instances[i]
 		})
 	case "weight":
+		// Sort by weight (descending) so higher-weight instances are tried first.
+		// The actual per-request weighted selection is done by the Selector provider (WRR/P2C).
+		sort.SliceStable(instances, func(i, j int) bool {
+			wi, _ := strconv.ParseFloat(instances[i].Metadata["weight"], 64)
+			wj, _ := strconv.ParseFloat(instances[j].Metadata["weight"], 64)
+			return wi > wj
+		})
 	}
 	return instances
 }

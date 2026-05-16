@@ -28,6 +28,7 @@ package ent
 import (
 	"fmt"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -75,11 +76,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.EntClientKey, func(c runtimecontract.Container) (any, error) {
 		factoryAny, err := c.Make(datacontract.EntClientFactoryKey)
 		if err != nil {
-			cfgAny, cfgErr := c.Make(datacontract.ConfigKey)
+			cfg, cfgErr := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 			if cfgErr != nil {
 				return nil, err
 			}
-			cfg := cfgAny.(datacontract.Config)
 			var dbc datacontract.DBConfig
 			_ = cfg.Unmarshal("database", &dbc)
 			return nil, fmt.Errorf("database.backend=ent is selected, but no project-level ent factory is bound at %q (driver=%s)", datacontract.EntClientFactoryKey, dbc.Driver)

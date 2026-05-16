@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -59,9 +61,14 @@ func (s *kafkaSubscriber) SubscribeWithGroup(ctx context.Context, topic string, 
 	// Check if consumer group already exists
 	// 检查是否已存在 consumer group
 	if existingGroup, ok := s.queue.consumerGroups[group]; ok {
+		// Increment reference count for shared group
+		// 增加共享 group 的引用计数
+		if s.queue.consumerGroupRefs != nil {
+			s.queue.consumerGroupRefs[group]++
+		}
 		// Wrap existing group with new handler
 		// 使用新 handler 包装已存在的 group
-		return s.wrapConsumerGroup(ctx, existingGroup, topic, handler)
+		return s.wrapConsumerGroup(ctx, group, existingGroup, topic, handler)
 	}
 
 	// Create new consumer group
@@ -76,8 +83,12 @@ func (s *kafkaSubscriber) SubscribeWithGroup(ctx context.Context, topic string, 
 	}
 
 	s.queue.consumerGroups[group] = consumerGroup
+	if s.queue.consumerGroupRefs == nil {
+		s.queue.consumerGroupRefs = make(map[string]int)
+	}
+	s.queue.consumerGroupRefs[group] = 1
 
-	return s.wrapConsumerGroup(ctx, consumerGroup, topic, handler)
+	return s.wrapConsumerGroup(ctx, group, consumerGroup, topic, handler)
 }
 
 // wrapConsumerGroup wraps a consumer group with handler logic.
@@ -87,7 +98,7 @@ func (s *kafkaSubscriber) SubscribeWithGroup(ctx context.Context, topic string, 
 // wrapConsumerGroup 用 handler 逻辑包装 consumer group。
 // 启动后台 goroutine 消费消息。
 // 返回 unsubscribe 函数用于取消消费和关闭 group。
-func (s *kafkaSubscriber) wrapConsumerGroup(ctx context.Context, group sarama.ConsumerGroup, topic string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
+func (s *kafkaSubscriber) wrapConsumerGroup(ctx context.Context, groupID string, group sarama.ConsumerGroup, topic string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
 	consumer := &kafkaConsumer{handler: handler}
 
 	// Start consuming in background
@@ -106,6 +117,7 @@ func (s *kafkaSubscriber) wrapConsumerGroup(ctx context.Context, group sarama.Co
 					}
 					// Log error and continue
 					// 记录错误并继续
+					slog.Warn("messagequeue.kafka: consume error", "topic", topic, "group", groupID, "error", err)
 					continue
 				}
 			}
@@ -114,7 +126,22 @@ func (s *kafkaSubscriber) wrapConsumerGroup(ctx context.Context, group sarama.Co
 
 	return func() error {
 		cancel()
-		return group.Close()
+		// Only close the consumer group if this is the last subscription using it.
+		// Decrement the reference count; close the group only when it reaches zero.
+		// 仅当这是使用该 consumer group 的最后一个订阅时才关闭它。
+		// 减少引用计数；仅在归零时关闭 group。
+		s.queue.mu.Lock()
+		if s.queue.consumerGroupRefs != nil {
+			s.queue.consumerGroupRefs[groupID]--
+			if s.queue.consumerGroupRefs[groupID] <= 0 {
+				delete(s.queue.consumerGroupRefs, groupID)
+				delete(s.queue.consumerGroups, groupID)
+				s.queue.mu.Unlock()
+				return group.Close()
+			}
+		}
+		s.queue.mu.Unlock()
+		return nil
 	}, nil
 }
 
@@ -133,12 +160,12 @@ func (s *kafkaSubscriber) Consume(ctx context.Context, queue string, handler int
 	return ErrConsumeNotSupported
 }
 
-// Unsubscribe closes all consumer groups.
-// Implements integrationcontract.MessageSubscriber.Unsubscribe.
+// UnsubscribeAll closes all consumer groups.
+// Implements integrationcontract.MessageSubscriber.UnsubscribeAll.
 //
-// Unsubscribe 关闭所有 consumer groups。
-// 实现 integrationcontract.MessageSubscriber.Unsubscribe。
-func (s *kafkaSubscriber) Unsubscribe() error {
+// UnsubscribeAll 关闭所有 consumer groups。
+// 实现 integrationcontract.MessageSubscriber.UnsubscribeAll。
+func (s *kafkaSubscriber) UnsubscribeAll() error {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
 	for _, group := range s.queue.consumerGroups {
@@ -173,15 +200,20 @@ func (s *kafkaSubscriber) As(target any) bool {
 }
 
 // NativeSubscriber implements NativeSubscriberProvider interface.
-// Returns the most recent consumer group.
+// Returns the first consumer group by sorted key name for deterministic behavior.
 //
 // NativeSubscriber 实现 NativeSubscriberProvider 接口。
-// 返回最近的 consumer group。
+// 按排序后的 key 名返回第一个 consumer group，确保行为确定性。
 func (s *kafkaSubscriber) NativeSubscriber() any {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
-	for _, group := range s.queue.consumerGroups {
-		return group // Return first available
+	keys := make([]string, 0, len(s.queue.consumerGroups))
+	for k := range s.queue.consumerGroups {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		return s.queue.consumerGroups[k]
 	}
 	return nil
 }

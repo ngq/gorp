@@ -8,6 +8,7 @@ package transport
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // WebSocketKey is the container key for WebSocket service.
@@ -172,6 +173,17 @@ type WebSocketConfig struct {
 	// ParallelGolimit is the max goroutines for parallel processing (default runtime.NumCPU).
 	// 并行处理的最大 goroutine 数，默认 runtime.NumCPU。
 	ParallelGolimit int
+
+	// ReadTimeout sets the maximum duration for reading a message.
+	// Connections that exceed this timeout will be closed automatically.
+	// Default 0 means no timeout.
+	// 读超时，超过此时间的连接将被自动关闭。默认 0 表示无超时。
+	ReadTimeout time.Duration
+
+	// WriteTimeout sets the maximum duration for writing a message.
+	// Default 0 means no timeout.
+	// 写超时。默认 0 表示无超时。
+	WriteTimeout time.Duration
 }
 
 // WebSocketClientConfig holds WebSocket client configuration.

@@ -24,7 +24,7 @@ const EventKey = "framework.event"
 // Event 描述一个业务或集成事件。
 type Event interface {
 	Name() string
-	Payload() interface{}
+	Payload() any
 	OccurredAt() time.Time
 }
 

@@ -18,8 +18,13 @@ func buildSaramaConfig(cfg *integrationcontract.MessageQueueConfig) *sarama.Conf
 
 	// Version
 	if cfg.KafkaVersion != "" {
-		// sarama.ParseVersion 不存在，使用 V2_8_0_0 常量
-		saramaCfg.Version = sarama.V2_8_0_0
+		if v, err := sarama.ParseKafkaVersion(cfg.KafkaVersion); err == nil {
+			saramaCfg.Version = v
+		} else {
+			// Fallback to a known version when the config string is invalid.
+			// 配置字符串无效时回退到已知版本。
+			saramaCfg.Version = sarama.V2_8_0_0
+		}
 	} else {
 		saramaCfg.Version = sarama.V2_8_0_0
 	}

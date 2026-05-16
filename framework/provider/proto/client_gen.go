@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
@@ -41,13 +42,13 @@ type ProtoMethod struct {
 	HTTPBody   string // "*" or field name for body mapping
 	// Auth and middleware info from gorp options.
 	// 认证和中间件信息，从 gorp 选项解析。
-	AuthRequired   bool     // 是否要求认证
-	AuthRoles      []string // 要求的角色
-	AuthSkip       bool     // 跳过认证
-	Middleware     []string // 中间件名称列表
-	RateLimitRPS   int32    // 每秒请求数限制
-	RateLimitRPM   int32    // 每分钟请求数限制
-	RateLimitKey   string   // 限流键
+	AuthRequired bool     // 是否要求认证
+	AuthRoles    []string // 要求的角色
+	AuthSkip     bool     // 跳过认证
+	Middleware   []string // 中间件名称列表
+	RateLimitRPS int32    // 每秒请求数限制
+	RateLimitRPM int32    // 每分钟请求数限制
+	RateLimitKey string   // 限流键
 }
 
 // GenClient generates typed RPC client wrapper from proto file.
@@ -78,6 +79,18 @@ func (g *Generator) GenClient(ctx context.Context, opts integrationcontract.Clie
 	services, err := parseProtoFile(opts.ProtoFile)
 	if err != nil {
 		return fmt.Errorf("parse proto file failed: %w", err)
+	}
+
+	// 校验所有服务名和方法名的标识符合法性，防止代码注入。
+	for _, svc := range services {
+		if !isValidGoIdentifier(svc.Name) {
+			return fmt.Errorf("invalid service name %q: must match [A-Za-z_][A-Za-z0-9_]*", svc.Name)
+		}
+		for _, m := range svc.Methods {
+			if !isValidGoIdentifier(m.Name) {
+				return fmt.Errorf("invalid method name %q in service %q: must match [A-Za-z_][A-Za-z0-9_]*", m.Name, svc.Name)
+			}
+		}
 	}
 
 	// Filter service if specified
@@ -169,21 +182,21 @@ func parseProtoFile(protoFile string) ([]ProtoService, error) {
 			authRequired, authRoles, authSkip, middleware, rateLimitRPS, rateLimitRPM, rateLimitKey := parseGorpOptions(methodBody)
 
 			methods = append(methods, ProtoMethod{
-				Name:          methodName,
-				RequestType:   requestType,
-				ResponseType:  responseType,
-				InputStream:   inputStream,
-				OutputStream:  outputStream,
-				HTTPMethod:    httpMethod,
-				HTTPPath:      httpPath,
-				HTTPBody:      httpBody,
-				AuthRequired:  authRequired,
-				AuthRoles:     authRoles,
-				AuthSkip:      authSkip,
-				Middleware:    middleware,
-				RateLimitRPS:  rateLimitRPS,
-				RateLimitRPM:  rateLimitRPM,
-				RateLimitKey:  rateLimitKey,
+				Name:         methodName,
+				RequestType:  requestType,
+				ResponseType: responseType,
+				InputStream:  inputStream,
+				OutputStream: outputStream,
+				HTTPMethod:   httpMethod,
+				HTTPPath:     httpPath,
+				HTTPBody:     httpBody,
+				AuthRequired: authRequired,
+				AuthRoles:    authRoles,
+				AuthSkip:     authSkip,
+				Middleware:   middleware,
+				RateLimitRPS: rateLimitRPS,
+				RateLimitRPM: rateLimitRPM,
+				RateLimitKey: rateLimitKey,
 			})
 		}
 
@@ -325,14 +338,17 @@ func parseGorpOptions(methodBody string) (authRequired bool, authRoles []string,
 }
 
 // parseInt32 parses a string to int32.
+// Uses strconv.ParseInt for proper validation: rejects non-numeric characters
+// and reports overflow instead of silently truncating.
+//
+// parseInt32 将字符串解析为 int32。
+// 使用 strconv.ParseInt 进行正确校验：拒绝非数字字符并报告溢出。
 func parseInt32(s string) int32 {
-	var n int32
-	for _, c := range s {
-		if c >= '0' && c <= '9' {
-			n = n*10 + int32(c-'0')
-		}
+	n, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return 0
 	}
-	return n
+	return int32(n)
 }
 
 // generateClientWrapperCode generates Go code for typed RPC client wrapper.

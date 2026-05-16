@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 
@@ -79,11 +80,10 @@ func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey
 // 核心逻辑：解析配置、标准化驱动名称、打开连接、应用连接池设置。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.SQLXKey, func(c runtimecontract.Container) (any, error) {
-		cfgAny, err := c.Make(datacontract.ConfigKey)
+		cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 		if err != nil {
 			return nil, err
 		}
-		cfg := cfgAny.(datacontract.Config)
 
 		var dbc datacontract.DBConfig
 		if err := cfg.Unmarshal("database", &dbc); err != nil {

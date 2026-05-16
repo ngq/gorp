@@ -46,7 +46,12 @@ type MessageSubscriber interface {
 	Subscribe(ctx context.Context, topic string, handler MessageHandler) (UnsubscribeFunc, error)
 	SubscribeWithGroup(ctx context.Context, topic string, group string, handler MessageHandler) (UnsubscribeFunc, error)
 	Consume(ctx context.Context, queue string, handler MessageHandler) error
-	Unsubscribe() error
+	// UnsubscribeAll closes all active subscriptions and releases resources.
+	// For canceling a single subscription, use the UnsubscribeFunc returned by Subscribe/SubscribeWithGroup.
+	//
+	// UnsubscribeAll 关闭所有活跃订阅并释放资源。
+	// 若需取消单个订阅，请使用 Subscribe/SubscribeWithGroup 返回的 UnsubscribeFunc。
+	UnsubscribeAll() error
 }
 
 // MessageHandler handles one inbound message.

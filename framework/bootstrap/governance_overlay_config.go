@@ -42,19 +42,36 @@ func (c *governanceOverlayConfig) Env() string {
 }
 
 func (c *governanceOverlayConfig) Get(key string) any {
-	switch key {
-	case "governance.disable":
+	// Handle overlay keys with explicit logic flow (no implicit fallthrough).
+	// This is clearer than switch fallthrough and less error-prone when adding new keys.
+	//
+	// 使用显式逻辑流处理 overlay key（无隐式 fallthrough）。
+	// 比 switch fallthrough 更清晰，新增 key 时不易出错。
+
+	// governance.disable: return overlay value if non-empty, otherwise fallback to base.
+	if key == "governance.disable" {
 		if len(c.governanceDisable) > 0 {
 			return append([]string(nil), c.governanceDisable...)
 		}
-	case "governance.enable":
+		// Empty overlay, fall through to base config.
+		// overlay 为空，fallback 到基础配置。
+	}
+
+	// governance.enable: return overlay value if non-empty, otherwise fallback to base.
+	if key == "governance.enable" {
 		if len(c.governanceEnable) > 0 {
 			return append([]string(nil), c.governanceEnable...)
 		}
+		// Empty overlay, fall through to base config.
+		// overlay 为空，fallback 到基础配置。
 	}
+
+	// governance.providers.*: check overlay map first.
 	if value, ok := c.lookupGovernanceProviderKey(key); ok {
 		return value
 	}
+
+	// Fallback to base config for all other keys.
 	if c.base == nil {
 		return nil
 	}

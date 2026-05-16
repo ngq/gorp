@@ -24,10 +24,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -78,11 +80,10 @@ type config struct {
 // 从配置读取 "cache.driver" 或环境变量 CACHE_DRIVER，默认为 "redis"。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.CacheKey, func(c runtimecontract.Container) (any, error) {
-		cfgAny, err := c.Make(datacontract.ConfigKey)
+		cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 		if err != nil {
 			return nil, err
 		}
-		cfg := cfgAny.(datacontract.Config)
 
 		var cc config
 		_ = cfg.Unmarshal("cache", &cc)
@@ -99,11 +100,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		case "memory", "mem", "inmemory":
 			d = newMemoryStore()
 		case "redis":
-			rAny, err := c.Make(datacontract.RedisKey)
+			r, err := container.MakeWith[datacontract.Redis](c, datacontract.RedisKey)
 			if err != nil {
 				return nil, err
 			}
-			r := rAny.(datacontract.Redis)
 			d = newRedisCache(r)
 		default:
 			return nil, fmt.Errorf("invalid cache.driver: %s", driver)
@@ -198,6 +198,8 @@ func (s *service) Remember(ctx context.Context, key string, ttl time.Duration, f
 	if err != nil {
 		return "", err
 	}
-	_ = s.d.Set(ctx, key, computed, ttl)
+	if setErr := s.d.Set(ctx, key, computed, ttl); setErr != nil {
+		slog.Warn("cache: Remember failed to Set computed value", "key", key, "error", setErr)
+	}
 	return computed, nil
 }

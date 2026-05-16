@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/ngq/gorp/contrib/internal/baseregistry"
@@ -157,6 +158,7 @@ type Registry struct {
 	agent      *api.Agent
 	registered sync.Map
 	mu         sync.Mutex
+	lbCounter  atomic.Uint64
 	closed     bool
 }
 
@@ -307,6 +309,14 @@ func (r *Registry) buildHealthCheck(serviceID, host string, port int) *api.Agent
 	return check
 }
 
+// applyLoadBalance applies load balance strategy to instances.
+// Note: The registry layer only reorders instances for initial selection preference.
+// The actual per-request weighted/round-robin selection is performed by the
+// Selector provider (WRR/P2C) at the RPC layer.
+//
+// applyLoadBalance 对实例应用负载均衡策略。
+// 注意：注册中心层仅对实例重新排序以表达初始选择偏好。
+// 实际的逐请求加权/轮询选择由 Selector provider（WRR/P2C）在 RPC 层执行。
 func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstance) []transportcontract.ServiceInstance {
 	switch r.cfg.LoadBalance {
 	case "random":
@@ -314,6 +324,13 @@ func (r *Registry) applyLoadBalance(instances []transportcontract.ServiceInstanc
 			instances[i], instances[j] = instances[j], instances[i]
 		})
 	case "round_robin":
+		// Rotate instances by current counter to achieve round-robin ordering.
+		// The actual per-request selection is done by the Selector provider (WRR/P2C).
+		if len(instances) > 1 {
+			r.lbCounter.Add(1)
+			offset := int(r.lbCounter.Load()) % len(instances)
+			instances = append(instances[offset:], instances[:offset]...)
+		}
 	}
 	return instances
 }

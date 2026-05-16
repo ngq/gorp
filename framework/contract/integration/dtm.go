@@ -9,7 +9,10 @@
 // - 保持 DTM client 和事务配置与具体 provider 解耦。
 package integration
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // DTMKey is the container key for the distributed transaction capability.
 //
@@ -28,8 +31,12 @@ type DTMClient interface {
 }
 
 // SAGABuilder defines the SAGA transaction builder contract.
+// Each method returns SAGABuilder to enable method chaining.
+// Implementations must use pointer receivers to allow value-type chaining.
 //
 // SAGABuilder 定义 SAGA 事务构建器契约。
+// 每个方法返回 SAGABuilder 以支持链式调用。
+// 实现必须使用指针接收器以支持值类型链式调用。
 type SAGABuilder interface {
 	Add(action string, compensate string, payload any) SAGABuilder
 	AddBranch(action string, compensate string, payload any, opts BranchOptions) SAGABuilder
@@ -66,9 +73,33 @@ type BarrierHandler interface {
 type DTMConfig struct {
 	Enabled         bool
 	Endpoint        string
-	Timeout         int
+	Timeout         int // Timeout in seconds. Use ParseTimeout() for time.Duration.
 	RetryCount      int
-	RetryInterval   int
+	RetryInterval   int // RetryInterval in seconds. Use ParseRetryInterval() for time.Duration.
 	CallbackPort    int
 	CallbackAddress string
+}
+
+// ParseTimeout converts Timeout (seconds) to time.Duration.
+// Returns defaultVal if Timeout is zero.
+//
+// ParseTimeout 将 Timeout（秒）转换为 time.Duration。
+// Timeout 为 0 时返回 defaultVal。
+func (c *DTMConfig) ParseTimeout(defaultVal time.Duration) time.Duration {
+	if c.Timeout <= 0 {
+		return defaultVal
+	}
+	return time.Duration(c.Timeout) * time.Second
+}
+
+// ParseRetryInterval converts RetryInterval (seconds) to time.Duration.
+// Returns defaultVal if RetryInterval is zero.
+//
+// ParseRetryInterval 将 RetryInterval（秒）转换为 time.Duration。
+// RetryInterval 为 0 时返回 defaultVal。
+func (c *DTMConfig) ParseRetryInterval(defaultVal time.Duration) time.Duration {
+	if c.RetryInterval <= 0 {
+		return defaultVal
+	}
+	return time.Duration(c.RetryInterval) * time.Second
 }

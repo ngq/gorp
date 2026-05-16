@@ -141,3 +141,24 @@ func (s *NoopSpan) SpanContext() observabilitycontract.SpanContext {
 }
 func (s *NoopSpan) IsRecording() bool        { return false }
 func (s *NoopSpan) Context() context.Context { return context.Background() }
+
+type PrometheusTracer struct{}
+
+func NewPrometheusTracer() *PrometheusTracer { return &PrometheusTracer{} }
+
+func (t *PrometheusTracer) StartSpan(ctx context.Context, name string, opts ...observabilitycontract.SpanOption) (context.Context, observabilitycontract.Span) {
+	// 简单的实现，实际项目中应该集成 OpenTelemetry 等真正的 tracing 系统
+	return ctx, &NoopSpan{}
+}
+
+func (t *PrometheusTracer) SpanFromContext(ctx context.Context) observabilitycontract.Span {
+	return &NoopSpan{}
+}
+
+func (t *PrometheusTracer) Inject(ctx context.Context, carrier observabilitycontract.TextMapCarrier) error {
+	return nil
+}
+
+func (t *PrometheusTracer) Extract(ctx context.Context, carrier observabilitycontract.TextMapCarrier) (context.Context, error) {
+	return ctx, nil
+}

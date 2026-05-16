@@ -18,15 +18,18 @@ import (
 
 // Queue implements integrationcontract.MessageQueue using amqp091-go SDK.
 // Manages connection, channels, and provides publisher/subscriber factories.
+// Publisher operations create short-lived channels that are closed after use.
+// Subscriber operations own their channels and close them on unsubscribe.
 //
 // Queue 使用 amqp091-go SDK 实现 integrationcontract.MessageQueue。
 // 管理连接、channels，并提供 publisher/subscriber 工厂。
+// Publisher 操作创建短期 channel，使用后关闭。
+// Subscriber 操作持有自己的 channel，在取消订阅时关闭。
 type Queue struct {
-	cfg      *integrationcontract.MessageQueueConfig
-	conn     *amqp.Connection
-	channels []*amqp.Channel
-	mu       sync.Mutex
-	closed   bool
+	cfg    *integrationcontract.MessageQueueConfig
+	conn   *amqp.Connection
+	mu     sync.Mutex
+	closed bool
 }
 
 // NewQueue creates a new RabbitMQ Queue instance.
@@ -48,7 +51,7 @@ func NewQueue(cfg *integrationcontract.MessageQueueConfig) (*Queue, error) {
 		return nil, fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
 	}
 
-	// Declare exchange if configured
+	// Create initial channel for exchange declaration
 	if cfg.RabbitMQExchange != "" {
 		err = ch.ExchangeDeclare(
 			cfg.RabbitMQExchange,
@@ -66,16 +69,13 @@ func NewQueue(cfg *integrationcontract.MessageQueueConfig) (*Queue, error) {
 		}
 	}
 
-	// Set prefetch for this channel
-	err = ch.Qos(cfg.RabbitMQPrefetch, 0, false)
-	if err != nil {
-		// Non-critical error, continue
-	}
+	// Close setup channel — publishers/subscribers will create their own.
+	// 关闭初始化 channel — publisher/subscriber 会创建自己的 channel。
+	ch.Close()
 
 	return &Queue{
-		cfg:      cfg,
-		conn:     conn,
-		channels: []*amqp.Channel{ch},
+		cfg:  cfg,
+		conn: conn,
 	}, nil
 }
 
@@ -93,11 +93,14 @@ func (q *Queue) Subscriber() integrationcontract.MessageSubscriber {
 	return &rabbitSubscriber{queue: q}
 }
 
-// Close closes all RabbitMQ resources.
+// Close closes the RabbitMQ connection.
 // Implements integrationcontract.MessageQueue.Close.
+// Individual channels are closed by their owners (publishers close after use,
+// subscribers close on unsubscribe).
 //
-// Close 关闭所有 RabbitMQ 资源。
+// Close 关闭 RabbitMQ 连接。
 // 实现 integrationcontract.MessageQueue.Close。
+// 各 channel 由其持有者关闭（publisher 使用后关闭，subscriber 取消订阅时关闭）。
 func (q *Queue) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -106,22 +109,22 @@ func (q *Queue) Close() error {
 	}
 	q.closed = true
 
-	// Close all channels
-	for _, ch := range q.channels {
-		ch.Close()
-	}
-	q.channels = nil
-
-	// Close connection
+	// Close connection — this implicitly closes all channels on it.
+	// 关闭连接——这会隐式关闭其上的所有 channel。
 	if q.conn != nil {
 		return q.conn.Close()
 	}
 	return nil
 }
 
-// getChannel returns an available channel or creates a new one.
+// getChannel creates a new AMQP channel for short-lived operations.
+// The caller MUST close the channel after use (typically via defer).
+// This avoids the channel leak that occurs when channels are stored
+// in a list but never closed.
 //
-// getChannel 返回可用 channel 或创建新的。
+// getChannel 创建新的 AMQP channel 用于短期操作。
+// 调用方必须在使用后关闭 channel（通常通过 defer）。
+// 这避免了将 channel 存入列表但从不关闭导致的泄漏。
 func (q *Queue) getChannel() (*amqp.Channel, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -130,26 +133,11 @@ func (q *Queue) getChannel() (*amqp.Channel, error) {
 		return nil, errors.New("messagequeue.rabbitmq: queue closed")
 	}
 
-	// Return existing channel if available
-	for _, ch := range q.channels {
-		if !ch.IsClosed() {
-			return ch, nil
-		}
-	}
-
-	// Create new channel
 	ch, err := q.conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
 	}
 
-	// Set QoS
-	err = ch.Qos(q.cfg.RabbitMQPrefetch, 0, false)
-	if err != nil {
-		// Non-critical, continue
-	}
-
-	q.channels = append(q.channels, ch)
 	return ch, nil
 }
 
@@ -186,10 +174,10 @@ func (q *Queue) NativeMQClient() any {
 }
 
 // NativeChannel returns a fresh channel for advanced operations.
-// Users should close this channel after use.
+// The caller MUST close the channel after use.
 //
 // NativeChannel 返回一个新 channel 用于高级操作。
-// 用户应在使用后关闭此 channel。
+// 调用方必须在使用后关闭此 channel。
 func (q *Queue) NativeChannel() (*amqp.Channel, error) {
 	return q.getChannel()
 }
