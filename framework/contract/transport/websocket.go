@@ -222,3 +222,79 @@ type WebSocketClientConfig struct {
 	// 握手时发送的请求头。
 	RequestHeader http.Header
 }
+
+// WebSocketClusterConfig holds WebSocket cluster configuration for multi-node deployment.
+//
+// WebSocketClusterConfig 保存多节点部署的 WebSocket 集群配置。
+type WebSocketClusterConfig struct {
+	// Enable cluster mode.
+	// 启用集群模式。
+	Enabled bool
+
+	// Node ID for this instance (auto-generated if empty).
+	// 本实例的节点 ID（为空则自动生成）。
+	NodeID string
+
+	// Redis address for Pub/Sub (e.g., "localhost:6379").
+	// Redis Pub/Sub 地址（如 "localhost:6379"）。
+	RedisAddr string
+
+	// Redis password.
+	// Redis 密码。
+	RedisPassword string
+
+	// Redis database number.
+	// Redis 数据库编号。
+	RedisDB int
+
+	// Pub/Sub channel name prefix (default "gorp:ws").
+	// Pub/Sub 通道名称前缀（默认 "gorp:ws"）。
+	ChannelPrefix string
+
+	// Enable global connection count tracking.
+	// 启用全局连接数统计。
+	EnableGlobalCount bool
+
+	// Connection count key prefix (default "gorp:ws:count").
+	// 连接数统计键前缀（默认 "gorp:ws:count"）。
+	CountKeyPrefix string
+
+	// Heartbeat interval for node health (seconds, default 30).
+	// 节点健康心跳间隔（秒，默认 30）。
+	HeartbeatInterval int
+}
+
+// WebSocketClusterServer extends WebSocketServer with cluster capabilities.
+//
+// WebSocketClusterServer 扩展 WebSocketServer 的集群能力。
+type WebSocketClusterServer interface {
+	WebSocketServer
+
+	// BroadcastGlobal broadcasts message to all nodes in the cluster.
+	// BroadcastGlobal 向集群所有节点广播消息。
+	BroadcastGlobal(message string) error
+
+	// BroadcastGlobalBinary broadcasts binary message to all nodes in the cluster.
+	// BroadcastGlobalBinary 向集群所有节点广播二进制消息。
+	BroadcastGlobalBinary(data []byte) error
+
+	// BroadcastToRoom broadcasts message to a room across all nodes.
+	// BroadcastToRoom 向房间广播消息（跨节点）。
+	BroadcastToRoom(roomID string, message string) error
+
+	// GlobalCount returns total connection count across all nodes.
+	// GlobalCount 返回所有节点的总连接数。
+	GlobalCount() int
+
+	// NodeCount returns connection count for a specific node.
+	// NodeCount 返回指定节点的连接数。
+	NodeCount(nodeID string) int
+
+	// ListNodes returns all active node IDs.
+	// ListNodes 返回所有活跃节点 ID。
+	ListNodes() []string
+
+	// GetNodeID returns this node's ID.
+	// GetNodeID 返回本节点 ID。
+	GetNodeID() string
+}

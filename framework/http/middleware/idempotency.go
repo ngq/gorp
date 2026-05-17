@@ -71,7 +71,10 @@ type IdempotencyResponse struct {
 // MemoryIdempotencyStore 是一个内存型幂等响应存储。
 // 使用 sync.Map.LoadOrStore 实现原子 Reserve，消除 TOCTOU 竞态。
 type MemoryIdempotencyStore struct {
-	data sync.Map
+	data   sync.Map
+	stopCh chan struct{} // stopCh 用于通知 cleanup goroutine 退出
+	                          //
+	                          // stopCh signals the cleanup goroutine to exit.
 }
 
 type idempotencyEntry struct {
@@ -124,9 +127,22 @@ func (w *idempotencyResponseWriter) Status() int {
 //
 // NewMemoryIdempotencyStore 创建一个基于内存的幂等存储。
 func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
-	store := &MemoryIdempotencyStore{}
+	store := &MemoryIdempotencyStore{
+		stopCh: make(chan struct{}),
+	}
 	go store.cleanup()
 	return store
+}
+
+// Close 停止 cleanup goroutine，释放资源。
+// 调用后 store 不应再被使用。
+func (s *MemoryIdempotencyStore) Close() {
+	select {
+	case <-s.stopCh:
+		// 已关闭
+	default:
+		close(s.stopCh)
+	}
 }
 
 // Reserve atomically reserves a key or returns the cached response.
@@ -193,15 +209,21 @@ func (s *MemoryIdempotencyStore) Commit(key string, response *IdempotencyRespons
 func (s *MemoryIdempotencyStore) cleanup() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		now := time.Now()
-		s.data.Range(func(key, value any) bool {
-			entry := value.(*idempotencyEntry)
-			if now.After(entry.expiresAt) {
-				s.data.Delete(key)
-			}
-			return true
-		})
+	for {
+		select {
+		case <-s.stopCh:
+			// 收到退出信号，停止 cleanup goroutine
+			return
+		case <-ticker.C:
+			now := time.Now()
+			s.data.Range(func(key, value any) bool {
+				entry := value.(*idempotencyEntry)
+				if now.After(entry.expiresAt) {
+					s.data.Delete(key)
+				}
+				return true
+			})
+		}
 	}
 }
 

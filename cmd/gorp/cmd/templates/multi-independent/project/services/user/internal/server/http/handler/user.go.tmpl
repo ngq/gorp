@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	"{{.ModuleName}}/services/user/internal/server/http/request"
 	"{{.ModuleName}}/services/user/internal/server/http/response"
 	"{{.ModuleName}}/services/user/internal/service"
@@ -26,7 +26,7 @@ func NewUserHandler(user *service.UserService) *UserHandler {
 	return &UserHandler{user: user}
 }
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 
 func (h *UserHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

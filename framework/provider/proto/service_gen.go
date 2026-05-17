@@ -462,8 +462,7 @@ func generateGRPCServiceCode(svc ProtoService, svcLower, protoPkg string, opts i
 		}
 		buf.WriteString(m.ResponseType)
 		buf.WriteString(", error) {\n")
-		buf.WriteString("\t// TODO: implement business logic\n")
-		buf.WriteString("\treturn &")
+			buf.WriteString("\treturn &")
 		if protoPkg != "" {
 			buf.WriteString("pb.")
 		}

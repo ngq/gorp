@@ -2,19 +2,6 @@ package cmd
 
 import "testing"
 
-func TestProtoGenDefaultOutputDirFallsBackToProtoDir(t *testing.T) {
-	protoDir = "api/proto"
-	outputDir = ""
-
-	out := outputDir
-	if out == "" {
-		out = protoDir
-	}
-	if out != "api/proto" {
-		t.Fatalf("expected output dir to fall back to proto dir, got %q", out)
-	}
-}
-
 func TestCreateProtoGeneratorRespectsHTTPFlag(t *testing.T) {
 	gen, err := createProtoGenerator(false)
 	if err != nil {
@@ -37,10 +24,10 @@ func TestCreateProtoGeneratorRespectsHTTPFlag(t *testing.T) {
 // 都注册了 -f, --proto-file flag，且不再使用旧名 --proto / --proto-files。
 func TestProtoSubcommandsHaveConsistentProtoFileFlag(t *testing.T) {
 	cmds := map[string][]string{
-		"gen":         {"proto-file"},
 		"gen-service": {"proto-file", "proto-dir"},
 		"gen-client":  {"proto-file"},
 		"all":         {"proto-file", "proto-dir"},
+		"openapi":     {"proto-file"},
 	}
 
 	for name, expectedFlags := range cmds {

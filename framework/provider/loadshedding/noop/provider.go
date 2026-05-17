@@ -42,9 +42,6 @@ func (p *Provider) Provides() []string {
 // Noop loadshedding 无依赖。
 func (p *Provider) DependsOn() []string { return nil }
 
-// Requires 返回该 provider 依赖的容器 key 列表（无外部依赖）。
-func (p *Provider) Requires() []string { return nil }
-
 // Register 将 noop LoadShedder 实例注册到容器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(resiliencecontract.LoadShedderKey, func(c runtimecontract.Container) (any, error) {

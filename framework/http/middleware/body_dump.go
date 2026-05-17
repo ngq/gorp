@@ -39,6 +39,19 @@ type HTTPExchangeCapture struct {
 	ResponseTruncated bool
 }
 
+// DefaultSensitiveHeaders is the default list of sensitive header keys that are excluded
+// from capture to avoid leaking credentials and security tokens.
+//
+// DefaultSensitiveHeaders 是默认的敏感头键列表，捕获时排除以避免泄露凭证和安全令牌。
+var DefaultSensitiveHeaders = map[string]struct{}{
+	"authorization":   {},
+	"cookie":          {},
+	"x-csrf-token":    {},
+	"x-xsrf-token":    {},
+	"proxy-authorization": {},
+	"www-authenticate":    {},
+}
+
 // BodyDumpOptions controls request-response capture behavior.
 //
 // BodyDumpOptions 控制请求响应捕获行为。
@@ -48,8 +61,14 @@ type BodyDumpOptions struct {
 	CaptureRequestBody     bool
 	CaptureResponseBody    bool
 	MaxBodyBytes           int
-	Skip                   func(transportcontract.HTTPContext) bool
-	OnCapture              func(transportcontract.HTTPContext, *HTTPExchangeCapture)
+	// SensitiveHeaders is a set of header keys (case-insensitive) to exclude from capture.
+	// If nil, DefaultSensitiveHeaders is used. Set to an empty map to capture all headers.
+	//
+	// SensitiveHeaders 是捕获时要排除的头部键集合（大小写不敏感）。
+	// 若为 nil 则使用 DefaultSensitiveHeaders。设为空 map 可捕获所有头部。
+	SensitiveHeaders map[string]struct{}
+	Skip             func(transportcontract.HTTPContext) bool
+	OnCapture        func(transportcontract.HTTPContext, *HTTPExchangeCapture)
 }
 
 // BodyDump captures request-response exchange details and forwards them to the configured callback.
@@ -101,7 +120,7 @@ func BodyDump(opts BodyDumpOptions) transportcontract.HTTPMiddleware {
 				dump.Tenant = tenant
 			}
 			if opts.CaptureRequestHeaders {
-				dump.RequestHeaders = flattenHeaders(requestHeaders(c))
+				dump.RequestHeaders = flattenHeaders(requestHeaders(c), opts.SensitiveHeaders)
 			}
 
 			var requestCapture *captureReadCloser
@@ -138,7 +157,7 @@ func BodyDump(opts BodyDumpOptions) transportcontract.HTTPMiddleware {
 					dump.ResponseTruncated = responseCapture.Truncated()
 				}
 				if opts.CaptureResponseHeaders {
-					dump.ResponseHeaders = flattenHeaders(responseCapture.Header())
+					dump.ResponseHeaders = flattenHeaders(responseCapture.Header(), opts.SensitiveHeaders)
 				}
 			}
 			if opts.OnCapture != nil {
@@ -252,6 +271,9 @@ func normalizeBodyDumpOptions(opts BodyDumpOptions) BodyDumpOptions {
 	if opts.MaxBodyBytes <= 0 {
 		opts.MaxBodyBytes = 4 << 10
 	}
+	if opts.SensitiveHeaders == nil {
+		opts.SensitiveHeaders = DefaultSensitiveHeaders
+	}
 	return opts
 }
 
@@ -288,16 +310,24 @@ func requestHeaders(c transportcontract.HTTPContext) http.Header {
 	return c.Request().Header
 }
 
-// flattenHeaders converts a header map into a single-value string map.
+// flattenHeaders converts a header map into a single-value string map,
+// excluding any headers listed in sensitiveHeaders (case-insensitive match).
 //
-// flattenHeaders 将头部集合转换为单值字符串 map。
-func flattenHeaders(header http.Header) map[string]string {
+// flattenHeaders 将头部集合转换为单值字符串 map，
+// 排除 sensitiveHeaders 中列出的头部（大小写不敏感匹配）。
+func flattenHeaders(header http.Header, sensitiveHeaders map[string]struct{}) map[string]string {
 	if len(header) == 0 {
 		return map[string]string{}
 	}
 	result := make(map[string]string, len(header))
 	for key, values := range header {
 		if len(values) == 0 {
+			continue
+		}
+		// Check if header is sensitive (case-insensitive)
+		lowerKey := strings.ToLower(key)
+		if _, isSensitive := sensitiveHeaders[lowerKey]; isSensitive {
+			result[key] = "[REDACTED]"
 			continue
 		}
 		result[key] = strings.Join(values, ",")

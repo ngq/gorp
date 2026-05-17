@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 
@@ -49,11 +50,14 @@ func NewHTTPService(name string, h transportcontract.HTTP) *HTTPService {
 func (s *HTTPService) Name() string { return s.name }
 
 // Start starts the HTTP server in background.
+// 非 ErrServerClosed 的错误会通过 slog.Error 记录。
 //
 // Start 在后台启动 HTTP 服务器。
+// 非 ErrServerClosed 的错误会通过 slog.Error 记录。
 func (s *HTTPService) Start(ctx context.Context) error {
 	go func() {
 		if err := s.http.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("http server error", "error", err)
 		}
 	}()
 	return nil
@@ -141,11 +145,15 @@ func NewGRPCService(name string, server *grpc.Server, lis net.Listener) *GRPCSer
 func (s *GRPCService) Name() string { return s.name }
 
 // Start starts the GRPC server in background.
+// 非 grpc.ErrServerStopped 的错误会通过 slog.Error 记录。
 //
 // Start 在后台启动 GRPC 服务器。
+// 非 grpc.ErrServerStopped 的错误会通过 slog.Error 记录。
 func (s *GRPCService) Start(ctx context.Context) error {
 	go func() {
-		_ = s.server.Serve(s.lis)
+		if err := s.server.Serve(s.lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			slog.Error("grpc server error", "error", err)
+		}
 	}()
 	return nil
 }

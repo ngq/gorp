@@ -134,7 +134,7 @@ func TestRenderMultiIndependentTemplateIncludesStarterMarkers(t *testing.T) {
 	mainText := string(mainContent)
 	require.Contains(t, mainText, "gorp.Run(")
 	require.NotContains(t, mainText, "gorp.HTTP()")
-	require.Contains(t, mainText, "gorp.WithMonolithMode()")
+	require.Contains(t, mainText, "gorp.WithMonoGovernance()")
 	require.Contains(t, mainText, "gorp.WithMigrate(migrate)")
 	require.Contains(t, mainText, "gorp.WithSetup(setup)")
 	require.NotContains(t, mainText, "frameworkbootstrap.BootHTTPService(")

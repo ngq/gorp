@@ -46,6 +46,9 @@ func Timeout(timeout time.Duration) transportcontract.HTTPMiddleware {
 			select {
 			case <-done:
 			case <-ctx.Done():
+				// Wait for the handler to finish to avoid race condition
+				// 等待 handler 完成以避免 race condition
+				<-done
 				if gc, ok := unwrapGinContext(c); ok {
 					writeGinResponseHeaders(gc)
 					resp := Response{
@@ -84,6 +87,9 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		select {
 		case <-done:
 		case <-ctx.Done():
+			// Wait for the handler to finish to avoid race condition
+			// 等待 handler 完成以避免 race condition
+			<-done
 			writeGinResponseHeaders(c)
 			resp := Response{
 				Code:    CodeServiceUnavailable,
@@ -114,6 +120,9 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 		select {
 		case <-done:
 		case <-ctx.Done():
+			// Wait for the handler to finish to avoid race condition
+			// 等待 handler 完成以避免 race condition
+			<-done
 			if onTimeout != nil {
 				onTimeout(c)
 			} else {

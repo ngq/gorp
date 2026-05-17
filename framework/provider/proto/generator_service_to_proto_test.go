@@ -250,3 +250,244 @@ func TestNewGenerator(t *testing.T) {
 		t.Errorf("unexpected DefaultProtoDir: %s", retrievedCfg.DefaultProtoDir)
 	}
 }
+
+// TestGenerator_GenFromService_WithHTTPAnnotation 测试带 HTTP 注释的方法生成 HTTP 注解。
+//
+// 中文说明：
+// - 验证方法注释中的 HTTP: 标记被正确解析为 google.api.http 注解；
+// - 验证不带 HTTP: 标记的方法只生成纯 gRPC；
+// - 验证自动导入 google/api/annotations.proto。
+func TestGenerator_GenFromService_WithHTTPAnnotation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	serviceContent := `package service
+
+import "context"
+
+// UserService 用户服务接口。
+type UserService interface {
+	// GetUser 获取用户
+	// HTTP: GET /v1/users/{id}
+	GetUser(ctx context.Context, req *GetUserRequest) (*GetUserResponse, error)
+
+	// CreateUser 创建用户
+	// HTTP: POST /v1/users
+	CreateUser(ctx context.Context, req *CreateUserRequest) (*CreateUserResponse, error)
+
+	// ValidateToken 验证 token - 只 gRPC，无 HTTP
+	ValidateToken(ctx context.Context, req *ValidateTokenRequest) (*ValidateTokenResponse, error)
+}
+
+type GetUserRequest struct {
+	ID int64 ` + "`json:\"id\"`" + `
+}
+
+type GetUserResponse struct {
+	ID       int64  ` + "`json:\"id\"`" + `
+	Username string ` + "`json:\"username\"`" + `
+}
+
+type CreateUserRequest struct {
+	Username string ` + "`json:\"username\"`" + `
+	Email    string ` + "`json:\"email\"`" + `
+}
+
+type CreateUserResponse struct {
+	ID int64 ` + "`json:\"id\"`" + `
+}
+
+type ValidateTokenRequest struct {
+	Token string ` + "`json:\"token\"`" + `
+}
+
+type ValidateTokenResponse struct {
+	Valid bool ` + "`json:\"valid\"`" + `
+}
+`
+	servicePath := filepath.Join(tmpDir, "user_service.go")
+	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+		t.Fatalf("failed to write service file: %v", err)
+	}
+
+	cfg := &integrationcontract.ProtoGeneratorConfig{
+		DefaultProtoDir: tmpDir,
+	}
+	gen, err := NewGenerator(cfg)
+	if err != nil {
+		t.Fatalf("failed to create generator: %v", err)
+	}
+
+	outputPath := filepath.Join(tmpDir, "user.proto")
+	opts := integrationcontract.ServiceToProtoOptions{
+		ServicePath: servicePath,
+		OutputPath:  outputPath,
+		Package:     "user.v1",
+		GoPackage:   "github.com/example/api/user/v1;userv1",
+		// 不需要 IncludeHTTP=true，HTTP 注解从方法注释自动解析
+	}
+
+	err = gen.GenFromService(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("GenFromService failed: %v", err)
+	}
+
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("failed to read proto file: %v", err)
+	}
+	contentStr := string(content)
+
+	// 验证自动导入 HTTP 注解
+	assertContainsAll(t, contentStr, `import "google/api/annotations.proto"`)
+
+	// 验证 GetUser 有 HTTP 注解
+	assertContainsAll(t, contentStr,
+		`rpc GetUser(GetUserRequest) returns (GetUserResponse) {`,
+		`option (google.api.http) = {`,
+		`get: "/v1/users/{id}"`,
+	)
+
+	// 验证 CreateUser 有 HTTP 注解（POST 默认带 body）
+	assertContainsAll(t, contentStr,
+		`rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {`,
+		`post: "/v1/users"`,
+		`body: "*"`,
+	)
+
+	// 验证 ValidateToken 无 HTTP 注解（只有 gRPC）
+	assertContainsAll(t, contentStr, `rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);`)
+	assertNotContainsAll(t, contentStr, `rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {`)
+}
+
+// TestParseHTTPAnnotation 测试 HTTP 注释解析。
+//
+// 中文说明：
+// - 验证各种 HTTP 注释格式的解析；
+// - 验证格式不规范时的错误提示。
+func TestParseHTTPAnnotation(t *testing.T) {
+	cfg := &integrationcontract.ProtoGeneratorConfig{}
+	gen, err := NewGenerator(cfg)
+	if err != nil {
+		t.Fatalf("failed to create generator: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		comments    []string
+		wantRule    bool
+		wantMethod  string
+		wantPath    string
+		wantBody    string
+		wantErrPart string
+	}{
+		{
+			name:       "valid GET",
+			comments:   []string{"GetUser 获取用户", "HTTP: GET /v1/users/{id}"},
+			wantRule:   true,
+			wantMethod: "GET",
+			wantPath:   "/v1/users/{id}",
+		},
+		{
+			name:       "valid POST",
+			comments:   []string{"CreateUser 创建用户", "HTTP: POST /v1/users"},
+			wantRule:   true,
+			wantMethod: "POST",
+			wantPath:   "/v1/users",
+			wantBody:   "*",
+		},
+		{
+			name:       "valid PUT",
+			comments:   []string{"UpdateUser 更新用户", "HTTP: PUT /v1/users/{id}"},
+			wantRule:   true,
+			wantMethod: "PUT",
+			wantPath:   "/v1/users/{id}",
+			wantBody:   "*",
+		},
+		{
+			name:       "valid DELETE",
+			comments:   []string{"DeleteUser 删除用户", "HTTP: DELETE /v1/users/{id}"},
+			wantRule:   true,
+			wantMethod: "DELETE",
+			wantPath:   "/v1/users/{id}",
+		},
+		{
+			name:       "valid PATCH",
+			comments:   []string{"PatchUser 部分更新用户", "HTTP: PATCH /v1/users/{id}"},
+			wantRule:   true,
+			wantMethod: "PATCH",
+			wantPath:   "/v1/users/{id}",
+			wantBody:   "*",
+		},
+		{
+			name:        "invalid - empty HTTP annotation",
+			comments:    []string{"GetUser 获取用户", "HTTP:"},
+			wantRule:    false,
+			wantErrPart: "HTTP annotation is empty",
+		},
+		{
+			name:        "invalid - missing path",
+			comments:    []string{"GetUser 获取用户", "HTTP: GET"},
+			wantRule:    false,
+			wantErrPart: "invalid HTTP annotation format",
+		},
+		{
+			name:        "invalid - path without leading slash",
+			comments:    []string{"GetUser 获取用户", "HTTP: GET v1/users/{id}"},
+			wantRule:    false,
+			wantErrPart: "path must start with /",
+		},
+		{
+			name:        "invalid - unsupported method",
+			comments:    []string{"GetUser 获取用户", "HTTP: OPTIONS /v1/users"},
+			wantRule:    false,
+			wantErrPart: "invalid HTTP method",
+		},
+		{
+			name:     "no HTTP annotation",
+			comments: []string{"ValidateToken 验证 token", "这是一个内部方法"},
+			wantRule: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rule, err := gen.parseHTTPAnnotation(tt.comments)
+
+			if tt.wantErrPart != "" {
+				if err == nil {
+					t.Errorf("expected error containing %q, got nil", tt.wantErrPart)
+					return
+				}
+				if !strings.Contains(err.Error(), tt.wantErrPart) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.wantErrPart)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if tt.wantRule {
+				if rule == nil {
+					t.Error("expected HTTPRule, got nil")
+					return
+				}
+				if rule.Method != tt.wantMethod {
+					t.Errorf("method: got %q, want %q", rule.Method, tt.wantMethod)
+				}
+				if rule.Path != tt.wantPath {
+					t.Errorf("path: got %q, want %q", rule.Path, tt.wantPath)
+				}
+				if tt.wantBody != "" && rule.Body != tt.wantBody {
+					t.Errorf("body: got %q, want %q", rule.Body, tt.wantBody)
+				}
+			} else {
+				if rule != nil {
+					t.Errorf("expected no HTTPRule, got %+v", rule)
+				}
+			}
+		})
+	}
+}

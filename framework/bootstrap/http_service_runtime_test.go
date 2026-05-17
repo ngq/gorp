@@ -39,7 +39,7 @@ func TestNewHTTPServiceRuntimeLeavesGovernanceOverrideEmptyByDefault(t *testing.
 		return sentinel
 	}
 
-	_, err := NewHTTPServiceRuntime("demo", HTTPServiceOptions{})
+	_, err := NewHTTPServiceRuntime(HTTPServiceOptions{})
 	require.Error(t, err)
 	require.ErrorIs(t, err, sentinel)
 	require.Empty(t, gotMode)
@@ -65,12 +65,12 @@ func TestNewHTTPServiceRuntimeForwardsMicroserviceGovernanceOverride(t *testing.
 		return sentinel
 	}
 
-	_, err := NewHTTPServiceRuntime("demo", HTTPServiceOptions{
-		GovernanceMode: string(resiliencecontract.GovernanceModeMicroservice),
+	_, err := NewHTTPServiceRuntime(HTTPServiceOptions{
+		GovernanceMode: string(resiliencecontract.GovernanceModeMicro),
 	})
 	require.Error(t, err)
 	require.ErrorIs(t, err, sentinel)
-	require.Equal(t, string(resiliencecontract.GovernanceModeMicroservice), gotMode)
+	require.Equal(t, string(resiliencecontract.GovernanceModeMicro), gotMode)
 }
 
 func TestNewHTTPServiceRuntimeForwardsGovernanceDisableAndProviderOverrides(t *testing.T) {
@@ -93,7 +93,7 @@ func TestNewHTTPServiceRuntimeForwardsGovernanceDisableAndProviderOverrides(t *t
 		return sentinel
 	}
 
-	_, err := NewHTTPServiceRuntime("demo", HTTPServiceOptions{
+	_, err := NewHTTPServiceRuntime(HTTPServiceOptions{
 		GovernanceDisable:   []string{"tracing"},
 		GovernanceProviders: map[string]string{"serviceauth": "mtls"},
 	})

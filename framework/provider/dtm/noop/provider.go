@@ -169,11 +169,16 @@ func (b *noopXABuilder) Submit(ctx context.Context) error {
 }
 
 // noopBarrierHandler implements BarrierHandler with no-op behavior.
+// 注意：Call 方法返回 ErrNoopDTM，不会调用业务回调 fn。
+// 这与其他 noop provider 的"静默安全"策略一致。
 //
 // noopBarrierHandler 使用空行为实现 BarrierHandler 接口。
 type noopBarrierHandler struct{}
 
 func (h *noopBarrierHandler) Call(ctx context.Context, fn func(db any) error) error {
 	_ = ctx
-	return fn(nil)
+	_ = fn
+	// 返回 ErrNoopDTM 而非调用 fn(nil)，避免业务代码 nil panic
+	// 与其他 noop provider 的"静默安全"策略一致
+	return ErrNoopDTM
 }

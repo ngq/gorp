@@ -10,21 +10,27 @@
 package middleware
 
 import (
+	"runtime/debug"
+
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	frameworkbizlog "github.com/ngq/gorp/framework/log"
 )
 
 // RecoveryMiddleware recovers panics and returns a unified internal-error response.
+// 包含 stack trace 以便生产环境排查问题。
 //
 // RecoveryMiddleware 捕获 panic，并返回统一的内部错误响应。
+// 包含 stack trace 以便生产环境排查问题。
 func RecoveryMiddleware() transportcontract.HTTPMiddleware {
 	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
 		return func(c transportcontract.HTTPContext) {
 			defer func() {
 				if rec := recover(); rec != nil {
+					stack := string(debug.Stack())
 					frameworkbizlog.Ctx(c.Context()).Error("http panic recovered",
 						observabilitycontract.Field{Key: "panic", Value: rec},
+						observabilitycontract.Field{Key: "stack", Value: stack},
 					)
 					responderFor(c).InternalError(c, "internal server error")
 				}

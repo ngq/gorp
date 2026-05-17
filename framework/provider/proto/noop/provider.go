@@ -74,7 +74,7 @@ func (g *noopGenerator) GenFromService(ctx context.Context, opts integrationcont
 	return generateProtoTemplate(opts)
 }
 
-// GenFromRoute 支持从 Route 生成 Proto（纯文本生成，不依赖 protoc）。
+// GenFromRoute 支持从 Route 生成 Proto（迁移工具，纯文本生成）。
 //
 // 中文说明：
 // - 解析 Gin 路由定义；

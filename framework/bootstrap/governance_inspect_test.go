@@ -24,7 +24,7 @@ import (
 func TestRegisterGovernanceInspectEndpointsUsesGET(t *testing.T) {
 	router := &recordingRouter{}
 	summary := GovernanceSummary{
-		Mode:            resiliencecontract.GovernanceModeMicroservice,
+		Mode:            resiliencecontract.GovernanceModeMicro,
 		EnabledFeatures: []string{"logging", "metrics"},
 	}
 
@@ -39,7 +39,7 @@ func TestRegisterGovernanceInspectEndpointsServesSummaryJSON(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		Mode:               resiliencecontract.GovernanceModeMicro,
 		EnabledFeatures:    []string{"logging", "metrics", "serviceauth"},
 		DisabledByOverride: []string{"tracing"},
 		ProviderBackends: map[string]string{
@@ -71,7 +71,7 @@ func TestRegisterGovernanceInspectEndpointsServesDiagnosticText(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode:            resiliencecontract.GovernanceModeMicroservice,
+		Mode:            resiliencecontract.GovernanceModeMicro,
 		ModeSource:      "code_override",
 		ModeReason:      "mode selected by startup option",
 		EnabledFeatures: []string{"logging", "metrics", "serviceauth"},
@@ -97,8 +97,8 @@ func TestRegisterGovernanceInspectEndpointsServesDiagnosticText(t *testing.T) {
 			},
 		},
 		ConfigSnapshot: map[string]any{
-			"governance.mode":                  "microservice",
-			"startup.governance_mode_override": "microservice",
+			"governance.mode":                  "micro",
+			"startup.governance_mode_override": "micro",
 			"governance.providers":             map[string]string{"selector": "unknown"},
 		},
 	}
@@ -120,7 +120,7 @@ func TestRegisterGovernanceInspectEndpointsServesDiagnosticText(t *testing.T) {
 	require.Contains(t, w.Body.String(), "requested=unknown")
 	require.Contains(t, w.Body.String(), "fallback=noop")
 	require.Contains(t, w.Body.String(), "Config Snapshot")
-	require.Contains(t, w.Body.String(), "governance.mode: microservice")
+	require.Contains(t, w.Body.String(), "governance.mode: micro")
 }
 
 func TestRegisterGovernanceInspectEndpointsSupportsBriefView(t *testing.T) {
@@ -128,7 +128,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsBriefView(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		Mode:               resiliencecontract.GovernanceModeMicro,
 		ModeSource:         "code_override",
 		ModeReason:         "mode selected by startup option",
 		EnabledFeatures:    []string{"logging", "metrics"},
@@ -158,7 +158,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsProvidersView(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode: resiliencecontract.GovernanceModeMicroservice,
+		Mode: resiliencecontract.GovernanceModeMicro,
 		ProviderDecisions: map[string]GovernanceProviderDecision{
 			"selector": {
 				Backend:          "noop",
@@ -190,7 +190,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsFeaturesView(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode: resiliencecontract.GovernanceModeMonolith,
+		Mode: resiliencecontract.GovernanceModeMono,
 		FeatureDecisions: map[string]GovernanceFeatureDecision{
 			"logging": {Enabled: true, Source: "mode_default", Reason: "logging is enabled by the current governance mode defaults"},
 			"retry":   {Enabled: false, Source: "mode_default", Reason: "retry is not part of the current governance mode defaults"},
@@ -215,10 +215,10 @@ func TestRegisterGovernanceInspectEndpointsSupportsConfigView(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode:       resiliencecontract.GovernanceModeMicroservice,
+		Mode:       resiliencecontract.GovernanceModeMicro,
 		ModeSource: "config_override",
 		ConfigSnapshot: map[string]any{
-			"governance.mode":      "microservice",
+			"governance.mode":      "micro",
 			"governance.disable":   []string{"tracing"},
 			"governance.providers": map[string]string{"serviceauth": "mtls"},
 		},
@@ -232,7 +232,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsConfigView(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), "Governance Config Snapshot")
-	require.Contains(t, w.Body.String(), "- governance.mode: microservice")
+	require.Contains(t, w.Body.String(), "- governance.mode: micro")
 	require.Contains(t, w.Body.String(), "- governance.disable: [tracing]")
 	require.Contains(t, w.Body.String(), "- governance.providers: {serviceauth=mtls}")
 	require.NotContains(t, w.Body.String(), "Providers")
@@ -244,7 +244,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsFullView(t *testing.T) {
 	engine := gin.New()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
-		Mode:            resiliencecontract.GovernanceModeMicroservice,
+		Mode:            resiliencecontract.GovernanceModeMicro,
 		ModeSource:      "code_override",
 		ModeReason:      "mode selected by startup option",
 		ResolutionOrder: []string{"code_explicit_override", "config_explicit_override", "mode_defaults", "provider_fallback"},
@@ -255,7 +255,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsFullView(t *testing.T) {
 			"selector": {Backend: "noop", Source: "provider_fallback", Reason: "provider backend fell back to noop selector"},
 		},
 		ConfigSnapshot: map[string]any{
-			"governance.mode": "microservice",
+			"governance.mode": "micro",
 		},
 	}
 

@@ -96,9 +96,11 @@ func (v *noopValidator) SetLocale(locale string) error {
 }
 
 // TranslateError wraps the error as BadRequest AppError.
+// Returns error interface; caller can cast to resiliencecontract.AppError if needed.
 //
 // TranslateError 将错误包装为 BadRequest AppError。
-func (v *noopValidator) TranslateError(err error) resiliencecontract.AppError {
+// 返回 error 接口；调用方可在需要时断言为 resiliencecontract.AppError。
+func (v *noopValidator) TranslateError(err error) error {
 	if err == nil {
 		return nil
 	}

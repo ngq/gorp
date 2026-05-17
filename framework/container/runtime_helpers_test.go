@@ -38,6 +38,8 @@ func (m *mockRedis) Del(ctx context.Context, key string) error                  
 func (m *mockRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
+func (m *mockRedis) MSet(ctx context.Context, kvs map[string]string) error { return nil }
+func (m *mockRedis) Expire(ctx context.Context, key string, ttl time.Duration) error { return nil }
 
 // mockCache implements datacontract.Cache
 type mockCache struct{}
@@ -48,6 +50,7 @@ func (m *mockCache) Del(ctx context.Context, key string) error                  
 func (m *mockCache) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
+func (m *mockCache) MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error { return nil }
 func (m *mockCache) Remember(ctx context.Context, key string, ttl time.Duration, fn func(ctx context.Context) (string, error)) (string, error) {
 	return fn(ctx)
 }
@@ -71,8 +74,8 @@ func (m *mockValidator) ValidateVar(ctx context.Context, v any, tag string) erro
 func (m *mockValidator) RegisterCustom(name string, fn datacontract.CustomValidateFunc) error {
 	return nil
 }
-func (m *mockValidator) SetLocale(locale string) error                        { return nil }
-func (m *mockValidator) TranslateError(err error) resiliencecontract.AppError { return nil }
+func (m *mockValidator) SetLocale(locale string) error            { return nil }
+func (m *mockValidator) TranslateError(err error) error           { return nil }
 
 // mockRetry implements resiliencecontract.Retry
 type mockRetry struct{}

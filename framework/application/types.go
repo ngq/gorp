@@ -57,6 +57,7 @@ type HTTPServiceOptions struct {
 	DisableGorm    bool
 	DisableMetrics bool
 	GovernanceMode resiliencecontract.GovernanceMode
+	HTTPMode       resiliencecontract.HTTPMode // HTTP 模式维度：contract 或 gin
 	GovernanceDisable []string
 	GovernanceEnable  []string
 	GovernanceProviders map[string]string

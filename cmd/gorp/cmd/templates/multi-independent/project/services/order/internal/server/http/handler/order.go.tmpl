@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	"{{.ModuleName}}/services/order/internal/server/http/request"
 	"{{.ModuleName}}/services/order/internal/server/http/response"
 	"{{.ModuleName}}/services/order/internal/service"
@@ -26,7 +26,7 @@ func NewOrderHandler(order *service.OrderService) *OrderHandler {
 	return &OrderHandler{order: order}
 }
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 
 func (h *OrderHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

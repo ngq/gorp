@@ -21,25 +21,6 @@ func TestSwaggerAndOpenAPIArtifactsStayInDocsDirectory(t *testing.T) {
 	}
 }
 
-func TestProtoGenerationArtifactsPreferProtoOrExplicitOutputDir(t *testing.T) {
-	protoDir = "api/proto"
-	outputDir = ""
-
-	out := outputDir
-	if out == "" {
-		out = protoDir
-	}
-	if out != "api/proto" {
-		t.Fatalf("expected proto output to default to proto dir, got %q", out)
-	}
-
-	outputDir = "gen/pb"
-	out = outputDir
-	if out != "gen/pb" {
-		t.Fatalf("expected explicit output dir to win, got %q", out)
-	}
-}
-
 func TestProtoHelpersDoNotTargetDocsOrManualDirectories(t *testing.T) {
 	if err := ensureProtoDir(filepath.Join("api", "proto", "user.proto")); err != nil {
 		t.Fatalf("ensureProtoDir failed: %v", err)

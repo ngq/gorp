@@ -22,7 +22,7 @@ var newOfflineBackend string
 var newOfflineWithDB bool
 var newOfflineWithSwagger bool
 var newOfflineFrameworkVersion string
-var newOfflineGovernanceMode string
+var newOfflineHTTP string
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)
@@ -83,11 +83,15 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	} else {
 		project.WithSwagger = starterProject.WithSwagger
 	}
-	if cmd.Flags().Changed("governance-mode") {
-		project.GovernanceMode = normalizeGovernanceMode(newOfflineGovernanceMode)
-	} else {
-		project.GovernanceMode = normalizeGovernanceMode("")
-	}
+
+	// HTTP 模式解析：--http 参数，不传则使用默认值 contract
+	// 治理模式由模板类型决定：golayout → mono，multi-* → micro
+	//
+	// HTTP mode: --http flag, defaults to contract
+	// Governance mode is determined by template: golayout → mono, multi-* → micro
+	project.HTTPMode = normalizeHTTPMode(newOfflineHTTP)
+	project.Governance = defaultGovernanceByTemplate(newOfflineTemplate)
+	project.GovernanceMode = expandGovernanceMode(project.Governance, project.HTTPMode)
 
 	folder, err := prepareScaffoldTargetDir(cwd, name)
 	if err != nil {
@@ -113,7 +117,7 @@ func init() {
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
 	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), if set, no replace directive will be generated")
-	newCmd.Flags().StringVar(&newOfflineGovernanceMode, "governance-mode", "", "governance mode: monolith, gin-first, microservice")
+	newCmd.Flags().StringVar(&newOfflineHTTP, "http", "", "HTTP mode: contract (default), gin")
 }
 
 func renderTemplateDir(src fs.FS, srcRoot string, dstRoot string, data map[string]any) error {

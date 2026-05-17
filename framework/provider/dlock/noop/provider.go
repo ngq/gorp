@@ -64,6 +64,8 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
 // noopLock implements datacontract.DistributedLock using local sync.Mutex.
+// 注意：locks 中的 mutex 在 Unlock 后会从 sync.Map 中删除，避免内存膨胀。
+// 但在高并发场景下，频繁创建/删除 mutex 可能影响性能，可考虑保留。
 //
 // noopLock 使用本地 sync.Mutex 实现 datacontract.DistributedLock 接口。
 type noopLock struct {
@@ -88,32 +90,28 @@ func (l *noopLock) Lock(ctx context.Context, key string, ttl time.Duration) erro
 }
 
 // TryLock attempts to acquire lock, returns immediately if locked by others.
+// 使用 sync.Mutex.TryLock 避免 goroutine 泄漏。
 //
 // TryLock 尝试获取锁，如果已被锁定则立即返回。
 func (l *noopLock) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 	_ = ttl
 	lock := l.getOrCreateLock(key)
 
-	locked := make(chan struct{})
-	go func() {
-		lock.Lock()
-		close(locked)
-	}()
-
-	select {
-	case <-locked:
+	if lock.TryLock() {
 		return true, nil
-	case <-ctx.Done():
-		return false, ctx.Err()
 	}
+	return false, nil
 }
 
-// Unlock releases the local mutex lock.
+// Unlock releases the local mutex lock and removes it from the map to prevent memory bloat.
+// Note: This may cause performance overhead in high-concurrency scenarios due to frequent mutex creation/deletion.
 //
-// Unlock 释放本地互斥锁。
+// Unlock 释放本地互斥锁并从 map 中删除，防止内存膨胀。
+// 注意：高并发场景下频繁创建/删除 mutex 可能影响性能。
 func (l *noopLock) Unlock(ctx context.Context, key string) error {
 	_ = ctx
 	if lock, ok := l.locks.Load(key); ok {
+		l.locks.Delete(key) // 删除锁记录，防止内存膨胀
 		lock.(*sync.Mutex).Unlock()
 	}
 	return nil
@@ -130,27 +128,18 @@ func (l *noopLock) Renew(ctx context.Context, key string, ttl time.Duration) err
 }
 
 // IsLocked checks if the key is currently locked.
+// 使用 sync.Mutex.TryLock 避免 goroutine 泄漏。
 //
 // IsLocked 检查键是否当前被锁定。
 func (l *noopLock) IsLocked(ctx context.Context, key string) (bool, error) {
 	lock := l.getOrCreateLock(key)
 
-	locked := make(chan bool)
-	go func() {
-		if lock.TryLock() {
-			lock.Unlock()
-			locked <- false
-		} else {
-			locked <- true
-		}
-	}()
-
-	select {
-	case result := <-locked:
-		return result, nil
-	case <-ctx.Done():
-		return false, ctx.Err()
+	// TryLock 成功说明之前未被锁定，立即释放
+	if lock.TryLock() {
+		lock.Unlock()
+		return false, nil
 	}
+	return true, nil
 }
 
 // WithLock acquires lock, executes function, then releases lock.

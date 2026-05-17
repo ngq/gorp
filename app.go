@@ -8,16 +8,18 @@
 //
 // Eg:
 //
-//	gorp.Run("my-service",
+//	gorp.Run(
 //	    gorp.WithProviders(configprovider.NewProvider()),
 //	    gorp.WithHTTPRoutes(registerRoutes),
 //	)
 //
 // HTTP is enabled by default. Use gorp.HTTP() only when you need HTTPServiceOptions.
 // Use gorp.WithoutHTTP() to explicitly disable the HTTP mainline.
+// Service name is read from config file (app.name) automatically.
 //
 // HTTP 默认已启用。仅当需要传入 HTTPServiceOptions 时才调用 gorp.HTTP()。
 // 使用 gorp.WithoutHTTP() 可显式关闭 HTTP 主线。
+// 服务名自动从配置文件 app.name 读取。
 package gorp
 
 import (
@@ -35,10 +37,6 @@ import (
 const DBRuntimeKey = data.DBRuntimeKey
 
 var (
-	// ErrServiceNameRequired indicates that the service name is missing.
-	//
-	// ErrServiceNameRequired 表示缺少服务名。
-	ErrServiceNameRequired = application.ErrServiceNameRequired
 	// ErrNoServiceDeclared indicates that no runnable service has been declared.
 	//
 	// ErrNoServiceDeclared 表示未声明可运行服务。
@@ -102,18 +100,30 @@ type HTTPServiceOptions = application.HTTPServiceOptions
 type GovernanceMode = resiliencecontract.GovernanceMode
 
 const (
-	// GovernanceModeMonolith keeps the runtime on the lightweight monolith governance mainline.
+	// GovernanceModeMono keeps the runtime on the lightweight mono governance mainline.
 	//
-	// GovernanceModeMonolith 表示继续使用轻量、单体优先的默认治理主线。
-	GovernanceModeMonolith = resiliencecontract.GovernanceModeMonolith
-	// GovernanceModeGinFirst keeps Gin-native development ergonomics on the shared governance mainline.
+	// GovernanceModeMono 表示继续使用轻量、单体优先的默认治理主线。
+	GovernanceModeMono = resiliencecontract.GovernanceModeMono
+	// GovernanceModeMicro enables the default microservice governance mainline.
 	//
-	// GovernanceModeGinFirst 表示在共享治理主线下优先保留 Gin 原生开发体验。
-	GovernanceModeGinFirst = resiliencecontract.GovernanceModeGinFirst
-	// GovernanceModeMicroservice enables the default microservice governance mainline.
+	// GovernanceModeMicro 表示启用默认微服务治理主线。
+	GovernanceModeMicro = resiliencecontract.GovernanceModeMicro
+)
+
+// HTTPMode is the top-level alias of the HTTP handling abstraction mode.
+//
+// HTTPMode 是 HTTP 处理抽象模式的顶层别名。
+type HTTPMode = resiliencecontract.HTTPMode
+
+const (
+	// HTTPModeContract uses gorp.HTTPContext abstraction.
 	//
-	// GovernanceModeMicroservice 表示启用默认微服务治理主线。
-	GovernanceModeMicroservice = resiliencecontract.GovernanceModeMicroservice
+	// HTTPModeContract 使用 gorp.HTTPContext 契约抽象。
+	HTTPModeContract = resiliencecontract.HTTPModeContract
+	// HTTPModeGin uses native gin.Context directly.
+	//
+	// HTTPModeGin 使用原生 gin.Context。
+	HTTPModeGin = resiliencecontract.HTTPModeGin
 )
 
 // ServiceProvider is the top-level alias of the runtime service provider contract.
@@ -142,49 +152,62 @@ type HTTPRouteRegistrar = application.HTTPRouteRegistrar
 type Option = application.Option
 
 // Run boots the default HTTP mainline with top-level gorp options.
+// Service name is read from config file (app.name) automatically.
 //
 // Run 使用顶层 gorp 选项启动默认 HTTP 主线。
+// 服务名自动从配置文件 app.name 读取。
 //
 // Example:
 //
 //	err := gorp.Run(
-//	    "user-service",
 //	    gorp.HTTP(),
 //	    gorp.WithHTTPRoutes(func(router gorp.HTTPRouter, c gorp.Container) error {
 //	        registerRoutes(router)
 //	        return nil
 //	    }),
 //	)
-func Run(serviceName string, options ...Option) error {
-	return application.Run(serviceName, options...)
+func Run(options ...Option) error {
+	return application.Run(options...)
 }
 
 // Start is an alias of Run.
 //
+// Deprecated: Use Run instead. Start is kept for backward compatibility.
+//
 // Start 是 Run 的同义入口。
-func Start(serviceName string, options ...Option) error {
-	return application.Start(serviceName, options...)
+//
+// Deprecated: 请使用 Run。Start 仅为向后兼容保留。
+func Start(options ...Option) error {
+	return application.Start(options...)
 }
 
 // RunContext boots the default HTTP mainline with an explicit context.
+// Service name is read from config file (app.name) automatically.
 //
 // RunContext 使用显式 context 启动默认 HTTP 主线。
-func RunContext(ctx context.Context, serviceName string, options ...Option) error {
-	return application.RunContext(ctx, serviceName, options...)
+// 服务名自动从配置文件 app.name 读取。
+func RunContext(ctx context.Context, options ...Option) error {
+	return application.RunContext(ctx, options...)
 }
 
 // BuildHTTPRuntime builds the HTTP runtime without starting listeners.
+// Service name is read from config file (app.name) automatically.
 //
 // BuildHTTPRuntime 构建 HTTP runtime，但不启动监听。
-func BuildHTTPRuntime(serviceName string, options ...Option) (*HTTPRuntime, error) {
-	return application.BuildHTTPRuntime(serviceName, options...)
+// 服务名自动从配置文件 app.name 读取。
+func BuildHTTPRuntime(options ...Option) (*HTTPRuntime, error) {
+	return application.BuildHTTPRuntime(options...)
 }
 
 // Build is an alias of BuildHTTPRuntime.
 //
+// Deprecated: Use BuildHTTPRuntime instead. Build is kept for backward compatibility.
+//
 // Build 是 BuildHTTPRuntime 的同义入口。
-func Build(serviceName string, options ...Option) (*HTTPRuntime, error) {
-	return application.Build(serviceName, options...)
+//
+// Deprecated: 请使用 BuildHTTPRuntime。Build 仅为向后兼容保留。
+func Build(options ...Option) (*HTTPRuntime, error) {
+	return application.Build(options...)
 }
 
 // HTTP declares that the default HTTP mainline should be used.
@@ -211,7 +234,7 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 //	gorp.Run("user-service",
 //	    gorp.HTTP(),
 //	    gorp.GRPC(),
-//	    gorp.WithMicroserviceMode(),
+//	    gorp.WithMicroMode(),
 //	    gorp.WithSetup(func(rt *gorp.HTTPRuntime) error {
 //	        pb.RegisterUserServiceServer(rt.GRPCServer, userService)
 //	        return nil
@@ -230,7 +253,11 @@ func WithoutHTTP() Option {
 
 // Module declares providers for a single module.
 //
+// Deprecated: Use WithProviders instead. Module is kept for backward compatibility.
+//
 // Module 声明单个模块的 providers。
+//
+// Deprecated: 请使用 WithProviders。Module 仅为向后兼容保留。
 func Module(providers ...ServiceProvider) Option {
 	return application.Module(providers...)
 }
@@ -244,7 +271,11 @@ func Modules(groups ...[]ServiceProvider) Option {
 
 // WithModule is the explicit named alias of Module.
 //
+// Deprecated: Use WithProviders instead. WithModule is kept for backward compatibility.
+//
 // WithModule 是 Module 的显式命名入口。
+//
+// Deprecated: 请使用 WithProviders。WithModule 仅为向后兼容保留。
 func WithModule(providers ...ServiceProvider) Option {
 	return application.WithModule(providers...)
 }
@@ -309,23 +340,51 @@ func WithGovernanceProvider(name, backend string) Option {
 	return application.WithGovernanceProvider(name, backend)
 }
 
-// WithMicroserviceMode selects the default microservice governance mainline.
+// WithMicroMode selects the microservice governance mainline.
 //
-// WithMicroserviceMode 选择默认微服务治理主线。
-func WithMicroserviceMode() Option {
-	return application.WithMicroserviceMode()
+// WithMicroMode 选择微服务治理主线。
+func WithMicroMode() Option {
+	return application.WithMicroMode()
 }
 
-// WithMonolithMode selects the default monolith governance mainline.
+// WithMonoMode selects the mono governance mainline.
 //
-// WithMonolithMode 选择默认单体治理主线。
-func WithMonolithMode() Option {
-	return application.WithMonolithMode()
+// WithMonoMode 选择单体治理主线。
+func WithMonoMode() Option {
+	return application.WithMonoMode()
 }
 
-// WithGinFirstMode selects the Gin-first governance mainline.
+// WithMicroGovernance selects microservice governance and HTTP contract mode.
 //
-// WithGinFirstMode 选择 Gin-first 治理主线。
-func WithGinFirstMode() Option {
-	return application.WithGinFirstMode()
+// WithMicroGovernance 选择微服务治理 + HTTP 契约模式。
+func WithMicroGovernance() Option {
+	return application.WithMicroGovernance()
+}
+
+// WithMonoGovernance selects mono governance (HTTP mode left to default or explicit).
+//
+// WithMonoGovernance 选择单体治理（HTTP 模式由默认值或显式参数决定）。
+func WithMonoGovernance() Option {
+	return application.WithMonoGovernance()
+}
+
+// WithHTTPMode declares the HTTP handling mode explicitly.
+//
+// WithHTTPMode 显式声明 HTTP 处理抽象模式。
+func WithHTTPMode(mode HTTPMode) Option {
+	return application.WithHTTPMode(mode)
+}
+
+// WithContractHTTPMode selects the gorp.HTTPContext contract abstraction.
+//
+// WithContractHTTPMode 选择 gorp.HTTPContext 契约抽象。
+func WithContractHTTPMode() Option {
+	return application.WithContractHTTPMode()
+}
+
+// WithGinHTTPMode selects the native gin.Context mode.
+//
+// WithGinHTTPMode 选择原生 gin.Context 模式。
+func WithGinHTTPMode() Option {
+	return application.WithGinHTTPMode()
 }

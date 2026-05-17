@@ -1,9 +1,0 @@
-module {{.Module}}
-
-go 1.22
-
-require (
-	{{.FrameworkModule}} {{.FrameworkVersion}}
-){{if .UseReplace}}
-
-replace {{.FrameworkModule}} => {{.FrameworkPath}}{{end}}

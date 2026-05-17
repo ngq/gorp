@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-const (
-	CircuitBreakerKey = "framework.circuit_breaker"
-	RateLimiterKey    = "framework.rate_limiter"
-)
+// CircuitBreakerKey is the container key for the circuit breaker capability.
+//
+// CircuitBreakerKey 是熔断器能力的容器键。
+const CircuitBreakerKey = "framework.circuit_breaker"
 
 type CircuitBreaker interface {
 	Allow(ctx context.Context, resource string) error

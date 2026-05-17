@@ -22,6 +22,11 @@ const ProtoGeneratorKey = "framework.proto.generator"
 type ProtoGenerator interface {
 	GenFromProto(ctx context.Context, opts ProtoGenOptions) error
 	GenFromService(ctx context.Context, opts ServiceToProtoOptions) error
+	// GenFromRoute generates proto from Gin route definitions.
+	// This is a migration tool for existing Gin projects, not a primary workflow.
+	//
+	// GenFromRoute 从 Gin 路由定义生成 proto。
+	// 这是现有 Gin 项目的迁移工具，不是主工作流。
 	GenFromRoute(ctx context.Context, opts RouteToProtoOptions) error
 	// GenClient generates typed RPC client wrapper from proto file.
 	// The generated wrapper provides type-safe method calls using the framework's RPCClient.
@@ -77,8 +82,10 @@ type ServiceToProtoOptions struct {
 }
 
 // RouteToProtoOptions describes generation from route declarations.
+// Used for migrating existing Gin projects to gRPC/proto workflow.
 //
 // RouteToProtoOptions 描述从路由声明生成 proto 的选项。
+// 用于将现有 Gin 项目迁移到 gRPC/proto 工作流。
 type RouteToProtoOptions struct {
 	RouteFile   string
 	HandlerFile string

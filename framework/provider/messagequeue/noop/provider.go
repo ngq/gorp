@@ -82,22 +82,33 @@ func (p *Provider) Boot(c runtimecontract.Container) error {
 var ErrNoopQueue = errors.New("messagequeue: noop mode, message queue not available in monolith")
 
 // noopQueue implements MessageQueue with no-op behavior.
+// publisher and subscriber are cached as singletons for consistent behavior.
 //
 // noopQueue 使用空行为实现 MessageQueue 接口。
-type noopQueue struct{}
-
-// Publisher returns a no-op publisher.
-//
-// Publisher 返回空发布者。
-func (q *noopQueue) Publisher() integrationcontract.MessagePublisher {
-	return &noopPublisher{}
+// publisher 和 subscriber 缓存为单例以保持行为一致。
+type noopQueue struct {
+	publisher integrationcontract.MessagePublisher
+	subscriber integrationcontract.MessageSubscriber
 }
 
-// Subscriber returns a no-op subscriber.
+// Publisher returns a no-op publisher (cached singleton).
 //
-// Subscriber 返回空订阅者。
+// Publisher 返回空发布者（缓存单例）。
+func (q *noopQueue) Publisher() integrationcontract.MessagePublisher {
+	if q.publisher == nil {
+		q.publisher = &noopPublisher{}
+	}
+	return q.publisher
+}
+
+// Subscriber returns a no-op subscriber (cached singleton).
+//
+// Subscriber 返回空订阅者（缓存单例）。
 func (q *noopQueue) Subscriber() integrationcontract.MessageSubscriber {
-	return &noopSubscriber{}
+	if q.subscriber == nil {
+		q.subscriber = &noopSubscriber{}
+	}
+	return q.subscriber
 }
 
 // Close does nothing and returns nil.

@@ -33,8 +33,21 @@ import (
 // It manages connection pooling, service discovery, metadata propagation,
 // tracing, service authentication, circuit breaker and retry.
 //
+// Connection Pool Behavior:
+// - Connections are cached by address in a sync.Map with no upper limit.
+// - Each unique service address creates one gRPC connection that is reused.
+// - Connections are closed when Client.Close() is called.
+// - For scenarios with many services, consider implementing a connection pool
+//   with LRU eviction or using a connection pool library.
+//
 // Client 使用 gRPC 实现 transportcontract.RPCClient。
 // 管理连接池、服务发现、metadata 传播、tracing、服务认证、熔断和重试。
+//
+// 连接池行为：
+// - 连接按地址缓存在 sync.Map 中，无上限。
+// - 每个唯一服务地址创建一个 gRPC 连接并复用。
+// - 调用 Client.Close() 时关闭所有连接。
+// - 对于服务数量多的场景，建议实现带 LRU 淘汰的连接池或使用连接池库。
 type Client struct {
 	cfg                *transportcontract.RPCConfig
 	registry           transportcontract.ServiceRegistry

@@ -9,18 +9,14 @@ package application
 
 import (
 	"context"
-	"strings"
 )
 
 // resolveRunConfig resolves and normalizes startup options.
+// Service name is no longer passed here; it will be read from config in bootstrap.
 //
 // resolveRunConfig 解析并归一化启动配置。
-func resolveRunConfig(serviceName string, options ...Option) (runConfig, error) {
-	serviceName = strings.TrimSpace(serviceName)
-	if serviceName == "" {
-		return runConfig{}, ErrServiceNameRequired
-	}
-
+// 服务名不再在此传入，将在 bootstrap 层从配置读取。
+func resolveRunConfig(options ...Option) (runConfig, error) {
 	cfg := runConfig{httpEnabled: true}
 	for _, opt := range options {
 		if opt != nil {

@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
-	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
@@ -27,8 +26,8 @@ func (s *exportValidatorStub) ValidateVar(context.Context, any, string) error { 
 func (s *exportValidatorStub) RegisterCustom(string, datacontract.CustomValidateFunc) error {
 	return nil
 }
-func (s *exportValidatorStub) SetLocale(string) error                           { return nil }
-func (s *exportValidatorStub) TranslateError(error) resiliencecontract.AppError { return nil }
+func (s *exportValidatorStub) SetLocale(string) error                    { return nil }
+func (s *exportValidatorStub) TranslateError(error) error               { return nil }
 
 type exportValidateContainerStub struct {
 	validator datacontract.Validator

@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -35,10 +36,20 @@ type JWTService struct {
 }
 
 // NewJWTService creates a new JWT service instance.
+// If secret is empty, a warning is logged because JWT operations will fail.
 //
 // NewJWTService 创建新的 JWT 服务实例。
+// 如果 secret 为空，会记录警告日志，因为 JWT 操作将会失败。
 func NewJWTService(secret, issuer, audience string) *JWTService {
-	return &JWTService{secret: strings.TrimSpace(secret), issuer: issuer, audience: audience}
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		slog.Warn("JWT service created with empty secret. " +
+			"Sign and Verify operations will fail. " +
+			"Provide a non-empty secret in production. " +
+			"JWT 服务使用空 secret 创建，Sign 和 Verify 操作将失败，" +
+			"生产环境请提供非空 secret。")
+	}
+	return &JWTService{secret: secret, issuer: issuer, audience: audience}
 }
 
 // Sign generates a JWT token from the given claims.
@@ -112,6 +123,14 @@ func (s *JWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
 	}
 	if claims.SubjectID == 0 || time.Now().Unix() >= claims.ExpiresAt {
 		return nil, errors.New("invalid token")
+	}
+	// 校验 issuer：如果服务配置了 issuer，则 token 的 issuer 必须匹配
+	if s.issuer != "" && claims.Issuer != "" && claims.Issuer != s.issuer {
+		return nil, errors.New("invalid token: issuer mismatch")
+	}
+	// 校验 audience：如果服务配置了 audience，则 token 的 audience 必须匹配
+	if s.audience != "" && claims.Audience != "" && claims.Audience != s.audience {
+		return nil, errors.New("invalid token: audience mismatch")
 	}
 	return &claims, nil
 }

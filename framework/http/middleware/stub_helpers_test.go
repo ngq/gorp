@@ -84,7 +84,7 @@ func (v *stubValidator) RegisterCustom(string, datacontract.CustomValidateFunc) 
 	return nil
 }
 func (v *stubValidator) SetLocale(string) error { return nil }
-func (v *stubValidator) TranslateError(err error) resiliencecontract.AppError {
+func (v *stubValidator) TranslateError(err error) error {
 	var appErr resiliencecontract.AppError
 	if errors.As(err, &appErr) {
 		return appErr

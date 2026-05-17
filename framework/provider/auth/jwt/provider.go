@@ -26,12 +26,35 @@ package jwt
 
 import (
 	"errors"
+	"log/slog"
 	"strings"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
+
+// defaultJWTSecret 是未配置 JWT secret 时的硬编码默认值。
+// 生产环境 MUST 修改此值，否则所有 JWT token 均可被伪造。
+const defaultJWTSecret = "default-secret-change-in-production"
+
+// unsafeSecretValues 是已知的不安全 secret 值列表。
+// 这些值通常来自模板默认配置，生产环境必须替换。
+var unsafeSecretValues = map[string]struct{}{
+	"change-me-in-production":             {},
+	"default-secret-change-in-production": {},
+	"your-secret-key":                     {},
+	"secret":                              {},
+	"jwt-secret":                          {},
+}
+
+// isUnsafeSecret checks if the given secret is a known unsafe placeholder value.
+//
+// isUnsafeSecret 检查给定的 secret 是否为已知的不安全占位符值。
+func isUnsafeSecret(secret string) bool {
+	_, unsafe := unsafeSecretValues[secret]
+	return unsafe
+}
 
 // Provider registers the JWT authentication service contract.
 //
@@ -78,7 +101,8 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(securitycontract.AuthJWTKey, func(c runtimecontract.Container) (any, error) {
 		cfgAny, err := c.Make(datacontract.ConfigKey)
 		if err != nil {
-			return NewJWTService("default-secret-change-in-production", "gorp", ""), nil
+			slog.Error("auth.jwt: config service unavailable, using default secret — MUST change in production!")
+			return NewJWTService(defaultJWTSecret, "gorp", ""), nil
 		}
 
 		cfg, ok := cfgAny.(datacontract.Config)
@@ -88,7 +112,13 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 
 		secret := JWTSecretFromConfig(cfg)
 		if secret == "" {
-			secret = "default-secret-change-in-production"
+			secret = defaultJWTSecret
+			slog.Error("auth.jwt: JWT secret not configured, using default secret — MUST change in production!")
+		} else if secret == defaultJWTSecret {
+			slog.Error("auth.jwt: JWT secret is the default value — MUST change in production!")
+		} else if isUnsafeSecret(secret) {
+			slog.Error("auth.jwt: JWT secret appears to be a template placeholder value — MUST change in production! " +
+				"Unsafe values include: change-me-in-production, your-secret-key, secret, jwt-secret")
 		}
 
 		issuer := strings.TrimSpace(cfg.GetString("auth.jwt.issuer"))

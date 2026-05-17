@@ -277,7 +277,8 @@ func parseError(err error) (int, string) {
 	if errors.As(err, &bizErr) {
 		return bizErr.Code(), bizErr.Message()
 	}
-	return CodeInternalError, err.Error()
+	// 非 BusinessError 不暴露内部错误细节，返回通用消息
+	return CodeInternalError, "internal server error"
 }
 
 func codeToHTTPStatus(code int) int {
@@ -299,9 +300,8 @@ func codeToHTTPStatus(code int) int {
 	case CodeServiceUnavailable:
 		return http.StatusServiceUnavailable
 	default:
-		if code >= 1001 && code <= 9999 {
-			return http.StatusBadRequest
-		}
+		// 未定义的业务码返回 InternalServerError，避免将服务端错误误判为客户端错误
+		// Undefined business codes return InternalServerError to avoid misclassifying server errors as client errors
 		return http.StatusInternalServerError
 	}
 }

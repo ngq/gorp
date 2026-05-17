@@ -345,7 +345,9 @@ type scaffoldInput struct {
 	Backend          string
 	WithDB           bool
 	WithSwagger      bool
-	GovernanceMode   string // 治理模式：monolith, gin-first, microservice
+	GovernanceMode   string // 旧字段，兼容模板：monolith, gin-first, microservice
+	HTTPMode         string // HTTP 模式维度：contract 或 gin
+	Governance       string // 治理维度：monolith 或 microservice
 }
 
 func buildScaffoldData(in scaffoldInput) map[string]any {
@@ -356,7 +358,9 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 	protoUserGoPackage := in.Module + "/proto/user/v1;userv1"
 	protoUserGoPackageLen := len([]byte(protoUserGoPackage))
 	kubeName := toKubernetesName(in.Name)
-	governanceMode := normalizeGovernanceMode(in.GovernanceMode)
+	httpMode := normalizeHTTPMode(in.HTTPMode)
+	governance := normalizeGovernance(in.Governance)
+	governanceMode := expandGovernanceMode(governance, httpMode)
 	return map[string]any{
 		"Name":                          in.Name,
 		"ProjectName":                   in.Name, // 别名，供 README 等模板使用
@@ -378,24 +382,63 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 		"WithDB":                        in.WithDB,
 		"WithSwagger":                   in.WithSwagger,
 		"GovernanceMode":                governanceMode,
-		"IsMonolithMode":                governanceMode == "monolith",
-		"IsGinFirstMode":                governanceMode == "gin-first",
-		"IsMicroserviceMode":            governanceMode == "microservice",
+		// 双维度模板变量
+		"HTTPMode":                httpMode,
+		"Governance":              governance,
+		"IsContractHTTPMode":      httpMode == "contract",
+		"IsGinHTTPMode":           httpMode == "gin",
+		"IsMonoGovernance":    governance == "mono",
+		"IsMicroGovernance": governance == "micro",
 		"ProtoUserGoPackage":            protoUserGoPackage,
 		"ProtoUserGoPackageLenHex":      fmt.Sprintf("\\x%02x", protoUserGoPackageLen),
 		"ProtoUserGoPackageFieldLenHex": fmt.Sprintf("\\x%02x", protoUserGoPackageLen+2),
 	}
 }
 
-// normalizeGovernanceMode 规范化治理模式，空值默认回落到 monolith。
-func normalizeGovernanceMode(mode string) string {
+// defaultGovernanceByTemplate 根据模板类型返回默认治理模式。
+// golayout → mono（单体），multi-* → micro（微服务）。
+//
+// defaultGovernanceByTemplate returns the default governance mode based on template type.
+// golayout → mono, multi-* → micro.
+func defaultGovernanceByTemplate(template string) string {
+	template = strings.TrimSpace(strings.ToLower(template))
+	switch template {
+	case starterTemplateMultiFlatWire, starterTemplateMultiIndependent:
+		return "micro"
+	default:
+		return "mono"
+	}
+}
+
+// normalizeHTTPMode 规范化 HTTP 模式，空值默认回落到 contract。
+func normalizeHTTPMode(mode string) string {
 	mode = strings.TrimSpace(strings.ToLower(mode))
 	switch mode {
-	case "microservice", "gin-first", "monolith":
+	case "contract", "gin":
 		return mode
 	default:
-		return "monolith"
+		return "contract"
 	}
+}
+
+// normalizeGovernance 规范化治理维度，空值默认回落到 monolith。
+func normalizeGovernance(mode string) string {
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	switch mode {
+	case "micro", "mono":
+		return mode
+	default:
+		return "mono"
+	}
+}
+
+// expandGovernanceMode 从双维度重建 GovernanceMode 值（供模板变量 GovernanceMode 使用）。
+func expandGovernanceMode(governance, httpMode string) string {
+	// gin + monolith -> gin-first（模板兼容旧字段）
+	if httpMode == "gin" && governance == "mono" {
+		return "gin-first"
+	}
+	return governance
 }
 
 func normalizeFrameworkReplacePath(path string) string {

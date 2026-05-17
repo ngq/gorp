@@ -19,13 +19,13 @@ import (
 
 func TestBuildGovernanceSummaryReportsOverridesAndProviders(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":                  "microservice",
+		"governance.mode":                  "micro",
 		"governance.disable":               []string{"tracing", "selector"},
 		"governance.providers.serviceauth": "mtls",
 	}}
 
-	summary := BuildGovernanceSummary(cfg, resiliencecontract.GovernanceModeMicroservice)
-	require.Equal(t, resiliencecontract.GovernanceModeMicroservice, summary.Mode)
+	summary := BuildGovernanceSummary(cfg, resiliencecontract.GovernanceModeMicro)
+	require.Equal(t, resiliencecontract.GovernanceModeMicro, summary.Mode)
 	require.Equal(t, "config_override", summary.ModeSource)
 	require.Contains(t, summary.DisabledByOverride, "selector")
 	require.Contains(t, summary.DisabledByOverride, "tracing")
@@ -46,7 +46,7 @@ func TestBuildGovernanceSummaryReportsOverridesAndProviders(t *testing.T) {
 
 func TestFormatGovernanceSummaryIncludesModeEnabledAndDisabled(t *testing.T) {
 	summary := GovernanceSummary{
-		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		Mode:               resiliencecontract.GovernanceModeMicro,
 		EnabledFeatures:    []string{"logging", "metrics", "serviceauth"},
 		DisabledByOverride: []string{"selector", "tracing"},
 		ProviderBackends: map[string]string{
@@ -56,7 +56,7 @@ func TestFormatGovernanceSummaryIncludesModeEnabledAndDisabled(t *testing.T) {
 	}
 
 	formatted := FormatGovernanceSummary(summary)
-	require.Contains(t, formatted, "mode=microservice")
+	require.Contains(t, formatted, "mode=micro")
 	require.Contains(t, formatted, "enabled=[logging, metrics, serviceauth]")
 	require.Contains(t, formatted, "disabled_by_override=[selector, tracing]")
 	require.Contains(t, formatted, "selector=noop")
@@ -65,7 +65,7 @@ func TestFormatGovernanceSummaryIncludesModeEnabledAndDisabled(t *testing.T) {
 
 func TestFormatGovernanceDiagnosticGroupsFeaturesProvidersAndSnapshot(t *testing.T) {
 	summary := GovernanceSummary{
-		Mode:            resiliencecontract.GovernanceModeMonolith,
+		Mode:            resiliencecontract.GovernanceModeMono,
 		ModeSource:      "implicit_default",
 		ModeReason:      "mode fell back to monolith because no config key was set",
 		ResolutionOrder: []string{"code_explicit_override", "config_explicit_override", "mode_defaults", "provider_fallback"},
@@ -82,7 +82,7 @@ func TestFormatGovernanceDiagnosticGroupsFeaturesProvidersAndSnapshot(t *testing
 			},
 		},
 		ConfigSnapshot: map[string]any{
-			"governance.mode": "monolith",
+			"governance.mode": "mono",
 		},
 	}
 
@@ -94,12 +94,12 @@ func TestFormatGovernanceDiagnosticGroupsFeaturesProvidersAndSnapshot(t *testing
 	require.Contains(t, diagnostic, "Providers")
 	require.Contains(t, diagnostic, "- tracing: noop")
 	require.Contains(t, diagnostic, "Config Snapshot")
-	require.Contains(t, diagnostic, "- governance.mode: monolith")
+	require.Contains(t, diagnostic, "- governance.mode: mono")
 }
 
 func TestFormatGovernanceDiagnosticViewSupportsBriefProvidersAndFeatures(t *testing.T) {
 	summary := GovernanceSummary{
-		Mode:               resiliencecontract.GovernanceModeMicroservice,
+		Mode:               resiliencecontract.GovernanceModeMicro,
 		ModeSource:         "config_override",
 		ModeReason:         "mode selected from config key governance.mode",
 		EnabledFeatures:    []string{"logging"},
@@ -137,7 +137,7 @@ func TestFormatGovernanceDiagnosticViewSupportsBriefProvidersAndFeatures(t *test
 func TestBuildGovernanceSummaryWithModeOverrideReportsCodeAndConfigSources(t *testing.T) {
 	cfg := overlayGovernanceConfig(
 		&selectorConfigStub{values: map[string]any{
-			"governance.mode":               "monolith",
+			"governance.mode":               "mono",
 			"governance.disable":            []string{"tracing"},
 			"governance.providers.selector": "random",
 			"tracing.enabled":               true,
@@ -151,7 +151,7 @@ func TestBuildGovernanceSummaryWithModeOverrideReportsCodeAndConfigSources(t *te
 		map[string]string{"serviceauth": "mtls"},
 	)
 
-	summary := BuildGovernanceSummaryWithModeOverride(cfg, resiliencecontract.GovernanceModeMicroservice, "microservice")
+	summary := BuildGovernanceSummaryWithModeOverride(cfg, resiliencecontract.GovernanceModeMicro, "micro")
 	require.Equal(t, "code_override", summary.ModeSource)
 	require.Contains(t, summary.DisabledByConfig, "tracing")
 	require.Contains(t, summary.DisabledByCode, "selector")
@@ -177,7 +177,7 @@ func TestBuildGovernanceSummaryProviderDecisionFallsBackWhenRequestedBackendUnkn
 		"governance.providers.selector": "unknown",
 	}}
 
-	summary := BuildGovernanceSummary(cfg, resiliencecontract.GovernanceModeMicroservice)
+	summary := BuildGovernanceSummary(cfg, resiliencecontract.GovernanceModeMicro)
 	require.Equal(t, "noop", summary.ProviderBackends["selector"])
 	require.Equal(t, "config_override", summary.ProviderDecisions["selector"].Source)
 	require.Contains(t, summary.ProviderDecisions["selector"].Reason, "requested backend unknown was unavailable")

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	"{{.ModuleName}}/app/http/request"
 	"{{.ModuleName}}/app/http/response"
 	"{{.ModuleName}}/internal/biz"
@@ -28,7 +28,7 @@ func NewDemoHandler(svc *service.DemoService) *DemoHandler {
 	return &DemoHandler{svc: svc}
 }
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 
 // Create 创建 Demo（Gin-first 原生风格）。
 func (h *DemoHandler) Create(c *gin.Context) {

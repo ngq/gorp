@@ -28,7 +28,7 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 	c := app.Container()
 	// 配置启用了 tracing，但代码侧显式关闭了 tracing
 	cfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":      "microservice",
+		"governance.mode":      "micro",
 		"tracing.enabled":      true,
 		"tracing.backend":      "otel",
 		"service_auth.enabled": true,
@@ -38,7 +38,7 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 	}, true)
 
 	// 代码侧显式关闭 tracing（模拟 WithGovernanceDisabled("tracing")）
-	if err := registerSelectedMicroserviceProvidersWithOptions(c, "microservice", []string{"tracing"}, nil, nil); err != nil {
+	if err := registerSelectedMicroserviceProvidersWithOptions(c, "micro", []string{"tracing"}, nil, nil); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestCodeProviderOverrideWinsOverConfigProviderOverrideForSameKey(t *testing
 	c := app.Container()
 	// 配置中 governance.providers.serviceauth 设为 mtls
 	cfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":                  "microservice",
+		"governance.mode":                  "micro",
 		"governance.providers.serviceauth": "mtls",
 		"service_auth.enabled":             true,
 	}}
@@ -72,7 +72,7 @@ func TestCodeProviderOverrideWinsOverConfigProviderOverrideForSameKey(t *testing
 	}, true)
 
 	// 代码侧 WithGovernanceProvider("serviceauth", "noop") 覆盖配置的 mtls
-	if err := registerSelectedMicroserviceProvidersWithOptions(c, "microservice", nil, nil, map[string]string{"serviceauth": "noop"}); err != nil {
+	if err := registerSelectedMicroserviceProvidersWithOptions(c, "micro", nil, nil, map[string]string{"serviceauth": "noop"}); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
@@ -92,29 +92,29 @@ func TestCodeProviderOverrideWinsOverConfigProviderOverrideForSameKey(t *testing
 // 代码显式覆盖 > 配置显式覆盖 > 模式默认值 > provider 兜底
 func TestOverridePriorityChainForSingleFeature(t *testing.T) {
 	// 级别4：provider 兜底 —— monolith 模式下 tracing 默认为 noop
-	noopCfg := &selectorConfigStub{values: map[string]any{"governance.mode": "monolith"}}
-	if got := SelectTracingProviderWithMode(noopCfg, resiliencecontract.GovernanceModeMonolith).Name(); got != "tracing.noop" {
+	noopCfg := &selectorConfigStub{values: map[string]any{"governance.mode": "mono"}}
+	if got := SelectTracingProviderWithMode(noopCfg, resiliencecontract.GovernanceModeMono).Name(); got != "tracing.noop" {
 		t.Fatalf("priority 4 (provider fallback): expected tracing.noop, got %s", got)
 	}
 
 	// 级别3：模式默认值 —— microservice 模式下 tracing 默认为 otel
-	modeCfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
-	if got := SelectTracingProviderWithMode(modeCfg, resiliencecontract.GovernanceModeMicroservice).Name(); got != "tracing.otel" {
+	modeCfg := &selectorConfigStub{values: map[string]any{"governance.mode": "micro"}}
+	if got := SelectTracingProviderWithMode(modeCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.otel" {
 		t.Fatalf("priority 3 (mode default): expected tracing.otel, got %s", got)
 	}
 
 	// 级别2：配置显式覆盖 —— 配置中 governance.providers.tracing = noop 优先于模式默认
 	configOverrideCfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":              "microservice",
+		"governance.mode":              "micro",
 		"governance.providers.tracing": "noop",
 	}}
-	if got := SelectTracingProviderWithMode(configOverrideCfg, resiliencecontract.GovernanceModeMicroservice).Name(); got != "tracing.noop" {
+	if got := SelectTracingProviderWithMode(configOverrideCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.noop" {
 		t.Fatalf("priority 2 (config override): expected tracing.noop, got %s", got)
 	}
 
 	// 级别1：代码显式覆盖 —— 通过 overlay 注入的代码覆盖优先于配置
 	overlayCfg := overlayGovernanceConfig(configOverrideCfg, nil, nil, map[string]string{"tracing": "otel"})
-	if got := SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicroservice).Name(); got != "tracing.otel" {
+	if got := SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.otel" {
 		t.Fatalf("priority 1 (code override): expected tracing.otel, got %s", got)
 	}
 }

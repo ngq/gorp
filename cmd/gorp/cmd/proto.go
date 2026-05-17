@@ -10,35 +10,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// protoCmd 为 proto 命令组，支持三种工作流。
+// protoCmd 为 proto 命令组，支持两种工作流。
 //
-// 工作流一：Service -> Proto -> pb.go（Go 开发者习惯）
+// 工作流一：Proto -> pb.go + handler + service（主路径）
+//
+//	gorp proto all -f ./proto/user.proto
+//
+// 工作流二：Service -> Proto -> pb.go（迁移工具）
 //
 //	gorp proto from-service -s ./service.go -o ./proto/
-//	gorp proto gen -d ./proto -o ./pb/
-//
-// 工作流二：Route -> Proto -> pb.go（HTTP 开发者习惯）
-//
-//	gorp proto from-route -r ./routes.go -o ./proto/
-//	gorp proto gen -d ./proto -o ./pb/
-//
-// 工作流三：Proto -> pb.go（传统 gRPC 习惯）
-//
-//	gorp proto gen  # 默认 api/proto
+//	gorp proto all -f ./proto/user.proto
 var protoCmd = &cobra.Command{
 	Use:     "proto",
-	Short:   "Proto generator - three workflows",
+	Short:   "Proto generator",
 	GroupID: commandGroupCodegen,
-	Long: `gorp proto is a Proto generator CLI with three workflows:
+	Long: `gorp proto is a Proto generator CLI.
 
-1. from-service: Generate Proto from Go Service interface
-   gorp proto from-service -s ./service.go -o ./proto/
+Main workflow (Proto-first):
+  gorp proto all -f ./proto/user.proto
 
-2. gen: Generate Go pb code from Proto files (calls protoc)
-   gorp proto gen -d ./proto -o ./pb/
-
-3. from-route: Generate Proto from Gin routes (experimental)
-   gorp proto from-route -r ./routes.go -o ./proto/`,
+Migration tool (Service-first, for existing Go code):
+  gorp proto from-service -s ./service.go -o ./proto/`,
 }
 
 // outputDir is the output directory flag, shared by proto subcommands.

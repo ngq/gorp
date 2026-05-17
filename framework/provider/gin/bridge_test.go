@@ -139,34 +139,6 @@ func TestNativeRouterGroupFromHTTPService(t *testing.T) {
 	}
 }
 
-// TestGinFirstEngineDoesNotAutoMountGovernance 验证 Gin-first engine 不自动挂载 governance。
-//
-// 中文说明：
-// - Gin-first 模式只注入 container middleware，不自动装配 governance preset。
-func TestGinFirstEngineDoesNotAutoMountGovernance(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	// Gin-first engine 只注入 container middleware
-	c := &mockContainer{}
-	engine := newGinFirstEngine(c)
-
-	// 验证只有 1 个 middleware (injectRequestContainer)
-	// Gin 的 Handlers 数量在路由注册后才能确定，因此通过行为验证
-	var called bool
-	engine.GET("/test", func(c *gin.Context) {
-		called = true
-		c.Status(http.StatusOK)
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	engine.ServeHTTP(w, req)
-
-	if !called {
-		t.Error("expected handler to be called")
-	}
-}
-
 // TestMixedGinAndAbstractMiddleware 验证原生 Gin middleware 与框架抽象 middleware 可混合使用。
 //
 // 中文说明：

@@ -167,11 +167,13 @@ func (s *ValidatorService) SetLocale(locale string) error {
 // TranslateError translates validation errors into localized AppError.
 // Core logic: Check if error is ValidationErrors, then translate each field error.
 // If TranslateErrors is false, returns raw English errors for better performance.
+// Returns error interface; caller can cast to resiliencecontract.AppError if needed.
 //
 // TranslateError 将验证错误翻译为本地化的 AppError。
 // 核心逻辑：检查是否为 ValidationErrors 类型，然后翻译每个字段错误。
 // 如果 TranslateErrors 为 false，返回原始英文错误以获得更好性能。
-func (s *ValidatorService) TranslateError(err error) resiliencecontract.AppError {
+// 返回 error 接口；调用方可在需要时断言为 resiliencecontract.AppError。
+func (s *ValidatorService) TranslateError(err error) error {
 	if err == nil {
 		return nil
 	}

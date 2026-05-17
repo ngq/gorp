@@ -1,4 +1,4 @@
-// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+﻿// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
 // This file assembles and runs the default HTTP service mainline.
 // Builds reusable runtime carrying app, container, router, config, DB, Redis, JWT.
 //
@@ -55,6 +55,7 @@ type HTTPServiceOptions struct {
 	DisableMetrics      bool
 	EnablePprof         bool
 	GovernanceMode      string
+	HTTPMode            string // HTTP 模式：contract 或 gin，与 GovernanceMode 正交
 	GovernanceDisable   []string
 	GovernanceEnable    []string
 	GovernanceProviders map[string]string
@@ -63,8 +64,16 @@ type HTTPServiceOptions struct {
 // HTTPServiceRuntime carries the assembled HTTP runtime state used during startup callbacks.
 // In microservice mode, also carries the gRPC server instance for service registration.
 //
+// IMPORTANT: All fields in this struct should be treated as read-only after the runtime is built.
+// Modifying fields after setup may cause unpredictable behavior. The struct is exported for
+// convenience, but users should only read from it, not write to it.
+//
 // HTTPServiceRuntime 承载启动回调阶段使用的 HTTP runtime 状态。
 // 在微服务模式下，同时承载 gRPC 服务器实例供服务注册使用。
+//
+// 重要提示：此结构体的所有字段在 runtime 构建后应视为只读。
+// 在 setup 后修改字段可能导致不可预测的行为。结构体导出是为了便利，
+// 但用户应只从中读取，不应写入。
 type HTTPServiceRuntime struct {
 	App               *framework.Application
 	Container         runtimecontract.Container
@@ -76,29 +85,94 @@ type HTTPServiceRuntime struct {
 	Config            datacontract.Config
 	ServiceName       string
 	GovernanceMode    resiliencecontract.GovernanceMode
+	HTTPMode          resiliencecontract.HTTPMode // HTTP 模式维度：contract 或 gin
 	GovernanceSummary GovernanceSummary
 
 	// GRPCServer 是底层 gRPC 服务器实例，仅在微服务模式下可用。
 	// 用户可在 setup 回调中使用此字段注册 proto 服务。
+	// 单体模式下此字段为 nil，请使用 GetGRPCServer() 方法安全访问。
 	//
 	// GRPCServer is the underlying gRPC server instance, only available in microservice mode.
 	// Users can use this field to register proto services in the setup callback.
+	// In monolith mode this field is nil, use GetGRPCServer() method for safe access.
 	GRPCServer *grpc.Server
 
 	// GRPCServerRegistrar 是 gRPC 服务注册器，仅在微服务模式下可用。
 	// 提供 RegisterProto 方法用于注册 proto 生成的服务实现。
+	// 单体模式下此字段为 nil，请使用 GetGRPCServerRegistrar() 方法安全访问。
 	//
 	// GRPCServerRegistrar is the gRPC server registrar, only available in microservice mode.
 	// Provides RegisterProto method for registering protobuf-generated service implementations.
+	// In monolith mode this field is nil, use GetGRPCServerRegistrar() method for safe access.
 	GRPCServerRegistrar transportcontract.GRPCServerRegistrar
 }
 
+// GetGRPCServer safely returns the gRPC server instance.
+// Returns error in monolith mode where gRPC is not enabled.
+//
+// GetGRPCServer 安全返回 gRPC 服务器实例。
+// 在单体模式下（gRPC 未启用）返回错误。
+func (rt *HTTPServiceRuntime) GetGRPCServer() (*grpc.Server, error) {
+	if rt == nil || rt.GRPCServer == nil {
+		return nil, errors.New("grpc server not available: gRPC is not enabled in current governance mode")
+	}
+	return rt.GRPCServer, nil
+}
+
+// GetGRPCServerRegistrar safely returns the gRPC server registrar.
+// Returns error in monolith mode where gRPC is not enabled.
+//
+// GetGRPCServerRegistrar 安全返回 gRPC 服务注册器。
+// 在单体模式下（gRPC 未启用）返回错误。
+func (rt *HTTPServiceRuntime) GetGRPCServerRegistrar() (transportcontract.GRPCServerRegistrar, error) {
+	if rt == nil || rt.GRPCServerRegistrar == nil {
+		return nil, errors.New("grpc server registrar not available: gRPC is not enabled in current governance mode")
+	}
+	return rt.GRPCServerRegistrar, nil
+}
+
+// MustGRPCServer returns the gRPC server instance or panics if not available.
+// Use only when gRPC is guaranteed to be enabled (microservice mode).
+//
+// MustGRPCServer 返回 gRPC 服务器实例，不可用时 panic。
+// 仅在确定 gRPC 已启用（微服务模式）时使用。
+func (rt *HTTPServiceRuntime) MustGRPCServer() *grpc.Server {
+	srv, err := rt.GetGRPCServer()
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// MustGRPCServerRegistrar returns the gRPC server registrar or panics if not available.
+// Use only when gRPC is guaranteed to be enabled (microservice mode).
+//
+// MustGRPCServerRegistrar 返回 gRPC 服务注册器，不可用时 panic。
+// 仅在确定 gRPC 已启用（微服务模式）时使用。
+func (rt *HTTPServiceRuntime) MustGRPCServerRegistrar() transportcontract.GRPCServerRegistrar {
+	reg, err := rt.GetGRPCServerRegistrar()
+	if err != nil {
+		panic(err)
+	}
+	return reg
+}
+
 // NewHTTPServiceRuntime builds the default HTTP runtime without starting the server.
+// Service name is read from config (app.name) automatically.
 //
 // NewHTTPServiceRuntime 构建默认 HTTP runtime，但不启动服务。
-func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPServiceRuntime, error) {
+// 服务名自动从配置 app.name 读取。
+func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, retErr error) {
 	app := framework.NewApplication()
 	c := app.Container()
+
+	// 使用 defer 确保中途失败时清理 Container
+	// Use defer to ensure Container cleanup on failure
+	defer func() {
+		if retErr != nil && c != nil {
+			c.Destroy()
+		}
+	}()
 
 	providers := buildHTTPProvidersFunc(opts)
 	if err := c.RegisterProviders(providers...); err != nil {
@@ -108,12 +182,20 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 		return nil, fmt.Errorf("register selected microservice providers: %w", err)
 	}
 
-	rt := &HTTPServiceRuntime{
+	// 从配置读取服务名
+	// Read service name from config
+	cfg := container.MustMakeConfig(c)
+	serviceName := cfg.GetString("app.name")
+	if serviceName == "" {
+		return nil, fmt.Errorf("app.name is required in config file")
+	}
+
+	rt = &HTTPServiceRuntime{
 		App:         app,
 		Container:   c,
 		Logger:      container.MustMakeLogger(c),
 		Router:      container.MustMakeHTTPRouter(c),
-		Config:      container.MustMakeConfig(c),
+		Config:      cfg,
 		JWT:         container.MustMakeJWTService(c),
 		ServiceName: serviceName,
 	}
@@ -135,6 +217,15 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	}
 	governanceSummary := BuildGovernanceSummaryWithModeOverride(effectiveConfig, governanceMode, opts.GovernanceMode)
 	rt.GovernanceMode = governanceMode
+
+	// 解析 HTTP 模式维度：显式传入 > 从旧 GovernanceMode 拆解 > 默认 contract
+	// Resolve HTTP mode dimension: explicit option > default contract
+	httpMode := NormalizeHTTPMode(resiliencecontract.HTTPModeContract)
+	if opts.HTTPMode != "" {
+		httpMode = NormalizeHTTPMode(resiliencecontract.HTTPMode(opts.HTTPMode))
+	}
+	rt.HTTPMode = httpMode
+
 	rt.GovernanceSummary = governanceSummary
 	rt.Logger.Info(FormatGovernanceSummary(governanceSummary))
 
@@ -143,7 +234,7 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	}
 	if !opts.DisableRedis {
 		// Redis is optional in this mainline, so keep startup tolerant when the capability is absent.
-		// Redis 在这条主线里是可选能力，因此这里保持”缺失不阻断启动”的语义。
+		// Redis 在这条主线里是可选能力，因此这里保持"缺失不阻断启动"的语义。
 		if redisSvc, err := container.MakeRedis(c); err == nil {
 			rt.Redis = redisSvc
 		}
@@ -153,13 +244,16 @@ func NewHTTPServiceRuntime(serviceName string, opts HTTPServiceOptions) (*HTTPSe
 	// 让用户可以在 setup 回调中通过 rt.GRPCServer 注册 proto 服务
 	// In microservice mode, try to resolve gRPC server registrar from container
 	// Let users register proto services via rt.GRPCServer in the setup callback
-	if IsMicroserviceMode(governanceMode) && c.IsBind(transportcontract.GRPCServerRegistrarKey) {
+	if IsMicroMode(governanceMode) && c.IsBind(transportcontract.GRPCServerRegistrarKey) {
 		if registrar, err := container.MakeGRPCServerRegistrar(c); err == nil {
 			rt.GRPCServerRegistrar = registrar
 			rt.GRPCServer = registrar.Server()
 		}
 	}
 
+	// 成功时清除 defer 中的清理逻辑
+	// Clear cleanup on success
+	retErr = nil
 	return rt, nil
 }
 
@@ -181,14 +275,24 @@ func buildHTTPProviders(opts HTTPServiceOptions) []runtimecontract.ServiceProvid
 }
 
 // BootHTTPService assembles, configures, and runs the default HTTP service.
+// Service name is read from config (app.name) automatically.
 //
 // BootHTTPService 装配、配置并运行默认 HTTP 服务。
-func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) error, setup func(*HTTPServiceRuntime) error) error {
-	rt, err := NewHTTPServiceRuntime(serviceName, opts)
+// 服务名自动从配置 app.name 读取。
+func BootHTTPService(opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) error, setup func(*HTTPServiceRuntime) error) (retErr error) {
+	rt, err := NewHTTPServiceRuntime(opts)
 	if err != nil {
 		return fmt.Errorf("initialize http runtime: %w", err)
 	}
 
+	// 确保 BootHTTPService 返回错误时清理 Container，释放已分配资源（DB、Redis 等）
+	defer func() {
+		if retErr != nil && rt != nil && rt.Container != nil {
+			rt.Container.Destroy()
+		}
+	}()
+
+	serviceName := rt.ServiceName
 	rt.Logger.Info(fmt.Sprintf("%s starting", serviceName))
 
 	if migrate != nil {
@@ -217,6 +321,7 @@ func BootHTTPService(serviceName string, opts HTTPServiceOptions, migrate func(*
 		RegisterPprofEndpoints(rt.Router)
 	}
 
+	// RunHTTP 成功后不再清理（服务正在运行）
 	return RunHTTP(rt.Container, rt.Logger)
 }
 

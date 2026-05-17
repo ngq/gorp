@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -76,6 +77,21 @@ func CSRF(opts CSRFOptions) transportcontract.HTTPMiddleware {
 	}
 	if opts.CookiePath == "" {
 		opts.CookiePath = "/"
+	}
+
+	// Warn if CookieSecure is false in production-like environments.
+	// CookieSecure=false means the CSRF cookie can be sent over HTTP,
+	// which exposes the token to network interception.
+	// 警告：CookieSecure=false 时 CSRF cookie 可通过 HTTP 传输，
+	// 这会使 token 暴露在网络拦截风险中。
+	if !opts.CookieSecure {
+		slog.Warn("CSRF middleware configured with CookieSecure=false. " +
+			"The CSRF cookie will be sent over HTTP connections, " +
+			"exposing the token to network interception. " +
+			"Set CookieSecure=true in production environments. " +
+			"CSRF 中间件配置了 CookieSecure=false，" +
+			"CSRF cookie 将通过 HTTP 连接传输，" +
+			"token 可能被网络拦截。生产环境请设置 CookieSecure=true。")
 	}
 
 	errorHandler := opts.ErrorHandler

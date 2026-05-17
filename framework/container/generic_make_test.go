@@ -180,6 +180,36 @@ type testCloser struct{}
 
 func (t *testCloser) Close() error { return nil }
 
+// testRedis is a mock implementation of datacontract.Redis for testing.
+//
+// testRedis 是 datacontract.Redis 的 mock 实现，用于测试。
+type testRedis struct{}
+
+func (t *testRedis) Ping(ctx context.Context) error                                      { return nil }
+func (t *testRedis) Get(ctx context.Context, key string) (string, error)                 { return "value", nil }
+func (t *testRedis) Set(ctx context.Context, key, value string, ttl time.Duration) error { return nil }
+func (t *testRedis) Del(ctx context.Context, key string) error                           { return nil }
+func (t *testRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
+	return map[string]string{"k": "v"}, nil
+}
+func (t *testRedis) MSet(ctx context.Context, kvs map[string]string) error { return nil }
+func (t *testRedis) Expire(ctx context.Context, key string, ttl time.Duration) error { return nil }
+
+// testJWTService is a mock implementation of securitycontract.JWTService for testing.
+//
+// testJWTService 是 securitycontract.JWTService 的 mock 实现，用于测试。
+type testJWTService struct{}
+
+func (t *testJWTService) Sign(claims securitycontract.JWTClaims) (string, error) {
+	return "token", nil
+}
+func (t *testJWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
+	return &securitycontract.JWTClaims{}, nil
+}
+func (t *testJWTService) NewClaims(subjectID int64, subjectType, subjectName string, roles []string, ttlSeconds int64) securitycontract.JWTClaims {
+	return securitycontract.JWTClaims{}
+}
+
 // TestMakeWith_DataContractInterface verifies that MakeWith[T] works with datacontract interfaces.
 //
 // TestMakeWith_DataContractInterface 验证 MakeWith[T] 可用于 datacontract 接口类型。
@@ -232,26 +262,4 @@ func TestMakeWith_SecurityContractInterface(t *testing.T) {
 	jwt2, err := MakeWith[securitycontract.JWTService](c, securitycontract.AuthJWTKey)
 	require.NoError(t, err, "MakeWith[securitycontract.JWTService] should work")
 	require.NotNil(t, jwt2)
-}
-
-type testRedis struct{}
-
-func (t *testRedis) Ping(ctx context.Context) error                                      { return nil }
-func (t *testRedis) Get(ctx context.Context, key string) (string, error)                 { return "value", nil }
-func (t *testRedis) Set(ctx context.Context, key, value string, ttl time.Duration) error { return nil }
-func (t *testRedis) Del(ctx context.Context, key string) error                           { return nil }
-func (t *testRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
-	return map[string]string{"k": "v"}, nil
-}
-
-type testJWTService struct{}
-
-func (t *testJWTService) Sign(claims securitycontract.JWTClaims) (string, error) {
-	return "token", nil
-}
-func (t *testJWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
-	return &securitycontract.JWTClaims{}, nil
-}
-func (t *testJWTService) NewClaims(subjectID int64, subjectType, subjectName string, roles []string, ttlSeconds int64) securitycontract.JWTClaims {
-	return securitycontract.JWTClaims{}
 }

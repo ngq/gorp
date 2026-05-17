@@ -4,17 +4,54 @@ import (
 	"{{.ModuleName}}/services/product/internal/server/http/handler"
 	"{{.ModuleName}}/services/product/internal/service"
 
+{{- if .IsGinHTTPMode }}
+	ginprovider "{{.FrameworkModule}}/framework/provider/gin"
+	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
+
+	"github.com/gin-gonic/gin"
+{{- else }}
 	gorp "{{.FrameworkModule}}"
+{{- end }}
 )
 
-func RegisterRoutes(r gorp.HTTPRouter, services *service.Services) {
+// RegisterRoutes 注册 HTTP 路由。
+//
+// 中文说明：
+// - Gin-first 模式：直接使用原生 Gin Engine 注册路由；
+// - 抽象契约模式：使用 gorp.HTTPRouter 抽象接口；
+func RegisterRoutes(
+{{- if .IsGinHTTPMode }}
+	httpSvc transportcontract.HTTP,
+{{- else }}
+	r gorp.HTTPRouter,
+{{- end }}
+	services *service.Services,
+) {
+{{- if .IsGinHTTPMode }}
+	// Gin-first 模式：获取原生 Gin Engine
+	engine, ok := ginprovider.NativeEngine(httpSvc)
+	if !ok {
+		panic("failed to get native gin engine")
+	}
+
+	productHandler := handler.NewProductHandler(services.Product)
+
+	api := engine.Group("/api/v1/products")
+	{
+		api.GET("", productHandler.List)
+		api.GET("/:id", productHandler.GetByID)
+		api.POST("", productHandler.Create)
+		api.DELETE("/:id", productHandler.Delete)
+	}
+{{- else }}
 	productHandler := handler.NewProductHandler(services.Product)
 
 	api := r.Group("/api/v1/products")
 	{
-	api.GET("", productHandler.List)
-	api.GET("/:id", productHandler.GetByID)
-	api.POST("", productHandler.Create)
-	api.DELETE("/:id", productHandler.Delete)
+		api.GET("", productHandler.List)
+		api.GET("/:id", productHandler.GetByID)
+		api.POST("", productHandler.Create)
+		api.DELETE("/:id", productHandler.Delete)
 	}
+{{- end }}
 }

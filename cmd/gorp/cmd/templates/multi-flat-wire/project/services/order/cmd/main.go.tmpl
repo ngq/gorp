@@ -7,18 +7,22 @@ import (
 	orderdata "{{.ModuleName}}/services/order/internal/data"
 	orderhttp "{{.ModuleName}}/services/order/internal/server/http"
 	"{{.FrameworkModule}}"
+{{- if .IsGinHTTPMode }}
+	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
+{{- end }}
 )
 
 // main 是 order 服务的主入口。
 func main() {
 	if err := gorp.Run(
-		"order-service",
-{{- if .IsMicroserviceMode }}
-		gorp.WithMicroserviceMode(),
-{{- else if .IsGinFirstMode }}
-		gorp.WithGinFirstMode(),
+{{- if .IsMicroGovernance }}
+		gorp.GRPC(),
+		gorp.WithMicroGovernance(),
 {{- else }}
-		gorp.WithMonolithMode(),
+		gorp.WithMonoGovernance(),
+{{- end }}
+{{- if .IsGinHTTPMode }}
+		gorp.WithGinHTTPMode(),
 {{- end }}
 		gorp.WithMigrate(migrate),
 		gorp.WithSetup(setup),
@@ -51,6 +55,16 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
+{{- if .IsGinHTTPMode }}
+
+	// Gin-first 模式：传递 HTTP 服务给路由注册函数
+	httpSvc, err := rt.Container.Make(transportcontract.HTTPKey)
+	if err != nil {
+		return err
+	}
+	orderhttp.RegisterRoutes(httpSvc.(transportcontract.HTTP), services)
+{{- else }}
 	orderhttp.RegisterRoutes(rt.Router, services)
+{{- end }}
 	return nil
 }

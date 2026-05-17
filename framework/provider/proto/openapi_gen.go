@@ -31,29 +31,29 @@ func (g *Generator) GenOpenAPI(ctx context.Context, opts integrationcontract.Ope
 		return errors.New("output file path is required")
 	}
 
-	// 解析 proto 文件。
-	services, err := parseProtoFile(opts.ProtoFile)
+	// 解析 proto 文件内容（包含 message、enum、service）。
+	protoContent, err := parseProtoFileContent(opts.ProtoFile)
 	if err != nil {
-		return fmt.Errorf("parse proto file failed: %w", err)
+		return fmt.Errorf("parse proto file content failed: %w", err)
 	}
 
 	// 如果指定了服务名则过滤。
 	if opts.ServiceName != "" {
 		filtered := []ProtoService{}
-		for _, svc := range services {
+		for _, svc := range protoContent.Services {
 			if svc.Name == opts.ServiceName {
 				filtered = append(filtered, svc)
 			}
 		}
-		services = filtered
+		protoContent.Services = filtered
 	}
 
-	if len(services) == 0 {
+	if len(protoContent.Services) == 0 {
 		return fmt.Errorf("no services found in proto file: %s", opts.ProtoFile)
 	}
 
-	// 生成 OpenAPI 文档。
-	doc := generateOpenAPIDoc(services, opts)
+	// 生成 OpenAPI 文档（包含完整 Schema）。
+	doc := generateOpenAPIDocWithSchemas(protoContent, opts)
 
 	// 写入文件。
 	outputDir := filepath.Dir(opts.OutputFile)
@@ -144,10 +144,16 @@ type Response struct {
 
 // Schema represents OpenAPI schema.
 type Schema struct {
-	Type       string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Format     string            `json:"format,omitempty" yaml:"format,omitempty"`
-	Properties map[string]Schema `json:"properties,omitempty" yaml:"properties,omitempty"`
-	Ref        string            `json:"$ref,omitempty" yaml:"$ref,omitempty"`
+	Type                 string            `json:"type,omitempty" yaml:"type,omitempty"`
+	Format               string            `json:"format,omitempty" yaml:"format,omitempty"`
+	Properties           map[string]Schema `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Ref                  string            `json:"$ref,omitempty" yaml:"$ref,omitempty"`
+	Items                *Schema           `json:"items,omitempty" yaml:"items,omitempty"`
+	AdditionalProperties *Schema           `json:"additionalProperties,omitempty" yaml:"additionalProperties,omitempty"`
+	Enum                 []string          `json:"enum,omitempty" yaml:"enum,omitempty"`
+	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Example              interface{}       `json:"example,omitempty" yaml:"example,omitempty"`
+	Required             []string          `json:"required,omitempty" yaml:"required,omitempty"`
 }
 
 // OpenAPIComponents represents OpenAPI components section.
@@ -295,6 +301,182 @@ func generateOpenAPIDoc(services []ProtoService, opts integrationcontract.OpenAP
 	}
 
 	return doc
+}
+
+// generateOpenAPIDocWithSchemas generates OpenAPI document with full schemas from proto content.
+// Includes message definitions in components/schemas section.
+//
+// generateOpenAPIDocWithSchemas 从 proto 内容生成包含完整 schema 的 OpenAPI 文档。
+// 在 components/schemas 部分包含 message 定义。
+func generateOpenAPIDocWithSchemas(protoContent *ProtoFileContent, opts integrationcontract.OpenAPIGenOptions) OpenAPIDoc {
+	doc := OpenAPIDoc{
+		OpenAPI: "3.0.3",
+		Info: OpenAPIInfo{
+			Title:       opts.Title,
+			Description: opts.Description,
+			Version:     opts.Version,
+		},
+		Paths: make(map[string]PathItem),
+		Components: OpenAPIComponents{
+			Schemas:         make(map[string]Schema),
+			SecuritySchemes: make(map[string]SecurityScheme),
+		},
+	}
+
+	// 设置默认值。
+	if doc.Info.Title == "" {
+		doc.Info.Title = "API"
+	}
+	if doc.Info.Version == "" {
+		doc.Info.Version = "1.0.0"
+	}
+
+	// 添加服务器。
+	if opts.Host != "" {
+		scheme := "http"
+		if len(opts.Schemes) > 0 {
+			scheme = opts.Schemes[0]
+		}
+		doc.Servers = append(doc.Servers, OpenAPIServer{
+			URL: fmt.Sprintf("%s://%s%s", scheme, opts.Host, opts.BasePath),
+		})
+	}
+
+	// 生成 message schemas 到 components。
+	for _, msg := range protoContent.Messages {
+		schema := messageToSchema(msg, protoContent.Messages, protoContent.Enums)
+		schema.Description = msg.Description
+		doc.Components.Schemas[msg.Name] = schema
+	}
+
+	// 生成 enum schemas 到 components。
+	for _, enum := range protoContent.Enums {
+		enumSchema := enumToSchema(enum.Name, protoContent.Enums)
+		enumSchema.Description = enum.Description
+		doc.Components.Schemas[enum.Name] = enumSchema
+	}
+
+	// 为每个服务生成路径。
+	for _, svc := range protoContent.Services {
+		for _, m := range svc.Methods {
+			if m.HTTPMethod == "" || m.HTTPPath == "" {
+				continue
+			}
+
+			// 创建操作。
+			op := &Operation{
+				OperationID: fmt.Sprintf("%s_%s", svc.Name, m.Name),
+				Summary:     m.Name,
+				Tags:        []string{svc.Name},
+				Responses: map[string]Response{
+					"200": {
+						Description: "Success",
+						Content: map[string]Media{
+							"application/json": {Schema: createSchemaRef(m.ResponseType, protoContent)},
+						},
+					},
+					"400": {
+						Description: "Bad Request",
+						Content: map[string]Media{
+							"application/json": {Schema: Schema{Type: "object"}},
+						},
+					},
+					"500": {
+						Description: "Internal Server Error",
+						Content: map[string]Media{
+							"application/json": {Schema: Schema{Type: "object"}},
+						},
+					},
+				},
+			}
+
+			// 添加请求体（POST/PUT/PATCH）。
+			if m.HTTPMethod == "POST" || m.HTTPMethod == "PUT" || m.HTTPMethod == "PATCH" {
+				reqSchema := createSchemaRef(m.RequestType, protoContent)
+				op.RequestBody = &RequestBody{
+					Required: true,
+					Content: map[string]Media{
+						"application/json": {Schema: reqSchema},
+					},
+				}
+			}
+
+			// 解析路径参数。
+			params := extractPathParams(m.HTTPPath)
+			for _, p := range params {
+				op.Parameters = append(op.Parameters, Parameter{
+					Name:        p,
+					In:          "path",
+					Required:    true,
+					Description: fmt.Sprintf("%s parameter", p),
+					Schema:      Schema{Type: "string"},
+				})
+			}
+
+			// 添加认证要求。
+			if m.AuthRequired || len(m.AuthRoles) > 0 {
+				op.Security = []map[string][]string{
+					{"bearerAuth": {}},
+				}
+			}
+
+			// 添加到路径。
+			pathItem, exists := doc.Paths[m.HTTPPath]
+			if !exists {
+				pathItem = PathItem{}
+			}
+
+			switch m.HTTPMethod {
+			case "GET":
+				pathItem.Get = op
+			case "POST":
+				pathItem.Post = op
+			case "PUT":
+				pathItem.Put = op
+			case "DELETE":
+				pathItem.Delete = op
+			case "PATCH":
+				pathItem.Patch = op
+			}
+
+			doc.Paths[m.HTTPPath] = pathItem
+		}
+	}
+
+	// 添加默认认证方案。
+	doc.Components.SecuritySchemes["bearerAuth"] = SecurityScheme{
+		Type:         "http",
+		Scheme:       "bearer",
+		BearerFormat: "JWT",
+	}
+
+	return doc
+}
+
+// createSchemaRef 创建 schema 引用，如果类型存在则使用 $ref，否则返回基本类型。
+func createSchemaRef(typeName string, protoContent *ProtoFileContent) Schema {
+	// 检查是否是已知 message
+	for _, msg := range protoContent.Messages {
+		if msg.Name == typeName {
+			return Schema{Ref: "#/components/schemas/" + typeName}
+		}
+	}
+
+	// 检查是否是已知 enum
+	for _, enum := range protoContent.Enums {
+		if enum.Name == typeName {
+			return Schema{Ref: "#/components/schemas/" + typeName}
+		}
+	}
+
+	// 检查特殊类型
+	openapiType, format := protoTypeToOpenAPIType(typeName)
+	if openapiType != "object" || format != "" {
+		return Schema{Type: openapiType, Format: format}
+	}
+
+	// 未知类型，返回 object
+	return Schema{Type: "object"}
 }
 
 // extractPathParams extracts path parameters from proto HTTP path.

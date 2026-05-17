@@ -41,6 +41,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// closerFunc 将 func() error 适配为 io.Closer 接口
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }
+
 // Provider registers the GORM DB contract.
 //
 // Provider 注册 GORM 数据库契约。
@@ -145,6 +150,12 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		collector := NewDBMetricsCollector(sqlDB, dbc.Driver)
 		collector.StartCollection()
 		GormQueryCallback(db, dbc.Driver)
+
+		// 注册 closer：关闭 DBMetricsCollector 和 sql.DB 连接
+		c.RegisterCloser("gorm.db", closerFunc(func() error {
+			collector.Stop()
+			return sqlDB.Close()
+		}))
 
 		return db, nil
 	}, true)

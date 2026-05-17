@@ -30,7 +30,7 @@ log:
   level: debug
 
 tracing:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   enabled: true
 {{- else }}
   enabled: false
@@ -42,7 +42,7 @@ tracing:
   sampling_rate: 1.0
 
 metadata:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   enabled: true
 {{- else }}
   enabled: false
@@ -51,7 +51,7 @@ metadata:
     - x-md-
 
 service_auth:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   mode: token
   token:
     secret: "change-me-in-production"
@@ -92,7 +92,7 @@ message_queue:
 
 # 治理覆盖配置
 governance:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   disable: []
   providers:
     tracing: otel
@@ -106,7 +106,7 @@ governance:
 
 # circuit_breaker 配置
 circuit_breaker:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   enabled: true
   backend: sentinel
   sentinel:
@@ -120,7 +120,7 @@ circuit_breaker:
 
 # selector 配置
 selector:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   enabled: true
   backend: p2c_ewma
 {{- else }}

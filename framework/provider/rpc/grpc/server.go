@@ -128,7 +128,21 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	s.server.GracefulStop()
+	// 带超时的优雅停止：先 GracefulStop，超时后强制 Stop
+	done := make(chan struct{})
+	go func() {
+		s.server.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// 优雅停止完成
+	case <-ctx.Done():
+		// 超时，强制停止
+		s.server.Stop()
+	}
+
 	s.running = false
 	return nil
 }

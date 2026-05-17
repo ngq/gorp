@@ -14,7 +14,7 @@ server:
   http:
     addr: :8080
     mode: debug  # debug, release, test
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # gRPC 服务器配置（微服务模式）
   grpc:
     addr: :9090
@@ -34,7 +34,7 @@ log:
 
 # tracing 配置
 tracing:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用 tracing
   enabled: true
   backend: otel
@@ -54,7 +54,7 @@ tracing:
 
 # metadata 传播配置
 metadata:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用 metadata 传播
   enabled: true
   backend: default
@@ -73,7 +73,7 @@ metadata:
 # - disable 用于显式关闭某个默认治理件
 # - providers 用于显式替换默认 provider backend
 governance:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：自动启用 tracing/selector/serviceauth/circuitbreaker/loadshedding
   disable: []
   providers:
@@ -96,7 +96,7 @@ governance:
 
 # service_auth 配置
 service_auth:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用服务间认证
   enabled: true
   backend: token
@@ -120,7 +120,7 @@ service_auth:
 
 # circuit_breaker 配置
 circuit_breaker:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用熔断
   enabled: true
   backend: sentinel
@@ -136,7 +136,7 @@ circuit_breaker:
 
 # load_shedding 配置（过载保护）
 load_shedding:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用过载保护
   enabled: true
   backend: semaphore
@@ -158,7 +158,7 @@ load_shedding:
 
 # selector 配置
 selector:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用 P2C 选择器
   enabled: true
   backend: p2c_ewma
@@ -170,7 +170,7 @@ selector:
 
 # discovery 配置
 discovery:
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
   # 微服务模式：默认启用服务发现
   enabled: true
   backend: etcd

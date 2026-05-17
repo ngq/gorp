@@ -87,7 +87,9 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		}
 
 		var cc config
-		_ = cfg.Unmarshal("cache", &cc)
+		if err := cfg.Unmarshal("cache", &cc); err != nil {
+			return nil, fmt.Errorf("cache: unmarshal config: %w", err)
+		}
 		driver := strings.TrimSpace(cc.Driver)
 		if driver == "" {
 			driver = strings.TrimSpace(os.Getenv("CACHE_DRIVER"))
@@ -259,7 +261,9 @@ func (p *BinaryCacheProvider) Register(c runtimecontract.Container) error {
 		}
 
 		var cc config
-		_ = cfg.Unmarshal("cache", &cc)
+		if err := cfg.Unmarshal("cache", &cc); err != nil {
+			return nil, fmt.Errorf("cache: unmarshal config: %w", err)
+		}
 		driver := strings.TrimSpace(cc.Driver)
 		if driver == "" {
 			driver = strings.TrimSpace(os.Getenv("CACHE_DRIVER"))

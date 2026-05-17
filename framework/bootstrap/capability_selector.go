@@ -20,52 +20,68 @@ import (
 // SelectedMicroserviceProviders returns the config-selected microservice capability providers.
 // Does NOT process governance.disable/enable/providers.* overrides.
 // For governance-aware selection, use SelectedMicroserviceProvidersWithOptions.
+// Note: nil providers are filtered out to prevent nil panic in RegisterProviders.
 //
 // SelectedMicroserviceProviders 返回由配置选择出的微服务能力 provider 集合。
 // 不处理 governance.disable/enable/providers.* 覆盖。
 // 需要治理覆盖的场景请使用 SelectedMicroserviceProvidersWithOptions。
+// 注意：nil provider 会被过滤，防止 RegisterProviders 时 nil panic。
 func SelectedMicroserviceProviders(cfg datacontract.Config) []runtimecontract.ServiceProvider {
 	mode := DetectGovernanceMode(cfg)
 	providers := make([]runtimecontract.ServiceProvider, 0, 12)
-	providers = append(providers, SelectDiscoveryProviderWithMode(cfg, mode))
-	providers = append(providers, SelectSelectorProviderWithMode(cfg, mode))
-	providers = append(providers, SelectRPCProviderWithMode(cfg, mode))
-	providers = append(providers, SelectTracingProviderWithMode(cfg, mode))
-	providers = append(providers, SelectMetadataProviderWithMode(cfg, mode))
-	providers = append(providers, SelectServiceAuthProviderWithMode(cfg, mode))
-	providers = append(providers, SelectCircuitBreakerProviderWithMode(cfg, mode))
-	providers = append(providers, SelectLoadSheddingProviderWithMode(cfg, mode))
-	providers = append(providers, SelectRetryProviderWithMode(cfg, mode))
-	providers = append(providers, SelectDTMProvider(cfg))
-	providers = append(providers, SelectMessageQueueProvider(cfg))
-	providers = append(providers, SelectDistributedLockProvider(cfg))
-	providers = append(providers, SelectWebSocketProvider(cfg))
+	for _, p := range []runtimecontract.ServiceProvider{
+		SelectDiscoveryProviderWithMode(cfg, mode),
+		SelectSelectorProviderWithMode(cfg, mode),
+		SelectRPCProviderWithMode(cfg, mode),
+		SelectTracingProviderWithMode(cfg, mode),
+		SelectMetadataProviderWithMode(cfg, mode),
+		SelectServiceAuthProviderWithMode(cfg, mode),
+		SelectCircuitBreakerProviderWithMode(cfg, mode),
+		SelectLoadSheddingProviderWithMode(cfg, mode),
+		SelectRetryProviderWithMode(cfg, mode),
+		SelectDTMProvider(cfg),
+		SelectMessageQueueProvider(cfg),
+		SelectDistributedLockProvider(cfg),
+		SelectWebSocketProvider(cfg),
+	} {
+		if p != nil {
+			providers = append(providers, p)
+		}
+	}
 	return providers
 }
 
 // SelectedMicroserviceProvidersWithOptions returns governance-aware microservice providers.
 // Processes governance.disable, governance.enable, and governance.providers.* overrides
 // before selecting providers.
+// Note: nil providers are filtered out to prevent nil panic in RegisterProviders.
 //
 // SelectedMicroserviceProvidersWithOptions 返回带治理覆盖的微服务 provider 集合。
 // 选择 provider 前处理 governance.disable、governance.enable 和 governance.providers.* 覆盖。
+// 注意：nil provider 会被过滤，防止 RegisterProviders 时 nil panic。
 func SelectedMicroserviceProvidersWithOptions(cfg datacontract.Config, disabled, enabled []string, providerOverrides map[string]string) []runtimecontract.ServiceProvider {
 	overlayCfg := overlayGovernanceConfig(cfg, disabled, enabled, providerOverrides)
 	mode := DetectGovernanceMode(overlayCfg)
 	providers := make([]runtimecontract.ServiceProvider, 0, 12)
-	providers = append(providers, SelectDiscoveryProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectSelectorProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectRPCProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectTracingProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectMetadataProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectServiceAuthProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectCircuitBreakerProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectLoadSheddingProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectRetryProviderWithMode(overlayCfg, mode))
-	providers = append(providers, SelectDTMProvider(overlayCfg))
-	providers = append(providers, SelectMessageQueueProvider(overlayCfg))
-	providers = append(providers, SelectDistributedLockProvider(overlayCfg))
-	providers = append(providers, SelectWebSocketProvider(overlayCfg))
+	for _, p := range []runtimecontract.ServiceProvider{
+		SelectDiscoveryProviderWithMode(overlayCfg, mode),
+		SelectSelectorProviderWithMode(overlayCfg, mode),
+		SelectRPCProviderWithMode(overlayCfg, mode),
+		SelectTracingProviderWithMode(overlayCfg, mode),
+		SelectMetadataProviderWithMode(overlayCfg, mode),
+		SelectServiceAuthProviderWithMode(overlayCfg, mode),
+		SelectCircuitBreakerProviderWithMode(overlayCfg, mode),
+		SelectLoadSheddingProviderWithMode(overlayCfg, mode),
+		SelectRetryProviderWithMode(overlayCfg, mode),
+		SelectDTMProvider(overlayCfg),
+		SelectMessageQueueProvider(overlayCfg),
+		SelectDistributedLockProvider(overlayCfg),
+		SelectWebSocketProvider(overlayCfg),
+	} {
+		if p != nil {
+			providers = append(providers, p)
+		}
+	}
 	return providers
 }
 

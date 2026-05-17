@@ -8,7 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
+	"github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -19,6 +19,7 @@ type redisPublisher struct {
 
 // Publish sends a message to a topic using Redis Pub/Sub.
 func (p *redisPublisher) Publish(ctx context.Context, topic string, message []byte, options ...integrationcontract.PublishOption) error {
+	startTime := time.Now()
 	cfg := &integrationcontract.PublishConfig{}
 	for _, opt := range options {
 		opt(cfg)
@@ -26,7 +27,19 @@ func (p *redisPublisher) Publish(ctx context.Context, topic string, message []by
 	if p == nil || p.queue == nil || p.queue.client == nil {
 		return errors.New("messagequeue.redis: client not initialized")
 	}
-	return p.queue.client.Publish(ctx, topic, message).Err()
+	err := p.queue.client.Publish(ctx, topic, message).Err()
+
+	// 记录发布指标
+	latency := time.Since(startTime).Seconds()
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	if p.queue.metrics != nil {
+		p.queue.metrics.OnPublish(topic, status, len(message), latency)
+	}
+
+	return err
 }
 
 // PublishWithDelay sends a delayed message using Redis sorted set.
@@ -87,7 +100,7 @@ func (p *redisPublisher) As(target any) bool {
 	if p == nil || p.queue == nil || p.queue.client == nil {
 		return false
 	}
-	return internalnative.As(p.queue.client, target)
+	return native.As(p.queue.client, target)
 }
 
 // NativePublisher implements NativePublisherProvider interface.

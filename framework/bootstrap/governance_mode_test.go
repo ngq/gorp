@@ -19,42 +19,44 @@ import (
 
 func TestDetectGovernanceModeDefaultsToMonolith(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{}}
-	if got := DetectGovernanceMode(cfg); got != resilience.GovernanceModeMonolith {
+	if got := DetectGovernanceMode(cfg); got != resilience.GovernanceModeMono {
 		t.Fatalf("expected monolith mode, got %q", got)
 	}
 }
 
 func TestDetectGovernanceModeAcceptsLegacyServiceModeKey(t *testing.T) {
-	cfg := &selectorConfigStub{values: map[string]any{"service.mode": "microservice"}}
-	if got := DetectGovernanceMode(cfg); got != resilience.GovernanceModeMicroservice {
+	cfg := &selectorConfigStub{values: map[string]any{"service.mode": "micro"}}
+	if got := DetectGovernanceMode(cfg); got != resilience.GovernanceModeMicro {
 		t.Fatalf("expected microservice mode from service.mode, got %q", got)
 	}
 }
 
-func TestDetectGovernanceModeAcceptsGinFirst(t *testing.T) {
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "gin-first"}}
-	if got := DetectGovernanceMode(cfg); got != resilience.GovernanceModeGinFirst {
-		t.Fatalf("expected gin-first mode from governance.mode, got %q", got)
-	}
-}
-
 func TestNormalizeGovernanceModeFallsBackToMonolith(t *testing.T) {
-	if got := NormalizeGovernanceMode(""); got != resilience.GovernanceModeMonolith {
+	if got := NormalizeGovernanceMode(""); got != resilience.GovernanceModeMono {
 		t.Fatalf("expected empty mode to normalize to monolith, got %q", got)
 	}
-	if got := NormalizeGovernanceMode("unknown"); got != resilience.GovernanceModeMonolith {
+	if got := NormalizeGovernanceMode("unknown"); got != resilience.GovernanceModeMono {
 		t.Fatalf("expected unknown mode to normalize to monolith, got %q", got)
 	}
 }
 
-func TestNormalizeGovernanceModePreservesGinFirst(t *testing.T) {
-	if got := NormalizeGovernanceMode(resilience.GovernanceModeGinFirst); got != resilience.GovernanceModeGinFirst {
-		t.Fatalf("expected gin-first mode preserved, got %q", got)
+func TestNormalizeHTTPModeFallsBackToContract(t *testing.T) {
+	if got := NormalizeHTTPMode(""); got != resilience.HTTPModeContract {
+		t.Fatalf("expected empty HTTP mode to normalize to contract, got %q", got)
 	}
-	if !IsGinFirstMode(resilience.GovernanceModeGinFirst) {
-		t.Fatal("expected IsGinFirstMode to report true for gin-first")
+	if got := NormalizeHTTPMode("unknown"); got != resilience.HTTPModeContract {
+		t.Fatalf("expected unknown HTTP mode to normalize to contract, got %q", got)
 	}
-	if IsMicroserviceMode(resilience.GovernanceModeGinFirst) {
-		t.Fatal("expected gin-first not to be treated as microservice mode")
+}
+
+func TestNormalizeHTTPModePreservesGin(t *testing.T) {
+	if got := NormalizeHTTPMode(resilience.HTTPModeGin); got != resilience.HTTPModeGin {
+		t.Fatalf("expected gin HTTP mode preserved, got %q", got)
+	}
+	if !IsGinHTTPMode(resilience.HTTPModeGin) {
+		t.Fatal("expected IsGinHTTPMode to report true for gin")
+	}
+	if IsGinHTTPMode(resilience.HTTPModeContract) {
+		t.Fatal("expected IsGinHTTPMode to report false for contract")
 	}
 }

@@ -121,7 +121,7 @@ func (rv *realValidator) SetLocale(locale string) error {
 	return nil
 }
 
-func (rv *realValidator) TranslateError(err error) resiliencecontract.AppError {
+func (rv *realValidator) TranslateError(err error) error {
 	if err == nil {
 		return nil
 	}

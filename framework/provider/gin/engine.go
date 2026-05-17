@@ -131,28 +131,3 @@ func getLogger(c runtimecontract.Container) observabilitycontract.Logger {
 	l, _ := providerlog.NewDefaultLogger()
 	return l
 }
-
-// newGinFirstEngine 创建 Gin-first 模式下的 Engine。
-// 只注入 injectRequestContainer（框架容器注入），不自动挂载治理 preset。
-// 用户获取 *gin.Engine 后通过 engine.Use(AdaptMiddleware(...)) 按需手动挂载治理 middleware。
-//
-// newGinFirstEngine creates the Engine for Gin-first mode.
-// Only injects container middleware; governance presets are NOT auto-mounted.
-// Users obtain *gin.Engine and manually mount governance middleware via engine.Use(AdaptMiddleware(...)).
-func newGinFirstEngine(c runtimecontract.Container) *gin.Engine {
-	engine := gin.New()
-	engine.Use(injectRequestContainer(c))
-	return engine
-}
-
-// isGinFirstMode detects whether the current governance mode is gin-first.
-//
-// isGinFirstMode 检测当前治理模式是否为 gin-first。
-func isGinFirstMode(c runtimecontract.Container) bool {
-	cfg := getConfig(c)
-	if cfg == nil {
-		return false
-	}
-	modeStr := strings.TrimSpace(cfg.GetString("governance.mode"))
-	return strings.EqualFold(modeStr, "gin-first") || strings.EqualFold(modeStr, "ginfirst")
-}

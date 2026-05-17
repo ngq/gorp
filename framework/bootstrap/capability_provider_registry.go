@@ -62,6 +62,15 @@ import (
 
 type providerFactory func() runtimecontract.ServiceProvider
 
+// providerFactoryRegistry maps backend names to provider factory functions.
+// Note: This is a map type and NOT safe for concurrent writes. All RegisterXxxProviderFactory
+// calls must happen during init() or early main() before any goroutines start.
+// If concurrent registration is needed, use sync.Map or add mutex protection.
+//
+// providerFactoryRegistry 将后端名称映射到 provider 工厂函数。
+// 注意：这是 map 类型，并发写入不安全。所有 RegisterXxxProviderFactory 调用
+// 必须在 init() 或 main() 早期、任何 goroutine 启动前完成。
+// 如果需要并发注册，请使用 sync.Map 或添加互斥锁保护。
 type providerFactoryRegistry map[string]providerFactory
 
 func (r providerFactoryRegistry) register(key string, factory providerFactory) {

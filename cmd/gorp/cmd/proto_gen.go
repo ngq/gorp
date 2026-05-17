@@ -6,70 +6,94 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	"github.com/spf13/cobra"
 )
 
 var (
-	// gen 子命令 flags
-	protoDir     string
-	protoFiles   []string
-	importPathsP []string
-	goOpt        string
-	goGrpcOpt    string
-	gatewayOpt   string
-	includeHTTPP bool
-	plugins      []string
+	// protoGenFile 指定单个 proto 文件。
+	protoGenFile string
 )
 
-// protoGenCmd gen 子命令：从 Proto 文件生成 Go pb 代码
+// protoGenCmd 从单个 Proto 文件生成全套代码。
 var protoGenCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "从 Proto 文件生成 Go pb 代码",
-	Long: `从 Proto 文件生成 Go pb 代码（调用 protoc）。
+	Short: "从单个 Proto 文件生成全套代码",
+	Long: `从单个 Proto 文件生成完整代码套件。
 
-支持生成：
-- Go message 代码 (--go_out)
-- gRPC client/server 代码 (--go-grpc_out)
-- HTTP 转码代码 (--grpc-gateway_out, 可选)
+生成内容：
+  1. Go pb.go 代码（调用 protoc）
+  2. gRPC service skeleton
+  3. HTTP handler skeleton
+  4. 路由注册代码
+  5. 类型化 RPC client wrapper
 
-使用:
-  gorp proto gen                      # 默认扫描 api/proto
-  gorp proto gen -d ./proto -o ./pb   # 自定义目录
-  gorp proto gen --include-http       # 生成 HTTP gateway
-
-前置条件:
+前置条件：
   1. 安装 protoc: https://grpc.io/docs/protoc-installation/
   2. 安装 Go 插件:
      go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
      go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-  3. HTTP 转码需要额外安装:
-     go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest`,
+
+使用:
+  gorp proto gen -f api/proto/user/v1/user.proto
+
+批量处理多个 proto 文件请使用: gorp proto all -d api/proto`,
 	RunE: runProtoGen,
 }
 
 func init() {
 	protoCmd.AddCommand(protoGenCmd)
 
-	protoGenCmd.Flags().StringVarP(&protoDir, "proto-dir", "d", "api/proto", "Proto 文件目录")
-	protoGenCmd.Flags().StringSliceVarP(&protoFiles, "proto-file", "f", nil, "指定的 Proto 文件（可多次指定）")
-	protoGenCmd.Flags().StringVarP(&outputDir, "output", "o", "", "输出目录（默认同输入目录）")
-	protoGenCmd.Flags().StringSliceVar(&importPathsP, "import-paths", nil, "protoc 导入路径 (-I)")
-	protoGenCmd.Flags().StringVar(&goOpt, "go-opt", "paths=source_relative", "--go_opt 参数")
-	protoGenCmd.Flags().StringVar(&goGrpcOpt, "go-grpc-opt", "paths=source_relative", "--go-grpc_opt 参数")
-	protoGenCmd.Flags().StringVar(&gatewayOpt, "gateway-opt", "paths=source_relative", "--grpc-gateway_opt 参数")
-	protoGenCmd.Flags().BoolVar(&includeHTTPP, "include-http", false, "生成 grpc-gateway HTTP 转码")
-	protoGenCmd.Flags().StringSliceVar(&plugins, "plugins", nil, "额外的 protoc 插件")
+	protoGenCmd.Flags().StringVarP(&protoGenFile, "proto-file", "f", "", "Proto 文件路径（必填）")
+	protoGenCmd.MarkFlagRequired("proto-file")
 }
 
 func runProtoGen(cmd *cobra.Command, args []string) error {
-	// 检查 protoc 是否安装
+	if protoGenFile == "" {
+		return fmt.Errorf("proto file is required, use -f to specify")
+	}
+
+	// 检测 Go module。
+	module, err := detectGoModule()
+	if err != nil {
+		return fmt.Errorf("detect go module failed: %w", err)
+	}
+
+	// Step 1: 生成 pb.go。
+	fmt.Fprintf(cmd.OutOrStdout(), "Step 1/3: Generating pb.go files...\n")
+	if err := genPB(cmd, protoGenFile); err != nil {
+		return fmt.Errorf("proto gen failed: %w", err)
+	}
+
+	// Step 2: 生成 handler/service/routes。
+	fmt.Fprintf(cmd.OutOrStdout(), "Step 2/3: Generating service skeleton...\n")
+	if err := genServiceSkeleton(cmd, protoGenFile, module); err != nil {
+		return fmt.Errorf("proto gen-service failed: %w", err)
+	}
+
+	// Step 3: 生成 client wrapper。
+	fmt.Fprintf(cmd.OutOrStdout(), "Step 3/3: Generating RPC client wrapper...\n")
+	if err := genClientWrapper(cmd, protoGenFile); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "Warning: proto gen-client skipped: %v\n", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "\nProto-first complete! Generated:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - pb.go files (from protoc)\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - HTTP handler skeleton\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - gRPC service skeleton\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - Route registration\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - RPC client wrapper\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "\nNext: implement business logic in service files\n")
+	return nil
+}
+
+// genPB 执行 protoc 生成 pb.go。
+func genPB(cmd *cobra.Command, protoFile string) error {
 	if _, err := exec.LookPath("protoc"); err != nil {
 		return fmt.Errorf("protoc 未安装，请先安装: https://grpc.io/docs/protoc-installation/")
 	}
-
-	// 检查 Go 插件
 	if _, err := exec.LookPath("protoc-gen-go"); err != nil {
 		return fmt.Errorf("protoc-gen-go 未安装，请运行: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest")
 	}
@@ -77,64 +101,66 @@ func runProtoGen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("protoc-gen-go-grpc 未安装，请运行: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest")
 	}
 
-	// 检查 grpc-gateway 插件（如果启用 HTTP）
-	if includeHTTPP {
-		if _, err := exec.LookPath("protoc-gen-grpc-gateway"); err != nil {
-			return fmt.Errorf("protoc-gen-grpc-gateway 未安装，请运行: go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest")
-		}
-	}
-
-	// 默认输出目录为输入目录
-	out := outputDir
-	if out == "" {
-		out = protoDir
-	}
-
-	// 确保输出目录存在
+	out := filepath.Dir(protoFile)
 	if err := os.MkdirAll(out, 0755); err != nil {
 		return fmt.Errorf("创建输出目录失败: %w", err)
 	}
 
-	// 创建生成器
-	gen, err := createProtoGenerator(includeHTTPP)
+	gen, err := createProtoGenerator(false)
 	if err != nil {
 		return fmt.Errorf("创建生成器失败: %w", err)
 	}
 
-	// 构建选项
 	opts := integrationcontract.ProtoGenOptions{
-		ProtoDir:    protoDir,
-		ProtoFiles:  protoFiles,
-		OutputDir:   out,
-		ImportPaths: importPathsP,
-		GoOpt:       goOpt,
-		GoGrpcOpt:   goGrpcOpt,
-		GatewayOpt:  gatewayOpt,
-		IncludeHTTP: includeHTTPP,
-		Plugins:     plugins,
+		ProtoDir:   filepath.Dir(protoFile),
+		ProtoFiles: []string{protoFile},
+		OutputDir:  out,
+		GoOpt:      "paths=source_relative",
+		GoGrpcOpt:  "paths=source_relative",
 	}
 
-	// 执行生成
-	srcDesc := protoDir
-	if len(protoFiles) > 0 {
-		srcDesc = fmt.Sprintf("%v", protoFiles)
-	}
-	fmt.Printf("🔄 正在生成: %s → %s\n", srcDesc, out)
+	return gen.GenFromProto(context.Background(), opts)
+}
 
-	if err := gen.GenFromProto(context.Background(), opts); err != nil {
-		printProtoError("Proto→pb.go", err)
+// genServiceSkeleton 生成 service skeleton。
+func genServiceSkeleton(cmd *cobra.Command, protoFile, module string) error {
+	gen, err := createProtoGenerator(true)
+	if err != nil {
 		return err
 	}
 
-	// 列出生成的文件
-	files, _ := filepath.Glob(filepath.Join(out, "*.go"))
-	printProtoSuccess("Proto→pb.go", out)
-	if len(files) > 0 {
-		fmt.Printf("   生成文件:\n")
-		for _, f := range files {
-			fmt.Printf("     - %s\n", filepath.Base(f))
-		}
+	opts := integrationcontract.ServiceGenOptions{
+		ProtoFile:      protoFile,
+		OutputDir:      "internal/server/http",
+		PackageName:    "http",
+		Module:         module,
+		IncludeHTTP:    true,
+		IncludeGRPC:    true,
+		RegisterRoutes: true,
 	}
 
-	return nil
+	return gen.GenService(context.Background(), opts)
+}
+
+// genClientWrapper 生成 client wrapper。
+func genClientWrapper(cmd *cobra.Command, protoFile string) error {
+	base := strings.TrimSuffix(filepath.Base(protoFile), ".proto")
+	clientDir := filepath.Join("internal", "client")
+	if err := os.MkdirAll(clientDir, 0755); err != nil {
+		return fmt.Errorf("创建 client 目录失败: %w", err)
+	}
+	outputFile := filepath.Join(clientDir, base+"_client.go")
+
+	gen, err := createProtoGenerator(false)
+	if err != nil {
+		return err
+	}
+
+	opts := integrationcontract.ClientGenOptions{
+		ProtoFile:   protoFile,
+		OutputFile:  outputFile,
+		PackageName: "client",
+	}
+
+	return gen.GenClient(context.Background(), opts)
 }

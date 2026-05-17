@@ -9,13 +9,14 @@ import (
 )
 
 func main() {
-	if err := gorp.Run("{{.Name}}",
-{{- if .IsMicroserviceMode }}
-		gorp.WithMicroserviceMode(),
-{{- else if .IsGinFirstMode }}
-		gorp.WithGinFirstMode(),
+	if err := gorp.Run(
+{{- if .IsMicroGovernance }}
+		gorp.WithMicroGovernance(),
 {{- else }}
-		gorp.WithMonolithMode(),
+		gorp.WithMonoGovernance(),
+{{- end }}
+{{- if .IsGinHTTPMode }}
+		gorp.WithGinHTTPMode(),
 {{- end }}
 		gorp.WithSetup(setup)); err != nil {
 		fmt.Fprintln(os.Stderr, err)

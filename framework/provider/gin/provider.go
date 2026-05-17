@@ -100,18 +100,14 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	}
 
 	c.Bind(httpEngineKey, func(c runtimecontract.Container) (any, error) {
-		var engine *gin.Engine
-		if isGinFirstMode(c) {
-			// Gin-first 模式：只注入容器中间件，不自动挂载治理 preset
-			// 用户通过 engine.Use(AdaptMiddleware(...)) 手动挂载
-			engine = newGinFirstEngine(c)
-		} else {
-			// 抽象主线模式：自动挂载默认治理 preset + transport middleware
-			engine = gin.New()
-			engine.Use(injectRequestContainer(c))
-			engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(getLogger(c))))
-			attachHTTPTransportMiddleware(engine, c)
-		}
+		// Gin HTTP 模式与契约模式统一：自动挂载治理 preset + transport middleware
+		// 用户不需要手动挂载，如需禁用可通过配置或代码显式关闭
+		// Gin HTTP mode now has same governance auto-mount behavior as contract mode
+		// Users can disable via config or code if needed
+		engine := gin.New()
+		engine.Use(injectRequestContainer(c))
+		engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(getLogger(c))))
+		attachHTTPTransportMiddleware(engine, c)
 		return engine, nil
 	}, true)
 

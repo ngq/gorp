@@ -31,7 +31,8 @@ type singletonState uint32
 const (
 	singletonUninit  singletonState = iota // not yet initialized
 	singletonIniting                       // currently being initialized
-	singletonInited                        // initialization complete (success or error)
+	singletonInited                        // initialization complete (success)
+	singletonFailed                        // initialization failed (error cached)
 )
 
 type binding struct {
@@ -134,19 +135,17 @@ func (c *Container) NamedBind(name, key string, factory runtimecontract.Factory,
 }
 
 // IsBind reports whether the key is directly bound or promised by a deferred provider.
+// 使用单次 RLock 避免 TOCTOU 竞态。
 //
 // IsBind 返回目标 key 是否已直接绑定，或是否由延迟 provider 承诺提供。
 func (c *Container) IsBind(key string) bool {
 	c.mu.RLock()
+	defer c.mu.RUnlock()
 	_, ok := c.bindings[key]
-	c.mu.RUnlock()
 	if ok {
 		return true
 	}
-
-	c.mu.RLock()
 	_, ok = c.deferredByKey[key]
-	c.mu.RUnlock()
 	return ok
 }
 
@@ -392,14 +391,19 @@ func (c *Container) DebugPrint() string {
 		fmt.Fprintf(&buf, "  %s → %s\n", k, c.deferredByKey[k])
 	}
 
+	c.mu.RUnlock()
+
+	// 读取 closers 需要在 closerMu 保护下
+	// Read closers under closerMu protection
+	c.closerMu.Lock()
 	fmt.Fprintf(&buf, "Closers (%d):\n", len(c.closers))
 	for _, ce := range c.closers {
 		fmt.Fprintf(&buf, "  %s\n", ce.key)
 	}
+	c.closerMu.Unlock()
 
 	fmt.Fprintf(&buf, "Destroyed: %v\n", c.destroyed.Load())
 
-	c.mu.RUnlock()
 	return buf.String()
 }
 
@@ -429,9 +433,10 @@ func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 		return b.factory(c)
 	}
 
-	// Fast path: already initialized.
-	// 快速路径：已初始化。
-	if singletonState(b.state.Load()) == singletonInited {
+	// Fast path: already initialized or failed.
+	// 快速路径：已初始化或已失败。
+	state := singletonState(b.state.Load())
+	if state == singletonInited || state == singletonFailed {
 		return b.inst, b.err
 	}
 
@@ -439,7 +444,7 @@ func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 	// 尝试成为初始化者。
 	b.mu.Lock()
 	switch singletonState(b.state.Load()) {
-	case singletonInited:
+	case singletonInited, singletonFailed:
 		b.mu.Unlock()
 		return b.inst, b.err
 
@@ -492,15 +497,15 @@ func (c *Container) resolveBinding(b *binding, key string) (any, error) {
 
 		b.mu.Lock()
 		if err != nil {
-			// Do not cache error instances; reset state so the next call can retry.
-			// The done channel is still closed so waiters are unblocked,
-			// but they will see state=singletonUninit and re-attempt initialization.
-			// 不缓存错误实例；重置状态使下次调用可重试。
-			// done channel 仍然被关闭以解除等待者阻塞，
-			// 但等待者会看到 state=singletonUninit 并重新尝试初始化。
+			// Cache the error and mark as failed. Subsequent calls will return the cached error
+			// instead of retrying. This prevents infinite retry loops when factory keeps failing.
+			// The error can be cleared by calling Refresh() or re-binding the factory.
+			// 缓存错误并标记为失败。后续调用将返回缓存的错误而不是重试。
+			// 这可以防止 factory 持续失败时的无限重试循环。
+			// 可以通过调用 Refresh() 或重新绑定 factory 来清除错误。
 			b.inst = nil
 			b.err = err
-			b.state.Store(uint32(singletonUninit))
+			b.state.Store(uint32(singletonFailed))
 			close(b.done)
 			b.mu.Unlock()
 			return nil, err

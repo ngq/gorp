@@ -1,12 +1,12 @@
 // Application scenarios:
 // - Define one mode-aware default governance feature set shared by bootstrap, summaries, and docs.
-// - Separate "which governance capabilities are on by default" from concrete provider-backend selection.
-// - Keep monolith, microservice, and gin-first default behavior explicit and testable.
+// - Separate “which governance capabilities are on by default” from concrete provider-backend selection.
+// - Keep monolith and microservice default behavior explicit and testable.
 //
 // 适用场景：
 // - 定义一套按模式生效的默认治理能力集合，供 bootstrap、生效摘要和文档共用。
-// - 将“默认启用哪些治理能力”与“选择哪个 provider backend”解耦。
-// - 让 monolith、microservice、gin-first 三种模式的默认行为显式且可测试。
+// - 将”默认启用哪些治理能力”与”选择哪个 provider backend”解耦。
+// - 让 monolith 与 microservice 两种模式的默认行为显式且可测试。
 package resilience
 
 // GovernanceFeatureSet describes which governance capabilities are enabled by default.
@@ -42,7 +42,7 @@ func DefaultGovernanceFeatureSet(mode GovernanceMode) GovernanceFeatureSet {
 	}
 
 	switch mode {
-	case GovernanceModeMicroservice:
+	case GovernanceModeMicro:
 		base.MetadataPropagation = true
 		base.Tracing = true
 		base.Selector = true
@@ -51,16 +51,10 @@ func DefaultGovernanceFeatureSet(mode GovernanceMode) GovernanceFeatureSet {
 		// LoadShedding 在微服务模式下默认启用，提供过载保护。
 		// 默认值：MaxConcurrent = runtime.GOMAXPROCS(0) * 100（约 100-800 并发）
 		base.LoadShedding = true
-	case GovernanceModeGinFirst:
-		// Gin-first 模式：基础能力与 monolith 相同，
-		// 但语义不同——框架不自动注入高级治理 middleware，
-		// 用户通过 *gin.Engine.Use(AdaptMiddleware(...)) 按需手动挂载。
-		// 基础 5 项由框架 preset 自动启用，高级能力需显式开启。
-		return base
-	case GovernanceModeMonolith:
+	case GovernanceModeMono:
 		return base
 	default:
-		return DefaultGovernanceFeatureSet(GovernanceModeMonolith)
+		return DefaultGovernanceFeatureSet(GovernanceModeMono)
 	}
 
 	return base

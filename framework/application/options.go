@@ -54,6 +54,9 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 		if h.GovernanceMode != "" {
 			cfg.httpOpts.GovernanceMode = string(h.GovernanceMode)
 		}
+		if h.HTTPMode != "" {
+			cfg.httpOpts.HTTPMode = string(h.HTTPMode)
+		}
 		if len(h.GovernanceDisable) > 0 {
 			cfg.httpOpts.GovernanceDisable = append([]string(nil), h.GovernanceDisable...)
 		}
@@ -142,12 +145,21 @@ func WithProviders(providers ...ServiceProvider) Option {
 //	application.WithMigrate(func(rt *application.HTTPRuntime) error {
 //	    return migrateSchema(rt.Container)
 //	})
-func WithMigrate(fn func(*HTTPRuntime) error) Option {
+func WithMigrate(fn MigrateFunc) Option {
 	return optionFunc(func(cfg *runConfig) {
 		if fn == nil {
 			return
 		}
+		// 链式组合：多次调用时按声明顺序执行
+		prev := cfg.migrate
 		cfg.migrate = func(rt *HTTPRuntime) error {
+			// 先执行之前的 migrate
+			if prev != nil {
+				if err := prev(rt); err != nil {
+					return err
+				}
+			}
+			// 再执行当前 migrate
 			if err := fn(rt); err != nil {
 				return errors.Join(ErrMigrateFailed, err)
 			}
@@ -165,7 +177,7 @@ func WithMigrate(fn func(*HTTPRuntime) error) Option {
 //	application.WithSetup(func(rt *application.HTTPRuntime) error {
 //	    return registerHTTP(rt.Router)
 //	})
-func WithSetup(fn func(*HTTPRuntime) error) Option {
+func WithSetup(fn SetupFunc) Option {
 	return optionFunc(func(cfg *runConfig) {
 		var next SetupFunc
 		if fn != nil {
@@ -267,25 +279,63 @@ func WithGovernanceProvider(name, backend string) Option {
 	})
 }
 
-// WithMicroserviceMode selects the default microservice governance mainline.
+// WithMicroMode selects the microservice governance mainline.
 //
-// WithMicroserviceMode 选择默认微服务治理主线。
-func WithMicroserviceMode() Option {
-	return WithGovernanceMode(resiliencecontract.GovernanceModeMicroservice)
+// WithMicroMode 选择微服务治理主线。
+func WithMicroMode() Option {
+	return WithGovernanceMode(resiliencecontract.GovernanceModeMicro)
 }
 
-// WithMonolithMode selects the lightweight monolith governance mode.
+// WithMonoMode selects the lightweight mono governance mode.
 //
-// WithMonolithMode 选择轻量单体治理模式。
-func WithMonolithMode() Option {
-	return WithGovernanceMode(resiliencecontract.GovernanceModeMonolith)
+// WithMonoMode 选择轻量单体治理模式。
+func WithMonoMode() Option {
+	return WithGovernanceMode(resiliencecontract.GovernanceModeMono)
 }
 
-// WithGinFirstMode selects the Gin-first governance mode.
+// WithMicroGovernance selects microservice governance and HTTP contract mode.
 //
-// WithGinFirstMode 选择 Gin-first 治理模式。
-func WithGinFirstMode() Option {
-	return WithGovernanceMode(resiliencecontract.GovernanceModeGinFirst)
+// WithMicroGovernance 选择微服务治理 + HTTP 契约模式。
+func WithMicroGovernance() Option {
+	return optionFunc(func(cfg *runConfig) {
+		cfg.httpOpts.GovernanceMode = string(resiliencecontract.GovernanceModeMicro)
+		cfg.httpOpts.HTTPMode = string(resiliencecontract.HTTPModeContract)
+	})
+}
+
+// WithMonoGovernance selects mono governance (HTTP mode left to default or explicit).
+//
+// WithMonoGovernance 选择单体治理（HTTP 模式由默认值或显式参数决定）。
+func WithMonoGovernance() Option {
+	return WithGovernanceMode(resiliencecontract.GovernanceModeMono)
+}
+
+// WithHTTPMode declares the HTTP handling mode explicitly.
+// HTTPMode controls handler signature style (gorp.HTTPContext vs gin.Context).
+//
+// WithHTTPMode 显式声明 HTTP 处理抽象模式。
+// HTTPMode 控制 handler 签名风格（gorp.HTTPContext vs gin.Context）。
+func WithHTTPMode(mode resiliencecontract.HTTPMode) Option {
+	return optionFunc(func(cfg *runConfig) {
+		if mode == "" {
+			return
+		}
+		cfg.httpOpts.HTTPMode = string(mode)
+	})
+}
+
+// WithContractHTTPMode selects the gorp.HTTPContext contract abstraction.
+//
+// WithContractHTTPMode 选择 gorp.HTTPContext 契约抽象。
+func WithContractHTTPMode() Option {
+	return WithHTTPMode(resiliencecontract.HTTPModeContract)
+}
+
+// WithGinHTTPMode selects the native gin.Context mode.
+//
+// WithGinHTTPMode 选择原生 gin.Context 模式。
+func WithGinHTTPMode() Option {
+	return WithHTTPMode(resiliencecontract.HTTPModeGin)
 }
 
 // GRPC declares that the gRPC service should be started alongside the HTTP mainline.
@@ -301,7 +351,7 @@ func WithGinFirstMode() Option {
 //	gorp.Run("user-service",
 //	    gorp.HTTP(),
 //	    gorp.GRPC(),
-//	    gorp.WithMicroserviceMode(),
+//	    gorp.WithMicroMode(),
 //	    gorp.WithSetup(func(rt *gorp.HTTPRuntime) error {
 //	        pb.RegisterUserServiceServer(rt.GRPCServer, userService)
 //	        return nil

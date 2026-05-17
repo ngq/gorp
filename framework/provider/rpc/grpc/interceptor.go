@@ -7,13 +7,14 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // serviceAuthWrappedStream wraps a grpc.ServerStream with a custom context.
@@ -87,7 +88,9 @@ func serviceAuthUnaryServerInterceptor(auth securitycontract.ServiceAuthenticato
 		// 执行认证
 		identity, err := auth.Authenticate(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("rpc: service authentication failed: %w", err)
+			// 不暴露底层错误细节，返回通用认证失败
+			// 原始错误应在服务端日志中记录
+			return nil, status.Error(codes.Unauthenticated, "service authentication failed")
 		}
 		// 将身份注入 context
 		if identity != nil {
@@ -114,7 +117,9 @@ func serviceAuthStreamServerInterceptor(auth securitycontract.ServiceAuthenticat
 		// 执行认证
 		identity, err := auth.Authenticate(ctx)
 		if err != nil {
-			return fmt.Errorf("rpc: service authentication failed: %w", err)
+			// 不暴露底层错误细节，返回通用认证失败
+			// 原始错误应在服务端日志中记录
+			return status.Error(codes.Unauthenticated, "service authentication failed")
 		}
 		// 将身份注入 context
 		if identity != nil {
@@ -133,7 +138,7 @@ func recoveryUnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = fmt.Errorf("grpc: panic recovered: %v", r)
+				err = status.Errorf(codes.Internal, "grpc: panic recovered: %v", r)
 			}
 		}()
 		return handler(ctx, req)
@@ -149,7 +154,7 @@ func recoveryStreamServerInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = fmt.Errorf("grpc: panic recovered: %v", r)
+				err = status.Errorf(codes.Internal, "grpc: panic recovered: %v", r)
 			}
 		}()
 		return handler(srv, ss)

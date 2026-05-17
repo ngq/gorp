@@ -24,7 +24,7 @@ import (
 // =============================================================================
 
 func TestModeAwareSelectionsPromoteMicroserviceDefaults(t *testing.T) {
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "micro"}}
 
 	if got := SelectSelectorProvider(cfg).Name(); got != "selector.p2c" {
 		t.Fatalf("expected selector.p2c provider implementation, got %s", got)
@@ -47,30 +47,7 @@ func TestModeAwareSelectionsPromoteMicroserviceDefaults(t *testing.T) {
 }
 
 func TestModeAwareSelectionsKeepMonolithDefaultsWithoutExplicitEnablement(t *testing.T) {
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "monolith"}}
-
-	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
-		t.Fatalf("expected selector.noop, got %s", got)
-	}
-	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
-		t.Fatalf("expected tracing.noop, got %s", got)
-	}
-	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.noop" {
-		t.Fatalf("expected metadata.noop, got %s", got)
-	}
-	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
-		t.Fatalf("expected serviceauth.noop, got %s", got)
-	}
-	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
-		t.Fatalf("expected circuitbreaker.noop, got %s", got)
-	}
-	if got := SelectLoadSheddingProvider(cfg).Name(); got != "loadshedding.noop" {
-		t.Fatalf("expected loadshedding.noop, got %s", got)
-	}
-}
-
-func TestModeAwareSelectionsKeepGinFirstOnLightweightDefaults(t *testing.T) {
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "gin-first"}}
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "mono"}}
 
 	if got := SelectSelectorProvider(cfg).Name(); got != "selector.noop" {
 		t.Fatalf("expected selector.noop, got %s", got)
@@ -94,7 +71,7 @@ func TestModeAwareSelectionsKeepGinFirstOnLightweightDefaults(t *testing.T) {
 
 func TestModeAwareSelectionsRespectExplicitBackendsOverGovernanceDefaults(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":         "microservice",
+		"governance.mode":         "micro",
 		"selector.backend":        "noop",
 		"tracing.backend":         "noop",
 		"metadata.backend":        "noop",
@@ -121,7 +98,7 @@ func TestModeAwareSelectionsRespectExplicitBackendsOverGovernanceDefaults(t *tes
 
 func TestModeAwareSelectionsRespectGovernanceProviderOverrides(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":                  "microservice",
+		"governance.mode":                  "micro",
 		"governance.providers.selector":    "noop",
 		"governance.providers.tracing":     "noop",
 		"governance.providers.metadata":    "noop",
@@ -144,7 +121,7 @@ func TestModeAwareSelectionsRespectGovernanceProviderOverrides(t *testing.T) {
 
 func TestModeAwareSelectionsRespectGovernanceDisableList(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{
-		"governance.mode":    "microservice",
+		"governance.mode":    "micro",
 		"governance.disable": []string{"tracing", "selector", "metadata", "serviceauth", "circuitbreaker"},
 	}}
 
@@ -166,10 +143,12 @@ func TestModeAwareSelectionsRespectGovernanceDisableList(t *testing.T) {
 }
 
 func TestSelectedMicroserviceProvidersPromoteMicroserviceDefaults(t *testing.T) {
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "microservice"}}
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "micro"}}
 	providers := SelectedMicroserviceProviders(cfg)
-	if len(providers) != 11 {
-		t.Fatalf("expected 11 selected providers, got %d", len(providers))
+	// 13 providers: discovery, selector, rpc, tracing, metadata, serviceauth,
+	// circuitbreaker, loadshedding, retry, dtm, mq, dlock, websocket
+	if len(providers) != 13 {
+		t.Fatalf("expected 13 selected providers, got %d", len(providers))
 	}
 	assertProviderName(t, providers[0], "discovery.noop")
 	assertProviderName(t, providers[1], "selector.p2c")
@@ -184,12 +163,12 @@ func TestSelectedMicroserviceProvidersPromoteMicroserviceDefaults(t *testing.T) 
 func TestRegisterSelectedMicroserviceProvidersWithModeOverrideWinsOverConfig(t *testing.T) {
 	app := framework.NewApplication()
 	c := app.Container()
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "monolith"}}
+	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "mono"}}
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
 	}, true)
 
-	if err := RegisterSelectedMicroserviceProvidersWithMode(c, "microservice"); err != nil {
+	if err := RegisterSelectedMicroserviceProvidersWithMode(c, "micro"); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 

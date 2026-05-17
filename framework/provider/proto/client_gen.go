@@ -145,60 +145,35 @@ func parseProtoFile(protoFile string) ([]ProtoService, error) {
 	services := []ProtoService{}
 	contentStr := string(content)
 
-	// Regex patterns for service and method definitions
-	// 用于匹配 service 和 method 定义的正则模式
-	// 匹配 service 块，包含方法定义
-	servicePattern := regexp.MustCompile(`service\s+(\w+)\s*\{([\s\S]*?)\n\}`)
-	// 匹配 rpc 方法定义，包括方法体（option 块）
-	methodPattern := regexp.MustCompile(`rpc\s+(\w+)\s*\(\s*(stream\s+)?(\w+)\s*\)\s*returns\s*\(\s*(stream\s+)?(\w+)\s*\)\s*(\{([^}]*)\})?;?`)
+	// 使用改进的解析方式处理嵌套 {}
+	// 先找到所有 service 块的开始位置
+	serviceStartPattern := regexp.MustCompile(`service\s+(\w+)\s*\{`)
+	serviceStartMatches := serviceStartPattern.FindAllStringSubmatchIndex(contentStr, -1)
 
-	// Find all services
-	// 查找所有服务
-	serviceMatches := servicePattern.FindAllStringSubmatch(contentStr, -1)
-	for _, svcMatch := range serviceMatches {
-		serviceName := svcMatch[1]
-		serviceBody := svcMatch[2]
+	for _, match := range serviceStartMatches {
+		serviceName := contentStr[match[2]:match[3]]
+		startPos := match[1] // { 的位置
 
-		methods := []ProtoMethod{}
-
-		// Find all methods in the service
-		// 查找服务中的所有方法
-		methodMatches := methodPattern.FindAllStringSubmatch(serviceBody, -1)
-		for i := range methodMatches {
-			methodMatch := methodMatches[i]
-			methodName := methodMatch[1]
-			inputStream := strings.TrimSpace(methodMatch[2]) != ""
-			requestType := methodMatch[3]
-			outputStream := strings.TrimSpace(methodMatch[4]) != ""
-			responseType := methodMatch[5]
-			methodBody := methodMatch[7] // 可能为空
-
-			// Parse google.api.http annotation from method body
-			// 从方法体解析 google.api.http 注解
-			httpMethod, httpPath, httpBody := parseHTTPAnnotation(methodBody)
-
-			// Parse gorp auth/middleware options from method body
-			// 从方法体解析 gorp 认证/中间件选项
-			authRequired, authRoles, authSkip, middleware, rateLimitRPS, rateLimitRPM, rateLimitKey := parseGorpOptions(methodBody)
-
-			methods = append(methods, ProtoMethod{
-				Name:         methodName,
-				RequestType:  requestType,
-				ResponseType: responseType,
-				InputStream:  inputStream,
-				OutputStream: outputStream,
-				HTTPMethod:   httpMethod,
-				HTTPPath:     httpPath,
-				HTTPBody:     httpBody,
-				AuthRequired: authRequired,
-				AuthRoles:    authRoles,
-				AuthSkip:     authSkip,
-				Middleware:   middleware,
-				RateLimitRPS: rateLimitRPS,
-				RateLimitRPM: rateLimitRPM,
-				RateLimitKey: rateLimitKey,
-			})
+		// 找到对应的闭合 }
+		braceCount := 1
+		endPos := startPos + 1
+		for endPos < len(contentStr) {
+			if contentStr[endPos] == '{' {
+				braceCount++
+			} else if contentStr[endPos] == '}' {
+				braceCount--
+				if braceCount == 0 {
+					break
+				}
+			}
+			endPos++
 		}
+
+		// 提取 service body
+		serviceBody := contentStr[startPos+1 : endPos]
+
+		// 解析方法
+		methods := parseMethodsFromServiceBody(serviceBody)
 
 		services = append(services, ProtoService{
 			Name:    serviceName,
@@ -207,6 +182,90 @@ func parseProtoFile(protoFile string) ([]ProtoService, error) {
 	}
 
 	return services, nil
+}
+
+// parseMethodsFromServiceBody 从 service body 解析所有方法。
+//
+// 中文说明：
+// - 使用正则表达式匹配 rpc 方法定义；
+// - 支持 method body 中包含 option 块；
+// - 正确处理嵌套的 {} 结构。
+func parseMethodsFromServiceBody(serviceBody string) []ProtoMethod {
+	methods := []ProtoMethod{}
+
+	// 匹配 rpc 方法定义，包括方法体（option 块）
+	// 使用改进的正则，支持嵌套 {}
+	methodPattern := regexp.MustCompile(`rpc\s+(\w+)\s*\(\s*(stream\s+)?(\w+)\s*\)\s*returns\s*\(\s*(stream\s+)?(\w+)\s*\)\s*(\{|;)`)
+
+	methodStartMatches := methodPattern.FindAllStringSubmatchIndex(serviceBody, -1)
+
+	for _, match := range methodStartMatches {
+		methodName := serviceBody[match[2]:match[3]]
+
+		// 处理可选的 stream 关键字
+		inputStream := false
+		if match[4] != -1 && match[5] != -1 {
+			inputStream = strings.TrimSpace(serviceBody[match[4]:match[5]]) != ""
+		}
+		requestType := serviceBody[match[6]:match[7]]
+
+		outputStream := false
+		if match[8] != -1 && match[9] != -1 {
+			outputStream = strings.TrimSpace(serviceBody[match[8]:match[9]]) != ""
+		}
+		responseType := serviceBody[match[10]:match[11]]
+
+		// 检查是否有 method body
+		methodBody := ""
+		if match[12] != -1 && match[13] != -1 && match[12] < len(serviceBody) && match[13] <= len(serviceBody) {
+			if serviceBody[match[12]:match[13]] == "{" {
+				// 找到对应的闭合 }
+				startPos := match[12]
+				braceCount := 1
+				endPos := startPos + 1
+				for endPos < len(serviceBody) {
+					if serviceBody[endPos] == '{' {
+						braceCount++
+					} else if serviceBody[endPos] == '}' {
+						braceCount--
+						if braceCount == 0 {
+							break
+						}
+					}
+					endPos++
+				}
+				methodBody = serviceBody[startPos+1 : endPos]
+			}
+		}
+
+		// Parse google.api.http annotation from method body
+		// 从方法体解析 google.api.http 注解
+		httpMethod, httpPath, httpBody := parseHTTPAnnotation(methodBody)
+
+		// Parse gorp auth/middleware options from method body
+		// 从方法体解析 gorp 认证/中间件选项
+		authRequired, authRoles, authSkip, middleware, rateLimitRPS, rateLimitRPM, rateLimitKey := parseGorpOptions(methodBody)
+
+		methods = append(methods, ProtoMethod{
+			Name:         methodName,
+			RequestType:  requestType,
+			ResponseType: responseType,
+			InputStream:  inputStream,
+			OutputStream: outputStream,
+			HTTPMethod:   httpMethod,
+			HTTPPath:     httpPath,
+			HTTPBody:     httpBody,
+			AuthRequired: authRequired,
+			AuthRoles:    authRoles,
+			AuthSkip:     authSkip,
+			Middleware:   middleware,
+			RateLimitRPS: rateLimitRPS,
+			RateLimitRPM: rateLimitRPM,
+			RateLimitKey: rateLimitKey,
+		})
+	}
+
+	return methods
 }
 
 // parseHTTPAnnotation parses google.api.http annotation from rpc method body.
@@ -221,13 +280,18 @@ func parseHTTPAnnotation(methodBody string) (httpMethod, httpPath, httpBody stri
 
 	// 匹配 google.api.http 注解块
 	// option (google.api.http) = { get: "/v1/users/{id}" };
-	httpPattern := regexp.MustCompile(`\(google\.api\.http\)\s*=\s*\{([^}]+)\}`)
+	// 使用改进的正则，支持路径中包含 {}
+	httpPattern := regexp.MustCompile(`\(google\.api\.http\)\s*=\s*\{([^}]*\{[^}]*\}[^}]*)\}|\(google\.api\.http\)\s*=\s*\{([^}]+)\}`)
 	httpMatch := httpPattern.FindStringSubmatch(methodBody)
 	if len(httpMatch) < 2 {
 		return "", "", ""
 	}
 
+	// 选择匹配的组（可能匹配第一个或第二个模式）
 	httpBlock := httpMatch[1]
+	if httpBlock == "" && len(httpMatch) > 2 {
+		httpBlock = httpMatch[2]
+	}
 
 	// 解析 HTTP 方法：get/post/put/delete/patch
 	// 格式：get: "/v1/users/{id}" 或 post: "/v1/users" body: "*"

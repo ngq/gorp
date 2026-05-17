@@ -4,7 +4,7 @@ import (
 	"{{.ModuleName}}/app/http/handler"
 	"{{.ModuleName}}/internal/service"
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	ginprovider "{{.FrameworkModule}}/framework/provider/gin"
 	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
 
@@ -21,20 +21,20 @@ import (
 // - 调用 internal/service 层注册业务路由；
 // - `/healthz` 与 `/metrics` 等基础端点由 application 默认主线统一注册，这里只关注业务 API；
 // - 业务是否启用认证或缓存能力，仍由项目自行决定；
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 // - Gin-first 模式：直接使用原生 Gin Engine 注册路由；
 {{- else }}
 // - 抽象契约模式：使用 gorp.HTTPRouter 抽象接口；
 {{- end }}
 func RegisterRoutes(
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	httpSvc transportcontract.HTTP,
 {{- else }}
 	r gorp.HTTPRouter,
 {{- end }}
 	svc *service.Services,
 ) {
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	// Gin-first 模式：获取原生 Gin Engine
 	engine, ok := ginprovider.NativeEngine(httpSvc)
 	if !ok {

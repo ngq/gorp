@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	"{{.ModuleName}}/services/product/internal/server/http/request"
 	"{{.ModuleName}}/services/product/internal/server/http/response"
 	"{{.ModuleName}}/services/product/internal/service"
@@ -28,7 +28,7 @@ func NewProductHandler(product *service.ProductService) *ProductHandler {
 	return &ProductHandler{product: product}
 }
 
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 
 func (h *ProductHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

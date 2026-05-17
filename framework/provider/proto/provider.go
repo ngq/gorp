@@ -1,10 +1,10 @@
 // Package proto provides proto generator service for gorp framework.
-// Supports three workflows: Proto-first, Service-first, Route-first.
-// Generates Go code from proto, or proto from Go service/Gin routes.
+// Supports two workflows: Proto-first and Service-first.
+// Generates Go code from proto, or proto from Go service interface.
 //
 // Proto 包提供 proto 生成器服务，用于 gorp 框架。
-// 支持三种工作流：Proto-first、Service-first、Route-first。
-// 从 proto 生成 Go 代码，或从 Go service/Gin 路由生成 proto。
+// 支持两种工作流：Proto-first 和 Service-first。
+// 从 proto 生成 Go 代码，或从 Go service 接口生成 proto。
 package proto
 
 import (

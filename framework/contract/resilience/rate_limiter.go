@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// RateLimiterKey is the container key for the rate limiter capability.
+//
+// RateLimiterKey 是限流器能力的容器键。
+const RateLimiterKey = "framework.rate_limiter"
+
 type RateLimiter interface {
 	Allow(ctx context.Context, resource string) error
 	AllowN(ctx context.Context, resource string, n int) error

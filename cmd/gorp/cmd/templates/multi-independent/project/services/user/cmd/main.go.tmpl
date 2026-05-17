@@ -7,17 +7,21 @@ import (
 	userdata "{{.ModuleName}}/services/user/internal/data"
 	userhttp "{{.ModuleName}}/services/user/internal/server/http"
 	"{{.FrameworkModule}}"
+{{- if .IsGinHTTPMode }}
+	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
+{{- end }}
 )
 
 func main() {
 	if err := gorp.Run(
-		"user-service",
-{{- if .IsMicroserviceMode }}
-		gorp.WithMicroserviceMode(),
-{{- else if .IsGinFirstMode }}
-		gorp.WithGinFirstMode(),
+{{- if .IsMicroGovernance }}
+		gorp.GRPC(),
+		gorp.WithMicroGovernance(),
 {{- else }}
-		gorp.WithMonolithMode(),
+		gorp.WithMonoGovernance(),
+{{- end }}
+{{- if .IsGinHTTPMode }}
+		gorp.WithGinHTTPMode(),
 {{- end }}
 		gorp.WithMigrate(migrate),
 		gorp.WithSetup(setup),
@@ -42,6 +46,16 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
+{{- if .IsGinHTTPMode }}
+
+	// Gin-first 模式：传递 HTTP 服务给路由注册函数
+	httpSvc, err := rt.Container.Make(transportcontract.HTTPKey)
+	if err != nil {
+		return err
+	}
+	userhttp.RegisterRoutes(httpSvc.(transportcontract.HTTP), services)
+{{- else }}
 	userhttp.RegisterRoutes(rt.Router, services)
+{{- end }}
 	return nil
 }

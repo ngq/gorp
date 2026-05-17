@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,10 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
+
+// defaultTokenSecret 是未配置 service_auth token secret 时的硬编码默认值。
+// 生产环境 MUST 修改此值，否则所有服务间通信 token 均可被伪造。
+const defaultTokenSecret = "default-secret-change-in-production"
 
 type Provider struct{}
 
@@ -85,7 +90,8 @@ func getServiceAuthConfig(c runtimecontract.Container) (*securitycontract.Servic
 	if secret := configprovider.GetStringAny(cfg, "serviceauth.token.secret", "service_auth.token.secret", "service_auth.token_secret"); secret != "" {
 		authCfg.TokenSecret = secret
 	} else {
-		authCfg.TokenSecret = "default-secret-change-in-production"
+		authCfg.TokenSecret = defaultTokenSecret
+			slog.Error("serviceauth.token: token secret not configured, using default — MUST change in production!")
 	}
 	if issuer := configprovider.GetStringAny(cfg, "serviceauth.token.issuer", "service_auth.token.issuer", "service_auth.token_issuer"); issuer != "" {
 		authCfg.TokenIssuer = issuer

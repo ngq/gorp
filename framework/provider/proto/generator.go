@@ -1,10 +1,10 @@
 // Package proto provides proto generator implementation.
 // Core implementation of ProtoGenerator contract.
-// Supports protoc invocation, Go AST parsing, Gin route parsing.
+// Supports protoc invocation and Go AST parsing.
 //
 // Proto 包提供 proto 生成器实现。
 // ProtoGenerator 契约的核心实现。
-// 支持 protoc 调用、Go AST 解析、Gin 路由解析。
+// 支持 protoc 调用和 Go AST 解析。
 package proto
 
 import (
@@ -26,10 +26,9 @@ import (
 // Generator 实现 ProtoGenerator 接口。
 //
 // 中文说明：
-// - 支持三种工作流：Proto-first / Service-first / Route-first；
+// - 支持两种工作流：Proto-first 和 Service-first；
 // - Proto-first：调用 protoc 生成 Go 代码；
-// - Service-first：解析 Go AST 生成 Proto；
-// - Route-first：解析 Gin 路由生成 Proto。
+// - Service-first：解析 Go AST 生成 Proto。
 type Generator struct {
 	cfg *integrationcontract.ProtoGeneratorConfig
 }
@@ -219,36 +218,37 @@ func (g *Generator) GenFromService(ctx context.Context, opts integrationcontract
 	return nil
 }
 
-// GenFromRoute 从 Gin 路由生成 proto 文件。
-//
-// 中文说明：
-// - 解析 Gin 路由定义；
-// - 推断请求/响应类型；
-// - 自动添加 HTTP 注解。
-func (g *Generator) GenFromRoute(ctx context.Context, opts integrationcontract.RouteToProtoOptions) error {
-	// 解析路由文件
-	routes, err := g.parseGinRoutes(opts.RouteFile)
-	if err != nil {
-		return fmt.Errorf("proto: parse route file: %w", err)
+
+	// GenFromRoute 从 Gin 路由生成 proto 文件（迁移工具）。
+	//
+	// 中文说明：
+	// - 用于将现有 Gin 项目迁移到 gRPC/proto 工作流；
+	// - 解析 Gin 路由定义，推断请求/响应类型；
+	// - 自动添加 HTTP 注解。
+	func (g *Generator) GenFromRoute(ctx context.Context, opts integrationcontract.RouteToProtoOptions) error {
+		// 解析路由文件
+		routes, err := g.parseGinRoutes(opts.RouteFile)
+		if err != nil {
+			return fmt.Errorf("proto: parse route file: %w", err)
+		}
+
+		if len(routes) == 0 {
+			return fmt.Errorf("proto: no routes found in %s", opts.RouteFile)
+		}
+
+		// 生成 proto 内容
+		protoContent := g.generateProtoFromRoutes(routes, opts)
+
+		// 写入文件
+		if err := os.WriteFile(opts.OutputPath, []byte(protoContent), 0644); err != nil {
+			return fmt.Errorf("proto: write proto file: %w", err)
+		}
+
+		// 格式化 proto 文件
+		g.formatProtoFile(opts.OutputPath)
+
+		return nil
 	}
-
-	if len(routes) == 0 {
-		return fmt.Errorf("proto: no routes found in %s", opts.RouteFile)
-	}
-
-	// 生成 proto 内容
-	protoContent := g.generateProtoFromRoutes(routes, opts)
-
-	// 写入文件
-	if err := os.WriteFile(opts.OutputPath, []byte(protoContent), 0644); err != nil {
-		return fmt.Errorf("proto: write proto file: %w", err)
-	}
-
-	// 格式化 proto 文件
-	g.formatProtoFile(opts.OutputPath)
-
-	return nil
-}
 
 // scanProtoFiles 扫描目录下所有 proto 文件。
 func (g *Generator) scanProtoFiles(dir string) ([]string, error) {
@@ -535,7 +535,8 @@ func (g *Generator) extractServices(f *ast.File) []integrationcontract.ServiceDe
 // - 从接口方法签名中提取请求和响应类型；
 // - 自动跳过 context.Context 参数和 error 返回值；
 // - 解析指针、切片等复合类型；
-// - 提取方法注释。
+// - 提取方法注释；
+// - 解析 HTTP: 注释标记，生成 HTTPRule。
 func (g *Generator) extractMethod(fnType *ast.FuncType, name string, field *ast.Field) integrationcontract.MethodDef {
 	method := integrationcontract.MethodDef{
 		Name: name,
@@ -550,6 +551,17 @@ func (g *Generator) extractMethod(fnType *ast.FuncType, name string, field *ast.
 				method.Comments = append(method.Comments, text)
 			}
 		}
+	}
+
+	// 解析 HTTP: 注释标记
+	// 格式: HTTP: GET /v1/users/{id} 或 HTTP: POST /v1/users
+	// 不带 HTTP: 标记的方法只生成 gRPC，不生成 HTTP 注解
+	httpRule, httpErr := g.parseHTTPAnnotation(method.Comments)
+	if httpErr != nil {
+		// 记录解析错误，稍后在生成时统一报告
+		method.Comments = append(method.Comments, fmt.Sprintf("⚠️ HTTP annotation parse error: %s", httpErr.Error()))
+	} else if httpRule != nil {
+		method.HTTPRule = httpRule
 	}
 
 	// 提取请求类型（第一个参数）
@@ -578,6 +590,76 @@ func (g *Generator) extractMethod(fnType *ast.FuncType, name string, field *ast.
 	}
 
 	return method
+}
+
+// parseHTTPAnnotation 从方法注释中解析 HTTP: 标记。
+//
+// 中文说明：
+// - 解析格式: HTTP: GET /v1/users/{id} 或 HTTP: POST /v1/users；
+// - 支持 GET/POST/PUT/DELETE/PATCH 方法；
+// - POST/PUT/PATCH 默认添加 body: "*"；
+// - 格式不规范时返回错误提示。
+func (g *Generator) parseHTTPAnnotation(comments []string) (*integrationcontract.HTTPRule, error) {
+	for _, comment := range comments {
+		// 查找 HTTP: 标记
+		if !strings.HasPrefix(comment, "HTTP:") && !strings.HasPrefix(comment, "HTTP：") {
+			continue
+		}
+
+		// 提取 HTTP: 后面的内容
+		var httpDef string
+		if strings.HasPrefix(comment, "HTTP:") {
+			httpDef = strings.TrimSpace(strings.TrimPrefix(comment, "HTTP:"))
+		} else {
+			httpDef = strings.TrimSpace(strings.TrimPrefix(comment, "HTTP："))
+		}
+
+		if httpDef == "" {
+			return nil, fmt.Errorf("HTTP annotation is empty, expected format: HTTP: GET /v1/users/{id}")
+		}
+
+		// 解析 HTTP 方法和路径
+		// 支持格式: "GET /v1/users/{id}" 或 "GET /v1/users/{id} body:*"
+		parts := strings.Fields(httpDef)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid HTTP annotation format: %q, expected: HTTP: GET /v1/users/{id}", httpDef)
+		}
+
+		httpMethod := strings.ToUpper(parts[0])
+		httpPath := parts[1]
+
+		// 校验 HTTP 方法
+		validMethods := map[string]bool{
+			"GET":    true,
+			"POST":   true,
+			"PUT":    true,
+			"DELETE": true,
+			"PATCH":  true,
+		}
+		if !validMethods[httpMethod] {
+			return nil, fmt.Errorf("invalid HTTP method: %q, expected one of: GET, POST, PUT, DELETE, PATCH", httpMethod)
+		}
+
+		// 校验路径格式
+		if !strings.HasPrefix(httpPath, "/") {
+			return nil, fmt.Errorf("invalid HTTP path: %q, path must start with /", httpPath)
+		}
+
+		// 构建 HTTPRule
+		rule := &integrationcontract.HTTPRule{
+			Method: httpMethod,
+			Path:   httpPath,
+		}
+
+		// POST/PUT/PATCH 默认添加 body: "*"
+		if httpMethod == "POST" || httpMethod == "PUT" || httpMethod == "PATCH" {
+			rule.Body = "*"
+		}
+
+		return rule, nil
+	}
+
+	return nil, nil
 }
 
 // extractType 提取类型定义。
@@ -923,14 +1005,26 @@ func (g *Generator) generateProtoContent(svc *integrationcontract.ServiceDef, op
 	buf.WriteString("syntax = \"proto3\";\n\n")
 	buf.WriteString(fmt.Sprintf("package %s;\n\n", opts.Package))
 
+	// 判断是否需要 HTTP 注解导入
+	// 条件：opts.IncludeHTTP 为 true，或任何方法有 HTTPRule
+	needHTTPImport := opts.IncludeHTTP
+	if !needHTTPImport {
+		for _, method := range svc.Methods {
+			if method.HTTPRule != nil {
+				needHTTPImport = true
+				break
+			}
+		}
+	}
+
 	// HTTP 注解导入
-	if opts.IncludeHTTP {
+	if needHTTPImport {
 		buf.WriteString("import \"google/api/annotations.proto\";\n")
 	}
 	if g.serviceUsesProtoAny(svc, structDefs) {
 		buf.WriteString("import \"google/protobuf/any.proto\";\n")
 	}
-	if opts.IncludeHTTP || g.serviceUsesProtoAny(svc, structDefs) {
+	if needHTTPImport || g.serviceUsesProtoAny(svc, structDefs) {
 		buf.WriteString("\n")
 	}
 
@@ -1139,31 +1233,34 @@ func (g *Generator) generateMethod(buf *bytes.Buffer, method integrationcontract
 	}
 
 	// 写入方法注释（如果有）
-	if len(method.Comments) > 0 {
-		for _, c := range method.Comments {
+	// 过滤掉 HTTP 解析错误提示，不写入 proto
+	for _, c := range method.Comments {
+		if !strings.HasPrefix(c, "⚠️ HTTP annotation parse error:") {
 			buf.WriteString(fmt.Sprintf("  // %s\n", strings.TrimSpace(c)))
 		}
-	} else {
-		// 默认注释：方法名
-		buf.WriteString(fmt.Sprintf("  // %s RPC method\n", method.Name))
 	}
 
 	buf.WriteString(fmt.Sprintf("  rpc %s(%s) returns (%s)", method.Name, reqName, respName))
 
-	// HTTP 注解
-	if opts.IncludeHTTP {
+	// HTTP 注解：优先使用方法自身的 HTTPRule，其次使用 opts.HTTPAnnotations
+	// 方法自身的 HTTPRule 来自注释中的 HTTP: 标记解析
+	httpRule := method.HTTPRule
+	if httpRule == nil {
+		// 兼容旧逻辑：从 opts.HTTPAnnotations 获取
 		if rule, ok := opts.HTTPAnnotations[method.Name]; ok {
-			buf.WriteString(" {\n")
-			buf.WriteString("    option (google.api.http) = {\n")
-			buf.WriteString(fmt.Sprintf("      %s: \"%s\"\n", strings.ToLower(rule.Method), rule.Path))
-			if rule.Body != "" {
-				buf.WriteString(fmt.Sprintf("      body: \"%s\"\n", rule.Body))
-			}
-			buf.WriteString("    };\n")
-			buf.WriteString("  }\n")
-		} else {
-			buf.WriteString(";\n")
+			httpRule = &rule
 		}
+	}
+
+	if httpRule != nil {
+		buf.WriteString(" {\n")
+		buf.WriteString("    option (google.api.http) = {\n")
+		buf.WriteString(fmt.Sprintf("      %s: \"%s\"\n", strings.ToLower(httpRule.Method), httpRule.Path))
+		if httpRule.Body != "" {
+			buf.WriteString(fmt.Sprintf("      body: \"%s\"\n", httpRule.Body))
+		}
+		buf.WriteString("    };\n")
+		buf.WriteString("  }\n")
 	} else {
 		buf.WriteString(";\n")
 	}

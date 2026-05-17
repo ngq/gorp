@@ -245,3 +245,141 @@ func TestProviderDefaultFallbackSecret(t *testing.T) {
 		t.Fatalf("expected token verify pass with default secret, got err: %v", err)
 	}
 }
+
+// TestJWTService_VerifyRejectsIssuerMismatch verifies that tokens with mismatched issuer are rejected.
+//
+// TestJWTService_VerifyRejectsIssuerMismatch 验证 issuer 不匹配的 token 会被拒绝。
+func TestJWTService_VerifyRejectsIssuerMismatch(t *testing.T) {
+	// 创建一个配置了 issuer 的服务
+	svc := NewJWTService("secret", "expected-issuer", "")
+
+	// 用正确的 issuer 签发 token
+	claims := svc.NewClaims(1, "user", "u1", nil, 60)
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 用配置了不同 issuer 的验证器校验
+	wrongIssuerSvc := NewJWTService("secret", "wrong-issuer", "")
+	_, err = wrongIssuerSvc.Verify(token)
+	if err == nil {
+		t.Fatal("expected error when issuer mismatch")
+	}
+}
+
+// TestJWTService_VerifyAcceptsMatchingIssuer verifies that tokens with matching issuer are accepted.
+//
+// TestJWTService_VerifyAcceptsMatchingIssuer 验证 issuer 匹配的 token 会被接受。
+func TestJWTService_VerifyAcceptsMatchingIssuer(t *testing.T) {
+	svc := NewJWTService("secret", "my-issuer", "")
+	claims := svc.NewClaims(1, "user", "u1", nil, 60)
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 同一个服务验证，issuer 匹配
+	verified, err := svc.Verify(token)
+	if err != nil {
+		t.Fatalf("expected token verify pass, got err: %v", err)
+	}
+	if verified.Issuer != "my-issuer" {
+		t.Fatalf("expected issuer 'my-issuer', got '%s'", verified.Issuer)
+	}
+}
+
+// TestJWTService_VerifyRejectsAudienceMismatch verifies that tokens with mismatched audience are rejected.
+//
+// TestJWTService_VerifyRejectsAudienceMismatch 验证 audience 不匹配的 token 会被拒绝。
+func TestJWTService_VerifyRejectsAudienceMismatch(t *testing.T) {
+	// 创建一个配置了 audience 的服务
+	svc := NewJWTService("secret", "", "expected-audience")
+
+	// 用正确的 audience 签发 token
+	claims := svc.NewClaims(1, "user", "u1", nil, 60)
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 用配置了不同 audience 的验证器校验
+	wrongAudSvc := NewJWTService("secret", "", "wrong-audience")
+	_, err = wrongAudSvc.Verify(token)
+	if err == nil {
+		t.Fatal("expected error when audience mismatch")
+	}
+}
+
+// TestJWTService_VerifyAcceptsMatchingAudience verifies that tokens with matching audience are accepted.
+//
+// TestJWTService_VerifyAcceptsMatchingAudience 验证 audience 匹配的 token 会被接受。
+func TestJWTService_VerifyAcceptsMatchingAudience(t *testing.T) {
+	svc := NewJWTService("secret", "", "my-audience")
+	claims := svc.NewClaims(1, "user", "u1", nil, 60)
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 同一个服务验证，audience 匹配
+	verified, err := svc.Verify(token)
+	if err != nil {
+		t.Fatalf("expected token verify pass, got err: %v", err)
+	}
+	if verified.Audience != "my-audience" {
+		t.Fatalf("expected audience 'my-audience', got '%s'", verified.Audience)
+	}
+}
+
+// TestJWTService_VerifySkipsIssuerCheckWhenEmpty verifies that issuer check is skipped when service has no issuer configured.
+//
+// TestJWTService_VerifySkipsIssuerCheckWhenEmpty 验证服务未配置 issuer 时跳过 issuer 校验。
+func TestJWTService_VerifySkipsIssuerCheckWhenEmpty(t *testing.T) {
+	// 服务未配置 issuer
+	svc := NewJWTService("secret", "", "")
+
+	// 手动构建一个带任意 issuer 的 claims
+	claims := securitycontract.JWTClaims{
+		SubjectID:   1,
+		SubjectType: "user",
+		SubjectName: "u1",
+		ExpiresAt:   9999999999,
+		IssuedAt:    1,
+		Issuer:      "any-issuer", // 任意 issuer
+	}
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 服务未配置 issuer，应该接受任意 issuer
+	_, err = svc.Verify(token)
+	if err != nil {
+		t.Fatalf("expected token verify pass when no issuer configured, got err: %v", err)
+	}
+}
+
+// TestJWTService_VerifySkipsAudienceCheckWhenEmpty verifies that audience check is skipped when service has no audience configured.
+//
+// TestJWTService_VerifySkipsAudienceCheckWhenEmpty 验证服务未配置 audience 时跳过 audience 校验。
+func TestJWTService_VerifySkipsAudienceCheckWhenEmpty(t *testing.T) {
+	// 服务未配置 audience
+	svc := NewJWTService("secret", "", "")
+
+	// 手动构建一个带任意 audience 的 claims
+	claims := securitycontract.JWTClaims{
+		SubjectID:   1,
+		SubjectType: "user",
+		SubjectName: "u1",
+		ExpiresAt:   9999999999,
+		IssuedAt:    1,
+		Audience:    "any-audience", // 任意 audience
+	}
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 服务未配置 audience，应该接受任意 audience
+	_, err = svc.Verify(token)
+	if err != nil {
+		t.Fatalf("expected token verify pass when no audience configured, got err: %v", err)
+	}
+}

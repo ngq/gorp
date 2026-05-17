@@ -15,18 +15,35 @@ package resilience
 type GovernanceMode string
 
 const (
-	// GovernanceModeMonolith keeps the runtime lightweight and local-first.
+	// GovernanceModeMono keeps the runtime lightweight and local-first.
 	//
-	// GovernanceModeMonolith 表示继续走轻量、本地优先的单体主线。
-	GovernanceModeMonolith GovernanceMode = "monolith"
-	// GovernanceModeGinFirst keeps Gin-native development ergonomics while staying on the shared governance mainline.
+	// GovernanceModeMono 表示继续走轻量、本地优先的单体主线。
+	GovernanceModeMono GovernanceMode = "mono"
+	// GovernanceModeMicro enables the default microservice governance mainline.
 	//
-	// GovernanceModeGinFirst 表示在共享治理主线下优先保留 Gin 原生开发体验。
-	GovernanceModeGinFirst GovernanceMode = "gin-first"
-	// GovernanceModeMicroservice enables the default microservice governance mainline.
+	// GovernanceModeMicro 表示启用默认微服务治理主线。
+	GovernanceModeMicro GovernanceMode = "micro"
+)
+
+// HTTPMode identifies the HTTP handling abstraction mode.
+// This is an orthogonal dimension to GovernanceMode: HTTP mode controls
+// handler signature style (gorp.HTTPContext vs gin.Context), while
+// GovernanceMode controls governance capability set.
+//
+// HTTPMode 标识 HTTP 处理抽象模式。
+// 这是与 GovernanceMode 正交的维度：HTTP 模式控制 handler 签名风格
+// （gorp.HTTPContext vs gin.Context），GovernanceMode 控制治理能力集。
+type HTTPMode string
+
+const (
+	// HTTPModeContract uses gorp.HTTPContext abstraction.
 	//
-	// GovernanceModeMicroservice 表示启用默认微服务治理主线。
-	GovernanceModeMicroservice GovernanceMode = "microservice"
+	// HTTPModeContract 使用 gorp.HTTPContext 契约抽象。
+	HTTPModeContract HTTPMode = "contract"
+	// HTTPModeGin uses native gin.Context directly.
+	//
+	// HTTPModeGin 使用原生 gin.Context。
+	HTTPModeGin HTTPMode = "gin"
 )
 
 // GovernancePolicyProvider exposes unified policy lookups for runtime governance.

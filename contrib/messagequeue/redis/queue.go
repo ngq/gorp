@@ -7,18 +7,20 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
+	"github.com/ngq/gorp/contrib/internal/native"
+	"github.com/ngq/gorp/contrib/messagequeue"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
 // Queue implements integrationcontract.MessageQueue using Redis SDK.
 type Queue struct {
-	cfg    *integrationcontract.MessageQueueConfig
-	client *redis.Client
-	pubsub *redis.PubSub
-	mu     sync.Mutex
-	subs   map[string]context.CancelFunc
-	closed bool
+	cfg     *integrationcontract.MessageQueueConfig
+	client  *redis.Client
+	pubsub  *redis.PubSub
+	mu      sync.Mutex
+	subs    map[string]context.CancelFunc
+	closed  bool
+	metrics *messagequeue.MetricsRecorder // Prometheus 指标记录器
 }
 
 // NewQueue creates a new Redis Queue instance.
@@ -29,7 +31,12 @@ func NewQueue(cfg *integrationcontract.MessageQueueConfig) (*Queue, error) {
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("messagequeue.redis: connect failed: %w", err)
 	}
-	return &Queue{cfg: cfg, client: client, subs: make(map[string]context.CancelFunc)}, nil
+	return &Queue{
+		cfg:     cfg,
+		client:  client,
+		subs:    make(map[string]context.CancelFunc),
+		metrics: messagequeue.NewMetricsRecorder(),
+	}, nil
 }
 
 // Publisher returns a Redis-based MessagePublisher.
@@ -84,7 +91,7 @@ func (q *Queue) As(target any) bool {
 	if q == nil || q.client == nil {
 		return false
 	}
-	return internalnative.As(q.client, target)
+	return native.As(q.client, target)
 }
 
 // NativeMQClient implements NativeMQClientProvider interface.

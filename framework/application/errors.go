@@ -10,11 +10,6 @@ package application
 import "errors"
 
 var (
-	// ErrServiceNameRequired indicates that the service name is missing.
-	//
-	// ErrServiceNameRequired 表示缺少服务名。
-	ErrServiceNameRequired = errors.New("application: serviceName is required")
-
 	// ErrNoServiceDeclared indicates that no runnable service has been declared.
 	//
 	// ErrNoServiceDeclared 表示没有声明可运行服务。

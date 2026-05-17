@@ -33,7 +33,7 @@ func TestRegistryFactories_ProvideExpectedFallbacks(t *testing.T) {
 }
 
 func TestDefaultGovernanceProviderDefaultsRemainStable(t *testing.T) {
-	monolith := DefaultGovernanceProviderDefaults(resilience.GovernanceModeMonolith)
+	monolith := DefaultGovernanceProviderDefaults(resilience.GovernanceModeMono)
 	if monolith.ConfigSource != "local" || monolith.Discovery != "noop" || monolith.Selector != "noop" {
 		t.Fatalf("unexpected monolith defaults: %+v", monolith)
 	}
@@ -41,12 +41,7 @@ func TestDefaultGovernanceProviderDefaultsRemainStable(t *testing.T) {
 		t.Fatalf("unexpected monolith governance protection defaults: %+v", monolith)
 	}
 
-	ginFirst := DefaultGovernanceProviderDefaults(resilience.GovernanceModeGinFirst)
-	if ginFirst != monolith {
-		t.Fatalf("expected gin-first defaults to match monolith for now, got %+v vs %+v", ginFirst, monolith)
-	}
-
-	microservice := DefaultGovernanceProviderDefaults(resilience.GovernanceModeMicroservice)
+	microservice := DefaultGovernanceProviderDefaults(resilience.GovernanceModeMicro)
 	if microservice.ConfigSource != "local" || microservice.Discovery != "noop" || microservice.RPC != "noop" {
 		t.Fatalf("unexpected microservice transport defaults: %+v", microservice)
 	}
@@ -58,8 +53,10 @@ func TestDefaultGovernanceProviderDefaultsRemainStable(t *testing.T) {
 func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *testing.T) {
 	cfg := &selectorConfigStub{values: map[string]any{}}
 	providers := SelectedMicroserviceProviders(cfg)
-	if len(providers) != 11 {
-		t.Fatalf("expected 11 selected providers, got %d", len(providers))
+	// 13 providers: discovery, selector, rpc, tracing, metadata, serviceauth,
+	// circuitbreaker, loadshedding, retry, dtm, mq, dlock, websocket
+	if len(providers) != 13 {
+		t.Fatalf("expected 13 selected providers, got %d", len(providers))
 	}
 	assertProviderName(t, providers[0], "discovery.noop")
 	assertProviderName(t, providers[1], "selector.noop")
@@ -69,7 +66,9 @@ func TestSelectedMicroserviceProviders_DefaultsMatchBootstrapExpectations(t *tes
 	assertProviderName(t, providers[5], "serviceauth.noop")
 	assertProviderName(t, providers[6], "circuitbreaker.noop")
 	assertProviderName(t, providers[7], "loadshedding.noop")
-	assertProviderName(t, providers[8], "dtm.noop")
-	assertProviderName(t, providers[9], "messagequeue.noop")
-	assertProviderName(t, providers[10], "dlock.noop")
+	assertProviderName(t, providers[8], "retry.noop")
+	assertProviderName(t, providers[9], "dtm.noop")
+	assertProviderName(t, providers[10], "messagequeue.noop")
+	assertProviderName(t, providers[11], "dlock.noop")
+	assertProviderName(t, providers[12], "websocket.noop")
 }

@@ -41,6 +41,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// closerFunc 将 func() error 适配为 io.Closer 接口
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }
+
 // Provider registers the SQLX DB contract.
 //
 // Provider 注册 SQLX 数据库契约。
@@ -136,6 +141,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		if err := db.Ping(); err != nil {
 			return nil, err
 		}
+
+		// 注册 closer：关闭 sqlx.DB 连接
+		c.RegisterCloser("sqlx.db", closerFunc(func() error { return db.Close() }))
+
 		return db, nil
 	}, true)
 	return nil

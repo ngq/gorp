@@ -16,12 +16,12 @@ import (
 // 中文说明：
 // - 用户日常开发时，直接 `go run ./cmd/app` 或 IDE 调试即可启动 HTTP 服务；
 // - 使用框架统一入口 gorp，简化导入；
-// - 默认主线直接走 typed runtime + direct constructor，不要求先理解 ServiceProvider / ExtraProviders。
+// - 默认主线直接走 typed runtime + direct constructor，不要求先理解 ServiceProvider / ExtraProviders；
+// - 服务名从配置文件 app.name 自动读取。
 func main() {
 	if err := gorp.Run(
-		"monolith",
 		gorp.HTTP(),
-		gorp.WithMonolithMode(),
+		gorp.WithMonoGovernance(),
 		gorp.WithMigrate(migrate),
 		gorp.WithSetup(setup),
 	); err != nil {

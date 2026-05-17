@@ -11,8 +11,6 @@ package data
 
 import (
 	"context"
-
-	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
 // ValidatorKey is the container key for the validator capability.
@@ -45,9 +43,11 @@ type Validator interface {
 	SetLocale(locale string) error
 
 	// TranslateError converts a raw validation error into an app error.
+	// Returns an error that can be cast to resiliencecontract.AppError if needed.
 	//
 	// TranslateError 将原始校验错误转换为应用错误。
-	TranslateError(err error) resiliencecontract.AppError
+	// 返回的 error 可在需要时断言为 resiliencecontract.AppError。
+	TranslateError(err error) error
 }
 
 // CustomValidateFunc defines a custom validation rule function.

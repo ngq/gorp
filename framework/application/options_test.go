@@ -21,7 +21,7 @@ func TestHTTPOptionMapsToBootstrapOptions(t *testing.T) {
 		DisableRedis:       true,
 		DisableGorm:        true,
 		DisableMetrics:     true,
-		GovernanceMode:     resiliencecontract.GovernanceModeMicroservice,
+		GovernanceMode:     resiliencecontract.GovernanceModeMicro,
 		GovernanceDisable:  []string{"tracing"},
 		GovernanceProviders: map[string]string{"serviceauth": "mtls"},
 	}).apply(&cfg)
@@ -31,7 +31,7 @@ func TestHTTPOptionMapsToBootstrapOptions(t *testing.T) {
 	if !cfg.httpOpts.DisableRedis || !cfg.httpOpts.DisableGorm || !cfg.httpOpts.DisableMetrics {
 		t.Fatalf("expected HTTP options mapped to bootstrap options")
 	}
-	if cfg.httpOpts.GovernanceMode != "microservice" {
+	if cfg.httpOpts.GovernanceMode != "micro" {
 		t.Fatalf("expected governance mode propagated, got %q", cfg.httpOpts.GovernanceMode)
 	}
 	if len(cfg.httpOpts.GovernanceDisable) != 1 || cfg.httpOpts.GovernanceDisable[0] != "tracing" {
@@ -90,7 +90,7 @@ func TestModulesAppendsGroupedProviders(t *testing.T) {
 }
 
 func TestOptionOrderWithoutHTTPThenHTTPIsRunnable(t *testing.T) {
-	cfg, err := resolveRunConfig("demo", WithoutHTTP(), HTTP())
+	cfg, err := resolveRunConfig(WithoutHTTP(), HTTP())
 	if err != nil {
 		t.Fatalf("expected runnable config, got %v", err)
 	}
@@ -100,7 +100,7 @@ func TestOptionOrderWithoutHTTPThenHTTPIsRunnable(t *testing.T) {
 }
 
 func TestOptionOrderHTTPThenWithoutHTTPReturnsNoServiceDeclared(t *testing.T) {
-	_, err := resolveRunConfig("demo", HTTP(), WithoutHTTP())
+	_, err := resolveRunConfig(HTTP(), WithoutHTTP())
 	if !errors.Is(err, ErrNoServiceDeclared) {
 		t.Fatalf("expected ErrNoServiceDeclared, got %v", err)
 	}
@@ -225,14 +225,14 @@ func TestWithMigrateLastWins(t *testing.T) {
 	if err := cfg.migrate(&HTTPRuntime{}); err != nil {
 		t.Fatalf("unexpected migrate error: %v", err)
 	}
-	if len(called) != 1 || called[0] != "second" {
-		t.Fatalf("expected only last migrate called, got %v", called)
+	// 链式组合：两次调用都执行
+	if len(called) != 2 || called[0] != "first" || called[1] != "second" {
+		t.Fatalf("expected both migrate called in order, got %v", called)
 	}
 }
 
 func TestHTTPOptionLastWins(t *testing.T) {
 	cfg, err := resolveRunConfig(
-		"demo",
 		HTTP(HTTPServiceOptions{DisableRedis: true, DisableGorm: true, DisableMetrics: true}),
 		HTTP(HTTPServiceOptions{DisableRedis: false, DisableGorm: true, DisableMetrics: false}),
 	)
@@ -252,59 +252,55 @@ func TestHTTPOptionLastWins(t *testing.T) {
 
 func TestWithGovernanceModeOverridesStartupMode(t *testing.T) {
 	cfg, err := resolveRunConfig(
-		"demo",
 		HTTP(),
-		WithMicroserviceMode(),
+		WithMicroMode(),
 	)
 	if err != nil {
 		t.Fatalf("unexpected resolve error: %v", err)
 	}
-	if cfg.httpOpts.GovernanceMode != "microservice" {
+	if cfg.httpOpts.GovernanceMode != "micro" {
 		t.Fatalf("expected governance mode microservice, got %q", cfg.httpOpts.GovernanceMode)
 	}
 
-	WithMonolithMode().apply(&cfg)
-	if cfg.httpOpts.GovernanceMode != "monolith" {
+	WithMonoMode().apply(&cfg)
+	if cfg.httpOpts.GovernanceMode != "mono" {
 		t.Fatalf("expected governance mode monolith after override, got %q", cfg.httpOpts.GovernanceMode)
 	}
 
-	WithGinFirstMode().apply(&cfg)
-	if cfg.httpOpts.GovernanceMode != "gin-first" {
-		t.Fatalf("expected governance mode gin-first after override, got %q", cfg.httpOpts.GovernanceMode)
+	WithGinHTTPMode().apply(&cfg)
+	if cfg.httpOpts.HTTPMode != "gin" {
+		t.Fatalf("expected HTTP mode gin after override, got %q", cfg.httpOpts.HTTPMode)
 	}
 }
 
 func TestHTTPOptionGovernanceModeLastWinsAcrossMultipleHTTPDeclarations(t *testing.T) {
 	cfg, err := resolveRunConfig(
-		"demo",
-		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMonolith}),
-		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMicroservice}),
+		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMono}),
+		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMicro}),
 	)
 	if err != nil {
 		t.Fatalf("unexpected resolve error: %v", err)
 	}
-	if cfg.httpOpts.GovernanceMode != "microservice" {
+	if cfg.httpOpts.GovernanceMode != "micro" {
 		t.Fatalf("expected last HTTP governance mode to win, got %q", cfg.httpOpts.GovernanceMode)
 	}
 }
 
 func TestExplicitGovernanceModeOptionOverridesHTTPGovernanceMode(t *testing.T) {
 	cfg, err := resolveRunConfig(
-		"demo",
-		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMonolith}),
-		WithGovernanceMode(resiliencecontract.GovernanceModeMicroservice),
+		HTTP(HTTPServiceOptions{GovernanceMode: resiliencecontract.GovernanceModeMono}),
+		WithGovernanceMode(resiliencecontract.GovernanceModeMicro),
 	)
 	if err != nil {
 		t.Fatalf("unexpected resolve error: %v", err)
 	}
-	if cfg.httpOpts.GovernanceMode != "microservice" {
+	if cfg.httpOpts.GovernanceMode != "micro" {
 		t.Fatalf("expected explicit governance mode option to win, got %q", cfg.httpOpts.GovernanceMode)
 	}
 }
 
 func TestGovernanceOverrideHelpersMutateHTTPOptions(t *testing.T) {
 	cfg, err := resolveRunConfig(
-		"demo",
 		HTTP(),
 		WithGovernanceDisabled("tracing", "selector"),
 		WithGovernanceProvider("serviceauth", "mtls"),

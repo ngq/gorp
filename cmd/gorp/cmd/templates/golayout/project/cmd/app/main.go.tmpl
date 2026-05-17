@@ -9,7 +9,7 @@ import (
 	"{{.ModuleName}}/internal/data"
 	"{{.ModuleName}}/internal/service"
 	"{{.FrameworkModule}}"
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
 {{- end }}
 )
@@ -19,17 +19,18 @@ import (
 // 中文说明：
 // - 用户日常开发时，直接 `go run ./cmd/app` 或 IDE 调试即可启动 HTTP 服务；
 // - 使用框架统一入口 gorp，简化导入；
-// - 默认主线直接走 typed runtime + direct constructor，不要求先理解 ServiceProvider / ExtraProviders。
+// - 默认主线直接走 typed runtime + direct constructor，不要求先理解 ServiceProvider / ExtraProviders；
+// - 服务名从配置文件 app.name 自动读取。
 func main() {
 	if err := gorp.Run(
-		"{{.Name}}",
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
 		gorp.GRPC(),
-		gorp.WithMicroserviceMode(),
-{{- else if .IsGinFirstMode }}
-		gorp.WithGinFirstMode(),
+		gorp.WithMicroGovernance(),
 {{- else }}
-		gorp.WithMonolithMode(),
+		gorp.WithMonoGovernance(),
+{{- end }}
+{{- if .IsGinHTTPMode }}
+		gorp.WithGinHTTPMode(),
 {{- end }}
 		gorp.WithMigrate(migrate),
 		gorp.WithSetup(setup),
@@ -50,7 +51,7 @@ func setup(rt *gorp.HTTPRuntime) error {
 	d := data.NewData(rt.DB)
 	b := biz.NewBiz(data.NewDemoRepo(d))
 	svc := service.NewServices(b)
-{{- if .IsGinFirstMode }}
+{{- if .IsGinHTTPMode }}
 
 	// Gin-first 模式：传递 HTTP 服务给路由注册函数
 	httpSvc, err := rt.Container.Make(transportcontract.HTTPKey)
@@ -61,7 +62,7 @@ func setup(rt *gorp.HTTPRuntime) error {
 {{- else }}
 	apphttp.RegisterRoutes(rt.Router, svc)
 {{- end }}
-{{- if .IsMicroserviceMode }}
+{{- if .IsMicroGovernance }}
 
 	// 注册 gRPC 服务（微服务模式）
 	// 在微服务模式下，rt.GRPCServer 可用于注册 proto 生成的服务实现
