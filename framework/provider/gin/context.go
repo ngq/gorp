@@ -18,8 +18,15 @@ type ginContext struct {
 	gin *gin.Context
 }
 
-// Ensure ginContext implements Context interface.
-var _ transportcontract.Context = (*ginContext)(nil)
+// Compilation checks: ensure ginContext implements all transport interfaces.
+var (
+	_ transportcontract.RequestContext    = (*ginContext)(nil)
+	_ transportcontract.BindingContext    = (*ginContext)(nil)
+	_ transportcontract.ResponseContext   = (*ginContext)(nil)
+	_ transportcontract.MiddlewareContext = (*ginContext)(nil)
+	_ transportcontract.RouteContext      = (*ginContext)(nil)
+	_ transportcontract.Context           = (*ginContext)(nil)
+)
 
 // newContext creates a new gin-backed Context.
 func newContext(ctx *gin.Context) transportcontract.Context {

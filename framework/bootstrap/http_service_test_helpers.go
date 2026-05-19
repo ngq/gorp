@@ -45,7 +45,14 @@ type testContext struct {
 	gin *gin.Context
 }
 
-var _ transportcontract.Context = (*testContext)(nil)
+var (
+	_ transportcontract.RequestContext    = (*testContext)(nil)
+	_ transportcontract.BindingContext    = (*testContext)(nil)
+	_ transportcontract.ResponseContext   = (*testContext)(nil)
+	_ transportcontract.MiddlewareContext = (*testContext)(nil)
+	_ transportcontract.RouteContext      = (*testContext)(nil)
+	_ transportcontract.Context           = (*testContext)(nil)
+)
 
 func (c *testContext) Deadline() (deadline time.Time, ok bool) {
 	return c.gin.Request.Context().Deadline()
