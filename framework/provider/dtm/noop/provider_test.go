@@ -101,17 +101,18 @@ func TestNoopXABuilder(t *testing.T) {
 // TestNoopBarrierHandler verifies the noop barrier handler.
 //
 // TestNoopBarrierHandler 验证屏障处理器的空操作实现。
+// noop 模式下 Call 返回 ErrNoopDTM，不会执行业务回调。
 func TestNoopBarrierHandler(t *testing.T) {
 	handler := &noopBarrierHandler{}
 
-	// 测试 Call
+	// 测试 Call：noop 模式返回 ErrNoopDTM，不执行回调
 	executed := false
 	err := handler.Call(context.Background(), func(db any) error {
 		executed = true
 		return nil
 	})
-	assert.NoError(t, err)
-	assert.True(t, executed)
+	assert.ErrorIs(t, err, ErrNoopDTM)
+	assert.False(t, executed, "callback should not be executed in noop mode")
 }
 
 // TestDTMProvider verifies the DTM provider registration.

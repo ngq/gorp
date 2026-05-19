@@ -720,8 +720,14 @@ func TestValidatorService_TranslateError_NonValidationError(t *testing.T) {
 	if appErr == nil {
 		t.Fatal("expected non-nil AppError for non-validation error")
 	}
-	if appErr.GetStatus().Code != 400 {
-		t.Errorf("expected code 400, got: %d", appErr.GetStatus().Code)
+
+	// 需要类型断言才能调用 GetStatus()
+	var appErrTyped resiliencecontract.AppError
+	if !errors.As(appErr, &appErrTyped) {
+		t.Fatal("expected AppError type")
+	}
+	if appErrTyped.GetStatus().Code != 400 {
+		t.Errorf("expected code 400, got: %d", appErrTyped.GetStatus().Code)
 	}
 }
 
