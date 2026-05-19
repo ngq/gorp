@@ -26,7 +26,7 @@ type HTTP interface {
 	// Router returns the framework HTTP router facade.
 	//
 	// Router 返回框架 HTTP 路由门面。
-	Router() HTTPRouter
+	Router() Router
 
 	// Server returns the underlying net/http server.
 	//

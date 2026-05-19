@@ -36,14 +36,24 @@ func TestAuthorizationMiddleware(t *testing.T) {
 	}
 
 	roleRouter := gin.New()
-	applyTransportMiddleware(roleRouter, func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
-			ctx := securitycontract.NewJWTClaimsContext(c.Context(), &securitycontract.JWTClaims{
+	applyTransportMiddleware(roleRouter, func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			claims := &securitycontract.JWTClaims{
 				SubjectID:   1,
 				SubjectType: "user",
 				Roles:       []string{"admin", "writer"},
-			})
-			c.SetContext(ctx)
+			}
+			c.Set("jwt_claims", claims)
+			c.Set("subject_id", int64(1))
+			c.Set("subject_type", "user")
+			// Also update gin.Request.Context for context.Context value propagation
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				ctx := gc.Request.Context()
+				ctx = securitycontract.NewJWTClaimsContext(ctx, claims)
+				ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
+				ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
+				gc.Request = gc.Request.WithContext(ctx)
+			}
 			next(c)
 		}
 	}, RequireAnyRole("admin"), RequireAllRoles("admin", "writer"), RequireSubjectType("user"))
@@ -60,14 +70,24 @@ func TestAuthorizationMiddleware(t *testing.T) {
 	}
 
 	forbiddenRouter := gin.New()
-	applyTransportMiddleware(forbiddenRouter, func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
-			ctx := securitycontract.NewJWTClaimsContext(c.Context(), &securitycontract.JWTClaims{
+	applyTransportMiddleware(forbiddenRouter, func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			claims := &securitycontract.JWTClaims{
 				SubjectID:   1,
 				SubjectType: "service",
 				Roles:       []string{"reader"},
-			})
-			c.SetContext(ctx)
+			}
+			c.Set("jwt_claims", claims)
+			c.Set("subject_id", int64(1))
+			c.Set("subject_type", "service")
+			// Also update gin.Request.Context for context.Context value propagation
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				ctx := gc.Request.Context()
+				ctx = securitycontract.NewJWTClaimsContext(ctx, claims)
+				ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
+				ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
+				gc.Request = gc.Request.WithContext(ctx)
+			}
 			next(c)
 		}
 	}, RequireAnyRole("admin"))

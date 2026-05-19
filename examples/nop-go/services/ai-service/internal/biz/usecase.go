@@ -131,10 +131,10 @@ func (uc *AIUseCase) Chat(ctx context.Context, req *models.ChatRequest) (*models
 	}
 
 	return &models.ChatResponse{
-		SessionID:     sessionID,
-		Response:      response,
-		TokensUsed:    tokensUsed,
-		ModelUsed:     conv.ModelUsed,
+		SessionID:      sessionID,
+		Response:       response,
+		TokensUsed:     tokensUsed,
+		ModelUsed:      conv.ModelUsed,
 		ConversationID: conv.ID,
 	}, nil
 }

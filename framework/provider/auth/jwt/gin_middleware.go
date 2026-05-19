@@ -161,7 +161,7 @@ func hasRequiredRole(claimsRoles, requiredRoles []string) bool {
 // Returns 401 if token is missing or invalid, 403 if subject type or role mismatch.
 //
 // token 缺失或无效返回 401，主体类型或角色不匹配返回 403。
-func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType string, opts ...AuthMiddlewareOption) transportcontract.HTTPMiddleware {
+func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType string, opts ...AuthMiddlewareOption) transportcontract.Middleware {
 	// 应用配置选项。
 	cfg := &authMiddlewareConfig{}
 	for _, opt := range opts {
@@ -172,8 +172,8 @@ func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType stri
 	skipPaths := cfg.SkipPaths
 	requiredRoles := cfg.RequiredRoles
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			// 白名单路径跳过认证，直接放行。
 			if len(skipPaths) > 0 && c.Request() != nil && isSkipPath(c.Request().URL.Path, skipPaths) {
 				if next != nil {
@@ -205,11 +205,9 @@ func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType stri
 				c.JSON(http.StatusForbidden, map[string]any{"error": "insufficient role"})
 				return
 			}
-			ctx := c.Context()
-			ctx = securitycontract.NewJWTClaimsContext(ctx, claims)
-			ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
-			ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
-			c.SetContext(ctx)
+			c.Set(ContextJWTClaimsKey, claims)
+			c.Set(ContextSubjectIDKey, claims.SubjectID)
+			c.Set(ContextSubjectTypeKey, claims.SubjectType)
 			if next != nil {
 				next(c)
 			}

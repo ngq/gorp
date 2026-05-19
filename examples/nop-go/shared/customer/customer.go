@@ -58,18 +58,18 @@ type GetCustomerAddressesResponse struct {
 
 // Address 地址
 type Address struct {
-	ID               uint64
-	FirstName        string
-	LastName         string
-	Email            string
-	Phone            string
-	Country          string
-	State            string
-	City             string
-	Address1         string
-	Address2         string
-	ZipCode          string
-	IsDefaultBilling bool
+	ID                uint64
+	FirstName         string
+	LastName          string
+	Email             string
+	Phone             string
+	Country           string
+	State             string
+	City              string
+	Address1          string
+	Address2          string
+	ZipCode           string
+	IsDefaultBilling  bool
 	IsDefaultShipping bool
 }
 

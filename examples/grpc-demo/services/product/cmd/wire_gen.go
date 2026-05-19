@@ -6,8 +6,8 @@ package main
 
 import (
 	"github.com/ngq/gorp"
-	"grpc-demo/services/product/internal/service"
 	"gorm.io/gorm"
+	"grpc-demo/services/product/internal/service"
 )
 
 func wireProductServices(db *gorm.DB, publisher gorp.MessagePublisher, subscriber gorp.MessageSubscriber) (*service.Services, error) {

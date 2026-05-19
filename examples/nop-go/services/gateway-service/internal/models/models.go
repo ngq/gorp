@@ -23,9 +23,9 @@ func (Route) TableName() string {
 
 // RateLimitRecord 限流记录
 type RateLimitRecord struct {
-	Key       string    `json:"key"`
-	Count     int       `json:"count"`
-	ResetAt   time.Time `json:"reset_at"`
+	Key     string    `json:"key"`
+	Count   int       `json:"count"`
+	ResetAt time.Time `json:"reset_at"`
 }
 
 // ServiceHealth 服务健康状态
@@ -46,6 +46,6 @@ type RouteResponse struct {
 }
 
 type HealthResponse struct {
-	Status   string                     `json:"status"`
-	Services map[string]ServiceHealth   `json:"services"`
+	Status   string                   `json:"status"`
+	Services map[string]ServiceHealth `json:"services"`
 }

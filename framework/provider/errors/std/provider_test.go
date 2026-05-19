@@ -20,16 +20,16 @@ func TestHTTPToGRPC(t *testing.T) {
 		httpCode int
 		grpcCode int
 	}{
-		{200, 0},   // OK
-		{400, 3},   // InvalidArgument
-		{401, 16},  // Unauthenticated
-		{403, 7},   // PermissionDenied
-		{404, 5},   // NotFound
-		{409, 6},   // AlreadyExists
-		{429, 8},   // ResourceExhausted
-		{500, 13},  // Internal
-		{503, 14},  // Unavailable
-		{504, 4},   // DeadlineExceeded
+		{200, 0},  // OK
+		{400, 3},  // InvalidArgument
+		{401, 16}, // Unauthenticated
+		{403, 7},  // PermissionDenied
+		{404, 5},  // NotFound
+		{409, 6},  // AlreadyExists
+		{429, 8},  // ResourceExhausted
+		{500, 13}, // Internal
+		{503, 14}, // Unavailable
+		{504, 4},  // DeadlineExceeded
 	}
 
 	for _, tt := range tests {
@@ -51,16 +51,16 @@ func TestGRPCToHTTP(t *testing.T) {
 		grpcCode int
 		httpCode int
 	}{
-		{0, 200},   // OK
-		{1, 499},   // Canceled
-		{2, 500},   // Unknown
-		{3, 400},   // InvalidArgument
-		{4, 504},   // DeadlineExceeded
-		{5, 404},   // NotFound
-		{6, 409},   // AlreadyExists
-		{7, 403},   // PermissionDenied
-		{8, 429},   // ResourceExhausted
-		{16, 401},  // Unauthenticated
+		{0, 200},  // OK
+		{1, 499},  // Canceled
+		{2, 500},  // Unknown
+		{3, 400},  // InvalidArgument
+		{4, 504},  // DeadlineExceeded
+		{5, 404},  // NotFound
+		{6, 409},  // AlreadyExists
+		{7, 403},  // PermissionDenied
+		{8, 429},  // ResourceExhausted
+		{16, 401}, // Unauthenticated
 	}
 
 	for _, tt := range tests {

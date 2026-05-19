@@ -35,7 +35,7 @@ type GatewayService struct {
 // NewGatewayService 创建网关服务
 func NewGatewayService(routes []Route) *GatewayService {
 	gs := &GatewayService{
-		routes: routes,
+		routes:   routes,
 		services: getServiceList(),
 	}
 	return gs
@@ -57,7 +57,7 @@ func (s *GatewayService) RegisterRoutes(r *gin.Engine) {
 // swaggerIndex 聚合 Swagger 首页
 func (s *GatewayService) swaggerIndex(c *gin.Context) {
 	html := s.generateSwaggerIndexHTML()
-	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.SetHeader("Content-Type", "text/html; charset=utf-8")
 	c.String(http.StatusOK, html)
 }
 

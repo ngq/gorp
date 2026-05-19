@@ -7,7 +7,7 @@ import (
 	gorp "github.com/ngq/gorp"
 )
 
-func RegisterRoutes(r gorp.HTTPRouter, services *service.Services) {
+func RegisterRoutes(r gorp.Router, services *service.Services) {
 	productHandler := handler.NewProductHandler(services.Product)
 
 	api := r.Group("/api/v1/products")

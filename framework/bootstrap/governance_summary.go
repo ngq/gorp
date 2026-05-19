@@ -107,7 +107,7 @@ func BuildGovernanceSummaryWithModeOverride(cfg datacontract.Config, mode resili
 		ProviderDecisions:    providerDecisions,
 		ConfigSnapshot:       configSnapshot,
 		ResolutionOrder:      governanceResolutionOrder(),
-		MiddlewareChainOrder: governanceHTTPMiddlewareChainOrder(),
+		MiddlewareChainOrder: governanceMiddlewareChainOrder(),
 		RPCClientChainOrder:  governanceRPCClientChainOrder(),
 	}
 }
@@ -376,28 +376,28 @@ func formatGovernanceDefaultsDiagnostic(summary GovernanceSummary) string {
 
 	// HTTP 中间件默认值
 	writeGovernanceLine(&b, "")
-	writeGovernanceLine(&b, "HTTP Middleware Defaults")
-	writeGovernanceLine(&b, "- timeout: %s", d.HTTPMiddlewareDefaults.Timeout)
-	writeGovernanceLine(&b, "- body_limit: %s", d.HTTPMiddlewareDefaults.BodyLimit)
-	writeGovernanceLine(&b, "- max_concurrent: %d", d.HTTPMiddlewareDefaults.MaxConcurrent)
-	writeGovernanceLine(&b, "- enable_metrics: %t", d.HTTPMiddlewareDefaults.EnableMetrics)
-	writeGovernanceLine(&b, "- enable_compression: %t", d.HTTPMiddlewareDefaults.EnableCompression)
+	writeGovernanceLine(&b, "Middleware Defaults")
+	writeGovernanceLine(&b, "- timeout: %s", d.MiddlewareDefaults.Timeout)
+	writeGovernanceLine(&b, "- body_limit: %s", d.MiddlewareDefaults.BodyLimit)
+	writeGovernanceLine(&b, "- max_concurrent: %d", d.MiddlewareDefaults.MaxConcurrent)
+	writeGovernanceLine(&b, "- enable_metrics: %t", d.MiddlewareDefaults.EnableMetrics)
+	writeGovernanceLine(&b, "- enable_compression: %t", d.MiddlewareDefaults.EnableCompression)
 
 	// CORS 默认值
-	cors := d.HTTPMiddlewareDefaults.CORS
+	cors := d.MiddlewareDefaults.CORS
 	writeGovernanceLine(&b, "- cors:")
 	writeGovernanceLine(&b, "  allow_origins: %s", strings.Join(cors.AllowOrigins, ", "))
 	writeGovernanceLine(&b, "  max_age_seconds: %d", cors.MaxAgeSeconds)
 
 	// 安全头默认值
-	sec := d.HTTPMiddlewareDefaults.SecurityHeaders
+	sec := d.MiddlewareDefaults.SecurityHeaders
 	writeGovernanceLine(&b, "- security_headers:")
 	writeGovernanceLine(&b, "  x_frame_options: %s", sec.XFrameOptions)
 	writeGovernanceLine(&b, "  x_content_type_options: %s", sec.XContentTypeOptions)
 	writeGovernanceLine(&b, "  referrer_policy: %s", sec.ReferrerPolicy)
 
 	// 本地化默认值
-	loc := d.HTTPMiddlewareDefaults.Locale
+	loc := d.MiddlewareDefaults.Locale
 	writeGovernanceLine(&b, "- locale:")
 	writeGovernanceLine(&b, "  supported: %s", strings.Join(loc.Supported, ", "))
 	writeGovernanceLine(&b, "  default: %s", loc.Default)
@@ -971,9 +971,9 @@ func governanceResolutionOrder() []string {
 	}
 }
 
-// governanceHTTPMiddlewareChainOrder 返回 HTTP 服务端中间件链的正式逻辑顺序。
+// governanceMiddlewareChainOrder 返回中间件链的正式逻辑顺序。
 // 入站方向按此顺序执行，出站方向逆序执行。
-func governanceHTTPMiddlewareChainOrder() []string {
+func governanceMiddlewareChainOrder() []string {
 	return []string{
 		"request_identity",
 		"logging",

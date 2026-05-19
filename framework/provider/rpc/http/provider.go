@@ -33,7 +33,7 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string  { return "rpc.http" }
+func (p *Provider) Name() string { return "rpc.http" }
 
 // IsDefer indicates HTTP RPC should defer loading.
 // RPC can be loaded after core providers.

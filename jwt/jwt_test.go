@@ -15,17 +15,19 @@ type exportJWTContainerStub struct {
 	jwtSvc securitycontract.JWTService
 }
 
-func (s *exportJWTContainerStub) Bind(string, runtimecontract.Factory, bool)                      {}
-func (s *exportJWTContainerStub) NamedBind(string, string, runtimecontract.Factory, bool)          {}
-func (s *exportJWTContainerStub) IsBind(string) bool                                               { return true }
-func (s *exportJWTContainerStub) IsBindNamed(string, string) bool                                  { return false }
-func (s *exportJWTContainerStub) MustMake(key string) any                                          { v, _ := s.Make(key); return v }
-func (s *exportJWTContainerStub) MustMakeNamed(string, string) any                                 { return nil }
-func (s *exportJWTContainerStub) RegisterCloser(string, io.Closer)                                 {}
-func (s *exportJWTContainerStub) Destroy() error                                                   { return nil }
-func (s *exportJWTContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo              { return nil }
-func (s *exportJWTContainerStub) DebugPrint() string                                               { return "" }
-func (s *exportJWTContainerStub) ProviderDAG() runtimecontract.ProviderDAG                          { return runtimecontract.ProviderDAG{} }
+func (s *exportJWTContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (s *exportJWTContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (s *exportJWTContainerStub) IsBind(string) bool                                      { return true }
+func (s *exportJWTContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (s *exportJWTContainerStub) MustMake(key string) any                                 { v, _ := s.Make(key); return v }
+func (s *exportJWTContainerStub) MustMakeNamed(string, string) any                        { return nil }
+func (s *exportJWTContainerStub) RegisterCloser(string, io.Closer)                        {}
+func (s *exportJWTContainerStub) Destroy() error                                          { return nil }
+func (s *exportJWTContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo     { return nil }
+func (s *exportJWTContainerStub) DebugPrint() string                                      { return "" }
+func (s *exportJWTContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
 func (s *exportJWTContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }

@@ -17,12 +17,12 @@ import (
 // RegisterGovernanceInspectEndpoints registers the formal governance inspect/doctor endpoints.
 //
 // RegisterGovernanceInspectEndpoints 注册正式治理 inspect / doctor 端点。
-func RegisterGovernanceInspectEndpoints(router transportcontract.HTTPRouter, summary GovernanceSummary) {
+func RegisterGovernanceInspectEndpoints(router transportcontract.Router, summary GovernanceSummary) {
 	if router == nil {
 		return
 	}
 
-	handler := func(c transportcontract.HTTPContext) {
+	handler := func(c transportcontract.Context) {
 		view := strings.ToLower(strings.TrimSpace(c.DefaultQuery("view", "")))
 
 		// view=defaults 时懒加载默认值表，不影响共享 summary
@@ -30,7 +30,7 @@ func RegisterGovernanceInspectEndpoints(router transportcontract.HTTPRouter, sum
 			summaryCopy := summary
 			summaryCopy.Defaults = BuildGovernanceDefaultsTable(summary.Mode)
 			if wantsGovernanceDiagnosticText(c) {
-				c.Header("Content-Type", "text/plain; charset=utf-8")
+				c.SetHeader("Content-Type", "text/plain; charset=utf-8")
 				c.String(http.StatusOK, FormatGovernanceDiagnosticView(summaryCopy, view))
 				return
 			}
@@ -39,7 +39,7 @@ func RegisterGovernanceInspectEndpoints(router transportcontract.HTTPRouter, sum
 		}
 
 		if wantsGovernanceDiagnosticText(c) {
-			c.Header("Content-Type", "text/plain; charset=utf-8")
+			c.SetHeader("Content-Type", "text/plain; charset=utf-8")
 			c.String(http.StatusOK, FormatGovernanceDiagnosticView(summary, c.DefaultQuery("view", "")))
 			return
 		}
@@ -50,7 +50,7 @@ func RegisterGovernanceInspectEndpoints(router transportcontract.HTTPRouter, sum
 	router.GET("/doctor/governance", handler)
 }
 
-func wantsGovernanceDiagnosticText(c transportcontract.HTTPContext) bool {
+func wantsGovernanceDiagnosticText(c transportcontract.Context) bool {
 	if c == nil {
 		return false
 	}

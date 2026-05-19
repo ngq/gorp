@@ -126,8 +126,8 @@ var modelAPICmd = &cobra.Command{
 		}
 
 		tpl := template.Must(template.New("root").Funcs(template.FuncMap{
-			"toGoName":   toGoName,
-			"goType":     dbTypeToGo,
+			"toGoName": toGoName,
+			"goType":   dbTypeToGo,
 		}).Parse(""))
 
 		modelTpl := apiModelTpl
@@ -406,7 +406,7 @@ import (
 type API struct {
 }
 
-func RegisterRoutes(r gorp.HTTPRouter) {
+func RegisterRoutes(r gorp.Router) {
 	api := &API{}
 	g := r.Group("{{.HTTPGroup}}")
 	{
@@ -444,18 +444,18 @@ import (
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
 )
 
-func (api *API) Create(c gorp.HTTPContext) {
+func (api *API) Create(c gorp.Context) {
 	fields := map[string]any{}
 	if err := c.BindJSON(&fields); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
-	db, err := api.mustRuntimeGorm(c.Context())
+	db, err := api.mustRuntimeGorm(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Create{{.Name}}(c.Context(), db, fields)
+	item, err := svc.Create{{.Name}}(c, db, fields)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -476,18 +476,18 @@ type updateParam struct {
 	Fields map[string]any ` + "`json:\"fields\" binding:\"required\"`" + `
 }
 
-func (api *API) Update(c gorp.HTTPContext) {
+func (api *API) Update(c gorp.Context) {
 	param := &updateParam{}
 	if err := c.BindJSON(param); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
-	db, err := api.mustRuntimeGorm(c.Context())
+	db, err := api.mustRuntimeGorm(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Update{{.Name}}(c.Context(), db, param.ID, param.Fields); err != nil {
+	if err := svc.Update{{.Name}}(c, db, param.ID, param.Fields); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -502,18 +502,18 @@ import (
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
 )
 
-func (api *API) Get(c gorp.HTTPContext) {
+func (api *API) Get(c gorp.Context) {
 	id := c.Query("{{.PKName}}")
 	if id == "" {
 		gorp.BadRequest(c, "missing {{.PKName}}")
 		return
 	}
-	db, err := api.mustRuntimeGorm(c.Context())
+	db, err := api.mustRuntimeGorm(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Get{{.Name}}(c.Context(), db, id)
+	item, err := svc.Get{{.Name}}(c, db, id)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -531,15 +531,15 @@ import (
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
 )
 
-func (api *API) List(c gorp.HTTPContext) {
+func (api *API) List(c gorp.Context) {
 	start, _ := strconv.Atoi(c.Query("start"))
 	size, _ := strconv.Atoi(c.Query("size"))
-	db, err := api.mustRuntimeGorm(c.Context())
+	db, err := api.mustRuntimeGorm(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	items, err := svc.List{{.Name}}(c.Context(), db, start, size)
+	items, err := svc.List{{.Name}}(c, db, start, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -559,18 +559,18 @@ type deleteParam struct {
 	ID any ` + "`json:\"{{.PKName}}\" binding:\"required\"`" + `
 }
 
-func (api *API) Delete(c gorp.HTTPContext) {
+func (api *API) Delete(c gorp.Context) {
 	param := &deleteParam{}
 	if err := c.BindJSON(param); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
-	db, err := api.mustRuntimeGorm(c.Context())
+	db, err := api.mustRuntimeGorm(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Delete{{.Name}}(c.Context(), db, param.ID); err != nil {
+	if err := svc.Delete{{.Name}}(c, db, param.ID); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -708,7 +708,7 @@ import (
 type API struct {
 }
 
-func RegisterRoutes(r gorp.HTTPRouter) {
+func RegisterRoutes(r gorp.Router) {
 	api := &API{}
 	g := r.Group("{{.HTTPGroup}}")
 	{
@@ -752,18 +752,18 @@ import (
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
 )
 
-func (api *API) Create(c gorp.HTTPContext) {
+func (api *API) Create(c gorp.Context) {
 	fields := map[string]any{}
 	if err := c.BindJSON(&fields); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
-	client, err := api.mustEntClient(c.Context())
+	client, err := api.mustEntClient(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Create{{.Name}}(c.Context(), client, fields)
+	item, err := svc.Create{{.Name}}(c, client, fields)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -784,18 +784,18 @@ type updateParam struct {
 	Fields map[string]any ` + "`json:\"fields\" binding:\"required\"`" + `
 }
 
-func (api *API) Update(c gorp.HTTPContext) {
+func (api *API) Update(c gorp.Context) {
 	param := &updateParam{}
 	if err := c.BindJSON(param); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
-	client, err := api.mustEntClient(c.Context())
+	client, err := api.mustEntClient(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Update{{.Name}}(c.Context(), client, param.ID, param.Fields); err != nil {
+	if err := svc.Update{{.Name}}(c, client, param.ID, param.Fields); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -810,18 +810,18 @@ import (
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
 )
 
-func (api *API) Get(c gorp.HTTPContext) {
+func (api *API) Get(c gorp.Context) {
 	id := c.Query("{{.PKName}}")
 	if id == "" {
 		gorp.BadRequest(c, "missing {{.PKName}}")
 		return
 	}
-	client, err := api.mustEntClient(c.Context())
+	client, err := api.mustEntClient(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	item, err := svc.Get{{.Name}}(c.Context(), client, id)
+	item, err := svc.Get{{.Name}}(c, client, id)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -839,15 +839,15 @@ import (
 	svc "{{.Module}}/app/service/{{.SvcPkg}}"
 )
 
-func (api *API) List(c gorp.HTTPContext) {
+func (api *API) List(c gorp.Context) {
 	start, _ := strconv.Atoi(c.Query("start"))
 	size, _ := strconv.Atoi(c.Query("size"))
-	client, err := api.mustEntClient(c.Context())
+	client, err := api.mustEntClient(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	items, err := svc.List{{.Name}}(c.Context(), client, start, size)
+	items, err := svc.List{{.Name}}(c, client, start, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -867,18 +867,18 @@ type deleteParam struct {
 	ID any ` + "`json:\"{{.PKName}}\" binding:\"required\"`" + `
 }
 
-func (api *API) Delete(c gorp.HTTPContext) {
+func (api *API) Delete(c gorp.Context) {
 	param := &deleteParam{}
 	if err := c.BindJSON(param); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
-	client, err := api.mustEntClient(c.Context())
+	client, err := api.mustEntClient(c)
 	if err != nil {
 		gorp.InternalError(c, err.Error())
 		return
 	}
-	if err := svc.Delete{{.Name}}(c.Context(), client, param.ID); err != nil {
+	if err := svc.Delete{{.Name}}(c, client, param.ID); err != nil {
 		gorp.Error(c, err)
 		return
 	}

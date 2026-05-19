@@ -4,7 +4,7 @@ import "testing"
 
 func TestDefaultReleaseTemplateAssetMapping(t *testing.T) {
 	cases := map[string]string{
-		"":                          "gorp-template-golayout.zip",
+		"":                              "gorp-template-golayout.zip",
 		starterTemplateGoLayout:         "gorp-template-golayout.zip",
 		starterTemplateMultiFlatWire:    "gorp-template-multi-flat-wire.zip",
 		starterTemplateMultiIndependent: "gorp-template-multi-independent.zip",

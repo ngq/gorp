@@ -372,7 +372,7 @@ func TestValidatorService_ErrorFormatConsistency(t *testing.T) {
 	}
 
 	user := &TestUser{
-		Username: "",         // 缺失
+		Username: "",          // 缺失
 		Email:    "not-email", // 无效
 		Age:      25,
 	}

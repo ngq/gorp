@@ -23,7 +23,7 @@ import (
 //	err := application.Run(
 //	    application.HTTP(),
 //	    application.WithProviders(myProvider),
-//	    application.WithHTTPRoutes(func(router transportcontract.HTTPRouter, c runtimecontract.Container) error {
+//	    application.WithHTTPRoutes(func(router transportcontract.Router, c runtimecontract.Container) error {
 //	        registerRoutes(router)
 //	        return nil
 //	    }),

@@ -420,7 +420,7 @@ func TestBindAndValidateQueryStoresValidatedBody(t *testing.T) {
 
 	router := gin.New()
 	router.GET("/search", func(c *gin.Context) {
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		input := &struct {
 			Q string `form:"q"`
 		}{}
@@ -471,7 +471,7 @@ func TestBindAndValidateReturnsUnifiedError(t *testing.T) {
 
 	router := gin.New()
 	router.POST("/form", func(c *gin.Context) {
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		input := &struct {
 			Name string `form:"name"`
 		}{}
@@ -697,7 +697,7 @@ func TestBindAndValidateJSON_NilValidator(t *testing.T) {
 
 	router := gin.New()
 	router.POST("/test", func(c *gin.Context) {
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		input := &struct {
 			Name string `json:"name"`
 		}{}

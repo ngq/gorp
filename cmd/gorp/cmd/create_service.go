@@ -55,7 +55,7 @@ Generated structure:
   └── README.md
 
 The generated service includes:
-  - HTTP contract mode (gorp.HTTPContext) by default
+  - HTTP contract mode (gorp.Context) by default
   - Mono governance (RequestIdentity, Logging, Recovery, Timeout, Metrics)
   - Health check endpoint
 
@@ -178,12 +178,12 @@ func generateServiceSkeleton(targetDir, serviceName, modulePath, httpMode string
 	}
 
 	files := map[string]string{
-		"cmd/app/main.go":      serviceMainTemplate,
-		"config/app.yaml":      serviceConfigTemplate,
-		"handler/handler.go":   serviceHandlerTemplate,
-		"routes.go":            serviceRoutesTemplate,
-		"go.mod":               serviceGoModTemplate,
-		"README.md":            serviceReadmeTemplate,
+		"cmd/app/main.go":    serviceMainTemplate,
+		"config/app.yaml":    serviceConfigTemplate,
+		"handler/handler.go": serviceHandlerTemplate,
+		"routes.go":          serviceRoutesTemplate,
+		"go.mod":             serviceGoModTemplate,
+		"README.md":          serviceReadmeTemplate,
 	}
 
 	for filename, template := range files {
@@ -217,8 +217,8 @@ func executeServiceTemplate(template string, data serviceSkeletonData) string {
 		result = strings.ReplaceAll(result, "{{.ImportGorp}}", "")
 		result = strings.ReplaceAll(result, "{{.ImportGin}}", "\n\t\"github.com/gin-gonic/gin\"")
 	} else {
-		result = strings.ReplaceAll(result, "{{.HTTPContextType}}", "gorp.HTTPContext")
-		result = strings.ReplaceAll(result, "{{.HTTPRouterType}}", "gorp.HTTPRouter")
+		result = strings.ReplaceAll(result, "{{.HTTPContextType}}", "gorp.Context")
+		result = strings.ReplaceAll(result, "{{.HTTPRouterType}}", "gorp.Router")
 		result = strings.ReplaceAll(result, "{{.ImportGorp}}", "")
 		result = strings.ReplaceAll(result, "{{.ImportGin}}", "")
 	}

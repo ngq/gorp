@@ -35,7 +35,7 @@ func DefaultLocaleOptions() LocaleOptions {
 // Locale negotiates the request locale and stores it in the request context.
 //
 // Locale 协商请求语言，并将结果写入请求上下文。
-func Locale(opts LocaleOptions) transportcontract.HTTPMiddleware {
+func Locale(opts LocaleOptions) transportcontract.Middleware {
 	if len(opts.Supported) == 0 {
 		opts = DefaultLocaleOptions()
 	}
@@ -52,8 +52,8 @@ func Locale(opts LocaleOptions) transportcontract.HTTPMiddleware {
 	supported := normalizeSupportedLocales(opts.Supported)
 	defaultLocale := normalizeLocaleTag(opts.Default)
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil {
 				if next != nil {
 					next(c)
@@ -62,10 +62,13 @@ func Locale(opts LocaleOptions) transportcontract.HTTPMiddleware {
 			}
 
 			locale := resolveRequestLocale(c, opts, supported, defaultLocale)
-			ctx := supportcontract.NewLocaleContext(c.Context(), locale)
-			c.SetContext(ctx)
+			c.Set("locale", locale)
+			// Also update gin.Request.Context for context.Context value propagation
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				gc.Request = gc.Request.WithContext(supportcontract.NewLocaleContext(gc.Request.Context(), locale))
+			}
 			if opts.WriteHeader {
-				c.Header("Content-Language", locale)
+				c.SetHeader("Content-Language", locale)
 			}
 
 			if next != nil {
@@ -88,7 +91,7 @@ func GetLocale(c *gin.Context) string {
 	return ""
 }
 
-func resolveRequestLocale(c transportcontract.HTTPContext, opts LocaleOptions, supported map[string]string, fallback string) string {
+func resolveRequestLocale(c transportcontract.Context, opts LocaleOptions, supported map[string]string, fallback string) string {
 	for _, key := range opts.QueryKeys {
 		if value := normalizeLocaleTag(c.Query(key)); value != "" {
 			if locale, ok := matchSupportedLocale(value, supported); ok {

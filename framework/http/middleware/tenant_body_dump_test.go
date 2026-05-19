@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -88,10 +87,13 @@ func TestBodyDumpCapturesExchange(t *testing.T) {
 			CaptureRequestBody:     true,
 			CaptureResponseBody:    true,
 			MaxBodyBytes:           4,
-			OnCapture: func(ctx transportcontract.HTTPContext, dump *HTTPExchangeCapture) {
+			OnCapture: func(ctx transportcontract.Context, dump *HTTPExchangeCapture) {
 				captured = dump
-				if tenant, ok := supportcontract.FromTenantContext(ctx.Context()); ok && dump.Tenant != tenant {
-					t.Fatalf("expected dump tenant %q to match context tenant %q", dump.Tenant, tenant)
+				// Tenant is stored in context via c.Set()
+				if tenantVal := ctx.Get("tenant"); tenantVal != nil {
+					if tenant, ok := tenantVal.(string); ok && dump.Tenant != tenant {
+						t.Fatalf("expected dump tenant %q to match context tenant %q", dump.Tenant, tenant)
+					}
 				}
 			},
 		}),

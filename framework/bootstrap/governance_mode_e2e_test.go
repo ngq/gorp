@@ -20,9 +20,9 @@ type stubConfigForGovernance struct {
 	values map[string]any
 }
 
-func (s *stubConfigForGovernance) Env() string                    { return "testing" }
-func (s *stubConfigForGovernance) Get(key string) any             { return s.values[key] }
-func (s *stubConfigForGovernance) GetString(key string) string    {
+func (s *stubConfigForGovernance) Env() string        { return "testing" }
+func (s *stubConfigForGovernance) Get(key string) any { return s.values[key] }
+func (s *stubConfigForGovernance) GetString(key string) string {
 	if v, ok := s.values[key]; ok {
 		if str, ok := v.(string); ok {
 			return str
@@ -46,7 +46,7 @@ func (s *stubConfigForGovernance) GetBool(key string) bool {
 	}
 	return false
 }
-func (s *stubConfigForGovernance) GetFloat(key string) float64    { return 0 }
+func (s *stubConfigForGovernance) GetFloat(key string) float64         { return 0 }
 func (s *stubConfigForGovernance) Unmarshal(key string, out any) error { return nil }
 
 // TestE2EGovernanceModeMonolithToMicroservice verifies the governance mode can be switched from monolith to microservice.

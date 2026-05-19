@@ -9,9 +9,9 @@ import (
 )
 
 // dummyMiddleware 返回一个空操作中间件，仅用于测试注册与查找。
-func dummyMiddleware(name string) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func dummyMiddleware(name string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if next != nil {
 				next(c)
 			}

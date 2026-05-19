@@ -25,14 +25,14 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string       { return "event" }
+func (p *Provider) Name() string { return "event" }
 
 // IsDefer indicates event bus should not defer loading.
 // Events may be needed early in application lifecycle.
 //
 // IsDefer 表示事件总线不应延迟加载。
 // 事件可能在应用生命周期早期就需要。
-func (p *Provider) IsDefer() bool      { return false }
+func (p *Provider) IsDefer() bool { return false }
 
 // Provides returns the capability keys this provider exposes.
 // Exposes EventKey for event bus service.

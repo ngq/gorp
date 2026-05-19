@@ -82,17 +82,17 @@ func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 // DefaultHost 实现 runtimecontract.Host 接口，管理多个服务的生命周期。
 type DefaultHost struct {
 	container runtimecontract.Container // container is the DI container.
-	                                   //
-	                                    // container DI 容器。
-	manager   *lifecycle.Manager         // manager is the lifecycle manager.
-	                                   //
-	                                    // manager 生命周期管理器。
-	mu        sync.RWMutex               // mu protects running state.
-	                                   //
-	                                    // mu 保护运行状态。
-	running   bool                       // running indicates if host is started.
-	                                   //
-	                                    // running 标记主机是否已启动。
+	//
+	// container DI 容器。
+	manager *lifecycle.Manager // manager is the lifecycle manager.
+	//
+	// manager 生命周期管理器。
+	mu sync.RWMutex // mu protects running state.
+	//
+	// mu 保护运行状态。
+	running bool // running indicates if host is started.
+	//
+	// running 标记主机是否已启动。
 }
 
 // NewDefaultHost creates a new host instance with the given container.

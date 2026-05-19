@@ -24,9 +24,13 @@ func TestRecoveryMiddlewareRecoversAndLogsPanic(t *testing.T) {
 	logger := newStubLogger()
 	router := gin.New()
 	applyTransportMiddleware(router,
-		func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-			return func(c transportcontract.HTTPContext) {
-				c.SetContext(frameworkbizlog.WithContext(c.Context(), logger))
+		func(next transportcontract.Handler) transportcontract.Handler {
+			return func(c transportcontract.Context) {
+				c.Set("logger", logger)
+				// Also update gin.Request.Context for context.Context value propagation
+				if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+					gc.Request = gc.Request.WithContext(frameworkbizlog.WithContext(gc.Request.Context(), logger))
+				}
 				next(c)
 			}
 		},

@@ -20,12 +20,12 @@ type AffiliateConfig struct {
 
 // AffiliateUseCase 联盟用例
 type AffiliateUseCase struct {
-	affiliateRepo   data.AffiliateRepository
-	orderRepo       data.AffiliateOrderRepository
-	referralRepo    data.AffiliateReferralRepository
-	commissionRepo  data.AffiliateCommissionRepository
-	payoutRepo      data.AffiliatePayoutRepository
-	config          AffiliateConfig
+	affiliateRepo  data.AffiliateRepository
+	orderRepo      data.AffiliateOrderRepository
+	referralRepo   data.AffiliateReferralRepository
+	commissionRepo data.AffiliateCommissionRepository
+	payoutRepo     data.AffiliatePayoutRepository
+	config         AffiliateConfig
 }
 
 // NewAffiliateUseCase 创建联盟用例
@@ -38,12 +38,12 @@ func NewAffiliateUseCase(
 	config AffiliateConfig,
 ) *AffiliateUseCase {
 	return &AffiliateUseCase{
-		affiliateRepo:   affiliateRepo,
-		orderRepo:       orderRepo,
-		referralRepo:    referralRepo,
-		commissionRepo:  commissionRepo,
-		payoutRepo:      payoutRepo,
-		config:          config,
+		affiliateRepo:  affiliateRepo,
+		orderRepo:      orderRepo,
+		referralRepo:   referralRepo,
+		commissionRepo: commissionRepo,
+		payoutRepo:     payoutRepo,
+		config:         config,
 	}
 }
 

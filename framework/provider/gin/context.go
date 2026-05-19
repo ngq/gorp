@@ -1,180 +1,185 @@
 // Package gin provides Gin-based HTTP server implementation for gorp framework.
-// This file implements HTTP context adaptation wrapping Gin Context.
-// Provides request/response primitives, bind helpers, and header access.
+// This file implements Context interface by delegating to gin.Context.
 //
 // Gin HTTP 服务包，提供基于 Gin 的 HTTP 服务器实现，用于 gorp 框架。
-// 本文件实现 HTTP context 适配，包装 Gin Context。
-// 提供请求/响应原语、绑定助手和头部访问。
+// 本文件通过委托给 gin.Context 实现 Context 接口。
 package gin
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
-// ginHTTPContext is the Gin-backed implementation of the framework HTTP context contract.
-//
-// ginHTTPContext 是基于 Gin 的框架 HTTPContext 实现。
-type ginHTTPContext struct {
-	*transportcontract.DefaultHTTPContext
+// ginContext implements Context by delegating to gin.Context.
+type ginContext struct {
 	gin *gin.Context
 }
 
-// GinContext exposes the underlying Gin context.
+// Ensure ginContext implements Context interface.
+var _ transportcontract.Context = (*ginContext)(nil)
+
+// newContext creates a new gin-backed Context.
+func newContext(ctx *gin.Context) transportcontract.Context {
+	return &ginContext{gin: ctx}
+}
+
+// GinContext exposes the underlying gin.Context.
+// This is useful when you need to access Gin-specific features.
 //
-// GinContext 暴露底层 Gin context。
-func (c *ginHTTPContext) GinContext() *gin.Context {
-	if c == nil {
-		return nil
-	}
+// GinContext 暴露底层 gin.Context。
+// 当需要访问 Gin 特有功能时使用。
+func (c *ginContext) GinContext() *gin.Context {
 	return c.gin
 }
 
-// newHTTPContext adapts a Gin context into the transport HTTP context contract.
-//
-// newHTTPContext 将 Gin context 适配为 transport HTTPContext 契约。
-func newHTTPContext(ctx *gin.Context) transportcontract.HTTPContext {
-	base := transportcontract.NewDefaultHTTPContext(nil, nil)
-	if ctx != nil {
-		base.SetRequest(ctx.Request)
-	}
-	base.SetParamFunc(func(key string) string {
-		if ctx == nil {
-			return ""
-		}
-		return ctx.Param(key)
-	})
-	base.SetQueryFunc(func(key string) string {
-		if ctx == nil {
-			return ""
-		}
-		return ctx.Query(key)
-	})
-	base.SetDefaultQueryFunc(func(key, defaultValue string) string {
-		if ctx == nil {
-			return defaultValue
-		}
-		return ctx.DefaultQuery(key, defaultValue)
-	})
-	base.SetHeaderFuncs(func(key string) string {
-		if ctx == nil {
-			return ""
-		}
-		return ctx.GetHeader(key)
-	}, func(key, value string) {
-		if ctx == nil {
-			return
-		}
-		ctx.Header(key, value)
-	})
-	base.SetBindFuncs(func(obj any) error {
-		if ctx == nil {
-			return nil
-		}
-		return ctx.ShouldBindJSON(obj)
-	}, func(obj any) error {
-		if ctx == nil {
-			return nil
-		}
-		return ctx.ShouldBindQuery(obj)
-	}, func(obj any) error {
-		if ctx == nil {
-			return nil
-		}
-		return ctx.ShouldBind(obj)
-	})
-	base.SetResponseFuncs(func(status int, body any) {
-		if ctx == nil {
-			return
-		}
-		ctx.JSON(status, body)
-	}, func(status int, body string) {
-		if ctx == nil {
-			return
-		}
-		ctx.String(status, body)
-	}, func(status int, body any) {
-		if ctx == nil {
-			return
-		}
-		ctx.XML(status, body)
-	}, func(status int, contentType string, body []byte) {
-		if ctx == nil {
-			return
-		}
-		ctx.Data(status, contentType, body)
-	}, func(status int, location string) {
-		if ctx == nil {
-			return
-		}
-		ctx.Redirect(status, location)
-	}, func(code int) {
-		if ctx == nil {
-			return
-		}
-		ctx.Status(code)
-	}, func() int {
-		if ctx == nil {
-			return 0
-		}
-		return ctx.Writer.Status()
-	})
-	base.SetRoutePathFunc(func() string {
-		if ctx == nil {
-			return ""
-		}
-		return ctx.FullPath()
-	})
-	// 设置中间件相关函数
-	base.SetMiddlewareFuncs(
-		func(key string) any {
-			if ctx == nil {
-				return nil
-			}
-			val, _ := ctx.Get(key)
-			return val
-		},
-		func(key string, value any) {
-			if ctx == nil {
-				return
-			}
-			ctx.Set(key, value)
-		},
-		func(status int) {
-			if ctx == nil {
-				return
-			}
-			ctx.AbortWithStatus(status)
-		},
-		func(status int, body any) {
-			if ctx == nil {
-				return
-			}
-			ctx.AbortWithStatusJSON(status, body)
-		},
-		func() bool {
-			if ctx == nil {
-				return false
-			}
-			return ctx.IsAborted()
-		},
-		func() {
-			if ctx == nil {
-				return
-			}
-			ctx.Next()
-		},
-	)
-	return &ginHTTPContext{DefaultHTTPContext: base, gin: ctx}
+// ========== context.Context delegation ==========
+
+func (c *ginContext) Deadline() (deadline time.Time, ok bool) {
+	return c.gin.Request.Context().Deadline()
 }
 
-// unwrapGinContext extracts the raw Gin context from a transport HTTP context.
+func (c *ginContext) Done() <-chan struct{} {
+	return c.gin.Request.Context().Done()
+}
+
+func (c *ginContext) Err() error {
+	return c.gin.Request.Context().Err()
+}
+
+func (c *ginContext) Value(key any) any {
+	return c.gin.Request.Context().Value(key)
+}
+
+// ========== Request/Response ==========
+
+func (c *ginContext) Request() *http.Request {
+	return c.gin.Request
+}
+
+func (c *ginContext) Response() http.ResponseWriter {
+	return c.gin.Writer
+}
+
+// ========== Params/Query ==========
+
+func (c *ginContext) Param(key string) string {
+	return c.gin.Param(key)
+}
+
+func (c *ginContext) Query(key string) string {
+	return c.gin.Query(key)
+}
+
+func (c *ginContext) DefaultQuery(key, defaultValue string) string {
+	return c.gin.DefaultQuery(key, defaultValue)
+}
+
+// ========== Headers ==========
+
+func (c *ginContext) GetHeader(key string) string {
+	return c.gin.GetHeader(key)
+}
+
+func (c *ginContext) SetHeader(key, value string) {
+	c.gin.Header(key, value)
+}
+
+// ========== Binding ==========
+
+func (c *ginContext) Bind(obj any) error {
+	return c.gin.ShouldBind(obj)
+}
+
+func (c *ginContext) BindJSON(obj any) error {
+	return c.gin.ShouldBindJSON(obj)
+}
+
+func (c *ginContext) BindQuery(obj any) error {
+	return c.gin.ShouldBindQuery(obj)
+}
+
+// ========== Response ==========
+
+func (c *ginContext) JSON(status int, body any) {
+	c.gin.JSON(status, body)
+}
+
+func (c *ginContext) String(status int, body string) {
+	c.gin.String(status, body)
+}
+
+func (c *ginContext) XML(status int, body any) {
+	c.gin.XML(status, body)
+}
+
+func (c *ginContext) Data(status int, contentType string, body []byte) {
+	c.gin.Data(status, contentType, body)
+}
+
+func (c *ginContext) Redirect(status int, location string) {
+	c.gin.Redirect(status, location)
+}
+
+func (c *ginContext) Status(code int) {
+	c.gin.Status(code)
+}
+
+// ========== Route info ==========
+
+func (c *ginContext) RoutePath() string {
+	return c.gin.FullPath()
+}
+
+func (c *ginContext) ResponseStatus() int {
+	return c.gin.Writer.Status()
+}
+
+// ========== Middleware support ==========
+
+func (c *ginContext) Get(key string) any {
+	val, _ := c.gin.Get(key)
+	return val
+}
+
+func (c *ginContext) Set(key string, value any) {
+	c.gin.Set(key, value)
+}
+
+func (c *ginContext) Abort(status int) {
+	c.gin.AbortWithStatus(status)
+}
+
+func (c *ginContext) AbortWithJSON(status int, body any) {
+	c.gin.AbortWithStatusJSON(status, body)
+}
+
+func (c *ginContext) IsAborted() bool {
+	return c.gin.IsAborted()
+}
+
+func (c *ginContext) Next() {
+	c.gin.Next()
+}
+
+// UnwrapContext extracts the raw gin.Context from a transport Context.
+// This is the public API for users who need to access Gin-specific features.
 //
-// unwrapGinContext 从 transport HTTPContext 中提取原始 Gin context。
-func unwrapGinContext(c transportcontract.HTTPContext) (*gin.Context, bool) {
+// UnwrapContext 从 transport Context 中提取原始 gin.Context。
+// 这是公开 API，供需要访问 Gin 特有功能的用户使用。
+//
+// Example:
+//
+//	func handler(c gorp.Context) {
+//	    gc, ok := gin.UnwrapContext(c)
+//	    if ok {
+//	        // Use native Gin context
+//	        gc.HTML(200, "index.html", gin.H{})
+//	    }
+//	}
+func UnwrapContext(c transportcontract.Context) (*gin.Context, bool) {
 	type ginContextProvider interface {
 		GinContext() *gin.Context
 	}
@@ -187,52 +192,4 @@ func unwrapGinContext(c transportcontract.HTTPContext) (*gin.Context, bool) {
 		return nil, false
 	}
 	return gc, true
-}
-
-// UnwrapGinContext extracts the raw Gin context from a transport HTTP context.
-// This is the public API for users who need to access Gin-specific features.
-//
-// UnwrapGinContext 从 transport HTTPContext 中提取原始 Gin context。
-// 这是公开 API，供需要访问 Gin 特有功能的用户使用。
-//
-// 使用示例：
-//
-//	func handler(c gorp.HTTPContext) {
-//	    gc, ok := gin.UnwrapGinContext(c)
-//	    if ok {
-//	        // 使用原生 Gin context
-//	        gc.HTML(200, "index.html", gin.H{})
-//	    }
-//	}
-func UnwrapGinContext(c transportcontract.HTTPContext) (*gin.Context, bool) {
-	return unwrapGinContext(c)
-}
-
-// writeGinResponseHeaders syncs request identity headers from request context into the Gin response.
-//
-// writeGinResponseHeaders 将请求上下文中的请求标识头同步到 Gin 响应。
-func writeGinResponseHeaders(c *gin.Context) {
-	if c == nil || c.Request == nil {
-		return
-	}
-	if requestID, ok := supportcontract.FromRequestIDContext(c.Request.Context()); ok && requestID != "" {
-		c.Header("X-Request-Id", requestID)
-	}
-	if traceID, ok := supportcontract.FromTraceIDContext(c.Request.Context()); ok && traceID != "" {
-		c.Header("X-Trace-Id", traceID)
-	}
-}
-
-// copyHeaders replaces the destination headers with headers copied from the source.
-//
-// copyHeaders 使用源头部内容覆盖目标头部集合。
-func copyHeaders(dst, src http.Header) {
-	for k := range dst {
-		dst.Del(k)
-	}
-	for k, values := range src {
-		for _, value := range values {
-			dst.Add(k, value)
-		}
-	}
 }

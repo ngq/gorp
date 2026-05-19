@@ -6,11 +6,11 @@ import transportcontract "github.com/ngq/gorp/framework/contract/transport"
 //
 // SecurityHeadersOptions 定义默认 HTTP 安全响应头集合。
 type SecurityHeadersOptions struct {
-	XFrameOptions       string
-	XContentTypeOptions string
-	ReferrerPolicy      string
+	XFrameOptions         string
+	XContentTypeOptions   string
+	ReferrerPolicy        string
 	ContentSecurityPolicy string
-	PermissionsPolicy   string
+	PermissionsPolicy     string
 }
 
 // DefaultSecurityHeadersOptions returns the default security header set.
@@ -27,28 +27,28 @@ func DefaultSecurityHeadersOptions() SecurityHeadersOptions {
 // SecurityHeaders writes a small secure-by-default response header set.
 //
 // SecurityHeaders 输出一组安全默认响应头。
-func SecurityHeaders(opts SecurityHeadersOptions) transportcontract.HTTPMiddleware {
+func SecurityHeaders(opts SecurityHeadersOptions) transportcontract.Middleware {
 	if opts == (SecurityHeadersOptions{}) {
 		opts = DefaultSecurityHeadersOptions()
 	}
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c != nil {
 				if opts.XFrameOptions != "" {
-					c.Header("X-Frame-Options", opts.XFrameOptions)
+					c.SetHeader("X-Frame-Options", opts.XFrameOptions)
 				}
 				if opts.XContentTypeOptions != "" {
-					c.Header("X-Content-Type-Options", opts.XContentTypeOptions)
+					c.SetHeader("X-Content-Type-Options", opts.XContentTypeOptions)
 				}
 				if opts.ReferrerPolicy != "" {
-					c.Header("Referrer-Policy", opts.ReferrerPolicy)
+					c.SetHeader("Referrer-Policy", opts.ReferrerPolicy)
 				}
 				if opts.ContentSecurityPolicy != "" {
-					c.Header("Content-Security-Policy", opts.ContentSecurityPolicy)
+					c.SetHeader("Content-Security-Policy", opts.ContentSecurityPolicy)
 				}
 				if opts.PermissionsPolicy != "" {
-					c.Header("Permissions-Policy", opts.PermissionsPolicy)
+					c.SetHeader("Permissions-Policy", opts.PermissionsPolicy)
 				}
 			}
 			if next != nil {

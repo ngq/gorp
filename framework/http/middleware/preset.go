@@ -124,7 +124,7 @@ func DefaultHTTPServiceGovernanceDefaults() DefaultHTTPServiceGovernanceOptions 
 // DefaultMiddleware returns the stable default middleware baseline.
 //
 // DefaultMiddleware 返回稳定的默认中间件基线。
-func DefaultMiddleware(base observabilitycontract.Logger) transportcontract.HTTPMiddleware {
+func DefaultMiddleware(base observabilitycontract.Logger) transportcontract.Middleware {
 	return Chain(DefaultMiddlewareSet(base)...)
 }
 
@@ -141,8 +141,8 @@ func DefaultMiddleware(base observabilitycontract.Logger) transportcontract.HTTP
 // - RequestIdentity
 // - LoggingMiddleware
 // - RecoveryMiddleware
-func DefaultMiddlewareSet(base observabilitycontract.Logger) []transportcontract.HTTPMiddleware {
-	return []transportcontract.HTTPMiddleware{
+func DefaultMiddlewareSet(base observabilitycontract.Logger) []transportcontract.Middleware {
+	return []transportcontract.Middleware{
 		RequestIdentity(),
 		LoggingMiddleware(base),
 		RecoveryMiddleware(),
@@ -152,7 +152,7 @@ func DefaultMiddlewareSet(base observabilitycontract.Logger) []transportcontract
 // RecommendedAPIMiddleware returns the recommended public API middleware preset.
 //
 // RecommendedAPIMiddleware 返回推荐的对外 API 中间件预设。
-func RecommendedAPIMiddleware(base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) transportcontract.HTTPMiddleware {
+func RecommendedAPIMiddleware(base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) transportcontract.Middleware {
 	return Chain(RecommendedAPIMiddlewareSet(base, opts)...)
 }
 
@@ -179,10 +179,10 @@ func RecommendedAPIMiddleware(base observabilitycontract.Logger, opts Recommende
 // - 启用时追加 Locale
 // - 启用时追加 MetricsMiddleware
 // - 启用时追加 Compression
-func RecommendedAPIMiddlewareSet(base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) []transportcontract.HTTPMiddleware {
+func RecommendedAPIMiddlewareSet(base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) []transportcontract.Middleware {
 	opts = normalizeRecommendedMiddlewareOptions(opts)
 
-	middleware := make([]transportcontract.HTTPMiddleware, 0, 10)
+	middleware := make([]transportcontract.Middleware, 0, 10)
 	middleware = append(middleware, DefaultMiddlewareSet(base)...)
 
 	if opts.CORS != nil {
@@ -212,7 +212,7 @@ func RecommendedAPIMiddlewareSet(base observabilitycontract.Logger, opts Recomme
 // InternalAPIMiddleware returns the recommended internal API middleware preset.
 //
 // InternalAPIMiddleware 返回推荐的内网 API 中间件预设。
-func InternalAPIMiddleware(base observabilitycontract.Logger, opts InternalMiddlewareOptions) transportcontract.HTTPMiddleware {
+func InternalAPIMiddleware(base observabilitycontract.Logger, opts InternalMiddlewareOptions) transportcontract.Middleware {
 	return Chain(InternalAPIMiddlewareSet(base, opts)...)
 }
 
@@ -225,7 +225,7 @@ func InternalAPIMiddleware(base observabilitycontract.Logger, opts InternalMiddl
 //
 // 包含的中间件：
 // - 应用内网默认配置后的 RecommendedAPIMiddlewareSet
-func InternalAPIMiddlewareSet(base observabilitycontract.Logger, opts InternalMiddlewareOptions) []transportcontract.HTTPMiddleware {
+func InternalAPIMiddlewareSet(base observabilitycontract.Logger, opts InternalMiddlewareOptions) []transportcontract.Middleware {
 	opts = normalizeInternalMiddlewareOptions(opts)
 	return RecommendedAPIMiddlewareSet(base, opts.API)
 }
@@ -233,7 +233,7 @@ func InternalAPIMiddlewareSet(base observabilitycontract.Logger, opts InternalMi
 // AdminAPIMiddleware returns the recommended admin API middleware preset.
 //
 // AdminAPIMiddleware 返回推荐的管理 API 中间件预设。
-func AdminAPIMiddleware(base observabilitycontract.Logger, opts AdminMiddlewareOptions) transportcontract.HTTPMiddleware {
+func AdminAPIMiddleware(base observabilitycontract.Logger, opts AdminMiddlewareOptions) transportcontract.Middleware {
 	return Chain(AdminAPIMiddlewareSet(base, opts)...)
 }
 
@@ -256,10 +256,10 @@ func AdminAPIMiddleware(base observabilitycontract.Logger, opts AdminMiddlewareO
 // - 配置后追加 RequireAnyRole
 // - 配置后追加 RequireAllRoles
 // - 启用时追加 AuditMiddleware
-func AdminAPIMiddlewareSet(base observabilitycontract.Logger, opts AdminMiddlewareOptions) []transportcontract.HTTPMiddleware {
+func AdminAPIMiddlewareSet(base observabilitycontract.Logger, opts AdminMiddlewareOptions) []transportcontract.Middleware {
 	opts = normalizeAdminMiddlewareOptions(opts)
 
-	middleware := make([]transportcontract.HTTPMiddleware, 0, 12)
+	middleware := make([]transportcontract.Middleware, 0, 12)
 	middleware = append(middleware, InternalAPIMiddlewareSet(base, InternalMiddlewareOptions{API: opts.API})...)
 
 	if len(opts.Allowlist) > 0 {
@@ -283,7 +283,7 @@ func AdminAPIMiddlewareSet(base observabilitycontract.Logger, opts AdminMiddlewa
 // UseDefaultMiddleware applies the default middleware baseline to the router.
 //
 // UseDefaultMiddleware 将默认中间件基线装配到路由器。
-func UseDefaultMiddleware(router transportcontract.HTTPRouter, base observabilitycontract.Logger) {
+func UseDefaultMiddleware(router transportcontract.Router, base observabilitycontract.Logger) {
 	if router == nil {
 		return
 	}
@@ -293,7 +293,7 @@ func UseDefaultMiddleware(router transportcontract.HTTPRouter, base observabilit
 // UseRecommendedAPIMiddleware applies the recommended public API middleware preset to the router.
 //
 // UseRecommendedAPIMiddleware 将推荐的对外 API 中间件预设装配到路由器。
-func UseRecommendedAPIMiddleware(router transportcontract.HTTPRouter, base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) {
+func UseRecommendedAPIMiddleware(router transportcontract.Router, base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) {
 	if router == nil {
 		return
 	}
@@ -303,7 +303,7 @@ func UseRecommendedAPIMiddleware(router transportcontract.HTTPRouter, base obser
 // UseInternalAPIMiddleware applies the recommended internal API middleware preset to the router.
 //
 // UseInternalAPIMiddleware 将推荐的内网 API 中间件预设装配到路由器。
-func UseInternalAPIMiddleware(router transportcontract.HTTPRouter, base observabilitycontract.Logger, opts InternalMiddlewareOptions) {
+func UseInternalAPIMiddleware(router transportcontract.Router, base observabilitycontract.Logger, opts InternalMiddlewareOptions) {
 	if router == nil {
 		return
 	}
@@ -313,7 +313,7 @@ func UseInternalAPIMiddleware(router transportcontract.HTTPRouter, base observab
 // UseAdminAPIMiddleware applies the recommended admin API middleware preset to the router.
 //
 // UseAdminAPIMiddleware 将推荐的管理 API 中间件预设装配到路由器。
-func UseAdminAPIMiddleware(router transportcontract.HTTPRouter, base observabilitycontract.Logger, opts AdminMiddlewareOptions) {
+func UseAdminAPIMiddleware(router transportcontract.Router, base observabilitycontract.Logger, opts AdminMiddlewareOptions) {
 	if router == nil {
 		return
 	}
@@ -352,7 +352,7 @@ func DefaultHTTPServiceGovernanceOrder() []string {
 // DefaultHTTPServiceGovernancePreset returns the default HTTP service governance middleware preset.
 //
 // DefaultHTTPServiceGovernancePreset 返回默认 HTTP 服务治理中间件预设。
-func DefaultHTTPServiceGovernancePreset(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) transportcontract.HTTPMiddleware {
+func DefaultHTTPServiceGovernancePreset(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) transportcontract.Middleware {
 	return Chain(DefaultHTTPServiceGovernanceSet(base, opts)...)
 }
 
@@ -385,10 +385,10 @@ func DefaultHTTPServiceGovernancePreset(base observabilitycontract.Logger, opts 
 // - 启用时追加 Locale
 // - 启用时追加 MetricsMiddleware
 // - 启用时追加 Compression
-func DefaultHTTPServiceGovernanceSet(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) []transportcontract.HTTPMiddleware {
+func DefaultHTTPServiceGovernanceSet(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) []transportcontract.Middleware {
 	opts = normalizeDefaultHTTPServiceGovernanceOptions(opts)
 
-	middleware := make([]transportcontract.HTTPMiddleware, 0, 12)
+	middleware := make([]transportcontract.Middleware, 0, 12)
 	middleware = append(middleware, DefaultMiddlewareSet(base)...)
 
 	if opts.API.CORS != nil {
@@ -428,7 +428,7 @@ func DefaultHTTPServiceGovernanceSet(base observabilitycontract.Logger, opts Def
 // UseDefaultHTTPServiceGovernance applies the default HTTP service governance preset to the router.
 //
 // UseDefaultHTTPServiceGovernance 将默认 HTTP 服务治理预设装配到路由器。
-func UseDefaultHTTPServiceGovernance(router transportcontract.HTTPRouter, base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) {
+func UseDefaultHTTPServiceGovernance(router transportcontract.Router, base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) {
 	if router == nil {
 		return
 	}
@@ -539,8 +539,8 @@ func isZeroAuditOptions(opts AuditOptions) bool {
 // Chain combines multiple middlewares into a single middleware.
 //
 // Chain 将多个中间件组合成一个中间件。
-func Chain(middleware ...transportcontract.HTTPMiddleware) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
+func Chain(middleware ...transportcontract.Middleware) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
 		for i := len(middleware) - 1; i >= 0; i-- {
 			if middleware[i] == nil {
 				continue

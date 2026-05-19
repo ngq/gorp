@@ -1,9 +1,9 @@
 package grpc
 
 import (
+	"google.golang.org/grpc"
 	userv1 "grpc-demo/proto/user/v1"
 	"grpc-demo/services/user/internal/service"
-	"google.golang.org/grpc"
 )
 
 func RegisterUserService(server *grpc.Server, services *service.Services) {

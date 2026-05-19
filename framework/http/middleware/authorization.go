@@ -20,15 +20,15 @@ import (
 // AuthorizationChecker performs a request-level authorization decision.
 //
 // AuthorizationChecker 用于执行请求级鉴权判断。
-type AuthorizationChecker func(c transportcontract.HTTPContext, claims *securitycontract.JWTClaims) error
+type AuthorizationChecker func(c transportcontract.Context, claims *securitycontract.JWTClaims) error
 
 // Authorize enforces JWT claim presence first, then applies the custom checker.
 //
 // Authorize 先校验 JWT claims 是否存在，再执行自定义鉴权逻辑。
-func Authorize(checker AuthorizationChecker) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
-			claims, ok := claimsFromHTTPContext(c)
+func Authorize(checker AuthorizationChecker) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			claims, ok := claimsFromContext(c)
 			if !ok {
 				respondUnauthorized(c, "authentication required")
 				return
@@ -49,16 +49,16 @@ func Authorize(checker AuthorizationChecker) transportcontract.HTTPMiddleware {
 // RequireAuthorization requires authenticated JWT claims to exist in the request context.
 //
 // RequireAuthorization 要求请求上下文中必须存在已认证的 JWT claims。
-func RequireAuthorization() transportcontract.HTTPMiddleware {
+func RequireAuthorization() transportcontract.Middleware {
 	return Authorize(nil)
 }
 
 // RequireSubjectType requires the JWT subject type to match one of the expected values.
 //
 // RequireSubjectType 要求 JWT subject type 命中给定候选值之一。
-func RequireSubjectType(subjectTypes ...string) transportcontract.HTTPMiddleware {
+func RequireSubjectType(subjectTypes ...string) transportcontract.Middleware {
 	expected := normalizeRequiredValues(subjectTypes)
-	return Authorize(func(c transportcontract.HTTPContext, claims *securitycontract.JWTClaims) error {
+	return Authorize(func(c transportcontract.Context, claims *securitycontract.JWTClaims) error {
 		if len(expected) == 0 {
 			return nil
 		}
@@ -74,9 +74,9 @@ func RequireSubjectType(subjectTypes ...string) transportcontract.HTTPMiddleware
 // RequireAnyRole requires the caller to own at least one of the expected roles.
 //
 // RequireAnyRole 要求调用方至少拥有一个指定角色。
-func RequireAnyRole(roles ...string) transportcontract.HTTPMiddleware {
+func RequireAnyRole(roles ...string) transportcontract.Middleware {
 	required := normalizeRequiredValues(roles)
-	return Authorize(func(c transportcontract.HTTPContext, claims *securitycontract.JWTClaims) error {
+	return Authorize(func(c transportcontract.Context, claims *securitycontract.JWTClaims) error {
 		if len(required) == 0 {
 			return nil
 		}
@@ -93,9 +93,9 @@ func RequireAnyRole(roles ...string) transportcontract.HTTPMiddleware {
 // RequireAllRoles requires the caller to own all expected roles.
 //
 // RequireAllRoles 要求调用方拥有全部指定角色。
-func RequireAllRoles(roles ...string) transportcontract.HTTPMiddleware {
+func RequireAllRoles(roles ...string) transportcontract.Middleware {
 	required := normalizeRequiredValues(roles)
-	return Authorize(func(c transportcontract.HTTPContext, claims *securitycontract.JWTClaims) error {
+	return Authorize(func(c transportcontract.Context, claims *securitycontract.JWTClaims) error {
 		if len(required) == 0 {
 			return nil
 		}
@@ -109,14 +109,14 @@ func RequireAllRoles(roles ...string) transportcontract.HTTPMiddleware {
 	})
 }
 
-// claimsFromHTTPContext extracts JWT claims from the current request context.
+// claimsFromContext extracts JWT claims from the current request context.
 //
-// claimsFromHTTPContext 从当前请求上下文中提取 JWT claims。
-func claimsFromHTTPContext(c transportcontract.HTTPContext) (*securitycontract.JWTClaims, bool) {
+// claimsFromContext 从当前请求上下文中提取 JWT claims。
+func claimsFromContext(c transportcontract.Context) (*securitycontract.JWTClaims, bool) {
 	if c == nil {
 		return nil, false
 	}
-	return securitycontract.FromJWTClaimsContext(c.Context())
+	return securitycontract.FromJWTClaimsContext(c)
 }
 
 // claimsRoleSet normalizes role values into a set for quick membership checks.
@@ -159,7 +159,7 @@ func normalizeRequiredValues(values []string) []string {
 // respondUnauthorized writes the unified unauthorized response.
 //
 // respondUnauthorized 输出统一的未认证响应。
-func respondUnauthorized(c transportcontract.HTTPContext, message string) {
+func respondUnauthorized(c transportcontract.Context, message string) {
 	if gc, ok := unwrapGinContext(c); ok {
 		writeGinResponseHeaders(gc)
 		resp := Response{
@@ -180,7 +180,7 @@ func respondUnauthorized(c transportcontract.HTTPContext, message string) {
 // respondForbidden writes the unified forbidden response.
 //
 // respondForbidden 输出统一的无权限响应。
-func respondForbidden(c transportcontract.HTTPContext, message string) {
+func respondForbidden(c transportcontract.Context, message string) {
 	if gc, ok := unwrapGinContext(c); ok {
 		writeGinResponseHeaders(gc)
 		resp := Response{

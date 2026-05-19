@@ -38,7 +38,7 @@ func (m *mockRedis) Del(ctx context.Context, key string) error                  
 func (m *mockRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
-func (m *mockRedis) MSet(ctx context.Context, kvs map[string]string) error { return nil }
+func (m *mockRedis) MSet(ctx context.Context, kvs map[string]string) error           { return nil }
 func (m *mockRedis) Expire(ctx context.Context, key string, ttl time.Duration) error { return nil }
 
 // mockCache implements datacontract.Cache
@@ -50,7 +50,9 @@ func (m *mockCache) Del(ctx context.Context, key string) error                  
 func (m *mockCache) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
-func (m *mockCache) MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error { return nil }
+func (m *mockCache) MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error {
+	return nil
+}
 func (m *mockCache) Remember(ctx context.Context, key string, ttl time.Duration, fn func(ctx context.Context) (string, error)) (string, error) {
 	return fn(ctx)
 }
@@ -74,8 +76,8 @@ func (m *mockValidator) ValidateVar(ctx context.Context, v any, tag string) erro
 func (m *mockValidator) RegisterCustom(name string, fn datacontract.CustomValidateFunc) error {
 	return nil
 }
-func (m *mockValidator) SetLocale(locale string) error            { return nil }
-func (m *mockValidator) TranslateError(err error) error           { return nil }
+func (m *mockValidator) SetLocale(locale string) error  { return nil }
+func (m *mockValidator) TranslateError(err error) error { return nil }
 
 // mockRetry implements resiliencecontract.Retry
 type mockRetry struct{}
@@ -95,10 +97,10 @@ func (m *mockRetry) IsRetryable(err error) bool { return false }
 // mockHTTP implements transportcontract.HTTP
 type mockHTTP struct{}
 
-func (m *mockHTTP) Router() transportcontract.HTTPRouter { return nil }
-func (m *mockHTTP) Server() *http.Server                 { return nil }
-func (m *mockHTTP) Run() error                           { return nil }
-func (m *mockHTTP) Shutdown(ctx context.Context) error   { return nil }
+func (m *mockHTTP) Router() transportcontract.Router   { return nil }
+func (m *mockHTTP) Server() *http.Server               { return nil }
+func (m *mockHTTP) Run() error                         { return nil }
+func (m *mockHTTP) Shutdown(ctx context.Context) error { return nil }
 
 // mockMessagePublisher implements integrationcontract.MessagePublisher
 type mockMessagePublisher struct{}
@@ -206,8 +208,8 @@ func TestMakeHelpers_UnboundKey(t *testing.T) {
 	_, err = MakeHTTP(c)
 	require.Error(t, err, "MakeHTTP should error on unbound key")
 
-	_, err = MakeHTTPRouter(c)
-	require.Error(t, err, "MakeHTTPRouter should error on unbound key")
+	_, err = MakeRouter(c)
+	require.Error(t, err, "MakeRouter should error on unbound key")
 
 	_, err = MakeMessagePublisher(c)
 	require.Error(t, err, "MakeMessagePublisher should error on unbound key")
@@ -253,7 +255,7 @@ func TestMustMakeHelpers_PanicOnUnboundKey(t *testing.T) {
 	require.Panics(t, func() { MustMakeLogger(c) }, "MustMakeLogger should panic")
 	require.Panics(t, func() { MustMakeGorm(c) }, "MustMakeGorm should panic")
 	require.Panics(t, func() { MustMakeHTTP(c) }, "MustMakeHTTP should panic")
-	require.Panics(t, func() { MustMakeHTTPRouter(c) }, "MustMakeHTTPRouter should panic")
+	require.Panics(t, func() { MustMakeRouter(c) }, "MustMakeRouter should panic")
 	require.Panics(t, func() { MustMakeMessagePublisher(c) }, "MustMakeMessagePublisher should panic")
 	require.Panics(t, func() { MustMakeMessageSubscriber(c) }, "MustMakeMessageSubscriber should panic")
 	require.Panics(t, func() { MustMakeDistributedLock(c) }, "MustMakeDistributedLock should panic")
@@ -383,13 +385,13 @@ func TestMakeHTTP_Success(t *testing.T) {
 	require.NotNil(t, http)
 }
 
-func TestMakeHTTPRouter_Success(t *testing.T) {
+func TestMakeRouter_Success(t *testing.T) {
 	c := New()
 	c.Bind(transportcontract.HTTPKey, func(runtimecontract.Container) (any, error) {
 		return &mockHTTP{}, nil
 	}, true)
 
-	router, err := MakeHTTPRouter(c)
+	router, err := MakeRouter(c)
 	require.NoError(t, err)
 	// Router() returns nil in mock, which is valid
 	_ = router
@@ -481,13 +483,13 @@ func TestMustMakeHTTP_Success(t *testing.T) {
 	require.NotNil(t, http)
 }
 
-func TestMustMakeHTTPRouter_Success(t *testing.T) {
+func TestMustMakeRouter_Success(t *testing.T) {
 	c := New()
 	c.Bind(transportcontract.HTTPKey, func(runtimecontract.Container) (any, error) {
 		return &mockHTTP{}, nil
 	}, true)
 
-	router := MustMakeHTTPRouter(c)
+	router := MustMakeRouter(c)
 	// Router() returns nil in mock
 	_ = router
 }

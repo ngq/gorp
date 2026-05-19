@@ -87,7 +87,7 @@ var ErrNoopQueue = errors.New("messagequeue: noop mode, message queue not availa
 // noopQueue 使用空行为实现 MessageQueue 接口。
 // publisher 和 subscriber 缓存为单例以保持行为一致。
 type noopQueue struct {
-	publisher integrationcontract.MessagePublisher
+	publisher  integrationcontract.MessagePublisher
 	subscriber integrationcontract.MessageSubscriber
 }
 

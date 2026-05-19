@@ -9,10 +9,10 @@ import (
 
 // Services 聚合应用服务。
 type Services struct {
-	Demo  *DemoService
-	Auth  *AuthService
-	User  *UserService
-	Role  *RoleService
+	Demo *DemoService
+	Auth *AuthService
+	User *UserService
+	Role *RoleService
 }
 
 // NewServices 创建应用服务集合。

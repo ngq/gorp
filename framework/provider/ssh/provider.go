@@ -27,14 +27,14 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string       { return "ssh" }
+func (p *Provider) Name() string { return "ssh" }
 
 // IsDefer indicates SSH provider should defer loading.
 // SSH connections are typically established on-demand.
 //
 // IsDefer 表示 SSH provider 应延迟加载。
 // SSH 连接通常按需建立。
-func (p *Provider) IsDefer() bool      { return true }
+func (p *Provider) IsDefer() bool { return true }
 
 // Provides returns the capability keys this provider exposes.
 // Exposes SSHKey for SSH service.

@@ -22,13 +22,13 @@ import (
 //
 // RecoveryMiddleware 捕获 panic，并返回统一的内部错误响应。
 // 包含 stack trace 以便生产环境排查问题。
-func RecoveryMiddleware() transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func RecoveryMiddleware() transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			defer func() {
 				if rec := recover(); rec != nil {
 					stack := string(debug.Stack())
-					frameworkbizlog.Ctx(c.Context()).Error("http panic recovered",
+					frameworkbizlog.Ctx(c).Error("http panic recovered",
 						observabilitycontract.Field{Key: "panic", Value: rec},
 						observabilitycontract.Field{Key: "stack", Value: stack},
 					)

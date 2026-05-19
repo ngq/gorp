@@ -30,7 +30,7 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string  { return "proto.generator" }
+func (p *Provider) Name() string { return "proto.generator" }
 
 // IsDefer indicates proto generator should defer loading.
 // Generator is typically used during build/deployment phase.

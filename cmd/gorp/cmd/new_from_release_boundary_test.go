@@ -31,9 +31,9 @@ func TestNewFromReleaseTemplateAssetAndRootMapping(t *testing.T) {
 
 func TestReleaseTemplateSourceProvidesProjectRoot(t *testing.T) {
 	tests := []struct {
-		name       string
-		template   string
-		entryFile  string
+		name      string
+		template  string
+		entryFile string
 	}{
 		{name: "golayout", template: starterTemplateGoLayout, entryFile: "cmd/app/main.go.tmpl"},
 		{name: "multi-flat-wire", template: starterTemplateMultiFlatWire, entryFile: ".gorp-template.yml.tmpl"},

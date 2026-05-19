@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	grpcprovider "github.com/ngq/gorp/framework/provider/rpc/grpc"
 	transportcontracts "github.com/ngq/gorp/framework/contract/transport"
+	grpcprovider "github.com/ngq/gorp/framework/provider/rpc/grpc"
 	pb "github.com/ngq/gorp/test/integration/pb"
 )
 

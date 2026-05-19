@@ -26,25 +26,29 @@ func (s *exportValidatorStub) ValidateVar(context.Context, any, string) error { 
 func (s *exportValidatorStub) RegisterCustom(string, datacontract.CustomValidateFunc) error {
 	return nil
 }
-func (s *exportValidatorStub) SetLocale(string) error                    { return nil }
-func (s *exportValidatorStub) TranslateError(error) error               { return nil }
+func (s *exportValidatorStub) SetLocale(string) error     { return nil }
+func (s *exportValidatorStub) TranslateError(error) error { return nil }
 
 type exportValidateContainerStub struct {
 	validator datacontract.Validator
 }
 
-func (s *exportValidateContainerStub) Bind(string, runtimecontract.Factory, bool)                      {}
-func (s *exportValidateContainerStub) NamedBind(string, string, runtimecontract.Factory, bool)          {}
-func (s *exportValidateContainerStub) IsBind(string) bool                                               { return true }
-func (s *exportValidateContainerStub) IsBindNamed(string, string) bool                                  { return false }
-func (s *exportValidateContainerStub) MustMake(key string) any                                          { v, _ := s.Make(key); return v }
-func (s *exportValidateContainerStub) MustMakeNamed(string, string) any                                 { return nil }
-func (s *exportValidateContainerStub) RegisterCloser(string, io.Closer)                                 {}
-func (s *exportValidateContainerStub) Destroy() error                                                   { return nil }
-func (s *exportValidateContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo              { return nil }
-func (s *exportValidateContainerStub) DebugPrint() string                                               { return "" }
-func (s *exportValidateContainerStub) ProviderDAG() runtimecontract.ProviderDAG                          { return runtimecontract.ProviderDAG{} }
-func (s *exportValidateContainerStub) MakeNamed(string, string) (any, error)                            { return nil, nil }
+func (s *exportValidateContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (s *exportValidateContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (s *exportValidateContainerStub) IsBind(string) bool                                      { return true }
+func (s *exportValidateContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (s *exportValidateContainerStub) MustMake(key string) any                                 { v, _ := s.Make(key); return v }
+func (s *exportValidateContainerStub) MustMakeNamed(string, string) any                        { return nil }
+func (s *exportValidateContainerStub) RegisterCloser(string, io.Closer)                        {}
+func (s *exportValidateContainerStub) Destroy() error                                          { return nil }
+func (s *exportValidateContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo {
+	return nil
+}
+func (s *exportValidateContainerStub) DebugPrint() string { return "" }
+func (s *exportValidateContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
+func (s *exportValidateContainerStub) MakeNamed(string, string) (any, error) { return nil, nil }
 func (s *exportValidateContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }

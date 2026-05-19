@@ -12,12 +12,12 @@ import (
 
 func TestTokenAuthenticator_GenerateAndVerifyToken(t *testing.T) {
 	auth := NewTokenAuthenticator(&securitycontract.ServiceAuthConfig{
-		ServiceName:  "order-service",
-		TokenIssuer:  "order-service",
-		TokenSecret:  "test-secret",
-		TokenExpiry:  60,
-		Namespace:    "prod",
-		Environment:  "online",
+		ServiceName: "order-service",
+		TokenIssuer: "order-service",
+		TokenSecret: "test-secret",
+		TokenExpiry: 60,
+		Namespace:   "prod",
+		Environment: "online",
 	})
 
 	token, err := auth.GenerateToken(context.Background(), "user-service")

@@ -158,13 +158,13 @@ func ToBlogPostResponse(p *BlogPost) BlogPostResponse {
 
 // Menu 导航菜单
 type Menu struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"size:128;not null" json:"name"`
-	SystemName  string    `gorm:"size:128;uniqueIndex" json:"system_name"` // 系统标识
-	Title       string    `gorm:"size:256" json:"title"`                   // 显示标题
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID         uint64    `gorm:"primaryKey" json:"id"`
+	Name       string    `gorm:"size:128;not null" json:"name"`
+	SystemName string    `gorm:"size:128;uniqueIndex" json:"system_name"` // 系统标识
+	Title      string    `gorm:"size:256" json:"title"`                   // 显示标题
+	IsActive   bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 指定表名
@@ -174,16 +174,16 @@ func (Menu) TableName() string {
 
 // MenuItem 菜单项
 type MenuItem struct {
-	ID           uint64  `gorm:"primaryKey" json:"id"`
-	MenuID       uint64  `gorm:"not null;index" json:"menu_id"`
-	ParentID     *uint64 `gorm:"index" json:"parent_id"`           // 父菜单项ID（支持多级菜单）
-	Name         string  `gorm:"size:128;not null" json:"name"`    // 菜单项名称
-	URL          string  `gorm:"size:512" json:"url"`              // 链接地址
-	IconClass    string  `gorm:"size:64" json:"icon_class"`        // 图标CSS类
-	CssClass     string  `gorm:"size:128" json:"css_class"`        // 自定义CSS类
-	Target       string  `gorm:"size:16" json:"target"`            // 打开方式：_self, _blank
-	DisplayOrder int     `gorm:"default:0" json:"display_order"`   // 排序
-	IsActive     bool    `gorm:"default:true" json:"is_active"`
+	ID           uint64    `gorm:"primaryKey" json:"id"`
+	MenuID       uint64    `gorm:"not null;index" json:"menu_id"`
+	ParentID     *uint64   `gorm:"index" json:"parent_id"`         // 父菜单项ID（支持多级菜单）
+	Name         string    `gorm:"size:128;not null" json:"name"`  // 菜单项名称
+	URL          string    `gorm:"size:512" json:"url"`            // 链接地址
+	IconClass    string    `gorm:"size:64" json:"icon_class"`      // 图标CSS类
+	CssClass     string    `gorm:"size:128" json:"css_class"`      // 自定义CSS类
+	Target       string    `gorm:"size:16" json:"target"`          // 打开方式：_self, _blank
+	DisplayOrder int       `gorm:"default:0" json:"display_order"` // 排序
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
@@ -197,18 +197,18 @@ func (MenuItem) TableName() string {
 
 // Poll 投票
 type Poll struct {
-	ID               uint64     `gorm:"primaryKey" json:"id"`
-	Name             string     `gorm:"size:256;not null" json:"name"`
-	SystemKeyword    string     `gorm:"size:128;uniqueIndex" json:"system_keyword"` // 系统关键字
-	Question         string     `gorm:"size:512;not null" json:"question"`          // 投票问题
-	ShowOnHomepage   bool       `gorm:"default:false" json:"show_on_homepage"`      // 是否显示在首页
-	AllowGuestVotes  bool       `gorm:"default:true" json:"allow_guest_votes"`      // 是否允许游客投票
-	DisplayOrder     int        `gorm:"default:0" json:"display_order"`
-	IsActive         bool       `gorm:"default:true" json:"is_active"`
-	StartDateUtc     *time.Time `json:"start_date_utc"`
-	EndDateUtc       *time.Time `json:"end_date_utc"`
-	CreatedAt        time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt        time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID              uint64     `gorm:"primaryKey" json:"id"`
+	Name            string     `gorm:"size:256;not null" json:"name"`
+	SystemKeyword   string     `gorm:"size:128;uniqueIndex" json:"system_keyword"` // 系统关键字
+	Question        string     `gorm:"size:512;not null" json:"question"`          // 投票问题
+	ShowOnHomepage  bool       `gorm:"default:false" json:"show_on_homepage"`      // 是否显示在首页
+	AllowGuestVotes bool       `gorm:"default:true" json:"allow_guest_votes"`      // 是否允许游客投票
+	DisplayOrder    int        `gorm:"default:0" json:"display_order"`
+	IsActive        bool       `gorm:"default:true" json:"is_active"`
+	StartDateUtc    *time.Time `json:"start_date_utc"`
+	EndDateUtc      *time.Time `json:"end_date_utc"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 指定表名
@@ -220,8 +220,8 @@ func (Poll) TableName() string {
 type PollAnswer struct {
 	ID            uint64    `gorm:"primaryKey" json:"id"`
 	PollID        uint64    `gorm:"not null;index" json:"poll_id"`
-	Name          string    `gorm:"size:256;not null" json:"name"`       // 选项名称
-	NumberOfVotes int       `gorm:"default:0" json:"number_of_votes"`    // 投票数
+	Name          string    `gorm:"size:256;not null" json:"name"`    // 选项名称
+	NumberOfVotes int       `gorm:"default:0" json:"number_of_votes"` // 投票数
 	DisplayOrder  int       `gorm:"default:0" json:"display_order"`
 	CreatedAt     time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
@@ -235,9 +235,9 @@ func (PollAnswer) TableName() string {
 type PollVotingRecord struct {
 	ID           uint64    `gorm:"primaryKey" json:"id"`
 	PollAnswerID uint64    `gorm:"not null;index" json:"poll_answer_id"`
-	CustomerID   uint64    `gorm:"index" json:"customer_id"`      // 投票用户ID（游客为0）
-	IPAddress    string    `gorm:"size:50" json:"ip_address"`     // 投票IP
-	CreatedOnUtc time.Time `json:"created_on_utc"`                // 投票时间
+	CustomerID   uint64    `gorm:"index" json:"customer_id"`  // 投票用户ID（游客为0）
+	IPAddress    string    `gorm:"size:50" json:"ip_address"` // 投票IP
+	CreatedOnUtc time.Time `json:"created_on_utc"`            // 投票时间
 }
 
 // TableName 指定表名
@@ -249,13 +249,13 @@ func (PollVotingRecord) TableName() string {
 
 // HtmlBody HTML内容块
 type HtmlBody struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"size:256;not null;uniqueIndex" json:"name"` // 内容块名称
-	Title       string    `gorm:"size:256" json:"title"`                     // 显示标题
-	Content     string    `gorm:"type:longtext" json:"content"`              // HTML内容
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID        uint64    `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"size:256;not null;uniqueIndex" json:"name"` // 内容块名称
+	Title     string    `gorm:"size:256" json:"title"`                     // 显示标题
+	Content   string    `gorm:"type:longtext" json:"content"`              // HTML内容
+	IsActive  bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 指定表名
@@ -320,26 +320,26 @@ type PollCreateRequest struct {
 
 // PollVoteRequest 投票请求
 type PollVoteRequest struct {
-	PollID       uint64 `json:"poll_id" binding:"required"`
-	AnswerID     uint64 `json:"answer_id" binding:"required"`
-	CustomerID   uint64 `json:"customer_id"`
-	IPAddress    string `json:"ip_address"`
+	PollID     uint64 `json:"poll_id" binding:"required"`
+	AnswerID   uint64 `json:"answer_id" binding:"required"`
+	CustomerID uint64 `json:"customer_id"`
+	IPAddress  string `json:"ip_address"`
 }
 
 // PollResult 投票结果
 type PollResult struct {
-	PollID      uint64         `json:"poll_id"`
-	Question    string         `json:"question"`
-	TotalVotes  int            `json:"total_votes"`
-	Answers     []PollAnswerResult `json:"answers"`
+	PollID     uint64             `json:"poll_id"`
+	Question   string             `json:"question"`
+	TotalVotes int                `json:"total_votes"`
+	Answers    []PollAnswerResult `json:"answers"`
 }
 
 // PollAnswerResult 投票选项结果
 type PollAnswerResult struct {
-	ID        uint64  `json:"id"`
-	Name      string  `json:"name"`
-	Votes     int     `json:"votes"`
-	Percent   float64 `json:"percent"`
+	ID      uint64  `json:"id"`
+	Name    string  `json:"name"`
+	Votes   int     `json:"votes"`
+	Percent float64 `json:"percent"`
 }
 
 // HtmlBodyCreateRequest HTML内容块创建请求

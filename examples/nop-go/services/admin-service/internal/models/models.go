@@ -72,16 +72,16 @@ func (Setting) TableName() string {
 
 // ActivityLog 操作日志
 type ActivityLog struct {
-	ID         uint64    `gorm:"primaryKey" json:"id"`
-	AdminID    uint64    `gorm:"not null;index" json:"admin_id"`
-	Action     string    `gorm:"size:64;not null;index" json:"action"`
-	Entity     string    `gorm:"size:64;not null" json:"entity"`
-	EntityID   uint64    `json:"entity_id"`
-	OldData    string    `gorm:"type:json" json:"old_data"`
-	NewData    string    `gorm:"type:json" json:"new_data"`
-	IP         string    `gorm:"size:64" json:"ip"`
-	UserAgent  string    `gorm:"size:256" json:"user_agent"`
-	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID        uint64    `gorm:"primaryKey" json:"id"`
+	AdminID   uint64    `gorm:"not null;index" json:"admin_id"`
+	Action    string    `gorm:"size:64;not null;index" json:"action"`
+	Entity    string    `gorm:"size:64;not null" json:"entity"`
+	EntityID  uint64    `json:"entity_id"`
+	OldData   string    `gorm:"type:json" json:"old_data"`
+	NewData   string    `gorm:"type:json" json:"new_data"`
+	IP        string    `gorm:"size:64" json:"ip"`
+	UserAgent string    `gorm:"size:256" json:"user_agent"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (ActivityLog) TableName() string {
@@ -90,14 +90,14 @@ func (ActivityLog) TableName() string {
 
 // DashboardStats 仪表盘统计
 type DashboardStats struct {
-	TotalOrders       int64   `json:"total_orders"`
-	TotalRevenue      float64 `json:"total_revenue"`
-	TotalCustomers    int64   `json:"total_customers"`
-	TotalProducts     int64   `json:"total_products"`
-	PendingOrders     int64   `json:"pending_orders"`
-	LowStockProducts  int64   `json:"low_stock_products"`
-	TodayOrders       int64   `json:"today_orders"`
-	TodayRevenue      float64 `json:"today_revenue"`
+	TotalOrders      int64   `json:"total_orders"`
+	TotalRevenue     float64 `json:"total_revenue"`
+	TotalCustomers   int64   `json:"total_customers"`
+	TotalProducts    int64   `json:"total_products"`
+	PendingOrders    int64   `json:"pending_orders"`
+	LowStockProducts int64   `json:"low_stock_products"`
+	TodayOrders      int64   `json:"today_orders"`
+	TodayRevenue     float64 `json:"today_revenue"`
 }
 
 // DTO
@@ -107,7 +107,7 @@ type AdminLoginRequest struct {
 }
 
 type AdminLoginResponse struct {
-	Token string          `json:"token"`
+	Token string            `json:"token"`
 	User  AdminUserResponse `json:"user"`
 }
 

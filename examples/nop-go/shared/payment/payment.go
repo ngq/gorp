@@ -31,24 +31,24 @@ type PaymentServiceServer interface {
 
 // CreatePaymentRequest 创建支付请求
 type CreatePaymentRequest struct {
-	OrderID        uint64
-	CustomerID     uint64
-	Amount         float64
-	Currency       string
-	PaymentMethod  string // Payment.Alipay, Payment.Wechat
-	ReturnURL      string
-	NotifyURL      string
-	TransactionID  string // DTM 事务 ID
+	OrderID       uint64
+	CustomerID    uint64
+	Amount        float64
+	Currency      string
+	PaymentMethod string // Payment.Alipay, Payment.Wechat
+	ReturnURL     string
+	NotifyURL     string
+	TransactionID string // DTM 事务 ID
 }
 
 // CreatePaymentResponse 创建支付响应
 type CreatePaymentResponse struct {
-	Success        bool
-	PaymentID      uint64
-	TransactionID  string
-	PayURL         string       // 支付链接
-	QRCodeURL      string       // 二维码链接
-	ErrorMessage   string
+	Success       bool
+	PaymentID     uint64
+	TransactionID string
+	PayURL        string // 支付链接
+	QRCodeURL     string // 二维码链接
+	ErrorMessage  string
 }
 
 // CancelPaymentRequest 取消支付请求
@@ -71,11 +71,11 @@ type GetPaymentStatusRequest struct {
 
 // GetPaymentStatusResponse 获取支付状态响应
 type GetPaymentStatusResponse struct {
-	PaymentID      uint64
-	Status         string // pending, paid, failed, cancelled, refunded
-	Amount         float64
-	TransactionID  string
-	PaidAt         string
+	PaymentID     uint64
+	Status        string // pending, paid, failed, cancelled, refunded
+	Amount        float64
+	TransactionID string
+	PaidAt        string
 }
 
 // ProcessRefundRequest 处理退款请求

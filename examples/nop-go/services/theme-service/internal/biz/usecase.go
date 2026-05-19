@@ -15,19 +15,19 @@ import (
 
 // ImportConfig 导入配置（主题服务配置部分）
 type ThemeConfig struct {
-	ThemesDir         string // 主题目录
-	DefaultTheme      string // 默认主题名称
+	ThemesDir          string // 主题目录
+	DefaultTheme       string // 默认主题名称
 	AllowUserSelection bool   // 是否允许用户切换主题
 }
 
 // ThemeUseCase 主题用例
 type ThemeUseCase struct {
-	themeRepo   data.ThemeRepository
+	themeRepo    data.ThemeRepository
 	variableRepo data.ThemeVariableRepository
-	configRepo  data.ThemeConfigurationRepository
+	configRepo   data.ThemeConfigurationRepository
 	customerRepo data.CustomerThemeSettingRepository
-	fileRepo    data.ThemeFileRepository
-	config      ThemeConfig
+	fileRepo     data.ThemeFileRepository
+	config       ThemeConfig
 }
 
 // NewThemeUseCase 创建主题用例

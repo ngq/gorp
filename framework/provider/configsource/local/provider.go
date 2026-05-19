@@ -36,7 +36,7 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string  { return "configsource.local" }
+func (p *Provider) Name() string { return "configsource.local" }
 
 // IsDefer indicates local config source should defer loading.
 // Allows other providers to register before config source initialization.

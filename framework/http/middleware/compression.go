@@ -23,9 +23,9 @@ import (
 // Compression enables gzip response compression for clients that support it.
 //
 // Compression 为支持 gzip 的客户端开启响应压缩。
-func Compression() transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func Compression() transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			gc, ok := unwrapGinContext(c)
 			if !ok || gc == nil || !acceptsGzip(c) {
 				if next != nil {
@@ -109,7 +109,7 @@ type bufioReadWriter = bufio.ReadWriter
 // acceptsGzip reports whether the client accepts gzip encoding.
 //
 // acceptsGzip 判断客户端是否接受 gzip 编码。
-func acceptsGzip(c transportcontract.HTTPContext) bool {
+func acceptsGzip(c transportcontract.Context) bool {
 	if c == nil {
 		return false
 	}

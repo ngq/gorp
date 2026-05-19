@@ -97,39 +97,39 @@ func (b *p2cBuilder) Build() discoverycontract.Selector {
 //
 // P2CSelector 使用 P2C 算法实现 discoverycontract.Selector 接口。
 type P2CSelector struct {
-	mu            sync.Mutex                // mu protects instance stats.
-	                                        //
-	                                         // mu 保护实例统计。
-	r             *rand.Rand                // r is the random generator.
-	                                        //
-	                                         // r 随机数生成器。
+	mu sync.Mutex // mu protects instance stats.
+	//
+	// mu 保护实例统计。
+	r *rand.Rand // r is the random generator.
+	//
+	// r 随机数生成器。
 	instanceStats map[string]*InstanceStats // instanceStats tracks per-instance metrics.
-	                                        //
-	                                         // instanceStats 跟踪每个实例的指标。
+	//
+	// instanceStats 跟踪每个实例的指标。
 }
 
 // InstanceStats tracks load metrics for a single instance.
 //
 // InstanceStats 跟踪单个实例的负载指标。
 type InstanceStats struct {
-	pending        int64     // pending is the count of active requests.
-	                          //
-	                           // pending 活跃请求计数。
-	successCount   int64     // successCount is the count of successful requests.
-	                          //
-	                           // successCount 成功请求计数。
-	failCount      int64     // failCount is the count of failed requests.
-	                          //
-	                           // failCount 失败请求计数。
-	latencyEWMA    float64   // latencyEWMA is the exponentially weighted moving average of latency.
-	                          //
-	                           // latencyEWMA 延迟的指数加权移动平均值。
-	latencySamples int64     // latencySamples is the count of latency samples collected.
-	                          //
-	                           // latencySamples 收集的延迟样本计数。
-	lastUpdate     time.Time // lastUpdate is the timestamp of last update.
-	                          //
-	                           // lastUpdate 最后更新时间戳。
+	pending int64 // pending is the count of active requests.
+	//
+	// pending 活跃请求计数。
+	successCount int64 // successCount is the count of successful requests.
+	//
+	// successCount 成功请求计数。
+	failCount int64 // failCount is the count of failed requests.
+	//
+	// failCount 失败请求计数。
+	latencyEWMA float64 // latencyEWMA is the exponentially weighted moving average of latency.
+	//
+	// latencyEWMA 延迟的指数加权移动平均值。
+	latencySamples int64 // latencySamples is the count of latency samples collected.
+	//
+	// latencySamples 收集的延迟样本计数。
+	lastUpdate time.Time // lastUpdate is the timestamp of last update.
+	//
+	// lastUpdate 最后更新时间戳。
 }
 
 // NewP2CSelector creates a new P2C selector instance.

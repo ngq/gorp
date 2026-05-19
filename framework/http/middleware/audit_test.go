@@ -25,15 +25,25 @@ func TestAuditMiddlewareWritesActorAndOutcomeFields(t *testing.T) {
 	applyTransportMiddleware(router,
 		RequestIdentity(),
 		Locale(DefaultLocaleOptions()),
-		func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-			return func(c transportcontract.HTTPContext) {
-				ctx := securitycontract.NewJWTClaimsContext(c.Context(), &securitycontract.JWTClaims{
+		func(next transportcontract.Handler) transportcontract.Handler {
+			return func(c transportcontract.Context) {
+				claims := &securitycontract.JWTClaims{
 					SubjectID:   7,
 					SubjectType: "user",
 					SubjectName: "alice",
 					Roles:       []string{"admin", "writer"},
-				})
-				c.SetContext(ctx)
+				}
+				c.Set("jwt_claims", claims)
+				c.Set("subject_id", int64(7))
+				c.Set("subject_type", "user")
+				// Also update gin.Request.Context for context.Context value propagation
+				if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+					ctx := gc.Request.Context()
+					ctx = securitycontract.NewJWTClaimsContext(ctx, claims)
+					ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
+					ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
+					gc.Request = gc.Request.WithContext(ctx)
+				}
 				next(c)
 			}
 		},

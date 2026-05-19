@@ -150,10 +150,10 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 				cfg.Kind = observabilitycontract.SpanKindClient
 			})
 			span.SetAttributes(map[string]interface{}{
-				"rpc.service":  service,
-				"rpc.method":   method,
-				"rpc.system":   "grpc",
-				"rpc.target":   serviceName,
+				"rpc.service": service,
+				"rpc.method":  method,
+				"rpc.system":  "grpc",
+				"rpc.target":  serviceName,
 			})
 			err := next(ctx, service, method, req, resp)
 			if err != nil {

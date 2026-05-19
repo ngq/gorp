@@ -7,12 +7,12 @@ import "github.com/spf13/cobra"
 // 说明：为了兼顾“默认离线可用”与“未来 GitHub 发布”，我们把 new 设计成：
 //
 // 1) `gorp new`（默认，内置模板）：
-//    - 使用本仓库内置的模板（go:embed），生成一个最小可运行项目。
-//    - go.mod 会写入 replace 指向本地框架源码路径，适合开发调试。
+//   - 使用本仓库内置的模板（go:embed），生成一个最小可运行项目。
+//   - go.mod 会写入 replace 指向本地框架源码路径，适合开发调试。
 //
 // 2) `gorp new from-release`（联网）：
-//    - 从 GitHub Release 下载模板包并生成项目。
-//    - 面向后续发布给外部用户使用的 starter / template 场景。
+//   - 从 GitHub Release 下载模板包并生成项目。
+//   - 面向后续发布给外部用户使用的 starter / template 场景。
 var newCmd = &cobra.Command{
 	Use:     "new [multi-wire]",
 	Short:   "Create a new project from embedded starter templates",

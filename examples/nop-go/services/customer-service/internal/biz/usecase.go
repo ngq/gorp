@@ -1,4 +1,4 @@
-﻿// Package biz 瀹㈡埛鏈嶅姟涓氬姟閫昏緫灞?
+// Package biz 瀹㈡埛鏈嶅姟涓氬姟閫昏緫灞?
 package biz
 
 import (
@@ -413,10 +413,10 @@ func (uc *GdprUseCase) AcceptConsent(ctx context.Context, req *models.CustomerCo
 		logType = 2 // 鎾ゅ洖
 	}
 	log := &models.GdprLog{
-		CustomerID:  req.CustomerID,
-		ConsentID:   req.ConsentID,
-		RequestType: logType,
-		IpAddress:   req.IpAddress,
+		CustomerID:   req.CustomerID,
+		ConsentID:    req.ConsentID,
+		RequestType:  logType,
+		IpAddress:    req.IpAddress,
 		CreatedOnUtc: time.Now().UTC(),
 	}
 	uc.logRepo.Create(ctx, log)

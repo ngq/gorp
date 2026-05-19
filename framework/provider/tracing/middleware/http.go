@@ -14,7 +14,6 @@ import (
 	"time"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
-	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -23,13 +22,13 @@ import (
 //
 // TracingMiddleware 创建用于分布式追踪的 HTTP 中间件。
 // 核心逻辑：提取追踪上下文、创建 Span、记录属性、注入 Trace ID。
-func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			carrier := &httpHeaderCarrier{c.Request().Header}
-			ctx, err := tracer.Extract(c.Context(), carrier)
+			ctx, err := tracer.Extract(c, carrier)
 			if err != nil {
-				ctx = c.Context()
+				ctx = c
 			}
 
 			spanName := fmt.Sprintf("HTTP %s %s", c.Request().Method, c.RoutePath())
@@ -53,9 +52,8 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 			defer span.End()
 
 			if traceID := span.SpanContext().TraceID; traceID != "" {
-				ctx = supportcontract.NewTraceIDContext(ctx, traceID)
+				c.Set("trace_id", traceID)
 			}
-			c.SetContext(ctx)
 
 			startTime := time.Now()
 			if next != nil {
@@ -78,7 +76,7 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 
 			traceID := span.SpanContext().TraceID
 			if traceID != "" {
-				c.Header("X-Trace-ID", traceID)
+				c.SetHeader("X-Trace-ID", traceID)
 			}
 		}
 	}

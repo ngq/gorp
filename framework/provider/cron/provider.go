@@ -104,10 +104,10 @@ type jobRecord struct {
 // 特性：超时控制、Prometheus 指标采集、panic 恢复、任务内省。
 // 核心逻辑：封装 robfig/cron，添加超时和指标 hooks，追踪执行历史。
 type Service struct {
-	c   *cron.Cron       // c is the underlying cron scheduler.
-	mu  sync.RWMutex     // mu protects jobs and specs.
-	jobs map[int]*jobRecord // jobs maps entryID to job execution records.
-	specs map[int]string   // specs maps entryID to the original cron spec expression.
+	c     *cron.Cron         // c is the underlying cron scheduler.
+	mu    sync.RWMutex       // mu protects jobs and specs.
+	jobs  map[int]*jobRecord // jobs maps entryID to job execution records.
+	specs map[int]string     // specs maps entryID to the original cron spec expression.
 }
 
 // NewService creates a cron service with second-level expression support.

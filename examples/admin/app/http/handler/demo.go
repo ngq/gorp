@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
-	gorp "github.com/ngq/gorp"
 	"admin/app/http/request"
 	"admin/app/http/response"
 	"admin/internal/biz"
 	"admin/internal/service"
+	gorp "github.com/ngq/gorp"
 )
 
 type DemoHandler struct {
@@ -19,14 +19,14 @@ func NewDemoHandler(svc *service.DemoService) *DemoHandler {
 	return &DemoHandler{svc: svc}
 }
 
-func (h *DemoHandler) Create(c gorp.HTTPContext) {
+func (h *DemoHandler) Create(c gorp.Context) {
 	var req request.CreateDemo
 	if err := c.BindJSON(&req); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
 
-	demo, err := h.svc.Create(c.Context(), req.Name)
+	demo, err := h.svc.Create(c, req.Name)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -35,14 +35,14 @@ func (h *DemoHandler) Create(c gorp.HTTPContext) {
 	gorp.SuccessWithStatus(c, http.StatusCreated, toDemoResponse(demo))
 }
 
-func (h *DemoHandler) GetByID(c gorp.HTTPContext) {
+func (h *DemoHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
-	demo, err := h.svc.GetByID(c.Context(), uint(id))
+	demo, err := h.svc.GetByID(c, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "not found"})
 		return
@@ -51,7 +51,7 @@ func (h *DemoHandler) GetByID(c gorp.HTTPContext) {
 	gorp.Success(c, toDemoResponse(demo))
 }
 
-func (h *DemoHandler) List(c gorp.HTTPContext) {
+func (h *DemoHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 	if page < 1 {
@@ -61,7 +61,7 @@ func (h *DemoHandler) List(c gorp.HTTPContext) {
 		pageSize = 10
 	}
 
-	demos, total, err := h.svc.List(c.Context(), page, pageSize)
+	demos, total, err := h.svc.List(c, page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -80,7 +80,7 @@ func (h *DemoHandler) List(c gorp.HTTPContext) {
 	})
 }
 
-func (h *DemoHandler) Update(c gorp.HTTPContext) {
+func (h *DemoHandler) Update(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		gorp.BadRequest(c, "invalid id")
@@ -93,7 +93,7 @@ func (h *DemoHandler) Update(c gorp.HTTPContext) {
 		return
 	}
 
-	demo, err := h.svc.Update(c.Context(), uint(id), req.Name)
+	demo, err := h.svc.Update(c, uint(id), req.Name)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -102,14 +102,14 @@ func (h *DemoHandler) Update(c gorp.HTTPContext) {
 	gorp.Success(c, toDemoResponse(demo))
 }
 
-func (h *DemoHandler) Delete(c gorp.HTTPContext) {
+func (h *DemoHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
-	if err := h.svc.Delete(c.Context(), uint(id)); err != nil {
+	if err := h.svc.Delete(c, uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

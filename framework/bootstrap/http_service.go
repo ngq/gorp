@@ -1,4 +1,4 @@
-﻿// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
+// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
 // This file assembles and runs the default HTTP service mainline.
 // Builds reusable runtime carrying app, container, router, config, DB, Redis, JWT.
 //
@@ -78,7 +78,7 @@ type HTTPServiceRuntime struct {
 	App               *framework.Application
 	Container         runtimecontract.Container
 	Logger            observabilitycontract.Logger
-	Router            transportcontract.HTTPRouter
+	Router            transportcontract.Router
 	DB                *gormpkg.DB
 	Redis             datacontract.Redis
 	JWT               securitycontract.JWTService
@@ -194,7 +194,7 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 		App:         app,
 		Container:   c,
 		Logger:      container.MustMakeLogger(c),
-		Router:      container.MustMakeHTTPRouter(c),
+		Router:      container.MustMakeRouter(c),
 		Config:      cfg,
 		JWT:         container.MustMakeJWTService(c),
 		ServiceName: serviceName,
@@ -443,11 +443,11 @@ func AutoMigrateModels(rt *HTTPServiceRuntime, models ...any) error {
 // RegisterHealthCheck registers the default health endpoint.
 //
 // RegisterHealthCheck 注册默认健康检查端点。
-func RegisterHealthCheck(router transportcontract.HTTPRouter, serviceName string) {
+func RegisterHealthCheck(router transportcontract.Router, serviceName string) {
 	if router == nil {
 		return
 	}
-	router.GET("/healthz", func(c transportcontract.HTTPContext) {
+	router.GET("/healthz", func(c transportcontract.Context) {
 		c.JSON(http.StatusOK, map[string]any{
 			"status":  "healthy",
 			"service": serviceName,
@@ -459,7 +459,7 @@ func RegisterHealthCheck(router transportcontract.HTTPRouter, serviceName string
 // RegisterMetricsEndpoint registers the default metrics endpoint.
 //
 // RegisterMetricsEndpoint 注册默认 metrics 端点。
-func RegisterMetricsEndpoint(router transportcontract.HTTPRouter) {
+func RegisterMetricsEndpoint(router transportcontract.Router) {
 	if router == nil {
 		return
 	}
@@ -470,7 +470,7 @@ func RegisterMetricsEndpoint(router transportcontract.HTTPRouter) {
 // RegisterPprofEndpoints registers the standard pprof endpoints.
 //
 // RegisterPprofEndpoints 注册标准 pprof 端点。
-func RegisterPprofEndpoints(router transportcontract.HTTPRouter) {
+func RegisterPprofEndpoints(router transportcontract.Router) {
 	if router == nil {
 		return
 	}

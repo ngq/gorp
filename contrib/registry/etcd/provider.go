@@ -5,18 +5,18 @@
 //
 // 使用示例：
 //
-//  cfg := &DiscoveryConfig{
-//      EtcdEndpoints: []string{"localhost:2379"},
-//      ServicePath:   "/services/",
-//      LeaseTTL:      10,
-//  }
-//  registry, err := NewRegistry(cfg)
-//  if err != nil {
-//      panic(err)
-//  }
-//  defer registry.Close()
+//	cfg := &DiscoveryConfig{
+//	    EtcdEndpoints: []string{"localhost:2379"},
+//	    ServicePath:   "/services/",
+//	    LeaseTTL:      10,
+//	}
+//	registry, err := NewRegistry(cfg)
+//	if err != nil {
+//	    panic(err)
+//	}
+//	defer registry.Close()
 //
-//  err = registry.Register(ctx, "my-service", "192.168.1.100:8080", nil)
+//	err = registry.Register(ctx, "my-service", "192.168.1.100:8080", nil)
 //
 // 配置路径：discovery.etcd.*
 package etcd

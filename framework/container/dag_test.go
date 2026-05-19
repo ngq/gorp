@@ -15,10 +15,10 @@ type dagProvider struct {
 	dependsOn []string
 }
 
-func (p *dagProvider) Name() string                          { return p.nameStr }
-func (p *dagProvider) IsDefer() bool                         { return p.deferLoad }
-func (p *dagProvider) Provides() []string                    { return p.provide }
-func (p *dagProvider) DependsOn() []string                  { return p.dependsOn }
+func (p *dagProvider) Name() string        { return p.nameStr }
+func (p *dagProvider) IsDefer() bool       { return p.deferLoad }
+func (p *dagProvider) Provides() []string  { return p.provide }
+func (p *dagProvider) DependsOn() []string { return p.dependsOn }
 func (p *dagProvider) Register(c runtimecontract.Container) error {
 	for _, k := range p.provide {
 		key := k

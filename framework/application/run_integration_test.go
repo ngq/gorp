@@ -53,8 +53,8 @@ server:
 	go func() {
 		err := Run(
 			HTTP(),
-			WithHTTPRoutes(func(router transportcontract.HTTPRouter, c bootstrap.Container) error {
-				router.GET("/health", func(ctx transportcontract.HTTPContext) {
+			WithHTTPRoutes(func(router transportcontract.Router, c bootstrap.Container) error {
+				router.GET("/health", func(ctx transportcontract.Context) {
 					ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
 				})
 				return nil

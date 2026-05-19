@@ -57,20 +57,20 @@ func (l *captureLimiter) WaitTimeout(context.Context, string, time.Duration) err
 // applyTransportMiddleware mounts transport-level middleware onto a Gin engine for test execution.
 //
 // applyTransportMiddleware 为测试执行把 transport 层中间件挂到 Gin engine 上。
-func applyTransportMiddleware(router *gin.Engine, middleware ...transportcontract.HTTPMiddleware) {
+func applyTransportMiddleware(router *gin.Engine, middleware ...transportcontract.Middleware) {
 	handlers := make([]gin.HandlerFunc, 0, len(middleware))
 	for _, mw := range middleware {
 		if mw == nil {
 			continue
 		}
-		handler := mw(func(c transportcontract.HTTPContext) {
+		handler := mw(func(c transportcontract.Context) {
 			if gc, ok := unwrapGinContext(c); ok {
 				gc.Next()
 			}
 		})
-		handlers = append(handlers, func(handler transportcontract.HTTPHandler) gin.HandlerFunc {
+		handlers = append(handlers, func(handler transportcontract.Handler) gin.HandlerFunc {
 			return func(c *gin.Context) {
-				handler(newHTTPContext(c))
+				handler(newContext(c))
 			}
 		}(handler))
 	}

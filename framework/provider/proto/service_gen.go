@@ -72,7 +72,7 @@ func (g *Generator) GenService(ctx context.Context, opts integrationcontract.Ser
 		svcLower := strings.ToLower(svc.Name)
 
 		if opts.IncludeHTTP {
-			if err := genHTTPHandler(svc, svcLower, protoPkg, opts); err != nil {
+			if err := genHandler(svc, svcLower, protoPkg, opts); err != nil {
 				return fmt.Errorf("generate HTTP handler for %s failed: %w", svc.Name, err)
 			}
 		}
@@ -149,22 +149,22 @@ func parseGoPackageFromProto(protoFile string) (string, bool) {
 	return "", false
 }
 
-// genHTTPHandler 生成 HTTP handler skeleton。
-func genHTTPHandler(svc ProtoService, svcLower, protoPkg string, opts integrationcontract.ServiceGenOptions) error {
+// genHandler 生成 handler skeleton。
+func genHandler(svc ProtoService, svcLower, protoPkg string, opts integrationcontract.ServiceGenOptions) error {
 	handlerDir := filepath.Join(opts.OutputDir, "handler")
 	if err := os.MkdirAll(handlerDir, 0755); err != nil {
 		return err
 	}
 
-	code := generateHTTPHandlerCode(svc, svcLower, protoPkg, opts)
+	code := generateHandlerCode(svc, svcLower, protoPkg, opts)
 	handlerFile := filepath.Join(handlerDir, svcLower+".go")
 	return os.WriteFile(handlerFile, []byte(code), 0644)
 }
 
-// generateHTTPHandlerCode 生成 HTTP handler 代码。
+// generateHandlerCode 生成 handler 代码。
 // 生成的 handler 自动绑定请求参数、调用 ServiceServer、处理错误码映射。
 // 用户只需实现 gRPC ServiceServer 接口，HTTP 层自动委托。
-func generateHTTPHandlerCode(svc ProtoService, svcLower, protoPkg string, opts integrationcontract.ServiceGenOptions) string {
+func generateHandlerCode(svc ProtoService, svcLower, protoPkg string, opts integrationcontract.ServiceGenOptions) string {
 	var buf strings.Builder
 
 	buf.WriteString("// Package handler provides HTTP handlers for ")
@@ -462,7 +462,7 @@ func generateGRPCServiceCode(svc ProtoService, svcLower, protoPkg string, opts i
 		}
 		buf.WriteString(m.ResponseType)
 		buf.WriteString(", error) {\n")
-			buf.WriteString("\treturn &")
+		buf.WriteString("\treturn &")
 		if protoPkg != "" {
 			buf.WriteString("pb.")
 		}

@@ -9,8 +9,8 @@ import (
 
 	"nop-go/services/payment-service/internal/data"
 	"nop-go/services/payment-service/internal/models"
-	"nop-go/shared/plugin"
 	shareErrors "nop-go/shared/errors"
+	"nop-go/shared/plugin"
 )
 
 type PaymentUseCase struct {
@@ -161,12 +161,12 @@ func (uc *PaymentUseCase) ProcessPaymentWithPlugin(ctx context.Context, req *mod
 
 	// 调用插件处理支付
 	result, err := pm.ProcessPayment(ctx, &plugin.ProcessPaymentRequest{
-		OrderID:     req.OrderID,
-		Amount:      req.Amount,
-		Currency:    "CNY",
-		CustomerID:  0, // 从上下文获取
-		ReturnURL:   req.ReturnURL,
-		NotifyURL:   req.NotifyURL,
+		OrderID:    req.OrderID,
+		Amount:     req.Amount,
+		Currency:   "CNY",
+		CustomerID: 0, // 从上下文获取
+		ReturnURL:  req.ReturnURL,
+		NotifyURL:  req.NotifyURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("process payment failed: %w", err)
@@ -236,10 +236,10 @@ func (uc *PaymentUseCase) RefundWithPlugin(ctx context.Context, req *models.Refu
 
 	// 调用插件退款
 	result, err := pm.Refund(ctx, &plugin.RefundRequest{
-		PaymentID:      req.PaymentID,
-		TransactionID:  payment.TransactionID,
-		Amount:         req.Amount,
-		Reason:         req.Reason,
+		PaymentID:     req.PaymentID,
+		TransactionID: payment.TransactionID,
+		Amount:        req.Amount,
+		Reason:        req.Reason,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("refund failed: %w", err)

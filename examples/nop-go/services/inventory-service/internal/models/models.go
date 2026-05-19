@@ -67,16 +67,16 @@ func (InventoryLog) TableName() string {
 
 // StockReservation 库存预留
 type StockReservation struct {
-	ID           uint64    `gorm:"primaryKey" json:"id"`
-	OrderID      uint64    `gorm:"not null;uniqueIndex" json:"order_id"`
-	ProductID    uint64    `gorm:"not null;index" json:"product_id"`
-	WarehouseID  uint64    `gorm:"not null" json:"warehouse_id"`
-	Quantity     int       `gorm:"not null" json:"quantity"`
-	Status       string    `gorm:"size:16;default:'reserved'" json:"status"` // reserved, confirmed, released
-	ExpiresAt    time.Time `json:"expires_at"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
-	ConfirmedAt  *time.Time `json:"confirmed_at"`
-	ReleasedAt   *time.Time `json:"released_at"`
+	ID          uint64     `gorm:"primaryKey" json:"id"`
+	OrderID     uint64     `gorm:"not null;uniqueIndex" json:"order_id"`
+	ProductID   uint64     `gorm:"not null;index" json:"product_id"`
+	WarehouseID uint64     `gorm:"not null" json:"warehouse_id"`
+	Quantity    int        `gorm:"not null" json:"quantity"`
+	Status      string     `gorm:"size:16;default:'reserved'" json:"status"` // reserved, confirmed, released
+	ExpiresAt   time.Time  `json:"expires_at"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	ConfirmedAt *time.Time `json:"confirmed_at"`
+	ReleasedAt  *time.Time `json:"released_at"`
 }
 
 func (StockReservation) TableName() string {
@@ -101,28 +101,28 @@ func (TierPrice) TableName() string {
 
 // DTO
 type InventoryResponse struct {
-	ID               uint64 `json:"id"`
-	ProductID        uint64 `json:"product_id"`
-	WarehouseID      uint64 `json:"warehouse_id"`
-	Quantity         int    `json:"quantity"`
-	ReservedQuantity int    `json:"reserved_quantity"`
-	AvailableQuantity int   `json:"available_quantity"`
-	MinStock         int    `json:"min_stock"`
-	MaxStock         int    `json:"max_stock"`
-	IsLowStock       bool   `json:"is_low_stock"`
+	ID                uint64 `json:"id"`
+	ProductID         uint64 `json:"product_id"`
+	WarehouseID       uint64 `json:"warehouse_id"`
+	Quantity          int    `json:"quantity"`
+	ReservedQuantity  int    `json:"reserved_quantity"`
+	AvailableQuantity int    `json:"available_quantity"`
+	MinStock          int    `json:"min_stock"`
+	MaxStock          int    `json:"max_stock"`
+	IsLowStock        bool   `json:"is_low_stock"`
 }
 
 func ToInventoryResponse(i *Inventory) InventoryResponse {
 	return InventoryResponse{
-		ID:               i.ID,
-		ProductID:        i.ProductID,
-		WarehouseID:      i.WarehouseID,
-		Quantity:         i.Quantity,
-		ReservedQuantity: i.ReservedQuantity,
+		ID:                i.ID,
+		ProductID:         i.ProductID,
+		WarehouseID:       i.WarehouseID,
+		Quantity:          i.Quantity,
+		ReservedQuantity:  i.ReservedQuantity,
 		AvailableQuantity: i.AvailableQuantity(),
-		MinStock:         i.MinStock,
-		MaxStock:         i.MaxStock,
-		IsLowStock:       i.AvailableQuantity() < i.MinStock,
+		MinStock:          i.MinStock,
+		MaxStock:          i.MaxStock,
+		IsLowStock:        i.AvailableQuantity() < i.MinStock,
 	}
 }
 

@@ -42,12 +42,12 @@ func NewOrderCreateSaga(
 //
 // 中文说明:
 // - SAGA 流程:
-//   1. 验证客户 (只读)
-//   2. 计算价格 (只读)
-//   3. 预留库存 (Try) -> 释放库存
-//   4. 创建支付 -> 取消支付
-//   5. 创建订单 (本地事务)
-//   6. 确认库存
+//  1. 验证客户 (只读)
+//  2. 计算价格 (只读)
+//  3. 预留库存 (Try) -> 释放库存
+//  4. 创建支付 -> 取消支付
+//  5. 创建订单 (本地事务)
+//  6. 确认库存
 //
 // - 如果任何步骤失败,DTM 会自动触发补偿操作。
 func (s *OrderCreateSaga) Execute(ctx context.Context, req *CreateOrderSagaRequest) (*CreateOrderSagaResult, error) {
@@ -111,11 +111,11 @@ func (s *OrderCreateSaga) Execute(ctx context.Context, req *CreateOrderSagaReque
 	// 返回结果
 	// 注意: 订单创建在本地事务中完成,确认库存通过支付回调触发
 	return &CreateOrderSagaResult{
-		OrderID:        req.OrderID,
-		PaymentID:      paymentResp.PaymentID,
-		TransactionID:  paymentResp.TransactionID,
-		PayURL:         paymentResp.PayURL,
-		ReservationID:  reservationID,
+		OrderID:       req.OrderID,
+		PaymentID:     paymentResp.PaymentID,
+		TransactionID: paymentResp.TransactionID,
+		PayURL:        paymentResp.PayURL,
+		ReservationID: reservationID,
 	}, nil
 }
 
@@ -198,9 +198,9 @@ type SagaOrderItem struct {
 
 // CreateOrderSagaResult 创建订单 SAGA 结果
 type CreateOrderSagaResult struct {
-	OrderID        uint64
-	PaymentID      uint64
-	TransactionID  string
-	PayURL         string
-	ReservationID  string
+	OrderID       uint64
+	PaymentID     uint64
+	TransactionID string
+	PayURL        string
+	ReservationID string
 }

@@ -20,9 +20,9 @@ import (
 // BodyLimit constrains the incoming request body size for the HTTP mainline.
 //
 // BodyLimit 为 HTTP 主线限制请求体大小。
-func BodyLimit(maxBytes int64) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func BodyLimit(maxBytes int64) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil || maxBytes <= 0 {
 				if next != nil {
 					next(c)
@@ -45,7 +45,7 @@ func BodyLimit(maxBytes int64) transportcontract.HTTPMiddleware {
 
 			if gc, ok := unwrapGinContext(c); ok && req.Body != nil {
 				req.Body = http.MaxBytesReader(gc.Writer, req.Body, maxBytes)
-				c.SetRequest(req)
+				gc.Request.Body = req.Body
 			}
 
 			if next != nil {
@@ -61,7 +61,7 @@ func BodyLimit(maxBytes int64) transportcontract.HTTPMiddleware {
 // respondBodyTooLarge writes the unified request-entity-too-large response.
 //
 // respondBodyTooLarge 输出统一的请求体过大响应。
-func respondBodyTooLarge(c transportcontract.HTTPContext) {
+func respondBodyTooLarge(c transportcontract.Context) {
 	if gc, ok := unwrapGinContext(c); ok {
 		writeGinResponseHeaders(gc)
 		resp := Response{

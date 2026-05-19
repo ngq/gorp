@@ -46,9 +46,10 @@ type appYamlConfig struct {
 // 中文说明：
 // - 提供数据库迁移的创建、执行、回滚能力；
 // - 子命令：
-//   1. `gorp migrate create <name>`：创建一对 up/down 迁移文件；
-//   2. `gorp migrate up`：执行所有待执行的迁移；
-//   3. `gorp migrate down`：回滚最后一个迁移；
+//  1. `gorp migrate create <name>`：创建一对 up/down 迁移文件；
+//  2. `gorp migrate up`：执行所有待执行的迁移；
+//  3. `gorp migrate down`：回滚最后一个迁移；
+//
 // - 迁移文件存放在项目根目录的 migrations/ 目录下。
 var migrateCmd = &cobra.Command{
 	Use:     "migrate",

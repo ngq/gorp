@@ -291,11 +291,11 @@ func (r *themeFileRepo) DeleteByThemeID(ctx context.Context, themeID uint) error
 
 // 错误定义
 var (
-	ErrThemeNotFound          = errors.New("theme not found")
-	ErrThemeVariableNotFound  = errors.New("theme variable not found")
+	ErrThemeNotFound              = errors.New("theme not found")
+	ErrThemeVariableNotFound      = errors.New("theme variable not found")
 	ErrThemeConfigurationNotFound = errors.New("theme configuration not found")
-	ErrCustomerThemeNotFound  = errors.New("customer theme setting not found")
-	ErrThemeFileNotFound      = errors.New("theme file not found")
-	ErrThemeNameExists        = errors.New("theme name already exists")
-	ErrCannotDeleteDefault    = errors.New("cannot delete default theme")
+	ErrCustomerThemeNotFound      = errors.New("customer theme setting not found")
+	ErrThemeFileNotFound          = errors.New("theme file not found")
+	ErrThemeNameExists            = errors.New("theme name already exists")
+	ErrCannotDeleteDefault        = errors.New("cannot delete default theme")
 )

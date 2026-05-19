@@ -97,12 +97,12 @@ func (b *randomBuilder) Build() discoverycontract.Selector {
 //
 // RandomSelector 使用随机选择实现 discoverycontract.Selector 接口。
 type RandomSelector struct {
-	r  *rand.Rand // r is the random generator.
-	                //
-	                 // r 随机数生成器。
-	mu sync.Mutex  // mu protects random generator access.
-	                //
-	                 // mu 保护随机数生成器访问。
+	r *rand.Rand // r is the random generator.
+	//
+	// r 随机数生成器。
+	mu sync.Mutex // mu protects random generator access.
+	//
+	// mu 保护随机数生成器访问。
 }
 
 // NewRandomSelector creates a new random selector instance.

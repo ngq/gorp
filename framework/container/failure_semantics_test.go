@@ -19,9 +19,9 @@ type failingProvider struct {
 	booted      *int
 }
 
-func (p *failingProvider) Name() string       { return "failing" }
-func (p *failingProvider) IsDefer() bool      { return false }
-func (p *failingProvider) Provides() []string { return nil }
+func (p *failingProvider) Name() string        { return "failing" }
+func (p *failingProvider) IsDefer() bool       { return false }
+func (p *failingProvider) Provides() []string  { return nil }
 func (p *failingProvider) DependsOn() []string { return nil }
 func (p *failingProvider) Register(runtimecontract.Container) error {
 	*p.loaded++

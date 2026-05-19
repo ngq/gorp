@@ -18,11 +18,11 @@ import (
 func TestHTTPOptionMapsToBootstrapOptions(t *testing.T) {
 	cfg := runConfig{}
 	HTTP(HTTPServiceOptions{
-		DisableRedis:       true,
-		DisableGorm:        true,
-		DisableMetrics:     true,
-		GovernanceMode:     resiliencecontract.GovernanceModeMicro,
-		GovernanceDisable:  []string{"tracing"},
+		DisableRedis:        true,
+		DisableGorm:         true,
+		DisableMetrics:      true,
+		GovernanceMode:      resiliencecontract.GovernanceModeMicro,
+		GovernanceDisable:   []string{"tracing"},
 		GovernanceProviders: map[string]string{"serviceauth": "mtls"},
 	}).apply(&cfg)
 	if !cfg.httpEnabled {
@@ -136,7 +136,7 @@ func TestWithSetupShortCircuitOnError(t *testing.T) {
 		seq = append(seq, "first")
 		return cause
 	}).apply(&cfg)
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		seq = append(seq, "routes")
 		return nil
 	}).apply(&cfg)

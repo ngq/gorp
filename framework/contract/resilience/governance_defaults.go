@@ -70,17 +70,17 @@ func DefaultGovernanceFeatureSet(mode GovernanceMode) GovernanceFeatureSet {
 // 此结构体按需填充（仅在 view=defaults 时请求），
 // 避免撑大默认的 GovernanceSummary JSON 输出。
 type GovernanceDefaultsTable struct {
-	Mode                   GovernanceMode         `json:"mode"`
-	FeatureDefaults        map[string]bool        `json:"feature_defaults"`
-	ProviderDefaults       map[string]string      `json:"provider_defaults"`
-	HTTPMiddlewareDefaults HTTPMiddlewareDefaults `json:"http_middleware_defaults"`
-	RPCClientDefaults      RPCClientDefaults      `json:"rpc_client_defaults"`
+	Mode               GovernanceMode     `json:"mode"`
+	FeatureDefaults    map[string]bool    `json:"feature_defaults"`
+	ProviderDefaults   map[string]string  `json:"provider_defaults"`
+	MiddlewareDefaults MiddlewareDefaults `json:"middleware_defaults"`
+	RPCClientDefaults  RPCClientDefaults  `json:"rpc_client_defaults"`
 }
 
-// HTTPMiddlewareDefaults captures the default HTTP middleware option values.
+// MiddlewareDefaults captures the default middleware option values.
 //
-// HTTPMiddlewareDefaults 捕获 HTTP 中间件的默认选项值。
-type HTTPMiddlewareDefaults struct {
+// MiddlewareDefaults 捕获中间件的默认选项值。
+type MiddlewareDefaults struct {
 	Timeout           string                 `json:"timeout"`
 	BodyLimit         string                 `json:"body_limit"`
 	MaxConcurrent     int                    `json:"max_concurrent"`

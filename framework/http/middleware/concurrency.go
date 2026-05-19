@@ -96,10 +96,10 @@ func (l *ConcurrencyLimiter) release() {
 //
 // LoadShedding 在并发已满时立即拒绝请求。
 // 优先使用容器中的 LoadShedder 契约实现；若容器不可用则回退到本地 ConcurrencyLimiter。
-func LoadShedding(maxConcurrent int) transportcontract.HTTPMiddleware {
+func LoadShedding(maxConcurrent int) transportcontract.Middleware {
 	limiter := NewConcurrencyLimiter(maxConcurrent)
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			// 优先尝试从容器中获取 LoadShedder 契约实现
 			if shedder := loadShedderFromContext(c); shedder != nil {
 				if err := shedder.Allow(context.Background(), "http"); err != nil {
@@ -136,11 +136,11 @@ func LoadShedding(maxConcurrent int) transportcontract.HTTPMiddleware {
 
 // loadShedderFromContext 尝试从请求上下文中获取容器，再从容器中解析 LoadShedder 契约。
 // 如果容器不可用或 LoadShedder 未注册，返回 nil。
-func loadShedderFromContext(c transportcontract.HTTPContext) resiliencecontract.LoadShedder {
-	if c == nil || c.Context() == nil {
+func loadShedderFromContext(c transportcontract.Context) resiliencecontract.LoadShedder {
+	if c == nil {
 		return nil
 	}
-	containerAny, ok := supportcontract.FromContainerContext(c.Context())
+	containerAny, ok := supportcontract.FromContainerContext(c)
 	if !ok {
 		return nil
 	}
@@ -165,10 +165,10 @@ func loadShedderFromContext(c transportcontract.HTTPContext) resiliencecontract.
 // ConcurrencyLimit waits for a free slot until timeout, then rejects the request.
 //
 // ConcurrencyLimit 在超时前等待空闲槽位，超时后拒绝请求。
-func ConcurrencyLimit(maxConcurrent int, timeout time.Duration) transportcontract.HTTPMiddleware {
+func ConcurrencyLimit(maxConcurrent int, timeout time.Duration) transportcontract.Middleware {
 	limiter := NewConcurrencyLimiter(maxConcurrent)
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if limiter == nil {
 				if next != nil {
 					next(c)
@@ -191,7 +191,7 @@ func ConcurrencyLimit(maxConcurrent int, timeout time.Duration) transportcontrac
 // respondServiceBusy writes the unified overload response.
 //
 // respondServiceBusy 输出统一的服务繁忙响应。
-func respondServiceBusy(c transportcontract.HTTPContext, message string) {
+func respondServiceBusy(c transportcontract.Context, message string) {
 	if gc, ok := unwrapGinContext(c); ok {
 		writeGinResponseHeaders(gc)
 		resp := Response{

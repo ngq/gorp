@@ -74,7 +74,7 @@ var modelGenCmd = &cobra.Command{
 
 		tpl := template.Must(template.New("model").Funcs(template.FuncMap{
 			"dbTypeToGo": dbTypeToGo,
-			"toGoName":    toGoName,
+			"toGoName":   toGoName,
 		}).Parse(modelTpl))
 		if err := tpl.Execute(f, data); err != nil {
 			return err

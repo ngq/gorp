@@ -30,9 +30,9 @@ type RateLimiter interface {
 // RateLimit applies a transport-level rate limiter and returns a unified 429 response when exceeded.
 //
 // RateLimit 应用 transport 层限流器，并在超限时返回统一的 429 响应。
-func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if limiter == nil {
 				if next != nil {
 					next(c)
@@ -46,7 +46,7 @@ func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transpor
 			if target == "" && c.Request() != nil && c.Request().URL != nil {
 				target = c.Request().Method + " " + c.Request().URL.Path
 			}
-			if err := limiter.Allow(c.Context(), target); err != nil {
+			if err := limiter.Allow(c, target); err != nil {
 				if gc, ok := unwrapGinContext(c); ok {
 					writeGinResponseHeaders(gc)
 					resp := Response{
@@ -99,7 +99,7 @@ func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string)
 //
 // IPKeyFunc 从请求中提取基于客户端 IP 的限流 key。
 // X-Forwarded-For 和 X-Real-IP 头仅在请求来自可信代理时才会被信任
-//（见 ip_filter.go 中的 SetTrustedProxies）。
+// （见 ip_filter.go 中的 SetTrustedProxies）。
 // 否则直接使用 RemoteAddr，以防止伪造绕过限流。
 func IPKeyFunc(c *gin.Context) string {
 	remoteAddr := c.Request.RemoteAddr

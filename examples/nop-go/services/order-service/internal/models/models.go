@@ -7,27 +7,27 @@ import (
 
 // Order 订单
 type Order struct {
-	ID               uint64    `gorm:"primaryKey" json:"id"`
-	OrderNumber      string    `gorm:"size:32;uniqueIndex;not null" json:"order_number"`
-	CustomerID       uint64    `gorm:"not null;index" json:"customer_id"`
-	BillingAddressID uint64    `json:"billing_address_id"`
-	ShippingAddressID uint64   `json:"shipping_address_id"`
-	Subtotal         float64   `gorm:"type:decimal(10,2);not null" json:"subtotal"`
-	DiscountAmount   float64   `gorm:"type:decimal(10,2);default:0" json:"discount_amount"`
-	TaxAmount        float64   `gorm:"type:decimal(10,2);default:0" json:"tax_amount"`
-	ShippingAmount   float64   `gorm:"type:decimal(10,2);default:0" json:"shipping_amount"`
-	Total            float64   `gorm:"type:decimal(10,2);not null" json:"total"`
-	CurrencyCode     string    `gorm:"size:8;default:'CNY'" json:"currency_code"`
-	OrderStatus      string    `gorm:"size:16;not null;default:'pending';index" json:"order_status"`
-	PaymentStatus    string    `gorm:"size:16;default:'pending'" json:"payment_status"`
-	ShippingStatus   string    `gorm:"size:16;default:'not_shipped'" json:"shipping_status"`
-	CustomerIP       string    `gorm:"size:64" json:"customer_ip"`
-	CustomerNote     string    `gorm:"type:text" json:"customer_note"`
-	AdminNote        string    `gorm:"type:text" json:"admin_note"`
-	CreatedAt        time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID                uint64    `gorm:"primaryKey" json:"id"`
+	OrderNumber       string    `gorm:"size:32;uniqueIndex;not null" json:"order_number"`
+	CustomerID        uint64    `gorm:"not null;index" json:"customer_id"`
+	BillingAddressID  uint64    `json:"billing_address_id"`
+	ShippingAddressID uint64    `json:"shipping_address_id"`
+	Subtotal          float64   `gorm:"type:decimal(10,2);not null" json:"subtotal"`
+	DiscountAmount    float64   `gorm:"type:decimal(10,2);default:0" json:"discount_amount"`
+	TaxAmount         float64   `gorm:"type:decimal(10,2);default:0" json:"tax_amount"`
+	ShippingAmount    float64   `gorm:"type:decimal(10,2);default:0" json:"shipping_amount"`
+	Total             float64   `gorm:"type:decimal(10,2);not null" json:"total"`
+	CurrencyCode      string    `gorm:"size:8;default:'CNY'" json:"currency_code"`
+	OrderStatus       string    `gorm:"size:16;not null;default:'pending';index" json:"order_status"`
+	PaymentStatus     string    `gorm:"size:16;default:'pending'" json:"payment_status"`
+	ShippingStatus    string    `gorm:"size:16;default:'not_shipped'" json:"shipping_status"`
+	CustomerIP        string    `gorm:"size:64" json:"customer_ip"`
+	CustomerNote      string    `gorm:"type:text" json:"customer_note"`
+	AdminNote         string    `gorm:"type:text" json:"admin_note"`
+	CreatedAt         time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt         time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
-	Items            []OrderItem       `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	Items []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 }
 
 func (Order) TableName() string {
@@ -79,12 +79,12 @@ func (OrderAddress) TableName() string {
 
 // OrderNote 订单备注
 type OrderNote struct {
-	ID              uint64    `gorm:"primaryKey" json:"id"`
-	OrderID         uint64    `gorm:"not null;index" json:"order_id"`
-	Note            string    `gorm:"type:text;not null" json:"note"`
-	IsCustomerVisible bool    `gorm:"default:false" json:"is_customer_visible"`
-	CreatedBy       uint64    `json:"created_by"`
-	CreatedAt       time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID                uint64    `gorm:"primaryKey" json:"id"`
+	OrderID           uint64    `gorm:"not null;index" json:"order_id"`
+	Note              string    `gorm:"type:text;not null" json:"note"`
+	IsCustomerVisible bool      `gorm:"default:false" json:"is_customer_visible"`
+	CreatedBy         uint64    `json:"created_by"`
+	CreatedAt         time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (OrderNote) TableName() string {
@@ -93,19 +93,19 @@ func (OrderNote) TableName() string {
 
 // GiftCard 礼品卡
 type GiftCard struct {
-	ID             uint64     `gorm:"primaryKey" json:"id"`
-	Code           string     `gorm:"size:32;uniqueIndex;not null" json:"code"`
-	Amount         float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
-	RemainingAmount float64   `gorm:"type:decimal(10,2);not null" json:"remaining_amount"`
-	CustomerID     uint64     `json:"customer_id"`
-	OrderID        uint64     `json:"order_id"`
-	IsActive       bool       `gorm:"default:true" json:"is_active"`
-	IsRedeemed     bool       `gorm:"default:false" json:"is_redeemed"`
-	PurchasedAt    *time.Time `json:"purchased_at"`
-	ActivatedAt    *time.Time `json:"activated_at"`
-	RedeemedAt     *time.Time `json:"redeemed_at"`
-	ExpiresAt      *time.Time `json:"expires_at"`
-	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	ID              uint64     `gorm:"primaryKey" json:"id"`
+	Code            string     `gorm:"size:32;uniqueIndex;not null" json:"code"`
+	Amount          float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
+	RemainingAmount float64    `gorm:"type:decimal(10,2);not null" json:"remaining_amount"`
+	CustomerID      uint64     `json:"customer_id"`
+	OrderID         uint64     `json:"order_id"`
+	IsActive        bool       `gorm:"default:true" json:"is_active"`
+	IsRedeemed      bool       `gorm:"default:false" json:"is_redeemed"`
+	PurchasedAt     *time.Time `json:"purchased_at"`
+	ActivatedAt     *time.Time `json:"activated_at"`
+	RedeemedAt      *time.Time `json:"redeemed_at"`
+	ExpiresAt       *time.Time `json:"expires_at"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (GiftCard) TableName() string {
@@ -121,7 +121,7 @@ type ReturnRequest struct {
 	Reason          string     `gorm:"size:512" json:"reason"`
 	Quantity        int        `gorm:"not null" json:"quantity"`
 	RequestedAction string     `gorm:"size:16;default:'refund'" json:"requested_action"` // refund, replace, repair
-	Status          string     `gorm:"size:16;default:'pending'" json:"status"` // pending, approved, rejected, processed, cancelled
+	Status          string     `gorm:"size:16;default:'pending'" json:"status"`          // pending, approved, rejected, processed, cancelled
 	RefundAmount    float64    `gorm:"type:decimal(10,2)" json:"refund_amount"`
 	ProcessedBy     uint64     `json:"processed_by"`
 	ProcessedAt     *time.Time `json:"processed_at"`
@@ -135,12 +135,12 @@ func (ReturnRequest) TableName() string {
 
 // DTO
 type CreateOrderRequest struct {
-	CustomerID        uint64            `json:"customer_id" binding:"required"`
-	BillingAddress    AddressInput      `json:"billing_address" binding:"required"`
-	ShippingAddress   AddressInput      `json:"shipping_address" binding:"required"`
-	Items             []OrderItemInput  `json:"items" binding:"required,min=1"`
-	CouponCode        string            `json:"coupon_code"`
-	CustomerNote      string            `json:"customer_note"`
+	CustomerID      uint64           `json:"customer_id" binding:"required"`
+	BillingAddress  AddressInput     `json:"billing_address" binding:"required"`
+	ShippingAddress AddressInput     `json:"shipping_address" binding:"required"`
+	Items           []OrderItemInput `json:"items" binding:"required,min=1"`
+	CouponCode      string           `json:"coupon_code"`
+	CustomerNote    string           `json:"customer_note"`
 }
 
 type AddressInput struct {
@@ -163,19 +163,19 @@ type OrderItemInput struct {
 }
 
 type OrderResponse struct {
-	ID               uint64            `json:"id"`
-	OrderNumber      string            `json:"order_number"`
-	CustomerID       uint64            `json:"customer_id"`
-	Subtotal         float64           `json:"subtotal"`
-	DiscountAmount   float64           `json:"discount_amount"`
-	TaxAmount        float64           `json:"tax_amount"`
-	ShippingAmount   float64           `json:"shipping_amount"`
-	Total            float64           `json:"total"`
-	OrderStatus      string            `json:"order_status"`
-	PaymentStatus    string            `json:"payment_status"`
-	ShippingStatus   string            `json:"shipping_status"`
-	Items            []OrderItemResponse `json:"items"`
-	CreatedAt        string            `json:"created_at"`
+	ID             uint64              `json:"id"`
+	OrderNumber    string              `json:"order_number"`
+	CustomerID     uint64              `json:"customer_id"`
+	Subtotal       float64             `json:"subtotal"`
+	DiscountAmount float64             `json:"discount_amount"`
+	TaxAmount      float64             `json:"tax_amount"`
+	ShippingAmount float64             `json:"shipping_amount"`
+	Total          float64             `json:"total"`
+	OrderStatus    string              `json:"order_status"`
+	PaymentStatus  string              `json:"payment_status"`
+	ShippingStatus string              `json:"shipping_status"`
+	Items          []OrderItemResponse `json:"items"`
+	CreatedAt      string              `json:"created_at"`
 }
 
 type OrderItemResponse struct {

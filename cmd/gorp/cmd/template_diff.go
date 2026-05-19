@@ -142,10 +142,10 @@ Recommended workflow:
 			fmt.Fprintln(cmd.OutOrStdout())
 			if len(files) > 0 {
 				fmt.Fprintf(cmd.OutOrStdout(), "Scoped by --files: %v\n\n", files)
-					if len(selectedOnlyTemplate) == 0 && len(selectedDifferent) == 0 {
-						fmt.Fprintln(cmd.OutOrStdout(), "No matching upgrade candidates found for the selected --files.")
-						fmt.Fprintln(cmd.OutOrStdout())
-					}
+				if len(selectedOnlyTemplate) == 0 && len(selectedDifferent) == 0 {
+					fmt.Fprintln(cmd.OutOrStdout(), "No matching upgrade candidates found for the selected --files.")
+					fmt.Fprintln(cmd.OutOrStdout())
+				}
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Files only in template (%d):\n", len(selectedOnlyTemplate))
 			for _, p := range selectedOnlyTemplate {
@@ -191,12 +191,12 @@ var templateVersionCmd = &cobra.Command{
 		fmt.Fprintln(cmd.OutOrStdout(), "Template Version Information")
 		fmt.Fprintln(cmd.OutOrStdout(), "============================")
 		fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintln(cmd.OutOrStdout(), "Current CLI embeds the following public starter templates:")
-			fmt.Fprintln(cmd.OutOrStdout(), "  - golayout: default single-service starter")
-			fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat-wire: default microservice starter with Wire assembly")
-			fmt.Fprintln(cmd.OutOrStdout(), "  - multi-independent: stronger independently-governed multi-service starter")
-			fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintln(cmd.OutOrStdout(), "Release-pack / from-release currently supports the same public starter set: golayout, multi-flat-wire, multi-independent.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Current CLI embeds the following public starter templates:")
+		fmt.Fprintln(cmd.OutOrStdout(), "  - golayout: default single-service starter")
+		fmt.Fprintln(cmd.OutOrStdout(), "  - multi-flat-wire: default microservice starter with Wire assembly")
+		fmt.Fprintln(cmd.OutOrStdout(), "  - multi-independent: stronger independently-governed multi-service starter")
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "Release-pack / from-release currently supports the same public starter set: golayout, multi-flat-wire, multi-independent.")
 		fmt.Fprintln(cmd.OutOrStdout(), "Templates are embedded at build time.")
 		fmt.Fprintln(cmd.OutOrStdout(), "Upgrade CLI to get latest templates.")
 		return nil

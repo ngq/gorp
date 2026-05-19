@@ -10,7 +10,6 @@
 package middleware
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 
@@ -32,18 +31,25 @@ const (
 // Example:
 //
 //	router.Use(httpmiddleware.RequestIdentity())
-func RequestIdentity() transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func RequestIdentity() transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			rid := resolveRequestID(c)
-			c.Header(requestIDHeader, rid)
-			ctx := supportcontract.NewRequestIDContext(c.Context(), rid)
+			c.SetHeader(requestIDHeader, rid)
+			c.Set("request_id", rid)
 
-			tid := resolveTraceID(c, ctx)
-			c.Header(traceIDHeader, tid)
-			ctx = supportcontract.NewTraceIDContext(ctx, tid)
+			tid := resolveTraceID(c, rid)
+			c.SetHeader(traceIDHeader, tid)
+			c.Set("trace_id", tid)
 
-			c.SetContext(ctx)
+			// Also update gin.Request.Context for context.Context value propagation
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				ctx := gc.Request.Context()
+				ctx = supportcontract.NewRequestIDContext(ctx, rid)
+				ctx = supportcontract.NewTraceIDContext(ctx, tid)
+				gc.Request = gc.Request.WithContext(ctx)
+			}
+
 			if next != nil {
 				next(c)
 			}
@@ -78,7 +84,7 @@ func GetRequestID(c *gin.Context) string {
 // resolveRequestID reads or generates a request id for the current request.
 //
 // resolveRequestID 为当前请求读取或生成 request id。
-func resolveRequestID(c transportcontract.HTTPContext) string {
+func resolveRequestID(c transportcontract.Context) string {
 	if c == nil {
 		return generateIdentityID()
 	}
@@ -92,7 +98,7 @@ func resolveRequestID(c transportcontract.HTTPContext) string {
 // resolveTraceID reads or derives a trace id for the current request.
 //
 // resolveTraceID 为当前请求读取或派生 trace id。
-func resolveTraceID(c transportcontract.HTTPContext, ctx any) string {
+func resolveTraceID(c transportcontract.Context, rid string) string {
 	if c != nil {
 		tid := c.GetHeader(traceIDHeader)
 		if tid == "" {
@@ -103,10 +109,8 @@ func resolveTraceID(c transportcontract.HTTPContext, ctx any) string {
 		}
 	}
 
-	if baseCtx, ok := ctx.(context.Context); ok {
-		if rid, ok := supportcontract.FromRequestIDContext(baseCtx); ok && rid != "" {
-			return rid
-		}
+	if rid != "" {
+		return rid
 	}
 
 	return generateIdentityID()

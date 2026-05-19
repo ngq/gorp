@@ -157,8 +157,8 @@ func TestMixedGinAndAbstractMiddleware(t *testing.T) {
 	})
 
 	// 框架抽象 middleware 通过 AdaptMiddleware
-	engine.Use(AdaptMiddleware(func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(ctx transportcontract.HTTPContext) {
+	engine.Use(AdaptMiddleware(func(next transportcontract.Handler) transportcontract.Handler {
+		return func(ctx transportcontract.Context) {
 			order = append(order, "adapted-abstract")
 			next(ctx)
 		}
@@ -203,12 +203,14 @@ func (m *mockContainer) RegisterProviders(...runtimecontract.ServiceProvider) er
 }
 func (m *mockContainer) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
 func (m *mockContainer) DebugPrint() string                                  { return "" }
-func (m *mockContainer) ProviderDAG() runtimecontract.ProviderDAG             { return runtimecontract.ProviderDAG{} }
+func (m *mockContainer) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
 
 // nonGinHTTPService 模拟不实现 GINEngineProvider 的 HTTP 服务。
 type nonGinHTTPService struct{}
 
-func (n *nonGinHTTPService) Router() transportcontract.HTTPRouter { return nil }
-func (n *nonGinHTTPService) Server() *http.Server                 { return nil }
-func (n *nonGinHTTPService) Run() error                           { return nil }
-func (n *nonGinHTTPService) Shutdown(ctx context.Context) error   { return nil }
+func (n *nonGinHTTPService) Router() transportcontract.Router   { return nil }
+func (n *nonGinHTTPService) Server() *http.Server               { return nil }
+func (n *nonGinHTTPService) Run() error                         { return nil }
+func (n *nonGinHTTPService) Shutdown(ctx context.Context) error { return nil }

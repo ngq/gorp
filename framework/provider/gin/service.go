@@ -19,7 +19,7 @@ import (
 type service struct {
 	srv    *http.Server
 	engine *gin.Engine
-	router transportcontract.HTTPRouter
+	router transportcontract.Router
 	log    observabilitycontract.Logger
 }
 
@@ -27,10 +27,10 @@ type service struct {
 //
 // service 是构建在 Gin 之上的运行时 HTTP 服务实现。
 //
-// Router returns the framework HTTP router facade backed by Gin.
+// Router returns the framework router facade backed by Gin.
 //
-// Router 返回由 Gin 驱动的框架 HTTPRouter 门面。
-func (s *service) Router() transportcontract.HTTPRouter { return s.router }
+// Router 返回由 Gin 驱动的框架 Router 门面。
+func (s *service) Router() transportcontract.Router { return s.router }
 
 // Server returns the underlying net/http server instance.
 //

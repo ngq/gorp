@@ -22,15 +22,15 @@ import (
 //
 // HTTPService 封装 transportcontract.HTTP 为可托管服务。
 type HTTPService struct {
-	name   string                 // name is the service name.
-	                              //
-	                               // name 服务名称。
-	http   transportcontract.HTTP // http is the HTTP transport.
-	                              //
-	                               // http HTTP 传输层。
-	server *http.Server           // server is the underlying HTTP server.
-	                              //
-	                               // server 底层 HTTP 服务器。
+	name string // name is the service name.
+	//
+	// name 服务名称。
+	http transportcontract.HTTP // http is the HTTP transport.
+	//
+	// http HTTP 传输层。
+	server *http.Server // server is the underlying HTTP server.
+	//
+	// server 底层 HTTP 服务器。
 }
 
 // NewHTTPService creates a new HTTP service adapter.
@@ -74,12 +74,12 @@ func (s *HTTPService) Stop(ctx context.Context) error {
 //
 // CronService 封装 runtimecontract.Cron 为可托管服务。
 type CronService struct {
-	name string            // name is the service name.
-	                      //
-	                       // name 服务名称。
+	name string // name is the service name.
+	//
+	// name 服务名称。
 	cron runtimecontract.Cron // cron is the cron scheduler.
-	                      //
-	                       // cron Cron 调度器。
+	//
+	// cron Cron 调度器。
 }
 
 // NewCronService creates a new Cron service adapter.
@@ -121,15 +121,15 @@ func (s *CronService) Stop(ctx context.Context) error {
 //
 // GRPCService 封装 grpc.Server 为可托管服务。
 type GRPCService struct {
-	name   string       // name is the service name.
-	                    //
-	                     // name 服务名称。
+	name string // name is the service name.
+	//
+	// name 服务名称。
 	server *grpc.Server // server is the GRPC server.
-	                    //
-	                     // server GRPC 服务器。
-	lis    net.Listener // lis is the network listener.
-	                    //
-	                     // lis 网络监听器。
+	//
+	// server GRPC 服务器。
+	lis net.Listener // lis is the network listener.
+	//
+	// lis 网络监听器。
 }
 
 // NewGRPCService creates a new GRPC service adapter.

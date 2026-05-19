@@ -25,25 +25,29 @@ import (
 // Example:
 //
 //	router.Use(httpmiddleware.LoggingMiddleware(logger))
-func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			logger := base
 			fields := make([]observabilitycontract.Field, 0, 2)
 			traceID := ""
 			requestID := ""
-			if tid, ok := supportcontract.FromTraceIDContext(c.Context()); ok && tid != "" {
+			if tid, ok := supportcontract.FromTraceIDContext(c); ok && tid != "" {
 				traceID = tid
 				fields = append(fields, observabilitycontract.Field{Key: "trace_id", Value: tid})
 			}
-			if rid, ok := supportcontract.FromRequestIDContext(c.Context()); ok && rid != "" {
+			if rid, ok := supportcontract.FromRequestIDContext(c); ok && rid != "" {
 				requestID = rid
 				fields = append(fields, observabilitycontract.Field{Key: "request_id", Value: rid})
 			}
 			if logger != nil && len(fields) > 0 {
 				logger = logger.With(fields...)
 			}
-			c.SetContext(frameworkbizlog.WithContext(c.Context(), logger))
+			c.Set("logger", logger)
+			// Also update gin.Request.Context for context.Context value propagation
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				gc.Request = gc.Request.WithContext(frameworkbizlog.WithContext(gc.Request.Context(), logger))
+			}
 
 			start := time.Now()
 			if next != nil {
@@ -79,7 +83,7 @@ func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.HTTP
 			if traceID != "" {
 				logFields = append(logFields, observabilitycontract.Field{Key: "trace_id", Value: traceID})
 			}
-			frameworkbizlog.Ctx(c.Context()).Info("http request", logFields...)
+			frameworkbizlog.Ctx(c).Info("http request", logFields...)
 		}
 	}
 }

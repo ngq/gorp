@@ -83,18 +83,18 @@ func TestBuildGovernanceDefaultsTableProviderDefaultsConsistency(t *testing.T) {
 	}
 }
 
-// TestBuildGovernanceDefaultsTableHTTPMiddlewareDefaults 验证 HTTP 中间件默认值稳定性守卫。
-func TestBuildGovernanceDefaultsTableHTTPMiddlewareDefaults(t *testing.T) {
+// TestBuildGovernanceDefaultsTableMiddlewareDefaults 验证中间件默认值稳定性守卫。
+func TestBuildGovernanceDefaultsTableMiddlewareDefaults(t *testing.T) {
 	table := BuildGovernanceDefaultsTable(resiliencecontract.GovernanceModeMicro)
 	require.NotNil(t, table)
 
-	// HTTP 中间件关键默认值
-	assert.Equal(t, "15s", table.HTTPMiddlewareDefaults.Timeout)
-	assert.Equal(t, "2MB", table.HTTPMiddlewareDefaults.BodyLimit)
+	// 中间件关键默认值
+	assert.Equal(t, "15s", table.MiddlewareDefaults.Timeout)
+	assert.Equal(t, "2MB", table.MiddlewareDefaults.BodyLimit)
 	expectedMaxConcurrent := runtime.GOMAXPROCS(0) * 100
-	assert.Equal(t, expectedMaxConcurrent, table.HTTPMiddlewareDefaults.MaxConcurrent)
-	assert.True(t, table.HTTPMiddlewareDefaults.EnableMetrics)
-	assert.False(t, table.HTTPMiddlewareDefaults.EnableCompression)
+	assert.Equal(t, expectedMaxConcurrent, table.MiddlewareDefaults.MaxConcurrent)
+	assert.True(t, table.MiddlewareDefaults.EnableMetrics)
+	assert.False(t, table.MiddlewareDefaults.EnableCompression)
 }
 
 // TestBuildGovernanceDefaultsTableCORSDefaults 验证 CORS 默认值。
@@ -102,7 +102,7 @@ func TestBuildGovernanceDefaultsTableCORSDefaults(t *testing.T) {
 	table := BuildGovernanceDefaultsTable(resiliencecontract.GovernanceModeMicro)
 	require.NotNil(t, table)
 
-	cors := table.HTTPMiddlewareDefaults.CORS
+	cors := table.MiddlewareDefaults.CORS
 	assert.Equal(t, []string{"*"}, cors.AllowOrigins)
 	assert.Equal(t, 600, cors.MaxAgeSeconds)
 }
@@ -112,7 +112,7 @@ func TestBuildGovernanceDefaultsTableSecurityHeaderDefaults(t *testing.T) {
 	table := BuildGovernanceDefaultsTable(resiliencecontract.GovernanceModeMicro)
 	require.NotNil(t, table)
 
-	sec := table.HTTPMiddlewareDefaults.SecurityHeaders
+	sec := table.MiddlewareDefaults.SecurityHeaders
 	assert.Equal(t, "DENY", sec.XFrameOptions)
 	assert.Equal(t, "nosniff", sec.XContentTypeOptions)
 	assert.Equal(t, "strict-origin-when-cross-origin", sec.ReferrerPolicy)
@@ -123,7 +123,7 @@ func TestBuildGovernanceDefaultsTableLocaleDefaults(t *testing.T) {
 	table := BuildGovernanceDefaultsTable(resiliencecontract.GovernanceModeMicro)
 	require.NotNil(t, table)
 
-	loc := table.HTTPMiddlewareDefaults.Locale
+	loc := table.MiddlewareDefaults.Locale
 	assert.Equal(t, []string{"zh", "en"}, loc.Supported)
 	assert.Equal(t, "zh", loc.Default)
 	assert.Equal(t, []string{"lang", "locale"}, loc.QueryKeys)

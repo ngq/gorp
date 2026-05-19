@@ -12,11 +12,11 @@ import (
 
 // Event 基础事件
 type Event struct {
-	ID        string    `json:"id"`         // 事件ID
-	Type      string    `json:"type"`       // 事件类型
-	Source    string    `json:"source"`     // 来源服务
-	Timestamp time.Time `json:"timestamp"`  // 事件时间
-	Payload   any       `json:"payload"`    // 事件负载
+	ID        string    `json:"id"`        // 事件ID
+	Type      string    `json:"type"`      // 事件类型
+	Source    string    `json:"source"`    // 来源服务
+	Timestamp time.Time `json:"timestamp"` // 事件时间
+	Payload   any       `json:"payload"`   // 事件负载
 }
 
 // NewEvent 创建事件
@@ -63,11 +63,11 @@ const (
 
 // OrderCreatedPayload 订单创建事件负载
 type OrderCreatedPayload struct {
-	OrderID    uint64 `json:"order_id"`
-	OrderNumber string `json:"order_number"`
-	CustomerID uint64 `json:"customer_id"`
-	Total      string `json:"total"`
-	Items      []OrderItemPayload `json:"items"`
+	OrderID     uint64             `json:"order_id"`
+	OrderNumber string             `json:"order_number"`
+	CustomerID  uint64             `json:"customer_id"`
+	Total       string             `json:"total"`
+	Items       []OrderItemPayload `json:"items"`
 }
 
 // OrderItemPayload 订单项负载

@@ -37,7 +37,7 @@ func DefaultCORSOptions() CORSOptions {
 // CORS applies cross-origin resource sharing headers to the HTTP mainline.
 //
 // CORS 为 HTTP 主线应用跨域响应头。
-func CORS(opts CORSOptions) transportcontract.HTTPMiddleware {
+func CORS(opts CORSOptions) transportcontract.Middleware {
 	if len(opts.AllowOrigins) == 0 {
 		opts = DefaultCORSOptions()
 	}
@@ -73,8 +73,8 @@ func CORS(opts CORSOptions) transportcontract.HTTPMiddleware {
 	exposeHeaders := strings.Join(opts.ExposeHeaders, ", ")
 	maxAge := strconv.Itoa(opts.MaxAgeSeconds)
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil {
 				if next != nil {
 					next(c)
@@ -91,23 +91,23 @@ func CORS(opts CORSOptions) transportcontract.HTTPMiddleware {
 			}
 
 			if allowedOrigin, ok := resolveCORSOrigin(origin, opts.AllowOrigins); ok {
-				c.Header("Access-Control-Allow-Origin", allowedOrigin)
-				c.Header("Vary", "Origin")
+				c.SetHeader("Access-Control-Allow-Origin", allowedOrigin)
+				c.SetHeader("Vary", "Origin")
 			}
 			if allowMethods != "" {
-				c.Header("Access-Control-Allow-Methods", allowMethods)
+				c.SetHeader("Access-Control-Allow-Methods", allowMethods)
 			}
 			if allowHeaders != "" {
-				c.Header("Access-Control-Allow-Headers", allowHeaders)
+				c.SetHeader("Access-Control-Allow-Headers", allowHeaders)
 			}
 			if exposeHeaders != "" {
-				c.Header("Access-Control-Expose-Headers", exposeHeaders)
+				c.SetHeader("Access-Control-Expose-Headers", exposeHeaders)
 			}
 			if opts.AllowCredentials {
-				c.Header("Access-Control-Allow-Credentials", "true")
+				c.SetHeader("Access-Control-Allow-Credentials", "true")
 			}
 			if opts.MaxAgeSeconds > 0 {
-				c.Header("Access-Control-Max-Age", maxAge)
+				c.SetHeader("Access-Control-Max-Age", maxAge)
 			}
 
 			req := c.Request()

@@ -70,8 +70,8 @@ func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 // noopLock 使用本地 sync.Mutex 实现 datacontract.DistributedLock 接口。
 type noopLock struct {
 	locks sync.Map // locks stores per-key mutexes.
-	                 //
-	                  // locks 存储每个键的互斥锁。
+	//
+	// locks 存储每个键的互斥锁。
 }
 
 // Lock acquires a local mutex lock.

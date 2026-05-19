@@ -192,7 +192,7 @@ func (t *testRedis) Del(ctx context.Context, key string) error                  
 func (t *testRedis) MGet(ctx context.Context, keys ...string) (map[string]string, error) {
 	return map[string]string{"k": "v"}, nil
 }
-func (t *testRedis) MSet(ctx context.Context, kvs map[string]string) error { return nil }
+func (t *testRedis) MSet(ctx context.Context, kvs map[string]string) error           { return nil }
 func (t *testRedis) Expire(ctx context.Context, key string, ttl time.Duration) error { return nil }
 
 // testJWTService is a mock implementation of securitycontract.JWTService for testing.

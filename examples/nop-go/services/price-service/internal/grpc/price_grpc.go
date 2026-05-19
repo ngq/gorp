@@ -26,9 +26,9 @@ func (s *PriceGRPCServer) CalculateOrderPrice(ctx context.Context, req *price.Ca
 	}
 
 	return &price.CalculateOrderPriceResponse{
-		Subtotal:  subtotal,
-		Total:     subtotal,
-		Currency:  "CNY",
+		Subtotal: subtotal,
+		Total:    subtotal,
+		Currency: "CNY",
 	}, nil
 }
 

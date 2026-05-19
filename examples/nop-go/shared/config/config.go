@@ -25,7 +25,7 @@ type ServiceConfig struct {
 	RedisPort int
 
 	// 服务发现配置
-	ConsulAddr      string
+	ConsulAddr       string
 	DiscoveryEnabled bool
 
 	// 链路追踪配置
@@ -62,7 +62,7 @@ func LoadFromEnv() *ServiceConfig {
 		RedisHost: getEnvOrDefault("REDIS_HOST", "localhost"),
 		RedisPort: getEnvIntOrDefault("REDIS_PORT", 6379),
 
-		ConsulAddr:      getEnvOrDefault("CONSUL_ADDR", "localhost:8500"),
+		ConsulAddr:       getEnvOrDefault("CONSUL_ADDR", "localhost:8500"),
 		DiscoveryEnabled: getEnvBoolOrDefault("DISCOVERY_ENABLED", false),
 
 		TracingEnabled:  getEnvBoolOrDefault("TRACING_ENABLED", false),

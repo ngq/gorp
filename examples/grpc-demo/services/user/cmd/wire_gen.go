@@ -5,8 +5,8 @@
 package main
 
 import (
-	"grpc-demo/services/user/internal/service"
 	"gorm.io/gorm"
+	"grpc-demo/services/user/internal/service"
 )
 
 func wireUserServices(db *gorm.DB) (*service.Services, error) {

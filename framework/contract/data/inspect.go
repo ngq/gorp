@@ -33,8 +33,8 @@ type Column struct {
 	PrimaryKey bool
 	DefaultVal *string
 	Comment    string // Column comment from database schema.
-	           //
-	           // Column comment 数据库表的列注释。
+	//
+	// Column comment 数据库表的列注释。
 }
 
 // DBInspector defines database inspection operations.

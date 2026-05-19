@@ -116,9 +116,9 @@ const (
 type HTTPMode = resiliencecontract.HTTPMode
 
 const (
-	// HTTPModeContract uses gorp.HTTPContext abstraction.
+	// HTTPModeContract uses gorp.Context abstraction.
 	//
-	// HTTPModeContract 使用 gorp.HTTPContext 契约抽象。
+	// HTTPModeContract 使用 gorp.Context 契约抽象。
 	HTTPModeContract = resiliencecontract.HTTPModeContract
 	// HTTPModeGin uses native gin.Context directly.
 	//
@@ -161,7 +161,7 @@ type Option = application.Option
 //
 //	err := gorp.Run(
 //	    gorp.HTTP(),
-//	    gorp.WithHTTPRoutes(func(router gorp.HTTPRouter, c gorp.Container) error {
+//	    gorp.WithHTTPRoutes(func(router gorp.Router, c gorp.Container) error {
 //	        registerRoutes(router)
 //	        return nil
 //	    }),
@@ -375,9 +375,9 @@ func WithHTTPMode(mode HTTPMode) Option {
 	return application.WithHTTPMode(mode)
 }
 
-// WithContractHTTPMode selects the gorp.HTTPContext contract abstraction.
+// WithContractHTTPMode selects the gorp.Context contract abstraction.
 //
-// WithContractHTTPMode 选择 gorp.HTTPContext 契约抽象。
+// WithContractHTTPMode 选择 gorp.Context 契约抽象。
 func WithContractHTTPMode() Option {
 	return application.WithContractHTTPMode()
 }

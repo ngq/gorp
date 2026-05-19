@@ -21,9 +21,9 @@ import (
 // Timeout enforces a request deadline on the transport-level HTTP middleware chain.
 //
 // Timeout 在 transport 层 HTTP 中间件链上施加请求超时约束。
-func Timeout(timeout time.Duration) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func Timeout(timeout time.Duration) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if timeout <= 0 {
 				if next != nil {
 					next(c)
@@ -31,9 +31,8 @@ func Timeout(timeout time.Duration) transportcontract.HTTPMiddleware {
 				return
 			}
 
-			ctx, cancel := context.WithTimeout(c.Context(), timeout)
+			ctx, cancel := context.WithTimeout(c, timeout)
 			defer cancel()
-			c.SetContext(ctx)
 
 			done := make(chan struct{})
 			go func() {

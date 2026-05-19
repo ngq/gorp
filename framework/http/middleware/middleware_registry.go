@@ -1,10 +1,10 @@
 // Package middleware provides the default MiddlewareRegistry implementation.
 // The registry maps named middleware instances (e.g., "auth", "logging") to
-// transportcontract.HTTPMiddleware, enabling proto-annotation-driven automatic mounting.
+// transportcontract.Middleware, enabling proto-annotation-driven automatic mounting.
 //
 // 本包提供默认的 MiddlewareRegistry 实现。
 // 注册表将具名中间件实例（如 "auth"、"logging"）映射到
-// transportcontract.HTTPMiddleware，支持 proto 注解驱动的自动挂载。
+// transportcontract.Middleware，支持 proto 注解驱动的自动挂载。
 package middleware
 
 import (
@@ -18,7 +18,7 @@ import (
 // 支持注册、查找、批量查找、名称列举。
 type defaultMiddlewareRegistry struct {
 	mu    sync.RWMutex
-	store map[string]transportcontract.HTTPMiddleware
+	store map[string]transportcontract.Middleware
 }
 
 // NewMiddlewareRegistry creates a new empty middleware registry.
@@ -26,7 +26,7 @@ type defaultMiddlewareRegistry struct {
 // NewMiddlewareRegistry 创建一个新的空中间件注册表。
 func NewMiddlewareRegistry() transportcontract.MiddlewareRegistry {
 	return &defaultMiddlewareRegistry{
-		store: make(map[string]transportcontract.HTTPMiddleware),
+		store: make(map[string]transportcontract.Middleware),
 	}
 }
 
@@ -35,7 +35,7 @@ func NewMiddlewareRegistry() transportcontract.MiddlewareRegistry {
 //
 // Register 向注册表添加具名中间件。
 // 如果同名中间件已存在，则替换。
-func (r *defaultMiddlewareRegistry) Register(name string, middleware transportcontract.HTTPMiddleware) {
+func (r *defaultMiddlewareRegistry) Register(name string, middleware transportcontract.Middleware) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.store[name] = middleware
@@ -46,7 +46,7 @@ func (r *defaultMiddlewareRegistry) Register(name string, middleware transportco
 //
 // Lookup 按名称查找中间件。
 // 找到时返回中间件和 true，否则返回 nil 和 false。
-func (r *defaultMiddlewareRegistry) Lookup(name string) (transportcontract.HTTPMiddleware, bool) {
+func (r *defaultMiddlewareRegistry) Lookup(name string) (transportcontract.Middleware, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	mw, ok := r.store[name]
@@ -58,11 +58,11 @@ func (r *defaultMiddlewareRegistry) Lookup(name string) (transportcontract.HTTPM
 //
 // LookupAll 按名称列表查找多个中间件。
 // 按顺序返回找到的中间件；静默跳过未知名称。
-func (r *defaultMiddlewareRegistry) LookupAll(names []string) []transportcontract.HTTPMiddleware {
+func (r *defaultMiddlewareRegistry) LookupAll(names []string) []transportcontract.Middleware {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	result := make([]transportcontract.HTTPMiddleware, 0, len(names))
+	result := make([]transportcontract.Middleware, 0, len(names))
 	for _, name := range names {
 		if mw, ok := r.store[name]; ok {
 			result = append(result, mw)

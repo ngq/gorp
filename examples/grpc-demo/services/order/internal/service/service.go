@@ -24,7 +24,7 @@ func NewServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.D
 	orderRepo := data.NewOrderRepo(db)
 	orderUC := biz.NewOrderUseCase(orderRepo)
 	return &Services{
-	Order: &OrderService{uc: orderUC, userConnFactory: userConnFactory, dlock: dlock},
+		Order: &OrderService{uc: orderUC, userConnFactory: userConnFactory, dlock: dlock},
 	}
 }
 

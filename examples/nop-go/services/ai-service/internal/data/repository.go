@@ -315,11 +315,11 @@ func (r *aiModelConfigRepo) Delete(ctx context.Context, id uint) error {
 
 // 错误定义
 var (
-	ErrConversationNotFound  = errors.New("conversation not found")
-	ErrMessageNotFound       = errors.New("message not found")
+	ErrConversationNotFound   = errors.New("conversation not found")
+	ErrMessageNotFound        = errors.New("message not found")
 	ErrRecommendationNotFound = errors.New("recommendation not found")
-	ErrSuggestionNotFound    = errors.New("suggestion not found")
-	ErrContentNotFound       = errors.New("generated content not found")
-	ErrModelNotFound         = errors.New("model config not found")
-	ErrAIServiceUnavailable  = errors.New("AI service unavailable")
+	ErrSuggestionNotFound     = errors.New("suggestion not found")
+	ErrContentNotFound        = errors.New("generated content not found")
+	ErrModelNotFound          = errors.New("model config not found")
+	ErrAIServiceUnavailable   = errors.New("AI service unavailable")
 )

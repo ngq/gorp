@@ -40,12 +40,12 @@ func (uc *OrderUseCase) CreateOrder(ctx context.Context, req *models.CreateOrder
 	orderNumber := generateOrderNumber()
 
 	order := &models.Order{
-		OrderNumber:   orderNumber,
-		CustomerID:    req.CustomerID,
-		OrderStatus:   "pending",
-		PaymentStatus: "pending",
+		OrderNumber:    orderNumber,
+		CustomerID:     req.CustomerID,
+		OrderStatus:    "pending",
+		PaymentStatus:  "pending",
 		ShippingStatus: "not_shipped",
-		CustomerNote:  req.CustomerNote,
+		CustomerNote:   req.CustomerNote,
 	}
 
 	var subtotal float64

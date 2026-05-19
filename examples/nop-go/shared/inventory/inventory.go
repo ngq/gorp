@@ -45,10 +45,10 @@ type GetStockRequest struct {
 
 // GetStockResponse 获取库存响应
 type GetStockResponse struct {
-	ProductID        uint64
-	WarehouseID      uint64
-	Quantity         int32
-	ReservedQuantity int32
+	ProductID         uint64
+	WarehouseID       uint64
+	Quantity          int32
+	ReservedQuantity  int32
 	AvailableQuantity int32
 }
 

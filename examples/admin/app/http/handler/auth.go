@@ -1,7 +1,7 @@
 // Package handler HTTP 处理器。
 //
-// 使用 gorp.HTTPContext 抽象接口实现，与模板生成代码风格一致。
-// 中间件使用 HTTPContext 的 Get/Set/Abort/AbortWithJSON/Next 方法。
+// 使用 gorp.Context 抽象接口实现，与模板生成代码风格一致。
+// 中间件使用 Context 的 Get/Set/Abort/AbortWithJSON/Next 方法。
 package handler
 
 import (
@@ -25,7 +25,7 @@ func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 }
 
 // Login 登录。
-func (h *AuthHandler) Login(c gorp.HTTPContext) {
+func (h *AuthHandler) Login(c gorp.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
@@ -35,7 +35,7 @@ func (h *AuthHandler) Login(c gorp.HTTPContext) {
 		return
 	}
 
-	token, err := h.svc.Login(c.Context(), req.Username, req.Password)
+	token, err := h.svc.Login(c, req.Username, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, map[string]any{"error": err.Error()})
 		return
@@ -45,19 +45,19 @@ func (h *AuthHandler) Login(c gorp.HTTPContext) {
 }
 
 // Logout 登出。
-func (h *AuthHandler) Logout(c gorp.HTTPContext) {
+func (h *AuthHandler) Logout(c gorp.Context) {
 	c.JSON(http.StatusOK, map[string]any{"message": "logout success"})
 }
 
 // GetCurrentUser 获取当前用户。
-func (h *AuthHandler) GetCurrentUser(c gorp.HTTPContext) {
+func (h *AuthHandler) GetCurrentUser(c gorp.Context) {
 	userID := c.Get("user_id")
 	if userID == nil {
 		c.JSON(http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
 
-	user, err := h.svc.GetCurrentUser(c.Context(), userID.(uint))
+	user, err := h.svc.GetCurrentUser(c, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -77,7 +77,7 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 }
 
 // List 用户列表。
-func (h *UserHandler) List(c gorp.HTTPContext) {
+func (h *UserHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 	if page < 1 {
@@ -87,7 +87,7 @@ func (h *UserHandler) List(c gorp.HTTPContext) {
 		pageSize = 10
 	}
 
-	users, total, err := h.svc.List(c.Context(), page, pageSize)
+	users, total, err := h.svc.List(c, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -102,7 +102,7 @@ func (h *UserHandler) List(c gorp.HTTPContext) {
 }
 
 // Create 创建用户。
-func (h *UserHandler) Create(c gorp.HTTPContext) {
+func (h *UserHandler) Create(c gorp.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
@@ -113,7 +113,7 @@ func (h *UserHandler) Create(c gorp.HTTPContext) {
 		return
 	}
 
-	user, err := h.svc.Create(c.Context(), req.Username, req.Password, req.Nickname)
+	user, err := h.svc.Create(c, req.Username, req.Password, req.Nickname)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -123,7 +123,7 @@ func (h *UserHandler) Create(c gorp.HTTPContext) {
 }
 
 // Update 更新用户。
-func (h *UserHandler) Update(c gorp.HTTPContext) {
+func (h *UserHandler) Update(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
@@ -140,7 +140,7 @@ func (h *UserHandler) Update(c gorp.HTTPContext) {
 		return
 	}
 
-	if err := h.svc.Update(c.Context(), uint(id), req.Nickname, req.Email, req.Phone); err != nil {
+	if err := h.svc.Update(c, uint(id), req.Nickname, req.Email, req.Phone); err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
@@ -149,14 +149,14 @@ func (h *UserHandler) Update(c gorp.HTTPContext) {
 }
 
 // Delete 删除用户。
-func (h *UserHandler) Delete(c gorp.HTTPContext) {
+func (h *UserHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
 		return
 	}
 
-	if err := h.svc.Delete(c.Context(), uint(id)); err != nil {
+	if err := h.svc.Delete(c, uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
@@ -165,7 +165,7 @@ func (h *UserHandler) Delete(c gorp.HTTPContext) {
 }
 
 // AssignRoles 分配角色。
-func (h *UserHandler) AssignRoles(c gorp.HTTPContext) {
+func (h *UserHandler) AssignRoles(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
@@ -180,7 +180,7 @@ func (h *UserHandler) AssignRoles(c gorp.HTTPContext) {
 		return
 	}
 
-	if err := h.svc.AssignRoles(c.Context(), uint(id), req.RoleIDs); err != nil {
+	if err := h.svc.AssignRoles(c, uint(id), req.RoleIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
@@ -199,8 +199,8 @@ func NewRoleHandler(svc *service.RoleService) *RoleHandler {
 }
 
 // List 角色列表。
-func (h *RoleHandler) List(c gorp.HTTPContext) {
-	roles, err := h.svc.List(c.Context())
+func (h *RoleHandler) List(c gorp.Context) {
+	roles, err := h.svc.List(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -209,7 +209,7 @@ func (h *RoleHandler) List(c gorp.HTTPContext) {
 }
 
 // Create 创建角色。
-func (h *RoleHandler) Create(c gorp.HTTPContext) {
+func (h *RoleHandler) Create(c gorp.Context) {
 	var req struct {
 		Name string `json:"name" binding:"required"`
 		Code string `json:"code" binding:"required"`
@@ -220,7 +220,7 @@ func (h *RoleHandler) Create(c gorp.HTTPContext) {
 		return
 	}
 
-	role, err := h.svc.Create(c.Context(), req.Name, req.Code, req.Desc)
+	role, err := h.svc.Create(c, req.Name, req.Code, req.Desc)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -230,14 +230,14 @@ func (h *RoleHandler) Create(c gorp.HTTPContext) {
 }
 
 // Delete 删除角色。
-func (h *RoleHandler) Delete(c gorp.HTTPContext) {
+func (h *RoleHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, map[string]any{"error": "invalid id"})
 		return
 	}
 
-	if err := h.svc.Delete(c.Context(), uint(id)); err != nil {
+	if err := h.svc.Delete(c, uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
@@ -247,11 +247,11 @@ func (h *RoleHandler) Delete(c gorp.HTTPContext) {
 
 // AuthMiddleware JWT 认证中间件。
 //
-// 使用 gorp.HTTPContext 接口的 Get/Set/AbortWithJSON/Next 方法，
+// 使用 gorp.Context 接口的 Get/Set/AbortWithJSON/Next 方法，
 // 与模板生成的中间件风格一致。
-func AuthMiddleware(svc *service.AuthService) gorp.HTTPMiddleware {
-	return func(next gorp.HTTPHandler) gorp.HTTPHandler {
-		return func(c gorp.HTTPContext) {
+func AuthMiddleware(svc *service.AuthService) gorp.Middleware {
+	return func(next gorp.Handler) gorp.Handler {
+		return func(c gorp.Context) {
 			authHeader := c.GetHeader("Authorization")
 			if authHeader == "" {
 				c.AbortWithJSON(http.StatusUnauthorized, map[string]any{"error": "missing authorization header"})

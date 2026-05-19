@@ -271,9 +271,9 @@ func (uc *MenuUseCase) DeleteMenuItem(ctx context.Context, id uint64) error {
 
 // PollUseCase 投票用例
 type PollUseCase struct {
-	pollRepo    data.PollRepository
-	answerRepo  data.PollAnswerRepository
-	recordRepo  data.PollVotingRecordRepository
+	pollRepo   data.PollRepository
+	answerRepo data.PollAnswerRepository
+	recordRepo data.PollVotingRecordRepository
 }
 
 // NewPollUseCase 创建投票用例
@@ -303,9 +303,9 @@ func (uc *PollUseCase) CreatePoll(ctx context.Context, req *models.PollCreateReq
 		answers := make([]*models.PollAnswer, len(req.Answers))
 		for i, name := range req.Answers {
 			answers[i] = &models.PollAnswer{
-				PollID:        poll.ID,
-				Name:          name,
-				DisplayOrder:  i,
+				PollID:       poll.ID,
+				Name:         name,
+				DisplayOrder: i,
 			}
 		}
 		if err := uc.answerRepo.CreateBatch(ctx, answers); err != nil {

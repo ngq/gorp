@@ -22,30 +22,30 @@ import (
 // Container 是 runtime 容器契约的顶层别名。
 type Container = runtime.Container
 
-// HTTPRouter is the top-level alias of the transport HTTP router contract.
+// Router is the top-level alias of the transport router contract.
 //
-// HTTPRouter 是 transport 层 HTTPRouter 契约的顶层别名。
-type HTTPRouter = transport.HTTPRouter
+// Router 是 transport 层 Router 契约的顶层别名。
+type Router = transport.Router
 
-// HTTPContext is the top-level alias of the transport HTTP context contract.
+// Context is the top-level alias of the transport context contract.
 //
-// HTTPContext 是 transport 层 HTTPContext 契约的顶层别名。
-type HTTPContext = transport.HTTPContext
+// Context 是 transport 层 Context 契约的顶层别名。
+type Context = transport.Context
 
-// HTTPHandler is the top-level alias of the transport HTTP handler contract.
+// Handler is the top-level alias of the transport handler contract.
 //
-// HTTPHandler 是 transport 层 HTTPHandler 契约的顶层别名。
-type HTTPHandler = transport.HTTPHandler
+// Handler 是 transport 层 Handler 契约的顶层别名。
+type Handler = transport.Handler
 
-// HTTPMiddleware is the top-level alias of the transport HTTP middleware contract.
+// Middleware is the top-level alias of the transport middleware contract.
 //
-// HTTPMiddleware 是 transport 层 HTTPMiddleware 契约的顶层别名。
-type HTTPMiddleware = transport.HTTPMiddleware
+// Middleware 是 transport 层 Middleware 契约的顶层别名。
+type Middleware = transport.Middleware
 
-// HTTPMiddlewareFunc is the business-friendly helper signature used by Middleware.
+// MiddlewareFunc is the business-friendly helper signature used by Middleware.
 //
-// HTTPMiddlewareFunc 是 Middleware 使用的业务友好辅助签名。
-type HTTPMiddlewareFunc func(ctx HTTPContext, next HTTPHandler)
+// MiddlewareFunc 是 Middleware 使用的业务友好辅助签名。
+type MiddlewareFunc func(ctx Context, next Handler)
 
 // Metadata is the top-level alias of the transport metadata contract.
 //
@@ -62,25 +62,25 @@ type GRPCConnFactory = transport.GRPCConnFactory
 // GRPCServerRegistrar 是 proto-first gRPC 服务注册器的顶层别名。
 type GRPCServerRegistrar = transport.GRPCServerRegistrar
 
-// RecommendedHTTPMiddlewareOptions is the top-level alias of the recommended HTTP preset options.
+// RecommendedMiddlewareOptions is the top-level alias of the recommended HTTP preset options.
 //
-// RecommendedHTTPMiddlewareOptions 是推荐 HTTP 预设选项的顶层别名。
-type RecommendedHTTPMiddlewareOptions = httpmiddleware.RecommendedMiddlewareOptions
+// RecommendedMiddlewareOptions 是推荐 HTTP 预设选项的顶层别名。
+type RecommendedMiddlewareOptions = httpmiddleware.RecommendedMiddlewareOptions
 
-// InternalHTTPMiddlewareOptions is the top-level alias of the internal HTTP preset options.
+// InternalMiddlewareOptions is the top-level alias of the internal HTTP preset options.
 //
-// InternalHTTPMiddlewareOptions 是内网 HTTP 预设选项的顶层别名。
-type InternalHTTPMiddlewareOptions = httpmiddleware.InternalMiddlewareOptions
+// InternalMiddlewareOptions 是内网 HTTP 预设选项的顶层别名。
+type InternalMiddlewareOptions = httpmiddleware.InternalMiddlewareOptions
 
-// AdminHTTPMiddlewareOptions is the top-level alias of the admin HTTP preset options.
+// AdminMiddlewareOptions is the top-level alias of the admin HTTP preset options.
 //
-// AdminHTTPMiddlewareOptions 是管理 HTTP 预设选项的顶层别名。
-type AdminHTTPMiddlewareOptions = httpmiddleware.AdminMiddlewareOptions
+// AdminMiddlewareOptions 是管理 HTTP 预设选项的顶层别名。
+type AdminMiddlewareOptions = httpmiddleware.AdminMiddlewareOptions
 
-// DefaultHTTPServiceGovernanceOptions is the top-level alias of the HTTP service governance preset options.
+// DefaultServiceGovernanceOptions is the top-level alias of the HTTP service governance preset options.
 //
-// DefaultHTTPServiceGovernanceOptions 是 HTTP 服务治理预设选项的顶层别名。
-type DefaultHTTPServiceGovernanceOptions = httpmiddleware.DefaultHTTPServiceGovernanceOptions
+// DefaultServiceGovernanceOptions 是 HTTP 服务治理预设选项的顶层别名。
+type DefaultServiceGovernanceOptions = httpmiddleware.DefaultHTTPServiceGovernanceOptions
 
 // TenantOptions is the top-level alias of tenant middleware options.
 //
@@ -92,14 +92,14 @@ type TenantOptions = httpmiddleware.TenantOptions
 // BodyDumpOptions 是请求响应抓取中间件选项的顶层别名。
 type BodyDumpOptions = httpmiddleware.BodyDumpOptions
 
-// HTTPExchangeCapture is the top-level alias of the request/response capture result.
+// ExchangeCapture is the top-level alias of the request/response capture result.
 //
-// HTTPExchangeCapture 是请求响应抓取结果的顶层别名。
-type HTTPExchangeCapture = httpmiddleware.HTTPExchangeCapture
+// ExchangeCapture 是请求响应抓取结果的顶层别名。
+type ExchangeCapture = httpmiddleware.HTTPExchangeCapture
 
-// Chain combines multiple HTTP middlewares into one middleware.
+// Chain combines multiple middlewares into one middleware.
 //
-// Chain 将多个 HTTP 中间件组合成一个中间件。
+// Chain 将多个中间件组合成一个中间件。
 //
 // Example:
 //
@@ -110,8 +110,8 @@ type HTTPExchangeCapture = httpmiddleware.HTTPExchangeCapture
 //	)
 //
 //	router.Use(apiMiddleware)
-func Chain(middleware ...HTTPMiddleware) HTTPMiddleware {
-	return func(next HTTPHandler) HTTPHandler {
+func Chain(middleware ...Middleware) Middleware {
+	return func(next Handler) Handler {
 		for i := len(middleware) - 1; i >= 0; i-- {
 			if middleware[i] == nil {
 				continue
@@ -122,22 +122,22 @@ func Chain(middleware ...HTTPMiddleware) HTTPMiddleware {
 	}
 }
 
-// Middleware adapts a business-friendly middleware callback to HTTPMiddleware.
+// AdaptMiddleware adapts a business-friendly middleware callback to Middleware.
 //
-// Middleware 将业务友好的回调签名适配为 HTTPMiddleware。
+// AdaptMiddleware 将业务友好的回调签名适配为 Middleware。
 //
 // Example:
 //
-//	func AccessLog() gorp.HTTPMiddleware {
-//	    return gorp.Middleware(func(ctx gorp.HTTPContext, next gorp.HTTPHandler) {
+//	func AccessLog() gorp.Middleware {
+//	    return gorp.AdaptMiddleware(func(ctx gorp.Context, next gorp.Handler) {
 //	        if next != nil {
 //	            next(ctx)
 //	        }
 //	    })
 //	}
-func Middleware(fn HTTPMiddlewareFunc) HTTPMiddleware {
-	return func(next HTTPHandler) HTTPHandler {
-		return func(ctx HTTPContext) {
+func AdaptMiddleware(fn MiddlewareFunc) Middleware {
+	return func(next Handler) Handler {
+		return func(ctx Context) {
 			if fn == nil {
 				if next != nil {
 					next(ctx)
@@ -149,31 +149,31 @@ func Middleware(fn HTTPMiddlewareFunc) HTTPMiddleware {
 	}
 }
 
-// DefaultRecommendedHTTPMiddlewareOptions returns the default public API middleware preset options.
+// DefaultRecommendedMiddlewareOptions returns the default public API middleware preset options.
 //
-// DefaultRecommendedHTTPMiddlewareOptions 返回默认的对外 API 中间件预设选项。
-func DefaultRecommendedHTTPMiddlewareOptions() RecommendedHTTPMiddlewareOptions {
+// DefaultRecommendedMiddlewareOptions 返回默认的对外 API 中间件预设选项。
+func DefaultRecommendedMiddlewareOptions() RecommendedMiddlewareOptions {
 	return httpmiddleware.DefaultRecommendedMiddlewareOptions()
 }
 
-// DefaultInternalHTTPMiddlewareOptions returns the default internal API middleware preset options.
+// DefaultInternalMiddlewareOptions returns the default internal API middleware preset options.
 //
-// DefaultInternalHTTPMiddlewareOptions 返回默认的内网 API 中间件预设选项。
-func DefaultInternalHTTPMiddlewareOptions() InternalHTTPMiddlewareOptions {
+// DefaultInternalMiddlewareOptions 返回默认的内网 API 中间件预设选项。
+func DefaultInternalMiddlewareOptions() InternalMiddlewareOptions {
 	return httpmiddleware.DefaultInternalMiddlewareOptions()
 }
 
-// DefaultAdminHTTPMiddlewareOptions returns the default admin API middleware preset options.
+// DefaultAdminMiddlewareOptions returns the default admin API middleware preset options.
 //
-// DefaultAdminHTTPMiddlewareOptions 返回默认的管理 API 中间件预设选项。
-func DefaultAdminHTTPMiddlewareOptions() AdminHTTPMiddlewareOptions {
+// DefaultAdminMiddlewareOptions 返回默认的管理 API 中间件预设选项。
+func DefaultAdminMiddlewareOptions() AdminMiddlewareOptions {
 	return httpmiddleware.DefaultAdminMiddlewareOptions()
 }
 
-// DefaultHTTPServiceGovernanceDefaults returns the default HTTP service governance preset options.
+// DefaultServiceGovernanceDefaults returns the default HTTP service governance preset options.
 //
-// DefaultHTTPServiceGovernanceDefaults 返回默认 HTTP 服务治理预设选项。
-func DefaultHTTPServiceGovernanceDefaults() DefaultHTTPServiceGovernanceOptions {
+// DefaultServiceGovernanceDefaults 返回默认 HTTP 服务治理预设选项。
+func DefaultServiceGovernanceDefaults() DefaultServiceGovernanceOptions {
 	return httpmiddleware.DefaultHTTPServiceGovernanceDefaults()
 }
 
@@ -184,122 +184,122 @@ func DefaultTenantOptions() TenantOptions {
 	return httpmiddleware.DefaultTenantOptions()
 }
 
-// DefaultHTTPMiddleware returns the stable default HTTP middleware baseline.
+// DefaultMiddleware returns the stable default HTTP middleware baseline.
 //
-// DefaultHTTPMiddleware 返回稳定的默认 HTTP 中间件基线。
-func DefaultHTTPMiddleware(base observabilitycontract.Logger) HTTPMiddleware {
+// DefaultMiddleware 返回稳定的默认 HTTP 中间件基线。
+func DefaultMiddleware(base observabilitycontract.Logger) Middleware {
 	return httpmiddleware.DefaultMiddleware(base)
 }
 
-// DefaultHTTPMiddlewareSet returns the stable default HTTP middleware baseline as an ordered slice.
+// DefaultMiddlewareSet returns the stable default HTTP middleware baseline as an ordered slice.
 //
-// DefaultHTTPMiddlewareSet 以有序切片形式返回稳定的默认 HTTP 中间件基线。
-func DefaultHTTPMiddlewareSet(base observabilitycontract.Logger) []HTTPMiddleware {
+// DefaultMiddlewareSet 以有序切片形式返回稳定的默认 HTTP 中间件基线。
+func DefaultMiddlewareSet(base observabilitycontract.Logger) []Middleware {
 	return httpmiddleware.DefaultMiddlewareSet(base)
 }
 
-// RecommendedHTTPAPIMiddleware returns the recommended public API middleware preset.
+// RecommendedAPIMiddleware returns the recommended public API middleware preset.
 //
-// RecommendedHTTPAPIMiddleware 返回推荐的对外 API 中间件预设。
-func RecommendedHTTPAPIMiddleware(base observabilitycontract.Logger, opts RecommendedHTTPMiddlewareOptions) HTTPMiddleware {
+// RecommendedAPIMiddleware 返回推荐的对外 API 中间件预设。
+func RecommendedAPIMiddleware(base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) Middleware {
 	return httpmiddleware.RecommendedAPIMiddleware(base, opts)
 }
 
-// RecommendedHTTPAPIMiddlewareSet returns the recommended public API middleware preset as an ordered slice.
+// RecommendedAPIMiddlewareSet returns the recommended public API middleware preset as an ordered slice.
 //
-// RecommendedHTTPAPIMiddlewareSet 以有序切片形式返回推荐的对外 API 中间件预设。
-func RecommendedHTTPAPIMiddlewareSet(base observabilitycontract.Logger, opts RecommendedHTTPMiddlewareOptions) []HTTPMiddleware {
+// RecommendedAPIMiddlewareSet 以有序切片形式返回推荐的对外 API 中间件预设。
+func RecommendedAPIMiddlewareSet(base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) []Middleware {
 	return httpmiddleware.RecommendedAPIMiddlewareSet(base, opts)
 }
 
-// InternalHTTPAPIMiddleware returns the recommended internal API middleware preset.
+// InternalAPIMiddleware returns the recommended internal API middleware preset.
 //
-// InternalHTTPAPIMiddleware 返回推荐的内网 API 中间件预设。
-func InternalHTTPAPIMiddleware(base observabilitycontract.Logger, opts InternalHTTPMiddlewareOptions) HTTPMiddleware {
+// InternalAPIMiddleware 返回推荐的内网 API 中间件预设。
+func InternalAPIMiddleware(base observabilitycontract.Logger, opts InternalMiddlewareOptions) Middleware {
 	return httpmiddleware.InternalAPIMiddleware(base, opts)
 }
 
-// InternalHTTPAPIMiddlewareSet returns the recommended internal API middleware preset as an ordered slice.
+// InternalAPIMiddlewareSet returns the recommended internal API middleware preset as an ordered slice.
 //
-// InternalHTTPAPIMiddlewareSet 以有序切片形式返回推荐的内网 API 中间件预设。
-func InternalHTTPAPIMiddlewareSet(base observabilitycontract.Logger, opts InternalHTTPMiddlewareOptions) []HTTPMiddleware {
+// InternalAPIMiddlewareSet 以有序切片形式返回推荐的内网 API 中间件预设。
+func InternalAPIMiddlewareSet(base observabilitycontract.Logger, opts InternalMiddlewareOptions) []Middleware {
 	return httpmiddleware.InternalAPIMiddlewareSet(base, opts)
 }
 
-// AdminHTTPAPIMiddleware returns the recommended admin API middleware preset.
+// AdminAPIMiddleware returns the recommended admin API middleware preset.
 //
-// AdminHTTPAPIMiddleware 返回推荐的管理 API 中间件预设。
-func AdminHTTPAPIMiddleware(base observabilitycontract.Logger, opts AdminHTTPMiddlewareOptions) HTTPMiddleware {
+// AdminAPIMiddleware 返回推荐的管理 API 中间件预设。
+func AdminAPIMiddleware(base observabilitycontract.Logger, opts AdminMiddlewareOptions) Middleware {
 	return httpmiddleware.AdminAPIMiddleware(base, opts)
 }
 
-// AdminHTTPAPIMiddlewareSet returns the recommended admin API middleware preset as an ordered slice.
+// AdminAPIMiddlewareSet returns the recommended admin API middleware preset as an ordered slice.
 //
-// AdminHTTPAPIMiddlewareSet 以有序切片形式返回推荐的管理 API 中间件预设。
-func AdminHTTPAPIMiddlewareSet(base observabilitycontract.Logger, opts AdminHTTPMiddlewareOptions) []HTTPMiddleware {
+// AdminAPIMiddlewareSet 以有序切片形式返回推荐的管理 API 中间件预设。
+func AdminAPIMiddlewareSet(base observabilitycontract.Logger, opts AdminMiddlewareOptions) []Middleware {
 	return httpmiddleware.AdminAPIMiddlewareSet(base, opts)
 }
 
-// DefaultHTTPServiceGovernancePreset returns the default HTTP service governance middleware preset.
+// DefaultServiceGovernancePreset returns the default HTTP service governance middleware preset.
 //
-// DefaultHTTPServiceGovernancePreset 返回默认 HTTP 服务治理中间件预设。
-func DefaultHTTPServiceGovernancePreset(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) HTTPMiddleware {
+// DefaultServiceGovernancePreset 返回默认 HTTP 服务治理中间件预设。
+func DefaultServiceGovernancePreset(base observabilitycontract.Logger, opts DefaultServiceGovernanceOptions) Middleware {
 	return httpmiddleware.DefaultHTTPServiceGovernancePreset(base, opts)
 }
 
-// DefaultHTTPServiceGovernanceSet returns the default HTTP service governance preset as an ordered slice.
+// DefaultServiceGovernanceSet returns the default HTTP service governance preset as an ordered slice.
 //
-// DefaultHTTPServiceGovernanceSet 以有序切片形式返回默认 HTTP 服务治理预设。
-func DefaultHTTPServiceGovernanceSet(base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) []HTTPMiddleware {
+// DefaultServiceGovernanceSet 以有序切片形式返回默认 HTTP 服务治理预设。
+func DefaultServiceGovernanceSet(base observabilitycontract.Logger, opts DefaultServiceGovernanceOptions) []Middleware {
 	return httpmiddleware.DefaultHTTPServiceGovernanceSet(base, opts)
 }
 
-// UseDefaultHTTPMiddleware applies the default HTTP middleware baseline to the router.
+// UseDefaultMiddleware applies the default HTTP middleware baseline to the router.
 //
-// UseDefaultHTTPMiddleware 将默认 HTTP 中间件基线装配到路由器。
-func UseDefaultHTTPMiddleware(router HTTPRouter, base observabilitycontract.Logger) {
+// UseDefaultMiddleware 将默认 HTTP 中间件基线装配到路由器。
+func UseDefaultMiddleware(router Router, base observabilitycontract.Logger) {
 	httpmiddleware.UseDefaultMiddleware(router, base)
 }
 
-// UseRecommendedHTTPAPIMiddleware applies the recommended public API middleware preset to the router.
+// UseRecommendedAPIMiddleware applies the recommended public API middleware preset to the router.
 //
-// UseRecommendedHTTPAPIMiddleware 将推荐的对外 API 中间件预设装配到路由器。
-func UseRecommendedHTTPAPIMiddleware(router HTTPRouter, base observabilitycontract.Logger, opts RecommendedHTTPMiddlewareOptions) {
+// UseRecommendedAPIMiddleware 将推荐的对外 API 中间件预设装配到路由器。
+func UseRecommendedAPIMiddleware(router Router, base observabilitycontract.Logger, opts RecommendedMiddlewareOptions) {
 	httpmiddleware.UseRecommendedAPIMiddleware(router, base, opts)
 }
 
-// UseInternalHTTPAPIMiddleware applies the recommended internal API middleware preset to the router.
+// UseInternalAPIMiddleware applies the recommended internal API middleware preset to the router.
 //
-// UseInternalHTTPAPIMiddleware 将推荐的内网 API 中间件预设装配到路由器。
-func UseInternalHTTPAPIMiddleware(router HTTPRouter, base observabilitycontract.Logger, opts InternalHTTPMiddlewareOptions) {
+// UseInternalAPIMiddleware 将推荐的内网 API 中间件预设装配到路由器。
+func UseInternalAPIMiddleware(router Router, base observabilitycontract.Logger, opts InternalMiddlewareOptions) {
 	httpmiddleware.UseInternalAPIMiddleware(router, base, opts)
 }
 
-// UseAdminHTTPAPIMiddleware applies the recommended admin API middleware preset to the router.
+// UseAdminAPIMiddleware applies the recommended admin API middleware preset to the router.
 //
-// UseAdminHTTPAPIMiddleware 将推荐的管理 API 中间件预设装配到路由器。
-func UseAdminHTTPAPIMiddleware(router HTTPRouter, base observabilitycontract.Logger, opts AdminHTTPMiddlewareOptions) {
+// UseAdminAPIMiddleware 将推荐的管理 API 中间件预设装配到路由器。
+func UseAdminAPIMiddleware(router Router, base observabilitycontract.Logger, opts AdminMiddlewareOptions) {
 	httpmiddleware.UseAdminAPIMiddleware(router, base, opts)
 }
 
-// UseDefaultHTTPServiceGovernance applies the default HTTP service governance preset to the router.
+// UseDefaultServiceGovernance applies the default HTTP service governance preset to the router.
 //
-// UseDefaultHTTPServiceGovernance 将默认 HTTP 服务治理预设装配到路由器。
-func UseDefaultHTTPServiceGovernance(router HTTPRouter, base observabilitycontract.Logger, opts DefaultHTTPServiceGovernanceOptions) {
+// UseDefaultServiceGovernance 将默认 HTTP 服务治理预设装配到路由器。
+func UseDefaultServiceGovernance(router Router, base observabilitycontract.Logger, opts DefaultServiceGovernanceOptions) {
 	httpmiddleware.UseDefaultHTTPServiceGovernance(router, base, opts)
 }
 
 // Tenant returns the tenant middleware from the mainline HTTP middleware package.
 //
 // Tenant 返回主线 HTTP 中间件中的租户中间件。
-func Tenant(opts TenantOptions) HTTPMiddleware {
+func Tenant(opts TenantOptions) Middleware {
 	return httpmiddleware.Tenant(opts)
 }
 
 // BodyDump returns the request/response capture middleware from the mainline HTTP middleware package.
 //
 // BodyDump 返回主线 HTTP 中间件中的请求响应抓取中间件。
-func BodyDump(opts BodyDumpOptions) HTTPMiddleware {
+func BodyDump(opts BodyDumpOptions) Middleware {
 	return httpmiddleware.BodyDump(opts)
 }
 

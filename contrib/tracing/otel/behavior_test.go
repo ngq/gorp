@@ -14,7 +14,7 @@ type testTextMapCarrier struct {
 	values map[string]string
 }
 
-func (c *testTextMapCarrier) Get(key string) string { return c.values[key] }
+func (c *testTextMapCarrier) Get(key string) string        { return c.values[key] }
 func (c *testTextMapCarrier) Set(key string, value string) { c.values[key] = value }
 func (c *testTextMapCarrier) Keys() []string {
 	keys := make([]string, 0, len(c.values))
@@ -26,13 +26,13 @@ func (c *testTextMapCarrier) Keys() []string {
 
 func TestTracerProviderAndTracer_StartInjectExtractAndShutdown(t *testing.T) {
 	provider, err := NewTracerProvider(&observabilitycontract.TracingConfig{
-		Enabled:          true,
-		ExporterType:     "stdout",
-		ServiceName:      "order-service",
-		SamplingRate:     1,
-		Propagators:      []string{"tracecontext", "baggage"},
-		BatchTimeout:     1,
-		MaxQueueSize:     16,
+		Enabled:            true,
+		ExporterType:       "stdout",
+		ServiceName:        "order-service",
+		SamplingRate:       1,
+		Propagators:        []string{"tracecontext", "baggage"},
+		BatchTimeout:       1,
+		MaxQueueSize:       16,
 		MaxExportBatchSize: 8,
 	})
 	require.NoError(t, err)

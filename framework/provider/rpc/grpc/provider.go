@@ -31,7 +31,7 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns the provider identifier "rpc.grpc".
 //
 // Name 返回 provider 标识符 "rpc.grpc"。
-func (p *Provider) Name() string  { return "rpc.grpc" }
+func (p *Provider) Name() string { return "rpc.grpc" }
 
 // IsDefer returns true indicating this provider should be deferred during boot.
 //

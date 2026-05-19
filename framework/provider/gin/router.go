@@ -21,14 +21,14 @@ type router struct {
 // newRouter wraps a Gin router group as a framework router.
 //
 // newRouter 将 Gin router group 包装为框架 router。
-func newRouter(group *gin.RouterGroup) transportcontract.HTTPRouter {
+func newRouter(group *gin.RouterGroup) transportcontract.Router {
 	return &router{group: group}
 }
 
 // Use registers middleware on the current router group.
 //
 // Use 在当前 router group 上注册中间件。
-func (r *router) Use(middleware ...transportcontract.HTTPMiddleware) {
+func (r *router) Use(middleware ...transportcontract.Middleware) {
 	if r == nil || r.group == nil || len(middleware) == 0 {
 		return
 	}
@@ -48,7 +48,7 @@ func (r *router) Use(middleware ...transportcontract.HTTPMiddleware) {
 // Group creates a child router group with optional middleware.
 //
 // Group 创建一个可选挂载中间件的子路由组。
-func (r *router) Group(prefix string, middleware ...transportcontract.HTTPMiddleware) transportcontract.HTTPRouter {
+func (r *router) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	if r == nil || r.group == nil {
 		return &router{}
 	}
@@ -65,7 +65,7 @@ func (r *router) Group(prefix string, middleware ...transportcontract.HTTPMiddle
 // Handle registers a route handler for the given method and path.
 //
 // Handle 为指定 method 和 path 注册路由处理器。
-func (r *router) Handle(method, path string, handler transportcontract.HTTPHandler) {
+func (r *router) Handle(method, path string, handler transportcontract.Handler) {
 	if r == nil || r.group == nil || handler == nil {
 		return
 	}
@@ -75,7 +75,7 @@ func (r *router) Handle(method, path string, handler transportcontract.HTTPHandl
 // HandleFunc is a function-style alias for Handle.
 //
 // HandleFunc 是 Handle 的函数式别名。
-func (r *router) HandleFunc(method, path string, handlerFunc transportcontract.HTTPHandler) {
+func (r *router) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {
 	if handlerFunc == nil {
 		return
 	}
@@ -85,28 +85,28 @@ func (r *router) HandleFunc(method, path string, handlerFunc transportcontract.H
 // GET registers a GET route handler.
 //
 // GET 注册 GET 路由处理器。
-func (r *router) GET(path string, handler transportcontract.HTTPHandler) {
+func (r *router) GET(path string, handler transportcontract.Handler) {
 	r.Handle(http.MethodGet, path, handler)
 }
 
 // POST registers a POST route handler.
 //
 // POST 注册 POST 路由处理器。
-func (r *router) POST(path string, handler transportcontract.HTTPHandler) {
+func (r *router) POST(path string, handler transportcontract.Handler) {
 	r.Handle(http.MethodPost, path, handler)
 }
 
 // PUT registers a PUT route handler.
 //
 // PUT 注册 PUT 路由处理器。
-func (r *router) PUT(path string, handler transportcontract.HTTPHandler) {
+func (r *router) PUT(path string, handler transportcontract.Handler) {
 	r.Handle(http.MethodPut, path, handler)
 }
 
 // DELETE registers a DELETE route handler.
 //
 // DELETE 注册 DELETE 路由处理器。
-func (r *router) DELETE(path string, handler transportcontract.HTTPHandler) {
+func (r *router) DELETE(path string, handler transportcontract.Handler) {
 	r.Handle(http.MethodDelete, path, handler)
 }
 
@@ -117,7 +117,7 @@ func (r *router) Mount(path string, handler http.Handler) {
 	if handler == nil {
 		return
 	}
-	h := wrapHTTPHandler(handler)
+	h := wrapHandler(handler)
 	r.group.Handle(http.MethodGet, path, h)
 	r.group.Handle(http.MethodHead, path, h)
 }

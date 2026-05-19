@@ -28,28 +28,29 @@ type ValidateErrorResponse struct {
 	Details string `json:"details,omitempty"`
 }
 
-// storeValidatedBodyOnHTTPContext writes the validated request object into request context.
+// storeValidatedBody writes the validated request object into request context.
 //
-// storeValidatedBodyOnHTTPContext 将已校验的请求对象写回请求上下文。
-func storeValidatedBodyOnHTTPContext(c transportcontract.HTTPContext, obj any) {
+// storeValidatedBody 将已校验的请求对象写回请求上下文。
+func storeValidatedBody(c transportcontract.Context, obj any) {
 	if c == nil || obj == nil {
 		return
 	}
-	req := c.Request()
-	if req == nil {
-		return
+	// Store validated body in context using Set
+	c.Set("validated_body", obj)
+	// Also update gin.Request.Context for context.Context value propagation
+	if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+		gc.Request = gc.Request.WithContext(supportcontract.NewValidatedBodyContext(gc.Request.Context(), obj))
 	}
-	c.SetRequest(req.WithContext(supportcontract.NewValidatedBodyContext(req.Context(), obj)))
 }
 
 // validateBoundValue runs validator logic and emits a unified error response on validation failure.
 //
 // validateBoundValue 执行校验逻辑，并在校验失败时输出统一错误响应。
-func validateBoundValue(c transportcontract.HTTPContext, validator datacontract.Validator, obj any) error {
+func validateBoundValue(c transportcontract.Context, validator datacontract.Validator, obj any) error {
 	if validator == nil {
 		return nil
 	}
-	if err := validator.Validate(c.Context(), obj); err != nil {
+	if err := validator.Validate(c, obj); err != nil {
 		var appErr resiliencecontract.AppError
 		if !errors.As(err, &appErr) {
 			appErr = resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())
@@ -57,14 +58,14 @@ func validateBoundValue(c transportcontract.HTTPContext, validator datacontract.
 		respondWithError(c, appErr)
 		return appErr
 	}
-	storeValidatedBodyOnHTTPContext(c, obj)
+	storeValidatedBody(c, obj)
 	return nil
 }
 
 // BindAndValidateJSON binds a JSON payload and validates the bound object.
 //
 // BindAndValidateJSON 绑定 JSON 载荷并校验绑定后的对象。
-func BindAndValidateJSON(c transportcontract.HTTPContext, validator datacontract.Validator, obj any) error {
+func BindAndValidateJSON(c transportcontract.Context, validator datacontract.Validator, obj any) error {
 	if err := c.BindJSON(obj); err != nil {
 		appErr := resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, "invalid request body: "+err.Error())
 		respondWithError(c, appErr)
@@ -76,7 +77,7 @@ func BindAndValidateJSON(c transportcontract.HTTPContext, validator datacontract
 // BindAndValidateQuery binds query parameters and validates the bound object.
 //
 // BindAndValidateQuery 绑定查询参数并校验绑定后的对象。
-func BindAndValidateQuery(c transportcontract.HTTPContext, validator datacontract.Validator, obj any) error {
+func BindAndValidateQuery(c transportcontract.Context, validator datacontract.Validator, obj any) error {
 	if err := c.BindQuery(obj); err != nil {
 		appErr := resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, "invalid query parameters: "+err.Error())
 		respondWithError(c, appErr)
@@ -88,7 +89,7 @@ func BindAndValidateQuery(c transportcontract.HTTPContext, validator datacontrac
 // BindAndValidate binds a generic request payload and validates the bound object.
 //
 // BindAndValidate 绑定通用请求载荷并校验绑定后的对象。
-func BindAndValidate(c transportcontract.HTTPContext, validator datacontract.Validator, obj any) error {
+func BindAndValidate(c transportcontract.Context, validator datacontract.Validator, obj any) error {
 	if err := c.Bind(obj); err != nil {
 		appErr := resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, "invalid form data: "+err.Error())
 		respondWithError(c, appErr)
@@ -100,7 +101,7 @@ func BindAndValidate(c transportcontract.HTTPContext, validator datacontract.Val
 // respondWithError writes a normalized validation error response.
 //
 // respondWithError 输出归一化后的校验错误响应。
-func respondWithError(c transportcontract.HTTPContext, err resiliencecontract.AppError) {
+func respondWithError(c transportcontract.Context, err resiliencecontract.AppError) {
 	status := err.GetStatus()
 	response := ValidateErrorResponse{
 		Code:    int(status.Code),
@@ -145,7 +146,7 @@ func ValidateBodyMiddleware(validator datacontract.Validator, prototype any) fun
 		// 每次请求创建新的零值结构体，避免复用导致数据泄漏
 		obj := reflect.New(elemType).Interface()
 
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		if err := BindAndValidateJSON(httpCtx, validator, obj); err != nil {
 			c.Abort()
 			return
@@ -174,7 +175,7 @@ func ValidateQueryMiddleware(validator datacontract.Validator, prototype any) fu
 	return func(c *gin.Context) {
 		obj := reflect.New(elemType).Interface()
 
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		if err := BindAndValidateQuery(httpCtx, validator, obj); err != nil {
 			c.Abort()
 			return

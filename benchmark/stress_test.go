@@ -33,9 +33,9 @@ import (
 // ============================================================
 
 const (
-	stressDuration    = 10 * time.Second // 每个测试持续时间
-	stressConcurrency = 1000             // 并发数
-	stressInstanceCount = 100            // 服务实例数
+	stressDuration      = 10 * time.Second // 每个测试持续时间
+	stressConcurrency   = 1000             // 并发数
+	stressInstanceCount = 100              // 服务实例数
 )
 
 // ============================================================

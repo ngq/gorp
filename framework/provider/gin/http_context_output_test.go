@@ -1,7 +1,7 @@
-// Package gin_test provides unit tests for Gin-backed HTTP context output helpers.
+// Package gin_test provides unit tests for Gin-backed context output helpers.
 //
 // 适用场景：
-// - 验证基于 Gin 的 HTTP context 输出助手行为一致。
+// - 验证基于 Gin 的 context 输出助手行为一致。
 // - 防止字符串、XML、Data 和 Redirect 输出在 provider 适配层回归。
 // - 在主线抽象演进时，保持 provider 级上下文输出行为稳定。
 package gin
@@ -21,32 +21,32 @@ type xmlPayload struct {
 	Message string   `xml:"message"`
 }
 
-// TestHTTPContextString verifies string output through the Gin-backed HTTP context helper.
+// TestContextString verifies string output through the Gin-backed context helper.
 //
-// TestHTTPContextString 验证基于 Gin 的 HTTP context 字符串输出助手。
-func TestHTTPContextString(t *testing.T) {
+// TestContextString 验证基于 Gin 的 context 字符串输出助手。
+func TestContextString(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := ginpkg.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 
-	httpCtx := newHTTPContext(ctx)
+	httpCtx := newContext(ctx)
 	httpCtx.String(http.StatusOK, "success")
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "success", rec.Body.String())
 }
 
-// TestHTTPContextXML verifies XML output through the Gin-backed HTTP context helper.
+// TestContextXML verifies XML output through the Gin-backed context helper.
 //
-// TestHTTPContextXML 验证基于 Gin 的 HTTP context XML 输出助手。
-func TestHTTPContextXML(t *testing.T) {
+// TestContextXML 验证基于 Gin 的 context XML 输出助手。
+func TestContextXML(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := ginpkg.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 
-	httpCtx := newHTTPContext(ctx)
+	httpCtx := newContext(ctx)
 	httpCtx.XML(http.StatusOK, xmlPayload{Message: "ok"})
 
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -54,16 +54,16 @@ func TestHTTPContextXML(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "<message>ok</message>")
 }
 
-// TestHTTPContextData verifies binary data output through the Gin-backed HTTP context helper.
+// TestContextData verifies binary data output through the Gin-backed context helper.
 //
-// TestHTTPContextData 验证基于 Gin 的 HTTP context Data 输出助手。
-func TestHTTPContextData(t *testing.T) {
+// TestContextData 验证基于 Gin 的 context Data 输出助手。
+func TestContextData(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := ginpkg.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 
-	httpCtx := newHTTPContext(ctx)
+	httpCtx := newContext(ctx)
 	httpCtx.Data(http.StatusOK, "text/plain; charset=utf-8", []byte("pong"))
 
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -71,16 +71,16 @@ func TestHTTPContextData(t *testing.T) {
 	require.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
 }
 
-// TestHTTPContextRedirect verifies redirect output through the Gin-backed HTTP context helper.
+// TestContextRedirect verifies redirect output through the Gin-backed context helper.
 //
-// TestHTTPContextRedirect 验证基于 Gin 的 HTTP context Redirect 输出助手。
-func TestHTTPContextRedirect(t *testing.T) {
+// TestContextRedirect 验证基于 Gin 的 context Redirect 输出助手。
+func TestContextRedirect(t *testing.T) {
 	ginpkg.SetMode(ginpkg.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := ginpkg.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 
-	httpCtx := newHTTPContext(ctx)
+	httpCtx := newContext(ctx)
 	httpCtx.Redirect(http.StatusFound, "/callback")
 
 	require.Equal(t, http.StatusFound, rec.Code)

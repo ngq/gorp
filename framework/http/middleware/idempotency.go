@@ -73,8 +73,8 @@ type IdempotencyResponse struct {
 type MemoryIdempotencyStore struct {
 	data   sync.Map
 	stopCh chan struct{} // stopCh 用于通知 cleanup goroutine 退出
-	                          //
-	                          // stopCh signals the cleanup goroutine to exit.
+	//
+	// stopCh signals the cleanup goroutine to exit.
 }
 
 type idempotencyEntry struct {
@@ -257,7 +257,7 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 		reserved, response := store.Reserve(key, ttl)
 		if !reserved {
 			if response != nil {
-				writeCachedIdempotencyResponse(newHTTPContext(c), response)
+				writeCachedIdempotencyResponse(newContext(c), response)
 			} else {
 				// Another request is processing this key (reserved but not committed).
 				// Return 409 Conflict to tell the client to retry later.
@@ -293,13 +293,13 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 // Idempotency applies request de-duplication to transport-level HTTP middleware.
 //
 // Idempotency 将请求去重能力应用到 transport 层 HTTP 中间件链。
-func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HTTPMiddleware {
+func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.Middleware {
 	if ttl == 0 {
 		ttl = 24 * time.Hour
 	}
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if store == nil {
 				if next != nil {
 					next(c)
@@ -371,12 +371,12 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.HT
 // writeCachedIdempotencyResponse replays a previously cached idempotent response.
 //
 // writeCachedIdempotencyResponse 回放之前缓存的幂等响应。
-func writeCachedIdempotencyResponse(c transportcontract.HTTPContext, response *IdempotencyResponse) {
+func writeCachedIdempotencyResponse(c transportcontract.Context, response *IdempotencyResponse) {
 	if response == nil {
 		return
 	}
 	for k, v := range response.Headers {
-		c.Header(k, v)
+		c.SetHeader(k, v)
 	}
 	if len(response.Body) > 0 {
 		c.Data(response.StatusCode, response.ContentType, response.Body)

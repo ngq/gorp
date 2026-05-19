@@ -27,18 +27,18 @@ const (
 
 // HTTPMode identifies the HTTP handling abstraction mode.
 // This is an orthogonal dimension to GovernanceMode: HTTP mode controls
-// handler signature style (gorp.HTTPContext vs gin.Context), while
+// handler signature style (gorp.Context vs gin.Context), while
 // GovernanceMode controls governance capability set.
 //
 // HTTPMode 标识 HTTP 处理抽象模式。
 // 这是与 GovernanceMode 正交的维度：HTTP 模式控制 handler 签名风格
-// （gorp.HTTPContext vs gin.Context），GovernanceMode 控制治理能力集。
+// （gorp.Context vs gin.Context），GovernanceMode 控制治理能力集。
 type HTTPMode string
 
 const (
-	// HTTPModeContract uses gorp.HTTPContext abstraction.
+	// HTTPModeContract uses gorp.Context abstraction.
 	//
-	// HTTPModeContract 使用 gorp.HTTPContext 契约抽象。
+	// HTTPModeContract 使用 gorp.Context 契约抽象。
 	HTTPModeContract HTTPMode = "contract"
 	// HTTPModeGin uses native gin.Context directly.
 	//

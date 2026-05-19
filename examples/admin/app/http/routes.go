@@ -10,13 +10,13 @@ import (
 // RegisterRoutes 注册 HTTP 路由。
 //
 // 中文说明：
-// - 使用框架提供的 HTTPRouter 抽象接口；
+// - 使用框架提供的 Router 抽象接口；
 // - 调用 internal/service 层注册业务路由；
 // - `/healthz` 与 `/metrics` 等基础端点由 application 默认主线统一注册，这里只关注业务 API；
 // - 业务是否启用认证或缓存能力，仍由项目自行决定；
-// - 使用 gorp.HTTPContext 接口，与模板生成代码风格一致。
-func RegisterRoutes(r gorp.HTTPRouter, svc *service.Services) {
-	// Demo 处理器（使用模板生成的 HTTPContext 风格）
+// - 使用 gorp.Context 接口，与模板生成代码风格一致。
+func RegisterRoutes(r gorp.Router, svc *service.Services) {
+	// Demo 处理器（使用模板生成的 Context 风格）
 	demoHandler := handler.NewDemoHandler(svc.Demo)
 	authHandler := handler.NewAuthHandler(svc.Auth)
 	userHandler := handler.NewUserHandler(svc.User)

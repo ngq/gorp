@@ -33,14 +33,14 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string       { return "log" }
+func (p *Provider) Name() string { return "log" }
 
 // IsDefer indicates log provider should not defer loading.
 // Must be available early for other providers to log.
 //
 // IsDefer 表示日志 provider 不应延迟加载。
 // 必须尽早可用以便其他 provider 记录日志。
-func (p *Provider) IsDefer() bool      { return false }
+func (p *Provider) IsDefer() bool { return false }
 
 // Provides returns the capability keys this provider exposes.
 // Exposes LogKey for logging service.

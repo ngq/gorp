@@ -22,11 +22,11 @@ type ShippingServiceServer interface {
 
 // CalculateShippingRequest 计算运费请求
 type CalculateShippingRequest struct {
-	OrderID      uint64
-	FromAddress  *Address
-	ToAddress    *Address
-	Packages     []*Package
-	Currency     string
+	OrderID     uint64
+	FromAddress *Address
+	ToAddress   *Address
+	Packages    []*Package
+	Currency    string
 }
 
 // Address 地址
@@ -43,11 +43,11 @@ type Address struct {
 
 // Package 包裹
 type Package struct {
-	Weight  float64 // kg
-	Length  float64 // cm
-	Width   float64
-	Height  float64
-	Value   float64
+	Weight   float64 // kg
+	Length   float64 // cm
+	Width    float64
+	Height   float64
+	Value    float64
 	Quantity int32
 }
 
@@ -69,11 +69,11 @@ type ShippingOption struct {
 
 // CreateShipmentRequest 创建运单请求
 type CreateShipmentRequest struct {
-	OrderID             uint64
-	ShippingMethodCode  string
-	FromAddress         *Address
-	ToAddress           *Address
-	Packages            []*Package
+	OrderID            uint64
+	ShippingMethodCode string
+	FromAddress        *Address
+	ToAddress          *Address
+	Packages           []*Package
 }
 
 // CreateShipmentResponse 创建运单响应

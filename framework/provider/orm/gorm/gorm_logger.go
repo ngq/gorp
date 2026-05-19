@@ -28,18 +28,18 @@ import (
 //
 // gormLogger 实现 GORM 的 logger.Interface，使用 gorp 框架的 Logger。
 type gormLogger struct {
-	l                         observabilitycontract.Logger // l is the framework logger.
-	                                                       //
-	                                                        // l 框架日志实例。
-	level                     logger.LogLevel              // level is the current log level.
-	                                                       //
-	                                                        // level 当前日志级别。
-	slowThreshold             time.Duration                // slowThreshold is slow query threshold.
-	                                                       //
-	                                                        // slowThreshold 慢查询阈值。
-	ignoreRecordNotFoundError bool                         // ignoreRecordNotFoundError controls ErrRecordNotFound handling.
-	                                                       //
-	                                                        // ignoreRecordNotFoundError 是否忽略 ErrRecordNotFound。
+	l observabilitycontract.Logger // l is the framework logger.
+	//
+	// l 框架日志实例。
+	level logger.LogLevel // level is the current log level.
+	//
+	// level 当前日志级别。
+	slowThreshold time.Duration // slowThreshold is slow query threshold.
+	//
+	// slowThreshold 慢查询阈值。
+	ignoreRecordNotFoundError bool // ignoreRecordNotFoundError controls ErrRecordNotFound handling.
+	//
+	// ignoreRecordNotFoundError 是否忽略 ErrRecordNotFound。
 }
 
 // newGormLogger creates a new GORM logger adapter.

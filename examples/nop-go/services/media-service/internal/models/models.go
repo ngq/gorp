@@ -134,7 +134,7 @@ type PictureUploadRequest struct {
 	AltAttribute   string `form:"alt_attribute"`
 	TitleAttribute string `form:"title_attribute"`
 	SeoFilename    string `form:"seo_filename"`
-	EntityType     string `form:"entity_type"`   // product / category / manufacturer / vendor
+	EntityType     string `form:"entity_type"` // product / category / manufacturer / vendor
 	EntityID       uint   `form:"entity_id"`
 	DisplayOrder   int    `form:"display_order"`
 	IsMain         bool   `form:"is_main"`

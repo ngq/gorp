@@ -34,11 +34,11 @@ import (
 // tracing, service authentication, circuit breaker and retry.
 //
 // Connection Pool Behavior:
-// - Connections are cached by address in a sync.Map with no upper limit.
-// - Each unique service address creates one gRPC connection that is reused.
-// - Connections are closed when Client.Close() is called.
-// - For scenarios with many services, consider implementing a connection pool
-//   with LRU eviction or using a connection pool library.
+//   - Connections are cached by address in a sync.Map with no upper limit.
+//   - Each unique service address creates one gRPC connection that is reused.
+//   - Connections are closed when Client.Close() is called.
+//   - For scenarios with many services, consider implementing a connection pool
+//     with LRU eviction or using a connection pool library.
 //
 // Client 使用 gRPC 实现 transportcontract.RPCClient。
 // 管理连接池、服务发现、metadata 传播、tracing、服务认证、熔断和重试。

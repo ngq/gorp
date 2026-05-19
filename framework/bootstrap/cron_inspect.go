@@ -20,16 +20,16 @@ import (
 //
 // RegisterCronInspectEndpoints 注册 /debug/cron 和 /doctor/cron 端点。
 // 展示所有已注册 cron 任务的调度表达式、上次/下次执行时间及执行状态。
-func RegisterCronInspectEndpoints(router transportcontract.HTTPRouter, cronSvc runtimecontract.Cron) {
+func RegisterCronInspectEndpoints(router transportcontract.Router, cronSvc runtimecontract.Cron) {
 	if router == nil || cronSvc == nil {
 		return
 	}
 
-	handler := func(c transportcontract.HTTPContext) {
+	handler := func(c transportcontract.Context) {
 		jobs := cronSvc.Jobs()
 
 		if wantsCronDiagnosticText(c) {
-			c.Header("Content-Type", "text/plain; charset=utf-8")
+			c.SetHeader("Content-Type", "text/plain; charset=utf-8")
 			c.String(http.StatusOK, formatCronDiagnosticView(jobs))
 			return
 		}
@@ -46,7 +46,7 @@ func RegisterCronInspectEndpoints(router transportcontract.HTTPRouter, cronSvc r
 // wantsCronDiagnosticText checks if the client wants a text/plain response.
 //
 // wantsCronDiagnosticText 检查客户端是否希望 text/plain 响应。
-func wantsCronDiagnosticText(c transportcontract.HTTPContext) bool {
+func wantsCronDiagnosticText(c transportcontract.Context) bool {
 	if c == nil {
 		return false
 	}

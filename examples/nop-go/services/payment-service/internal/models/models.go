@@ -7,19 +7,19 @@ import (
 
 // Payment 支付记录
 type Payment struct {
-	ID              uint64     `gorm:"primaryKey" json:"id"`
-	OrderID         uint64     `gorm:"not null;uniqueIndex" json:"order_id"`
-	TransactionID   string     `gorm:"size:128;uniqueIndex" json:"transaction_id"`
-	PaymentMethod   string     `gorm:"size:32;not null" json:"payment_method"` // alipay, wechat, bank
-	Amount          float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
-	CurrencyCode    string     `gorm:"size:8;default:'CNY'" json:"currency_code"`
-	Status          string     `gorm:"size:16;not null;default:'pending'" json:"status"` // pending, authorized, paid, failed, refunded
-	PaidAt          *time.Time `json:"paid_at"`
-	RefundedAt      *time.Time `json:"refunded_at"`
-	RefundAmount    float64    `gorm:"type:decimal(10,2);default:0" json:"refund_amount"`
-	NotifyData      string     `gorm:"type:text" json:"notify_data"`
-	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt       time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID            uint64     `gorm:"primaryKey" json:"id"`
+	OrderID       uint64     `gorm:"not null;uniqueIndex" json:"order_id"`
+	TransactionID string     `gorm:"size:128;uniqueIndex" json:"transaction_id"`
+	PaymentMethod string     `gorm:"size:32;not null" json:"payment_method"` // alipay, wechat, bank
+	Amount        float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
+	CurrencyCode  string     `gorm:"size:8;default:'CNY'" json:"currency_code"`
+	Status        string     `gorm:"size:16;not null;default:'pending'" json:"status"` // pending, authorized, paid, failed, refunded
+	PaidAt        *time.Time `json:"paid_at"`
+	RefundedAt    *time.Time `json:"refunded_at"`
+	RefundAmount  float64    `gorm:"type:decimal(10,2);default:0" json:"refund_amount"`
+	NotifyData    string     `gorm:"type:text" json:"notify_data"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (Payment) TableName() string {
@@ -47,15 +47,15 @@ func (PaymentTransaction) TableName() string {
 
 // Refund 退款记录
 type Refund struct {
-	ID              uint64     `gorm:"primaryKey" json:"id"`
-	PaymentID       uint64     `gorm:"not null;index" json:"payment_id"`
-	OrderID         uint64     `gorm:"not null;index" json:"order_id"`
-	Amount          float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
-	Reason          string     `gorm:"size:256" json:"reason"`
-	Status          string     `gorm:"size:16;default:'pending'" json:"status"` // pending, processing, success, failed
-	TransactionID   string     `gorm:"size:128" json:"transaction_id"`
-	ProcessedAt     *time.Time `json:"processed_at"`
-	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	ID            uint64     `gorm:"primaryKey" json:"id"`
+	PaymentID     uint64     `gorm:"not null;index" json:"payment_id"`
+	OrderID       uint64     `gorm:"not null;index" json:"order_id"`
+	Amount        float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
+	Reason        string     `gorm:"size:256" json:"reason"`
+	Status        string     `gorm:"size:16;default:'pending'" json:"status"` // pending, processing, success, failed
+	TransactionID string     `gorm:"size:128" json:"transaction_id"`
+	ProcessedAt   *time.Time `json:"processed_at"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (Refund) TableName() string {
@@ -64,14 +64,14 @@ func (Refund) TableName() string {
 
 // PaymentMethod 支付方式配置
 type PaymentMethod struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"size:64;not null" json:"name"`
-	SystemName  string    `gorm:"size:64;uniqueIndex;not null" json:"system_name"`
-	Description string    `gorm:"type:text" json:"description"`
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	DisplayOrder int      `gorm:"default:0" json:"display_order"`
-	Config      string    `gorm:"type:json" json:"config"` // JSON 配置
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID           uint64    `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"size:64;not null" json:"name"`
+	SystemName   string    `gorm:"size:64;uniqueIndex;not null" json:"system_name"`
+	Description  string    `gorm:"type:text" json:"description"`
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
+	DisplayOrder int       `gorm:"default:0" json:"display_order"`
+	Config       string    `gorm:"type:json" json:"config"` // JSON 配置
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (PaymentMethod) TableName() string {
@@ -80,11 +80,11 @@ func (PaymentMethod) TableName() string {
 
 // DTO
 type CreatePaymentRequest struct {
-	OrderID       uint64 `json:"order_id" binding:"required"`
-	PaymentMethod string `json:"payment_method" binding:"required"`
+	OrderID       uint64  `json:"order_id" binding:"required"`
+	PaymentMethod string  `json:"payment_method" binding:"required"`
 	Amount        float64 `json:"amount" binding:"required"`
-	ReturnURL     string `json:"return_url"`
-	NotifyURL     string `json:"notify_url"`
+	ReturnURL     string  `json:"return_url"`
+	NotifyURL     string  `json:"notify_url"`
 }
 
 type PaymentResponse struct {

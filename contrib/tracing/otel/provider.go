@@ -5,19 +5,19 @@
 //
 // 使用示例：
 //
-//  cfg := &TracingConfig{
-//      ServiceName: "my-service",
-//      Exporter:    "otlp-grpc",
-//      Endpoint:    "localhost:4317",
-//  }
-//  tracer, err := NewTracer(cfg)
-//  if err != nil {
-//      panic(err)
-//  }
-//  defer tracer.Close()
+//	cfg := &TracingConfig{
+//	    ServiceName: "my-service",
+//	    Exporter:    "otlp-grpc",
+//	    Endpoint:    "localhost:4317",
+//	}
+//	tracer, err := NewTracer(cfg)
+//	if err != nil {
+//	    panic(err)
+//	}
+//	defer tracer.Close()
 //
-//  ctx, span := tracer.Start(ctx, "operation-name")
-//  defer span.End()
+//	ctx, span := tracer.Start(ctx, "operation-name")
+//	defer span.End()
 //
 // 配置路径：tracing.*
 package otel

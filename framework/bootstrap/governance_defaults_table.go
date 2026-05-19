@@ -12,8 +12,8 @@ package bootstrap
 import (
 	"fmt"
 
-	"github.com/ngq/gorp/framework/http/middleware"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	"github.com/ngq/gorp/framework/http/middleware"
 )
 
 // BuildGovernanceDefaultsTable builds the full governance defaults table for one mode.
@@ -47,7 +47,7 @@ func BuildGovernanceDefaultsTable(mode resiliencecontract.GovernanceMode) *resil
 
 	// HTTP 中间件默认值：从 DefaultHTTPServiceGovernanceDefaults 投影
 	httpDefaults := middleware.DefaultHTTPServiceGovernanceDefaults()
-	httpMiddlewareDefaults := resiliencecontract.HTTPMiddlewareDefaults{
+	middlewareDefaults := resiliencecontract.MiddlewareDefaults{
 		Timeout:           httpDefaults.API.Timeout.String(),
 		BodyLimit:         formatBytes(httpDefaults.API.BodyLimitBytes),
 		MaxConcurrent:     httpDefaults.MaxConcurrent,
@@ -57,14 +57,14 @@ func BuildGovernanceDefaultsTable(mode resiliencecontract.GovernanceMode) *resil
 
 	// CORS 默认值（启用 CORS 时生效的默认配置）
 	corsDefaults := middleware.DefaultCORSOptions()
-	httpMiddlewareDefaults.CORS = resiliencecontract.CORSDefaults{
+	middlewareDefaults.CORS = resiliencecontract.CORSDefaults{
 		AllowOrigins:  corsDefaults.AllowOrigins,
 		MaxAgeSeconds: corsDefaults.MaxAgeSeconds,
 	}
 
 	// 安全头默认值
 	securityDefaults := middleware.DefaultSecurityHeadersOptions()
-	httpMiddlewareDefaults.SecurityHeaders = resiliencecontract.SecurityHeaderDefaults{
+	middlewareDefaults.SecurityHeaders = resiliencecontract.SecurityHeaderDefaults{
 		XFrameOptions:       securityDefaults.XFrameOptions,
 		XContentTypeOptions: securityDefaults.XContentTypeOptions,
 		ReferrerPolicy:      securityDefaults.ReferrerPolicy,
@@ -72,7 +72,7 @@ func BuildGovernanceDefaultsTable(mode resiliencecontract.GovernanceMode) *resil
 
 	// 本地化默认值
 	localeDefaults := middleware.DefaultLocaleOptions()
-	httpMiddlewareDefaults.Locale = resiliencecontract.LocaleDefaults{
+	middlewareDefaults.Locale = resiliencecontract.LocaleDefaults{
 		Supported: localeDefaults.Supported,
 		Default:   localeDefaults.Default,
 		QueryKeys: localeDefaults.QueryKeys,
@@ -84,11 +84,11 @@ func BuildGovernanceDefaultsTable(mode resiliencecontract.GovernanceMode) *resil
 	}
 
 	return &resiliencecontract.GovernanceDefaultsTable{
-		Mode:                   mode,
-		FeatureDefaults:        featureDefaults,
-		ProviderDefaults:       providerDefaults,
-		HTTPMiddlewareDefaults: httpMiddlewareDefaults,
-		RPCClientDefaults:      rpcClientDefaults,
+		Mode:               mode,
+		FeatureDefaults:    featureDefaults,
+		ProviderDefaults:   providerDefaults,
+		MiddlewareDefaults: middlewareDefaults,
+		RPCClientDefaults:  rpcClientDefaults,
 	}
 }
 

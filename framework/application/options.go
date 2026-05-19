@@ -198,7 +198,7 @@ func WithSetup(fn SetupFunc) Option {
 //
 // Example:
 //
-//	application.WithHTTPRoutes(func(router transportcontract.HTTPRouter, c runtimecontract.Container) error {
+//	application.WithHTTPRoutes(func(router transportcontract.Router, c runtimecontract.Container) error {
 //	    api := router.Group("/api")
 //	    api.GET("/ping", pingHandler)
 //	    return nil
@@ -311,10 +311,10 @@ func WithMonoGovernance() Option {
 }
 
 // WithHTTPMode declares the HTTP handling mode explicitly.
-// HTTPMode controls handler signature style (gorp.HTTPContext vs gin.Context).
+// HTTPMode controls handler signature style (gorp.Context vs gin.Context).
 //
 // WithHTTPMode 显式声明 HTTP 处理抽象模式。
-// HTTPMode 控制 handler 签名风格（gorp.HTTPContext vs gin.Context）。
+// HTTPMode 控制 handler 签名风格（gorp.Context vs gin.Context）。
 func WithHTTPMode(mode resiliencecontract.HTTPMode) Option {
 	return optionFunc(func(cfg *runConfig) {
 		if mode == "" {
@@ -324,9 +324,9 @@ func WithHTTPMode(mode resiliencecontract.HTTPMode) Option {
 	})
 }
 
-// WithContractHTTPMode selects the gorp.HTTPContext contract abstraction.
+// WithContractHTTPMode selects the gorp.Context contract abstraction.
 //
-// WithContractHTTPMode 选择 gorp.HTTPContext 契约抽象。
+// WithContractHTTPMode 选择 gorp.Context 契约抽象。
 func WithContractHTTPMode() Option {
 	return WithHTTPMode(resiliencecontract.HTTPModeContract)
 }

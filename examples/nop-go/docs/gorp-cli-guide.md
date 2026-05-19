@@ -432,10 +432,10 @@ package ratelimit
 
 import gorp "github.com/ngq/gorp/framework/contract"
 
-// Middleware 返回该中间件的 gorp.HTTPMiddleware。
-func Middleware() gorp.HTTPMiddleware {
-    return func(next gorp.HTTPHandler) gorp.HTTPHandler {
-        return func(c gorp.HTTPContext) {
+// Middleware 返回该中间件的 gorp.Middleware。
+func Middleware() gorp.Middleware {
+    return func(next gorp.Handler) gorp.Handler {
+        return func(c gorp.Context) {
             if next != nil {
                 next(c)
             }

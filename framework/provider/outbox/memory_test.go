@@ -17,11 +17,11 @@ import (
 
 // senderStub 是用于测试的发送器存根，支持控制发送成功/失败。
 type senderStub struct {
-	err     error               // 发送时返回的错误
-	sent    int                 // 成功发送次数
+	err     error                              // 发送时返回的错误
+	sent    int                                // 成功发送次数
 	last    *integrationcontract.OutboxMessage // 最后发送的消息
-	mu      sync.Mutex          // 保护 sent 计数
-	callIDs []string            // 所有调用过的消息 ID（用于验证幂等性）
+	mu      sync.Mutex                         // 保护 sent 计数
+	callIDs []string                           // 所有调用过的消息 ID（用于验证幂等性）
 }
 
 // Send 实现 OutboxSender 接口。

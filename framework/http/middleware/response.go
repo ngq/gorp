@@ -118,35 +118,35 @@ func (e *BizError) Message() string { return e.message }
 // Success writes a standard success response using the default responder.
 //
 // Success 使用默认 responder 输出标准成功响应。
-func Success(c transportcontract.HTTPContext, data any) {
+func Success(c transportcontract.Context, data any) {
 	DefaultResponderInstance.Success(c, data)
 }
 
 // SuccessWithMessage writes a success response with a custom message.
 //
 // SuccessWithMessage 输出带自定义消息的成功响应。
-func SuccessWithMessage(c transportcontract.HTTPContext, message string, data any) {
+func SuccessWithMessage(c transportcontract.Context, message string, data any) {
 	DefaultResponderInstance.SuccessWithMessage(c, message, data)
 }
 
 // SuccessWithStatus writes a success response with a custom HTTP status.
 //
 // SuccessWithStatus 输出带自定义 HTTP 状态码的成功响应。
-func SuccessWithStatus(c transportcontract.HTTPContext, status int, data any) {
+func SuccessWithStatus(c transportcontract.Context, status int, data any) {
 	DefaultResponderInstance.SuccessWithStatus(c, status, data)
 }
 
 // Error writes an error response using the default responder.
 //
 // Error 使用默认 responder 输出错误响应。
-func Error(c transportcontract.HTTPContext, err error) {
+func Error(c transportcontract.Context, err error) {
 	DefaultResponderInstance.Error(c, err)
 }
 
 // ErrorWithData writes an error response and attaches extra response data.
 //
 // ErrorWithData 输出错误响应，并附带额外数据。
-func ErrorWithData(c transportcontract.HTTPContext, err error, data any) {
+func ErrorWithData(c transportcontract.Context, err error, data any) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	c.JSON(codeToHTTPStatus(code), Response{Code: code, Message: message, Data: data})
@@ -155,7 +155,7 @@ func ErrorWithData(c transportcontract.HTTPContext, err error, data any) {
 // ErrorWithStatus writes an error response using a caller-provided HTTP status.
 //
 // ErrorWithStatus 使用调用方指定的 HTTP 状态码输出错误响应。
-func ErrorWithStatus(c transportcontract.HTTPContext, status int, err error) {
+func ErrorWithStatus(c transportcontract.Context, status int, err error) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	c.JSON(status, Response{Code: code, Message: message})
@@ -164,14 +164,14 @@ func ErrorWithStatus(c transportcontract.HTTPContext, status int, err error) {
 // BadRequest writes a standard bad-request response.
 //
 // BadRequest 输出标准的错误请求响应。
-func BadRequest(c transportcontract.HTTPContext, message string) {
+func BadRequest(c transportcontract.Context, message string) {
 	DefaultResponderInstance.BadRequest(c, message)
 }
 
 // Unauthorized writes a standard unauthorized response.
 //
 // Unauthorized 输出标准的未认证响应。
-func Unauthorized(c transportcontract.HTTPContext, message string) {
+func Unauthorized(c transportcontract.Context, message string) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusUnauthorized, Response{Code: CodeUnauthorized, Message: message})
 }
@@ -179,7 +179,7 @@ func Unauthorized(c transportcontract.HTTPContext, message string) {
 // Forbidden writes a standard forbidden response.
 //
 // Forbidden 输出标准的无权限响应。
-func Forbidden(c transportcontract.HTTPContext, message string) {
+func Forbidden(c transportcontract.Context, message string) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusForbidden, Response{Code: CodeForbidden, Message: message})
 }
@@ -187,7 +187,7 @@ func Forbidden(c transportcontract.HTTPContext, message string) {
 // NotFound writes a standard not-found response.
 //
 // NotFound 输出标准的资源不存在响应。
-func NotFound(c transportcontract.HTTPContext, message string) {
+func NotFound(c transportcontract.Context, message string) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusNotFound, Response{Code: CodeNotFound, Message: message})
 }
@@ -195,14 +195,14 @@ func NotFound(c transportcontract.HTTPContext, message string) {
 // InternalError writes a standard internal-error response.
 //
 // InternalError 输出标准的内部错误响应。
-func InternalError(c transportcontract.HTTPContext, message string) {
+func InternalError(c transportcontract.Context, message string) {
 	DefaultResponderInstance.InternalError(c, message)
 }
 
 // SuccessPaginated writes a standard paginated success response.
 //
 // SuccessPaginated 输出标准的分页成功响应。
-func SuccessPaginated(c transportcontract.HTTPContext, items any, total int64, page, pageSize int) {
+func SuccessPaginated(c transportcontract.Context, items any, total int64, page, pageSize int) {
 	Success(c, PaginatedData{
 		Items:    items,
 		Total:    total,
@@ -211,40 +211,40 @@ func SuccessPaginated(c transportcontract.HTTPContext, items any, total int64, p
 	})
 }
 
-func (DefaultResponder) Success(c transportcontract.HTTPContext, data any) {
+func (DefaultResponder) Success(c transportcontract.Context, data any) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusOK, Response{Code: CodeSuccess, Message: "success", Data: data})
 }
 
-func (DefaultResponder) SuccessWithMessage(c transportcontract.HTTPContext, message string, data any) {
+func (DefaultResponder) SuccessWithMessage(c transportcontract.Context, message string, data any) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusOK, Response{Code: CodeSuccess, Message: message, Data: data})
 }
 
-func (DefaultResponder) SuccessWithStatus(c transportcontract.HTTPContext, status int, data any) {
+func (DefaultResponder) SuccessWithStatus(c transportcontract.Context, status int, data any) {
 	writeResponseHeaders(c)
 	c.JSON(status, Response{Code: CodeSuccess, Message: "success", Data: data})
 }
 
-func (DefaultResponder) Error(c transportcontract.HTTPContext, err error) {
+func (DefaultResponder) Error(c transportcontract.Context, err error) {
 	writeResponseHeaders(c)
 	code, message := parseError(err)
 	c.JSON(codeToHTTPStatus(code), Response{Code: code, Message: message})
 }
 
-func (DefaultResponder) BadRequest(c transportcontract.HTTPContext, message string) {
+func (DefaultResponder) BadRequest(c transportcontract.Context, message string) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusBadRequest, Response{Code: CodeBadRequest, Message: message})
 }
 
-func (DefaultResponder) InternalError(c transportcontract.HTTPContext, message string) {
+func (DefaultResponder) InternalError(c transportcontract.Context, message string) {
 	writeResponseHeaders(c)
 	c.JSON(http.StatusInternalServerError, Response{Code: CodeInternalError, Message: message})
 }
 
-func responderFor(c transportcontract.HTTPContext) transportcontract.HTTPResponder {
-	if c != nil && c.Context() != nil {
-		if containerAny, ok := supportcontract.FromContainerContext(c.Context()); ok {
+func responderFor(c transportcontract.Context) transportcontract.HTTPResponder {
+	if c != nil {
+		if containerAny, ok := supportcontract.FromContainerContext(c); ok {
 			if container, ok := containerAny.(runtimecontract.Container); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
 				if responderAny, err := container.Make(transportcontract.HTTPResponderKey); err == nil {
 					if responder, ok := responderAny.(transportcontract.HTTPResponder); ok && responder != nil {
@@ -257,15 +257,15 @@ func responderFor(c transportcontract.HTTPContext) transportcontract.HTTPRespond
 	return DefaultResponderInstance
 }
 
-func writeResponseHeaders(c transportcontract.HTTPContext) {
+func writeResponseHeaders(c transportcontract.Context) {
 	if c == nil {
 		return
 	}
-	if requestID, ok := supportcontract.FromRequestIDContext(c.Context()); ok && requestID != "" {
-		c.Header("X-Request-Id", requestID)
+	if requestID, ok := supportcontract.FromRequestIDContext(c); ok && requestID != "" {
+		c.SetHeader("X-Request-Id", requestID)
 	}
-	if traceID, ok := supportcontract.FromTraceIDContext(c.Context()); ok && traceID != "" {
-		c.Header("X-Trace-Id", traceID)
+	if traceID, ok := supportcontract.FromTraceIDContext(c); ok && traceID != "" {
+		c.SetHeader("X-Trace-Id", traceID)
 	}
 }
 

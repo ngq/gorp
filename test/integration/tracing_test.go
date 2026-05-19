@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	otelprovider "github.com/ngq/gorp/contrib/tracing/otel"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
-	otelprovider "github.com/ngq/gorp/contrib/tracing/otel"
 )
 
 // TestTracingSpanCreation tests OTel tracing span creation.

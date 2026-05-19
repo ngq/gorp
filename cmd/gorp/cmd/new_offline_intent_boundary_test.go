@@ -4,10 +4,10 @@ import "testing"
 
 func TestResolveOfflineIntentDefaults(t *testing.T) {
 	tests := []struct {
-		name           string
-		intent         string
-		wantTemplate   string
-		wantStarter    string
+		name         string
+		intent       string
+		wantTemplate string
+		wantStarter  string
 	}{
 		{name: "default", intent: "", wantTemplate: starterTemplateGoLayout, wantStarter: starterProfileBasic},
 		{name: "multi wire", intent: newIntentMultiWire, wantTemplate: starterTemplateMultiFlatWire, wantStarter: ""},

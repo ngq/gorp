@@ -10,8 +10,8 @@ import (
 )
 
 type PriceUseCase struct {
-	priceRepo  data.ProductPriceRepository
-	taxRepo    data.TaxRateRepository
+	priceRepo    data.ProductPriceRepository
+	taxRepo      data.TaxRateRepository
 	discountRepo data.DiscountRepository
 }
 
@@ -21,8 +21,8 @@ func NewPriceUseCase(
 	discountRepo data.DiscountRepository,
 ) *PriceUseCase {
 	return &PriceUseCase{
-		priceRepo:  priceRepo,
-		taxRepo:    taxRepo,
+		priceRepo:    priceRepo,
+		taxRepo:      taxRepo,
 		discountRepo: discountRepo,
 	}
 }

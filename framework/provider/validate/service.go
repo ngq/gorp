@@ -28,15 +28,15 @@ import (
 //
 // ValidatorService 使用 go-playground/validator 实现 datacontract.Validator 接口。
 type ValidatorService struct {
-	validate *validator.Validate         // validate is the underlying validator.
-	                                   //
-	                                    // validate 底层验证器。
-	trans    ut.Translator                // trans is the error translator.
-	                                   //
-	                                    // trans 错误翻译器。
-	cfg      *datacontract.ValidatorConfig // cfg is the validator configuration.
-	                                   //
-	                                    // cfg 验证配置。
+	validate *validator.Validate // validate is the underlying validator.
+	//
+	// validate 底层验证器。
+	trans ut.Translator // trans is the error translator.
+	//
+	// trans 错误翻译器。
+	cfg *datacontract.ValidatorConfig // cfg is the validator configuration.
+	//
+	// cfg 验证配置。
 }
 
 // NewValidatorService creates a new validator service with given config.

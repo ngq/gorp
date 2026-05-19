@@ -8,7 +8,7 @@
 //
 // Eg:
 //
-//	func Ping(c gorp.HTTPContext) {
+//	func Ping(c gorp.Context) {
 //	    gorp.Success(c, map[string]any{"pong": true})
 //	}
 package gorp
@@ -24,54 +24,54 @@ import (
 //
 // Example:
 //
-//	func Ping(c gorp.HTTPContext) {
+//	func Ping(c gorp.Context) {
 //	    gorp.Success(c, map[string]any{"pong": true})
 //	}
-func Success(c HTTPContext, data any) {
+func Success(c Context, data any) {
 	responderFor(c).Success(c, data)
 }
 
 // SuccessWithMessage writes a successful HTTP response with a custom message.
 //
 // SuccessWithMessage 使用自定义 message 输出成功 HTTP 响应。
-func SuccessWithMessage(c HTTPContext, message string, data any) {
+func SuccessWithMessage(c Context, message string, data any) {
 	responderFor(c).SuccessWithMessage(c, message, data)
 }
 
 // SuccessWithStatus writes a successful HTTP response with a custom HTTP status.
 //
 // SuccessWithStatus 使用自定义 HTTP status 输出成功响应。
-func SuccessWithStatus(c HTTPContext, status int, data any) {
+func SuccessWithStatus(c Context, status int, data any) {
 	responderFor(c).SuccessWithStatus(c, status, data)
 }
 
 // Error writes an error HTTP response through the current responder chain.
 //
 // Error 通过当前 responder 链输出错误 HTTP 响应。
-func Error(c HTTPContext, err error) {
+func Error(c Context, err error) {
 	responderFor(c).Error(c, err)
 }
 
 // BadRequest writes a bad-request HTTP response through the current responder chain.
 //
 // BadRequest 通过当前 responder 链输出 bad request 响应。
-func BadRequest(c HTTPContext, message string) {
+func BadRequest(c Context, message string) {
 	responderFor(c).BadRequest(c, message)
 }
 
 // InternalError writes an internal-error HTTP response through the current responder chain.
 //
 // InternalError 通过当前 responder 链输出内部错误响应。
-func InternalError(c HTTPContext, message string) {
+func InternalError(c Context, message string) {
 	responderFor(c).InternalError(c, message)
 }
 
 // responderFor resolves the responder from context and falls back to the default responder.
 //
 // responderFor 从上下文中解析 responder，缺省时回退到默认 responder。
-func responderFor(c HTTPContext) transportcontract.HTTPResponder {
-	if c != nil && c.Context() != nil {
-		if container, ok := FromContainerContext(c.Context()); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
+func responderFor(c Context) transportcontract.HTTPResponder {
+	if c != nil {
+		if container, ok := FromContainerContext(c); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
 			if responderAny, err := container.Make(transportcontract.HTTPResponderKey); err == nil {
 				if responder, ok := responderAny.(transportcontract.HTTPResponder); ok && responder != nil {
 					return responder

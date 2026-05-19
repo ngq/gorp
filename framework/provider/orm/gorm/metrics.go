@@ -55,10 +55,10 @@ var (
 // - 用于监控数据库连接池健康状态，排查连接泄漏等问题；
 // - 建议在应用启动后调用 StartCollection 开始定期收集。
 type DBMetricsCollector struct {
-	sqlDB   *sql.DB
-	driver  string
-	stopCh  chan struct{}
-	ticker  *time.Ticker
+	sqlDB  *sql.DB
+	driver string
+	stopCh chan struct{}
+	ticker *time.Ticker
 }
 
 // NewDBMetricsCollector 创建数据库指标收集器。

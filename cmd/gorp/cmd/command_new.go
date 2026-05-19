@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"github.com/spf13/cobra"
+	"path/filepath"
 )
 
 // commandNewCmd 创建一个新的 console command 骨架。
@@ -63,9 +63,9 @@ var %sCommand = &cobra.Command{
 }
 `, name, pub, name, name)
 
-	if err := writeGoFile(filepath.Join(targetDir, folder+".go"), src); err != nil {
-		return err
-	}
+		if err := writeGoFile(filepath.Join(targetDir, folder+".go"), src); err != nil {
+			return err
+		}
 
 		fmt.Fprintf(cmd.OutOrStdout(), "创建命令成功, 文件夹地址: %s\n", targetDir)
 		fmt.Fprintln(cmd.OutOrStdout(), "请不要忘记挂载新创建的命令")

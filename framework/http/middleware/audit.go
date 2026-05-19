@@ -26,9 +26,9 @@ import (
 // AuditOptions 用于控制请求级审计日志的输出行为。
 type AuditOptions struct {
 	Event    string
-	Action   func(transportcontract.HTTPContext) string
-	Resource func(transportcontract.HTTPContext) string
-	Skip     func(transportcontract.HTTPContext) bool
+	Action   func(transportcontract.Context) string
+	Resource func(transportcontract.Context) string
+	Skip     func(transportcontract.Context) bool
 }
 
 // AuditMiddleware writes a structured audit log for the current HTTP request.
@@ -38,14 +38,14 @@ type AuditOptions struct {
 // Example:
 //
 //	router.Use(httpmiddleware.AuditMiddleware(logger, httpmiddleware.AuditOptions{}))
-func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) transportcontract.HTTPMiddleware {
+func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) transportcontract.Middleware {
 	event := strings.TrimSpace(opts.Event)
 	if event == "" {
 		event = "http audit"
 	}
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil {
 				if next != nil {
 					next(c)
@@ -66,7 +66,7 @@ func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) trans
 
 			logger := base
 			if logger == nil {
-				logger = frameworkbizlog.Ctx(c.Context())
+				logger = frameworkbizlog.Ctx(c)
 			}
 
 			action := auditAction(c, opts)
@@ -100,16 +100,16 @@ func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) trans
 			if route := c.RoutePath(); route != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "route", Value: route})
 			}
-			if rid, ok := supportcontract.FromRequestIDContext(c.Context()); ok && rid != "" {
+			if rid, ok := supportcontract.FromRequestIDContext(c); ok && rid != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "request_id", Value: rid})
 			}
-			if tid, ok := supportcontract.FromTraceIDContext(c.Context()); ok && tid != "" {
+			if tid, ok := supportcontract.FromTraceIDContext(c); ok && tid != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "trace_id", Value: tid})
 			}
-			if locale, ok := supportcontract.FromLocaleContext(c.Context()); ok && locale != "" {
+			if locale, ok := supportcontract.FromLocaleContext(c); ok && locale != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "locale", Value: locale})
 			}
-			fields = append(fields, auditActorFields(c.Context())...)
+			fields = append(fields, auditActorFields(c)...)
 
 			logger.Info(event, fields...)
 		}
@@ -119,7 +119,7 @@ func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) trans
 // auditAction resolves the audit action label for the current request.
 //
 // auditAction 解析当前请求对应的审计动作名称。
-func auditAction(c transportcontract.HTTPContext, opts AuditOptions) string {
+func auditAction(c transportcontract.Context, opts AuditOptions) string {
 	if opts.Action != nil {
 		if value := strings.TrimSpace(opts.Action(c)); value != "" {
 			return value
@@ -134,7 +134,7 @@ func auditAction(c transportcontract.HTTPContext, opts AuditOptions) string {
 // auditResource resolves the audit resource label for the current request.
 //
 // auditResource 解析当前请求对应的审计资源标识。
-func auditResource(c transportcontract.HTTPContext, opts AuditOptions) string {
+func auditResource(c transportcontract.Context, opts AuditOptions) string {
 	if opts.Resource != nil {
 		if value := strings.TrimSpace(opts.Resource(c)); value != "" {
 			return value

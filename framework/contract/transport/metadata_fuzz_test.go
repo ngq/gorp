@@ -15,8 +15,8 @@ import (
 func FuzzMetadata_Set(f *testing.F) {
 	// Seed corpus with typical inputs
 	f.Add("key", "value")
-	f.Add("", "value")  // empty key
-	f.Add("key", "")    // empty value
+	f.Add("", "value") // empty key
+	f.Add("key", "")   // empty value
 	f.Add("X-Request-Id", "12345-abcde")
 	f.Add("中文key", "中文value")
 

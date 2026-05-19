@@ -13,38 +13,46 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ServiceAuthHTTPMiddleware 把服务间认证相关 header 提取到 context，并在可用时执行强校验。
+// ServiceAuthMiddleware 把服务间认证相关 header 提取到 context，并在可用时执行强校验。
 //
 // 中文说明：
 // - 负责把 Authorization / X-Service-Token 写入 request context；
 // - 如果容器中存在 ServiceAuthenticator，则直接执行认证；
 // - 认证失败时立刻返回 401，避免请求进入业务处理层。
-func ServiceAuthHTTPMiddleware(authenticator securitycontract.ServiceAuthenticator) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
-			ctx := c.Context()
-			if auth := strings.TrimSpace(c.GetHeader("Authorization")); auth != "" {
-				ctx = context.WithValue(ctx, "authorization", auth)
-			}
-			if token := strings.TrimSpace(c.GetHeader("X-Service-Token")); token != "" {
-				ctx = context.WithValue(ctx, "x-service-token", token)
-			}
+func ServiceAuthMiddleware(authenticator securitycontract.ServiceAuthenticator) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			auth := strings.TrimSpace(c.GetHeader("Authorization"))
+			token := strings.TrimSpace(c.GetHeader("X-Service-Token"))
 
-			if authenticator != nil {
-				hasServiceToken := strings.TrimSpace(c.GetHeader("X-Service-Token")) != "" || strings.TrimSpace(c.GetHeader("Authorization")) != ""
-				if hasServiceToken {
-					identity, err := authenticator.Authenticate(ctx)
-					if err != nil {
-						c.JSON(http.StatusUnauthorized, map[string]any{"error": "service authentication failed"})
-						return
-					}
-					if identity != nil {
-						ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
-					}
+			if authenticator != nil && (auth != "" || token != "") {
+				// Build context for authentication using standard context.Context
+				authCtx := context.Context(c)
+				if auth != "" {
+					authCtx = context.WithValue(authCtx, "authorization", auth)
+				}
+				if token != "" {
+					authCtx = context.WithValue(authCtx, "x-service-token", token)
+				}
+
+				identity, err := authenticator.Authenticate(authCtx)
+				if err != nil {
+					c.JSON(http.StatusUnauthorized, map[string]any{"error": "service authentication failed"})
+					return
+				}
+				if identity != nil {
+					c.Set("service_identity", identity)
+				}
+			} else {
+				// Store headers in context for later use
+				if auth != "" {
+					c.Set("authorization", auth)
+				}
+				if token != "" {
+					c.Set("x-service-token", token)
 				}
 			}
 
-			c.SetContext(ctx)
 			if next != nil {
 				next(c)
 			}

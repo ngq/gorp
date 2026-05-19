@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ngq/gorp"
 	productdata "grpc-demo/services/product/internal/data"
 	producthttp "grpc-demo/services/product/internal/server/http"
-	"github.com/ngq/gorp"
 )
 
 // main 是 product 服务的主入口。

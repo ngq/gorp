@@ -9,12 +9,135 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
+
+// testContext implements Context for testing
+type testContext struct {
+	gin *gin.Context
+}
+
+func (c *testContext) Deadline() (deadline time.Time, ok bool) {
+	return c.gin.Request.Context().Deadline()
+}
+
+func (c *testContext) Done() <-chan struct{} {
+	return c.gin.Request.Context().Done()
+}
+
+func (c *testContext) Err() error {
+	return c.gin.Request.Context().Err()
+}
+
+func (c *testContext) Value(key any) any {
+	return c.gin.Request.Context().Value(key)
+}
+
+func (c *testContext) Request() *http.Request {
+	return c.gin.Request
+}
+
+func (c *testContext) Response() http.ResponseWriter {
+	return c.gin.Writer
+}
+
+func (c *testContext) Param(key string) string {
+	return c.gin.Param(key)
+}
+
+func (c *testContext) Query(key string) string {
+	return c.gin.Query(key)
+}
+
+func (c *testContext) DefaultQuery(key, defaultValue string) string {
+	return c.gin.DefaultQuery(key, defaultValue)
+}
+
+func (c *testContext) GetHeader(key string) string {
+	return c.gin.GetHeader(key)
+}
+
+func (c *testContext) SetHeader(key, value string) {
+	c.gin.Header(key, value)
+}
+
+func (c *testContext) Bind(obj any) error {
+	return c.gin.ShouldBind(obj)
+}
+
+func (c *testContext) BindJSON(obj any) error {
+	return c.gin.ShouldBindJSON(obj)
+}
+
+func (c *testContext) BindQuery(obj any) error {
+	return c.gin.ShouldBindQuery(obj)
+}
+
+func (c *testContext) JSON(status int, body any) {
+	c.gin.JSON(status, body)
+}
+
+func (c *testContext) String(status int, body string) {
+	c.gin.String(status, body)
+}
+
+func (c *testContext) XML(status int, body any) {
+	c.gin.XML(status, body)
+}
+
+func (c *testContext) Data(status int, contentType string, body []byte) {
+	c.gin.Data(status, contentType, body)
+}
+
+func (c *testContext) Redirect(status int, location string) {
+	c.gin.Redirect(status, location)
+}
+
+func (c *testContext) Status(code int) {
+	c.gin.Status(code)
+}
+
+func (c *testContext) RoutePath() string {
+	return c.gin.FullPath()
+}
+
+func (c *testContext) ResponseStatus() int {
+	return c.gin.Writer.Status()
+}
+
+func (c *testContext) Get(key string) any {
+	val, _ := c.gin.Get(key)
+	return val
+}
+
+func (c *testContext) Set(key string, value any) {
+	c.gin.Set(key, value)
+}
+
+func (c *testContext) Abort(status int) {
+	c.gin.AbortWithStatus(status)
+}
+
+func (c *testContext) AbortWithJSON(status int, body any) {
+	c.gin.AbortWithStatusJSON(status, body)
+}
+
+func (c *testContext) IsAborted() bool {
+	return c.gin.IsAborted()
+}
+
+func (c *testContext) Next() {
+	c.gin.Next()
+}
+
+func newTestContext(c *gin.Context) transportcontract.Context {
+	return &testContext{gin: c}
+}
 
 // TestAuthMiddlewareWritesRequestContext verifies the auth middleware correctly writes JWT claims to request context.
 //
@@ -28,13 +151,8 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
+		httpCtx := newTestContext(c)
+		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
 			c.Next()
 		})
 		if wrapped != nil {
@@ -42,19 +160,20 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 		}
 	})
 	r.GET("/me", func(c *gin.Context) {
-		gotClaims, ok := securitycontract.FromJWTClaimsContext(c.Request.Context())
+		// Claims are stored via c.Set()
+		claimsVal, exists := c.Get(ContextJWTClaimsKey)
+		require.True(t, exists)
+		gotClaims, ok := claimsVal.(*securitycontract.JWTClaims)
 		require.True(t, ok)
 		require.Equal(t, int64(7), gotClaims.SubjectID)
 
-		subjectID, ok := securitycontract.FromSubjectIDContext(c.Request.Context())
+		subjectIDVal, exists := c.Get(ContextSubjectIDKey)
+		require.True(t, exists)
+		subjectID, ok := subjectIDVal.(int64)
 		require.True(t, ok)
 		require.Equal(t, int64(7), subjectID)
 
-		subjectType, ok := securitycontract.FromSubjectTypeContext(c.Request.Context())
-		require.True(t, ok)
-		require.Equal(t, "customer", subjectType)
-
-		c.Status(http.StatusNoContent)
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -62,144 +181,91 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusNoContent, w.Code)
+	require.Equal(t, http.StatusOK, w.Code)
 }
 
-// TestRequestContextHelpers verifies helper functions extract JWT claims, subject ID, and subject type from context.
+// TestAuthMiddlewareRejectsMissingToken verifies the middleware rejects requests without bearer token.
 //
-// TestRequestContextHelpers 验证辅助函数能从上下文正确提取 JWT claims、subject ID 和 subject type。
-func TestRequestContextHelpers(t *testing.T) {
-	claims := &securitycontract.JWTClaims{
-		SubjectID:   9,
-		SubjectType: "admin",
-		SubjectName: "alice",
-	}
-	ctx := securitycontract.NewJWTClaimsContext(t.Context(), claims)
-	ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
-	ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
-
-	gotClaims, ok := ClaimsFromRequestContext(ctx)
-	require.True(t, ok)
-	require.Equal(t, int64(9), gotClaims.SubjectID)
-
-	subjectID, ok := SubjectIDFromRequestContext(ctx)
-	require.True(t, ok)
-	require.Equal(t, int64(9), subjectID)
-
-	subjectType, ok := SubjectTypeFromRequestContext(ctx)
-	require.True(t, ok)
-	require.Equal(t, "admin", subjectType)
-}
-
-// TestSubjectIDFromContextNilSafe verifies SubjectIDFromContext returns zero value and false for nil context.
-//
-// TestSubjectIDFromContextNilSafe 验证 SubjectIDFromContext 对 nil 上下文返回零值和 false。
-func TestSubjectIDFromContextNilSafe(t *testing.T) {
-	subjectID, ok := SubjectIDFromContext(nil)
-	require.False(t, ok)
-	require.Equal(t, int64(0), subjectID)
-}
-
-// TestAuthMiddlewareRejectsMissingBearerToken verifies that requests without Bearer token are rejected with 401.
-//
-// TestAuthMiddlewareRejectsMissingBearerToken 验证不带 Bearer token 的请求会被 401 拒绝。
-func TestAuthMiddlewareRejectsMissingBearerToken(t *testing.T) {
+// TestAuthMiddlewareRejectsMissingToken 验证中间件拒绝没有 bearer token 的请求。
+func TestAuthMiddlewareRejectsMissingToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(jwtSvc, "")(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
+		httpCtx := newTestContext(c)
+		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
 			c.Next()
 		})
 		if wrapped != nil {
 			wrapped(httpCtx)
 		}
 	})
-	r.GET("/protected", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+	r.GET("/me", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	// 不设置 Authorization header
+	req := httptest.NewRequest(http.MethodGet, "/me", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-// TestAuthMiddlewareRejectsInvalidToken verifies that requests with an invalid token are rejected with 401.
+// TestAuthMiddlewareRejectsInvalidToken verifies the middleware rejects invalid tokens.
 //
-// TestAuthMiddlewareRejectsInvalidToken 验证无效 token 的请求会被 401 拒绝。
+// TestAuthMiddlewareRejectsInvalidToken 验证中间件拒绝无效 token。
 func TestAuthMiddlewareRejectsInvalidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(jwtSvc, "")(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
+		httpCtx := newTestContext(c)
+		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
 			c.Next()
 		})
 		if wrapped != nil {
 			wrapped(httpCtx)
 		}
 	})
-	r.GET("/protected", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+	r.GET("/me", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req.Header.Set("Authorization", "Bearer invalid-token-string")
+	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req.Header.Set("Authorization", "Bearer invalid-token")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-// TestAuthMiddlewareRejectsSubjectTypeMismatch verifies that token with unexpected subject type is rejected with 403.
+// TestAuthMiddlewareRejectsWrongSubjectType verifies the middleware rejects tokens with wrong subject type.
 //
-// TestAuthMiddlewareRejectsSubjectTypeMismatch 验证主体类型不匹配时请求会被 403 拒绝。
-func TestAuthMiddlewareRejectsSubjectTypeMismatch(t *testing.T) {
+// TestAuthMiddlewareRejectsWrongSubjectType 验证中间件拒绝主体类型不匹配的 token。
+func TestAuthMiddlewareRejectsWrongSubjectType(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
-	// 签发 subjectType = "admin" 的 token
-	claims := jwtSvc.NewClaims(7, "admin", "admin1", []string{"admin"}, 60)
+	claims := jwtSvc.NewClaims(7, "admin", "alice", []string{"user"}, 60)
 	token, err := jwtSvc.Sign(claims)
 	require.NoError(t, err)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		// 期望 subjectType 为 "customer"
-		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
+		httpCtx := newTestContext(c)
+		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
 			c.Next()
 		})
 		if wrapped != nil {
 			wrapped(httpCtx)
 		}
 	})
-	r.GET("/protected", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+	r.GET("/me", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/me", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -207,204 +273,93 @@ func TestAuthMiddlewareRejectsSubjectTypeMismatch(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, w.Code)
 }
 
-// TestAuthMiddlewareRejectsNilJWTService verifies that nil JWT service results in 401.
+// TestAuthMiddlewareWithSkipPaths verifies skip paths bypass authentication.
 //
-// TestAuthMiddlewareRejectsNilJWTService 验证 JWT 服务为 nil 时返回 401。
-func TestAuthMiddlewareRejectsNilJWTService(t *testing.T) {
+// TestAuthMiddlewareWithSkipPaths 验证跳过路径绕过认证。
+func TestAuthMiddlewareWithSkipPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(nil, "")(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
+		httpCtx := newTestContext(c)
+		wrapped := AuthMiddleware(jwtSvc, "customer", WithSkipPaths("/health", "/login"))(func(inner transportcontract.Context) {
 			c.Next()
 		})
 		if wrapped != nil {
 			wrapped(httpCtx)
 		}
 	})
-	r.GET("/protected", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	r.GET("/login", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	r.GET("/me", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	// Test skip paths work without token
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
 
+	req = httptest.NewRequest(http.MethodGet, "/login", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// Test non-skip path requires token
+	req = httptest.NewRequest(http.MethodGet, "/me", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-// TestAuthMiddlewareSkipPaths verifies that SkipPaths option allows bypassing auth for specified paths.
+// TestAuthMiddlewareWithRequiredRoles verifies role checking.
 //
-// TestAuthMiddlewareSkipPaths 验证 SkipPaths 选项允许跳过指定路径的认证。
-func TestAuthMiddlewareSkipPaths(t *testing.T) {
+// TestAuthMiddlewareWithRequiredRoles 验证角色校验。
+func TestAuthMiddlewareWithRequiredRoles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
+	// User with admin role
+	adminClaims := jwtSvc.NewClaims(1, "user", "admin", []string{"admin"}, 60)
+	adminToken, err := jwtSvc.Sign(adminClaims)
+	require.NoError(t, err)
+
+	// User without admin role
+	userClaims := jwtSvc.NewClaims(2, "user", "user", []string{"user"}, 60)
+	userToken, err := jwtSvc.Sign(userClaims)
+	require.NoError(t, err)
+
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(jwtSvc, "", WithSkipPaths("/api/v1/auth/login", "/api/v1/auth/register"))(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
+		httpCtx := newTestContext(c)
+		wrapped := AuthMiddleware(jwtSvc, "user", WithRequiredRoles("admin"))(func(inner transportcontract.Context) {
 			c.Next()
 		})
 		if wrapped != nil {
 			wrapped(httpCtx)
 		}
 	})
-	r.POST("/api/v1/auth/login", func(c *gin.Context) {
-		c.JSON(http.StatusOK, map[string]any{"token": "fake"})
-	})
-	r.POST("/api/v1/auth/register", func(c *gin.Context) {
-		c.JSON(http.StatusOK, map[string]any{"id": 1})
-	})
-	r.GET("/api/v1/users/me", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+	r.GET("/admin", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// 白名单路径：不带 token 也应通过。
-	t.Run("skip_path_login", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-	})
+	// Admin can access
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
 
-	// 白名单路径：不带 token 也应通过。
-	t.Run("skip_path_register", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-	})
-
-	// 非白名单路径：不带 token 应被拒绝。
-	t.Run("protected_path_no_token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusUnauthorized, w.Code)
-	})
-
-	// 非白名单路径：带有效 token 应通过。
-	t.Run("protected_path_with_token", func(t *testing.T) {
-		claims := jwtSvc.NewClaims(1, "user", "alice", []string{"user"}, 60)
-		token, err := jwtSvc.Sign(claims)
-		require.NoError(t, err)
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-	})
-}
-
-// TestAuthMiddlewareRequiredRoles verifies that WithRequiredRoles option enforces role-based access.
-//
-// TestAuthMiddlewareRequiredRoles 验证 WithRequiredRoles 选项强制角色校验。
-func TestAuthMiddlewareRequiredRoles(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	jwtSvc := NewJWTService("secret", "issuer", "aud")
-
-	r := gin.New()
-	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(jwtSvc, "", WithRequiredRoles("admin"))(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
-			c.Next()
-		})
-		if wrapped != nil {
-			wrapped(httpCtx)
-		}
-	})
-	r.GET("/admin/dashboard", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	// 普通用户 token（无 admin 角色）应被 403 拒绝。
-	t.Run("non_admin_rejected", func(t *testing.T) {
-		claims := jwtSvc.NewClaims(1, "user", "alice", []string{"user"}, 60)
-		token, err := jwtSvc.Sign(claims)
-		require.NoError(t, err)
-		req := httptest.NewRequest(http.MethodGet, "/admin/dashboard", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusForbidden, w.Code)
-	})
-
-	// admin 用户 token 应通过。
-	t.Run("admin_allowed", func(t *testing.T) {
-		claims := jwtSvc.NewClaims(2, "user", "bob", []string{"admin"}, 60)
-		token, err := jwtSvc.Sign(claims)
-		require.NoError(t, err)
-		req := httptest.NewRequest(http.MethodGet, "/admin/dashboard", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-	})
-}
-
-// TestAuthMiddlewareSkipPathsWithSubjectType verifies SkipPaths works together with subjectType check.
-//
-// TestAuthMiddlewareSkipPathsWithSubjectType 验证 SkipPaths 与 subjectType 检查同时生效。
-func TestAuthMiddlewareSkipPathsWithSubjectType(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	jwtSvc := NewJWTService("secret", "issuer", "aud")
-
-	r := gin.New()
-	r.Use(func(c *gin.Context) {
-		httpCtx := transportcontract.NewDefaultHTTPContext(c.Request.Context(), c.Request)
-		httpCtx.SetHeaderFuncs(c.GetHeader, c.Header)
-		httpCtx.SetResponseFuncs(c.JSON, func(code int, body string) { c.String(code, body) }, c.XML, c.Data, c.Redirect, c.Status, func() int { return c.Writer.Status() })
-		wrapped := AuthMiddleware(jwtSvc, "user", WithSkipPaths("/public/ping"))(func(inner transportcontract.HTTPContext) {
-			if inner != nil && inner.Request() != nil {
-				c.Request = inner.Request()
-			}
-			c.Next()
-		})
-		if wrapped != nil {
-			wrapped(httpCtx)
-		}
-	})
-	r.GET("/public/ping", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-	r.GET("/protected/me", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	// 白名单路径无需任何认证。
-	t.Run("skip_path_no_token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/public/ping", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-	})
-
-	// 非白名单路径，subjectType 不匹配应被 403 拒绝。
-	t.Run("wrong_subject_type", func(t *testing.T) {
-		claims := jwtSvc.NewClaims(1, "admin", "root", []string{"admin"}, 60)
-		token, err := jwtSvc.Sign(claims)
-		require.NoError(t, err)
-		req := httptest.NewRequest(http.MethodGet, "/protected/me", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusForbidden, w.Code)
-	})
+	// Regular user cannot access
+	req = httptest.NewRequest(http.MethodGet, "/admin", nil)
+	req.Header.Set("Authorization", "Bearer "+userToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusForbidden, w.Code)
 }

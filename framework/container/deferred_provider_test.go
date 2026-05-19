@@ -19,9 +19,9 @@ type deferredProvider struct {
 	value  string
 }
 
-func (p *deferredProvider) Name() string       { return p.name }
-func (p *deferredProvider) IsDefer() bool      { return true }
-func (p *deferredProvider) Provides() []string { return p.keys }
+func (p *deferredProvider) Name() string        { return p.name }
+func (p *deferredProvider) IsDefer() bool       { return true }
+func (p *deferredProvider) Provides() []string  { return p.keys }
 func (p *deferredProvider) DependsOn() []string { return nil }
 func (p *deferredProvider) Register(c runtimecontract.Container) error {
 	*p.loaded++

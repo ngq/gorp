@@ -88,8 +88,8 @@ enum Status {
 // TestProtoTypeToOpenAPIType 测试 proto 类型到 OpenAPI 类型的映射。
 func TestProtoTypeToOpenAPIType(t *testing.T) {
 	tests := []struct {
-		protoType     string
-		expectedType  string
+		protoType      string
+		expectedType   string
 		expectedFormat string
 	}{
 		{"string", "string", ""},

@@ -8,9 +8,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	ggrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"github.com/stretchr/testify/require"
 )
 
 func TestUnaryServerInterceptorExtractsTraceAndRequestID(t *testing.T) {

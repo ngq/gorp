@@ -13,11 +13,15 @@ import (
 type dlockStub struct{}
 
 func (d *dlockStub) Lock(ctx context.Context, key string, ttl time.Duration) error { return nil }
-func (d *dlockStub) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) { return true, nil }
-func (d *dlockStub) Unlock(ctx context.Context, key string) error { return nil }
+func (d *dlockStub) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	return true, nil
+}
+func (d *dlockStub) Unlock(ctx context.Context, key string) error                   { return nil }
 func (d *dlockStub) Renew(ctx context.Context, key string, ttl time.Duration) error { return nil }
-func (d *dlockStub) IsLocked(ctx context.Context, key string) (bool, error) { return true, nil }
-func (d *dlockStub) WithLock(ctx context.Context, key string, ttl time.Duration, fn func() error) error { return fn() }
+func (d *dlockStub) IsLocked(ctx context.Context, key string) (bool, error)         { return true, nil }
+func (d *dlockStub) WithLock(ctx context.Context, key string, ttl time.Duration, fn func() error) error {
+	return fn()
+}
 
 func TestOrderServiceLockOrderDemo(t *testing.T) {
 	svc := &OrderService{dlock: &dlockStub{}}

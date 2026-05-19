@@ -31,7 +31,7 @@ func NewProvider() *Provider { return &Provider{} }
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。
-func (p *Provider) Name() string  { return "errors.default" }
+func (p *Provider) Name() string { return "errors.default" }
 
 // IsDefer indicates error handler should defer loading.
 // Can be loaded after other core providers.

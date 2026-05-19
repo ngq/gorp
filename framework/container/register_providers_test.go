@@ -18,9 +18,9 @@ type orderedProvider struct {
 	failBoot error
 }
 
-func (p *orderedProvider) Name() string       { return p.name }
-func (p *orderedProvider) IsDefer() bool      { return false }
-func (p *orderedProvider) Provides() []string { return []string{p.name} }
+func (p *orderedProvider) Name() string        { return p.name }
+func (p *orderedProvider) IsDefer() bool       { return false }
+func (p *orderedProvider) Provides() []string  { return []string{p.name} }
 func (p *orderedProvider) DependsOn() []string { return nil }
 func (p *orderedProvider) Register(c runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":register")

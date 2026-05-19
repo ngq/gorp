@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ngq/gorp"
 	apphttp "monolith/app/http"
 	"monolith/internal/biz"
 	"monolith/internal/data"
 	"monolith/internal/service"
-	"github.com/ngq/gorp"
 )
 
 // main 是项目主入口。

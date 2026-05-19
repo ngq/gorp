@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"grpc-demo/services/user/internal/biz"
-	userv1 "grpc-demo/proto/user/v1"
 	"github.com/ngq/gorp"
+	userv1 "grpc-demo/proto/user/v1"
+	"grpc-demo/services/user/internal/biz"
 
 	"github.com/stretchr/testify/require"
 )

@@ -9,18 +9,18 @@ import (
 
 // ImportProfile 导入配置
 type ImportProfile struct {
-	ID                     uint           `gorm:"primaryKey" json:"id"`
-	Name                   string         `gorm:"size:256;not null" json:"name"`
-	EntityType             string         `gorm:"size:50;not null;index" json:"entity_type"`           // 实体类型(product/customer/order等)
-	FilePath               string         `gorm:"size:512" json:"file_path"`                           // 文件路径
-	FileType               string         `gorm:"size:20" json:"file_type"`                            // 文件类型(csv/xlsx/xml)
-	Separator              string         `gorm:"size:10" json:"separator"`                            // 分隔符
+	ID                      uint           `gorm:"primaryKey" json:"id"`
+	Name                    string         `gorm:"size:256;not null" json:"name"`
+	EntityType              string         `gorm:"size:50;not null;index" json:"entity_type"` // 实体类型(product/customer/order等)
+	FilePath                string         `gorm:"size:512" json:"file_path"`                 // 文件路径
+	FileType                string         `gorm:"size:20" json:"file_type"`                  // 文件类型(csv/xlsx/xml)
+	Separator               string         `gorm:"size:10" json:"separator"`                  // 分隔符
 	SkipAttributeValidation bool           `gorm:"default:false" json:"skip_attribute_validation"`
-	ColumnMapping          string         `gorm:"type:json" json:"column_mapping"`                     // 列映射JSON
-	IsActive               bool           `gorm:"default:true" json:"is_active"`
-	CreatedAt              time.Time      `json:"created_at"`
-	UpdatedAt              time.Time      `json:"updated_at"`
-	DeletedAt              gorm.DeletedAt `gorm:"index" json:"-"`
+	ColumnMapping           string         `gorm:"type:json" json:"column_mapping"` // 列映射JSON
+	IsActive                bool           `gorm:"default:true" json:"is_active"`
+	CreatedAt               time.Time      `json:"created_at"`
+	UpdatedAt               time.Time      `json:"updated_at"`
+	DeletedAt               gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName 指定表名
@@ -30,18 +30,18 @@ func (ImportProfile) TableName() string {
 
 // ExportProfile 导出配置
 type ExportProfile struct {
-	ID               uint           `gorm:"primaryKey" json:"id"`
-	Name             string         `gorm:"size:256;not null" json:"name"`
-	EntityType       string         `gorm:"size:50;not null;index" json:"entity_type"`          // 实体类型
-	FilePath         string         `gorm:"size:512" json:"file_path"`                          // 导出文件路径
-	FileType         string         `gorm:"size:20" json:"file_type"`                           // 文件类型
-	ExportWithIds    bool           `gorm:"default:true" json:"export_with_ids"`                // 是否导出ID
-	ColumnSelection  string         `gorm:"type:json" json:"column_selection"`                  // 列选择JSON
-	FilterCriteria   string         `gorm:"type:json" json:"filter_criteria"`                   // 过滤条件JSON
-	IsActive         bool           `gorm:"default:true" json:"is_active"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
+	ID              uint           `gorm:"primaryKey" json:"id"`
+	Name            string         `gorm:"size:256;not null" json:"name"`
+	EntityType      string         `gorm:"size:50;not null;index" json:"entity_type"` // 实体类型
+	FilePath        string         `gorm:"size:512" json:"file_path"`                 // 导出文件路径
+	FileType        string         `gorm:"size:20" json:"file_type"`                  // 文件类型
+	ExportWithIds   bool           `gorm:"default:true" json:"export_with_ids"`       // 是否导出ID
+	ColumnSelection string         `gorm:"type:json" json:"column_selection"`         // 列选择JSON
+	FilterCriteria  string         `gorm:"type:json" json:"filter_criteria"`          // 过滤条件JSON
+	IsActive        bool           `gorm:"default:true" json:"is_active"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName 指定表名
@@ -51,17 +51,17 @@ func (ExportProfile) TableName() string {
 
 // ImportHistory 导入历史记录
 type ImportHistory struct {
-	ID            uint64         `gorm:"primaryKey" json:"id"`
-	ProfileID     uint           `gorm:"not null;index" json:"profile_id"`
-	FileName      string         `gorm:"size:256;not null" json:"file_name"`
-	TotalRecords  int            `gorm:"default:0" json:"total_records"`              // 总记录数
-	SuccessCount  int            `gorm:"default:0" json:"success_count"`              // 成功数
-	ErrorCount    int            `gorm:"default:0" json:"error_count"`                // 失败数
-	ErrorMessage  string         `gorm:"type:text" json:"error_message"`              // 错误信息
-	Status        string         `gorm:"size:20;not null" json:"status"`              // pending/processing/completed/failed
-	StartedAt     time.Time      `json:"started_at"`
-	CompletedAt   time.Time      `json:"completed_at"`
-	CreatedAt     time.Time      `json:"created_at"`
+	ID           uint64    `gorm:"primaryKey" json:"id"`
+	ProfileID    uint      `gorm:"not null;index" json:"profile_id"`
+	FileName     string    `gorm:"size:256;not null" json:"file_name"`
+	TotalRecords int       `gorm:"default:0" json:"total_records"` // 总记录数
+	SuccessCount int       `gorm:"default:0" json:"success_count"` // 成功数
+	ErrorCount   int       `gorm:"default:0" json:"error_count"`   // 失败数
+	ErrorMessage string    `gorm:"type:text" json:"error_message"` // 错误信息
+	Status       string    `gorm:"size:20;not null" json:"status"` // pending/processing/completed/failed
+	StartedAt    time.Time `json:"started_at"`
+	CompletedAt  time.Time `json:"completed_at"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // TableName 指定表名
@@ -71,16 +71,16 @@ func (ImportHistory) TableName() string {
 
 // ExportHistory 导出历史记录
 type ExportHistory struct {
-	ID           uint64    `gorm:"primaryKey" json:"id"`
-	ProfileID    uint      `gorm:"not null;index" json:"profile_id"`
-	FileName     string    `gorm:"size:256;not null" json:"file_name"`
-	RecordCount  int       `gorm:"default:0" json:"record_count"`
-	FileSize     int64     `gorm:"default:0" json:"file_size"`             // 文件大小(字节)
-	FilePath     string    `gorm:"size:512" json:"file_path"`             // 导出文件路径
-	Status       string    `gorm:"size:20;not null" json:"status"`         // pending/processing/completed/failed
-	StartedAt    time.Time `json:"started_at"`
-	CompletedAt  time.Time `json:"completed_at"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID          uint64    `gorm:"primaryKey" json:"id"`
+	ProfileID   uint      `gorm:"not null;index" json:"profile_id"`
+	FileName    string    `gorm:"size:256;not null" json:"file_name"`
+	RecordCount int       `gorm:"default:0" json:"record_count"`
+	FileSize    int64     `gorm:"default:0" json:"file_size"`     // 文件大小(字节)
+	FilePath    string    `gorm:"size:512" json:"file_path"`      // 导出文件路径
+	Status      string    `gorm:"size:20;not null" json:"status"` // pending/processing/completed/failed
+	StartedAt   time.Time `json:"started_at"`
+	CompletedAt time.Time `json:"completed_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // TableName 指定表名
@@ -90,13 +90,13 @@ func (ExportHistory) TableName() string {
 
 // ImportError 导入错误记录
 type ImportError struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	HistoryID   uint64    `gorm:"not null;index" json:"history_id"`
-	RowNumber   int       `gorm:"not null" json:"row_number"`            // 行号
-	ColumnName  string    `gorm:"size:100" json:"column_name"`           // 列名
-	FieldValue  string    `gorm:"size:500" json:"field_value"`           // 字段值
-	ErrorMsg    string    `gorm:"type:text" json:"error_msg"`            // 错误信息
-	CreatedAt   time.Time `json:"created_at"`
+	ID         uint64    `gorm:"primaryKey" json:"id"`
+	HistoryID  uint64    `gorm:"not null;index" json:"history_id"`
+	RowNumber  int       `gorm:"not null" json:"row_number"`  // 行号
+	ColumnName string    `gorm:"size:100" json:"column_name"` // 列名
+	FieldValue string    `gorm:"size:500" json:"field_value"` // 字段值
+	ErrorMsg   string    `gorm:"type:text" json:"error_msg"`  // 错误信息
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // TableName 指定表名
@@ -108,24 +108,24 @@ func (ImportError) TableName() string {
 
 // ImportProfileCreateRequest 导入配置创建请求
 type ImportProfileCreateRequest struct {
-	Name                   string                 `json:"name" binding:"required"`
-	EntityType             string                 `json:"entity_type" binding:"required"`
-	FilePath               string                 `json:"file_path"`
-	FileType               string                 `json:"file_type"`
-	Separator              string                 `json:"separator"`
-	SkipAttributeValidation bool                   `json:"skip_attribute_validation"`
-	ColumnMapping          map[string]string      `json:"column_mapping"`
+	Name                    string            `json:"name" binding:"required"`
+	EntityType              string            `json:"entity_type" binding:"required"`
+	FilePath                string            `json:"file_path"`
+	FileType                string            `json:"file_type"`
+	Separator               string            `json:"separator"`
+	SkipAttributeValidation bool              `json:"skip_attribute_validation"`
+	ColumnMapping           map[string]string `json:"column_mapping"`
 }
 
 // ImportProfileUpdateRequest 导入配置更新请求
 type ImportProfileUpdateRequest struct {
-	Name                   string                 `json:"name"`
-	FilePath               string                 `json:"file_path"`
-	FileType               string                 `json:"file_type"`
-	Separator              string                 `json:"separator"`
-	SkipAttributeValidation bool                   `json:"skip_attribute_validation"`
-	ColumnMapping          map[string]string      `json:"column_mapping"`
-	IsActive               bool                   `json:"is_active"`
+	Name                    string            `json:"name"`
+	FilePath                string            `json:"file_path"`
+	FileType                string            `json:"file_type"`
+	Separator               string            `json:"separator"`
+	SkipAttributeValidation bool              `json:"skip_attribute_validation"`
+	ColumnMapping           map[string]string `json:"column_mapping"`
+	IsActive                bool              `json:"is_active"`
 }
 
 // ExportProfileCreateRequest 导出配置创建请求

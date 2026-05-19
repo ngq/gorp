@@ -14,10 +14,10 @@ import (
 
 // SEOConfig SEO配置
 type SEOConfig struct {
-	Enabled             bool
-	SitemapEnabled      bool
+	Enabled              bool
+	SitemapEnabled       bool
 	CanonicalUrlsEnabled bool
-	CustomMetaEnabled   bool
+	CustomMetaEnabled    bool
 }
 
 // SEOUseCase SEO用例
@@ -411,11 +411,11 @@ func (uc *SEOUseCase) AnalyzeSEO(ctx context.Context, entityID uint, entityType 
 	// 获取元信息
 	meta, err := uc.metaInfoRepo.GetByEntity(ctx, entityID, entityType, languageID)
 	result := &models.SEOAnalysisResult{
-		EntityID:    entityID,
-		EntityType:  entityType,
-		Slug:        slug,
-		Issues:      []string{},
-		Score:       100, // 初始满分
+		EntityID:   entityID,
+		EntityType: entityType,
+		Slug:       slug,
+		Issues:     []string{},
+		Score:      100, // 初始满分
 	}
 
 	if meta != nil {

@@ -90,10 +90,10 @@ func (p *BaseMQProvider) Register(c runtimecontract.Container) error {
 			return nil, err
 		}
 		mqSvc, ok := mq.(integrationcontract.MessageQueue)
-			if !ok {
-				return nil, fmt.Errorf("basemq: expected integrationcontract.MessageQueue, got %T", mq)
-			}
-			return mqSvc.Publisher(), nil
+		if !ok {
+			return nil, fmt.Errorf("basemq: expected integrationcontract.MessageQueue, got %T", mq)
+		}
+		return mqSvc.Publisher(), nil
 	}, true)
 
 	c.Bind(integrationcontract.MessageSubscriberKey, func(c runtimecontract.Container) (any, error) {
@@ -102,10 +102,10 @@ func (p *BaseMQProvider) Register(c runtimecontract.Container) error {
 			return nil, err
 		}
 		mqSvc, ok := mq.(integrationcontract.MessageQueue)
-			if !ok {
-				return nil, fmt.Errorf("basemq: expected integrationcontract.MessageQueue, got %T", mq)
-			}
-			return mqSvc.Subscriber(), nil
+		if !ok {
+			return nil, fmt.Errorf("basemq: expected integrationcontract.MessageQueue, got %T", mq)
+		}
+		return mqSvc.Subscriber(), nil
 	}, true)
 
 	return nil

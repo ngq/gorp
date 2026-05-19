@@ -260,9 +260,9 @@ func (r *currencyRepository) Delete(ctx context.Context, id uint) error {
 
 // 常见错误
 var (
-	ErrLanguageNotFound  = errors.New("language not found")
-	ErrResourceNotFound  = errors.New("locale resource not found")
-	ErrCurrencyNotFound  = errors.New("currency not found")
-	ErrCultureExists     = errors.New("language culture already exists")
+	ErrLanguageNotFound   = errors.New("language not found")
+	ErrResourceNotFound   = errors.New("locale resource not found")
+	ErrCurrencyNotFound   = errors.New("currency not found")
+	ErrCultureExists      = errors.New("language culture already exists")
 	ErrCurrencyCodeExists = errors.New("currency code already exists")
 )

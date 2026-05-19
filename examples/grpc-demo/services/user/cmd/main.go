@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ngq/gorp"
+	"google.golang.org/grpc"
 	userdata "grpc-demo/services/user/internal/data"
 	usergrpc "grpc-demo/services/user/internal/server/grpc"
 	userhttp "grpc-demo/services/user/internal/server/http"
-	"github.com/ngq/gorp"
-	"google.golang.org/grpc"
 )
 
 // main 是 user 服务的主入口。

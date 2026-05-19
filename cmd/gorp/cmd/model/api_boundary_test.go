@@ -11,7 +11,7 @@ import (
 
 func TestRoutesTemplateUsesRootApplicationTypes(t *testing.T) {
 	require.Contains(t, routesTpl, `gorp "github.com/ngq/gorp"`)
-	require.Contains(t, routesTpl, "RegisterRoutes(r gorp.HTTPRouter)")
+	require.Contains(t, routesTpl, "RegisterRoutes(r gorp.Router)")
 	require.Contains(t, routesTpl, "container, ok := gorp.FromContainerContext(ctx)")
 	require.Contains(t, routesTpl, "container.Make(gorp.DBRuntimeKey)")
 	require.NotContains(t, routesTpl, "framework/contract")
@@ -22,7 +22,7 @@ func TestRoutesTemplateUsesRootApplicationTypes(t *testing.T) {
 
 func TestEntRoutesTemplateUsesRootApplicationTypes(t *testing.T) {
 	require.Contains(t, entRoutesTpl, `gorp "github.com/ngq/gorp"`)
-	require.Contains(t, entRoutesTpl, "RegisterRoutes(r gorp.HTTPRouter)")
+	require.Contains(t, entRoutesTpl, "RegisterRoutes(r gorp.Router)")
 	require.Contains(t, entRoutesTpl, "container, ok := gorp.FromContainerContext(ctx)")
 	require.Contains(t, entRoutesTpl, "container.Make(gorp.DBRuntimeKey)")
 	require.NotContains(t, entRoutesTpl, "framework/contract")
@@ -58,7 +58,7 @@ func TestCRUDTemplatesUseRootApplicationResponseHelpers(t *testing.T) {
 		)
 		require.True(
 			t,
-			containsAny(tpl, "api.mustRuntimeGorm(c.Context())", "api.mustEntClient(c.Context())"),
+			containsAny(tpl, "api.mustRuntimeGorm(c)", "api.mustEntClient(c)"),
 			"expected template to resolve runtime backend from request context: %s",
 			tpl,
 		)
@@ -88,7 +88,7 @@ import (
 	gorp "github.com/ngq/gorp"
 )
 
-func RegisterRoutes(r gorp.HTTPRouter, svc *service.Services) {
+func RegisterRoutes(r gorp.Router, svc *service.Services) {
 	demoHandler := handler.NewDemoHandler(svc.Demo)
 
 	api := r.Group("/api/v1")
@@ -129,7 +129,7 @@ import (
 	gorp "github.com/ngq/gorp"
 )
 
-func RegisterRoutes(router gorp.HTTPRouter) {
+func RegisterRoutes(router gorp.Router) {
 	router.GET("/api/ping", nil)
 }
 `

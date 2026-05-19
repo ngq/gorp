@@ -22,12 +22,12 @@ import (
 // CacheControl writes a fixed Cache-Control header for the current response.
 //
 // CacheControl 为当前响应写入固定的 Cache-Control 头。
-func CacheControl(value string) transportcontract.HTTPMiddleware {
+func CacheControl(value string) transportcontract.Middleware {
 	value = strings.TrimSpace(value)
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c != nil && value != "" {
-				c.Header("Cache-Control", value)
+				c.SetHeader("Cache-Control", value)
 			}
 			if next != nil {
 				next(c)
@@ -39,9 +39,9 @@ func CacheControl(value string) transportcontract.HTTPMiddleware {
 // ETag computes a weak ETag for successful GET/HEAD responses and handles If-None-Match.
 //
 // ETag 为成功的 GET/HEAD 响应计算弱 ETag，并处理 If-None-Match。
-func ETag() transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func ETag() transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if next == nil {
 				return
 			}

@@ -32,7 +32,7 @@ type CSRFOptions struct {
 	CookieSecure   bool
 	CookieHTTPOnly bool
 	CookieSameSite http.SameSite
-	ErrorHandler   func(transportcontract.HTTPContext)
+	ErrorHandler   func(transportcontract.Context)
 }
 
 // DefaultCSRFOptions 返回 CSRF 中间件的默认配置。
@@ -62,7 +62,7 @@ func DefaultCSRFOptions() CSRFOptions {
 // - token 不匹配时返回 403 Forbidden；
 // - 适用场景：传统的 cookie-based 会话 + 表单提交的 Web 应用；
 // - 对于纯 API 服务（JWT / Bearer Token 认证），通常不需要 CSRF 防护。
-func CSRF(opts CSRFOptions) transportcontract.HTTPMiddleware {
+func CSRF(opts CSRFOptions) transportcontract.Middleware {
 	if opts.TokenLength <= 0 {
 		opts.TokenLength = 32
 	}
@@ -99,8 +99,8 @@ func CSRF(opts CSRFOptions) transportcontract.HTTPMiddleware {
 		errorHandler = defaultCSRFErrorHandler
 	}
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil {
 				if next != nil {
 					next(c)
@@ -188,7 +188,7 @@ func isSafeMethod(method string) bool {
 // - 将 token 写入响应 cookie，供后续请求携带；
 // - SameSite 默认 Lax，防止跨站请求携带 cookie（但允许顶级导航）；
 // - 使用 Add 而非 Set 避免覆盖其他中间件设置的 Set-Cookie 头。
-func setCSRFCookie(c transportcontract.HTTPContext, token string, opts CSRFOptions) {
+func setCSRFCookie(c transportcontract.Context, token string, opts CSRFOptions) {
 	cookie := &http.Cookie{
 		Name:     opts.CookieName,
 		Value:    token,
@@ -202,7 +202,7 @@ func setCSRFCookie(c transportcontract.HTTPContext, token string, opts CSRFOptio
 	if gc, ok := unwrapGinContext(c); ok {
 		gc.Writer.Header().Add("Set-Cookie", cookie.String())
 	} else {
-		c.Header("Set-Cookie", cookie.String())
+		c.SetHeader("Set-Cookie", cookie.String())
 	}
 }
 
@@ -239,7 +239,7 @@ func generateCSRFToken(length int) string {
 // 中文说明：
 // - 返回 403 Forbidden 状态码；
 // - 响应体为 JSON 格式的错误信息。
-func defaultCSRFErrorHandler(c transportcontract.HTTPContext) {
+func defaultCSRFErrorHandler(c transportcontract.Context) {
 	c.JSON(http.StatusForbidden, map[string]string{
 		"error": "CSRF token mismatch",
 	})

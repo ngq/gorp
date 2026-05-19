@@ -351,10 +351,10 @@ func protoTypeToOpenAPIType(protoType string) (openapiType, format string) {
 
 	// 特殊类型映射（google.protobuf）
 	specialTypeMap := map[string][2]string{
-		"google.protobuf.Timestamp":  {"string", "date-time"},
-		"google.protobuf.Duration":   {"string", "duration"},
-		"google.protobuf.Empty":      {"object", ""},
-		"google.protobuf.Any":        {"object", ""},
+		"google.protobuf.Timestamp":   {"string", "date-time"},
+		"google.protobuf.Duration":    {"string", "duration"},
+		"google.protobuf.Empty":       {"object", ""},
+		"google.protobuf.Any":         {"object", ""},
 		"google.protobuf.StringValue": {"string", ""},
 		"google.protobuf.Int32Value":  {"integer", "int32"},
 		"google.protobuf.Int64Value":  {"integer", "int64"},
@@ -454,7 +454,7 @@ func fieldToSchema(field ProtoField, allMessages []ProtoMessage, allEnums []Prot
 	// 处理 repeated（数组）
 	if field.Repeated {
 		schema = Schema{
-			Type: "array",
+			Type:  "array",
 			Items: &schema,
 		}
 	}
@@ -590,7 +590,7 @@ func parseInt(s string) int {
 	var result int
 	for _, c := range strings.TrimSpace(s) {
 		if c >= '0' && c <= '9' {
-			result = result * 10 + int(c - '0')
+			result = result*10 + int(c-'0')
 		}
 	}
 	return result

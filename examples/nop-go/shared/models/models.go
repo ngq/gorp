@@ -81,8 +81,8 @@ func (a *Address) FullAddress() string {
 // - 使用 int64 存储最小单位（分）避免浮点精度问题；
 // - 支持多货币。
 type Money struct {
-	Amount   int64  `json:"amount"`             // 金额（分）
-	Currency string `json:"currency"`           // 货币代码（CNY、USD、EUR）
+	Amount   int64  `json:"amount"`   // 金额（分）
+	Currency string `json:"currency"` // 货币代码（CNY、USD、EUR）
 }
 
 // NewMoney 创建金额
@@ -223,12 +223,12 @@ const (
 type PaymentStatus string
 
 const (
-	PaymentStatusPending          PaymentStatus = "pending"
-	PaymentStatusAuthorized       PaymentStatus = "authorized"
-	PaymentStatusPaid             PaymentStatus = "paid"
-	PaymentStatusPartialRefund    PaymentStatus = "partial_refund"
-	PaymentStatusRefunded         PaymentStatus = "refunded"
-	PaymentStatusVoided           PaymentStatus = "voided"
+	PaymentStatusPending       PaymentStatus = "pending"
+	PaymentStatusAuthorized    PaymentStatus = "authorized"
+	PaymentStatusPaid          PaymentStatus = "paid"
+	PaymentStatusPartialRefund PaymentStatus = "partial_refund"
+	PaymentStatusRefunded      PaymentStatus = "refunded"
+	PaymentStatusVoided        PaymentStatus = "voided"
 )
 
 // ShippingStatus 配送状态
@@ -254,13 +254,13 @@ const (
 type AttributeControlType string
 
 const (
-	AttrControlDropdownList  AttributeControlType = "dropdown"
-	AttrControlRadioList     AttributeControlType = "radio"
-	AttrControlCheckboxes    AttributeControlType = "checkbox"
-	AttrControlTextBox       AttributeControlType = "textbox"
-	AttrControlTextArea      AttributeControlType = "textarea"
-	AttrControlDatePicker    AttributeControlType = "datepicker"
-	AttrControlFileUpload    AttributeControlType = "fileupload"
-	AttrControlColorPicker   AttributeControlType = "color"
-	AttrControlImagePicker   AttributeControlType = "image"
+	AttrControlDropdownList AttributeControlType = "dropdown"
+	AttrControlRadioList    AttributeControlType = "radio"
+	AttrControlCheckboxes   AttributeControlType = "checkbox"
+	AttrControlTextBox      AttributeControlType = "textbox"
+	AttrControlTextArea     AttributeControlType = "textarea"
+	AttrControlDatePicker   AttributeControlType = "datepicker"
+	AttrControlFileUpload   AttributeControlType = "fileupload"
+	AttrControlColorPicker  AttributeControlType = "color"
+	AttrControlImagePicker  AttributeControlType = "image"
 )

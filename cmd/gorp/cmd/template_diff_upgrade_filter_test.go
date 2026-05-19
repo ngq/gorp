@@ -76,4 +76,3 @@ func TestTemplateUpgradeDryRunReportsNoMatchesForSelectedFiles(t *testing.T) {
 	out := buf.String()
 	require.Contains(t, out, "No matching upgrade candidates found for the selected --files.")
 }
-

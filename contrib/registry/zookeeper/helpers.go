@@ -50,11 +50,11 @@ func decodeServiceRecord(data []byte) (serviceRecord, error) {
 //
 // inMemoryZKBackend 实现 zkBackend 用于测试。
 type inMemoryZKBackend struct {
-	mu       sync.RWMutex
-	nodes    map[string][]byte
+	mu        sync.RWMutex
+	nodes     map[string][]byte
 	ephemeral map[string]struct{}
-	children map[string][]string
-	watchers map[string][]func()
+	children  map[string][]string
+	watchers  map[string][]func()
 }
 
 // newInMemoryZKBackend creates a new in-memory backend for testing.

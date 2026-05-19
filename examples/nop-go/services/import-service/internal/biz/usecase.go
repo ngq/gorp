@@ -61,14 +61,14 @@ func (uc *ImportUseCase) CreateProfile(ctx context.Context, req *models.ImportPr
 	}
 
 	profile := &models.ImportProfile{
-		Name:                   req.Name,
-		EntityType:             req.EntityType,
-		FilePath:               req.FilePath,
-		FileType:               req.FileType,
-		Separator:              separator,
+		Name:                    req.Name,
+		EntityType:              req.EntityType,
+		FilePath:                req.FilePath,
+		FileType:                req.FileType,
+		Separator:               separator,
 		SkipAttributeValidation: req.SkipAttributeValidation,
-		ColumnMapping:          columnMappingJSON,
-		IsActive:               true,
+		ColumnMapping:           columnMappingJSON,
+		IsActive:                true,
 	}
 
 	if err := uc.profileRepo.Create(ctx, profile); err != nil {

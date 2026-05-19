@@ -218,37 +218,36 @@ func (g *Generator) GenFromService(ctx context.Context, opts integrationcontract
 	return nil
 }
 
-
-	// GenFromRoute 从 Gin 路由生成 proto 文件（迁移工具）。
-	//
-	// 中文说明：
-	// - 用于将现有 Gin 项目迁移到 gRPC/proto 工作流；
-	// - 解析 Gin 路由定义，推断请求/响应类型；
-	// - 自动添加 HTTP 注解。
-	func (g *Generator) GenFromRoute(ctx context.Context, opts integrationcontract.RouteToProtoOptions) error {
-		// 解析路由文件
-		routes, err := g.parseGinRoutes(opts.RouteFile)
-		if err != nil {
-			return fmt.Errorf("proto: parse route file: %w", err)
-		}
-
-		if len(routes) == 0 {
-			return fmt.Errorf("proto: no routes found in %s", opts.RouteFile)
-		}
-
-		// 生成 proto 内容
-		protoContent := g.generateProtoFromRoutes(routes, opts)
-
-		// 写入文件
-		if err := os.WriteFile(opts.OutputPath, []byte(protoContent), 0644); err != nil {
-			return fmt.Errorf("proto: write proto file: %w", err)
-		}
-
-		// 格式化 proto 文件
-		g.formatProtoFile(opts.OutputPath)
-
-		return nil
+// GenFromRoute 从 Gin 路由生成 proto 文件（迁移工具）。
+//
+// 中文说明：
+// - 用于将现有 Gin 项目迁移到 gRPC/proto 工作流；
+// - 解析 Gin 路由定义，推断请求/响应类型；
+// - 自动添加 HTTP 注解。
+func (g *Generator) GenFromRoute(ctx context.Context, opts integrationcontract.RouteToProtoOptions) error {
+	// 解析路由文件
+	routes, err := g.parseGinRoutes(opts.RouteFile)
+	if err != nil {
+		return fmt.Errorf("proto: parse route file: %w", err)
 	}
+
+	if len(routes) == 0 {
+		return fmt.Errorf("proto: no routes found in %s", opts.RouteFile)
+	}
+
+	// 生成 proto 内容
+	protoContent := g.generateProtoFromRoutes(routes, opts)
+
+	// 写入文件
+	if err := os.WriteFile(opts.OutputPath, []byte(protoContent), 0644); err != nil {
+		return fmt.Errorf("proto: write proto file: %w", err)
+	}
+
+	// 格式化 proto 文件
+	g.formatProtoFile(opts.OutputPath)
+
+	return nil
+}
 
 // scanProtoFiles 扫描目录下所有 proto 文件。
 func (g *Generator) scanProtoFiles(dir string) ([]string, error) {

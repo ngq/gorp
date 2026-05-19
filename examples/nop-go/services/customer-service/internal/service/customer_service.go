@@ -178,20 +178,20 @@ type Customer struct {
 
 // Address 地址信息
 type Address struct {
-	Id              uint64 `json:"id"`              // 地址ID
-	CustomerId      uint64 `json:"customer_id"`     // 客户ID
-	FirstName       string `json:"first_name"`      // 名
-	LastName        string `json:"last_name"`       // 姓
-	Email           string `json:"email"`           // 邮箱
-	Company         string `json:"company"`         // 公司
-	CountryId       uint64 `json:"country_id"`      // 国家ID
+	Id              uint64 `json:"id"`                // 地址ID
+	CustomerId      uint64 `json:"customer_id"`       // 客户ID
+	FirstName       string `json:"first_name"`        // 名
+	LastName        string `json:"last_name"`         // 姓
+	Email           string `json:"email"`             // 邮箱
+	Company         string `json:"company"`           // 公司
+	CountryId       uint64 `json:"country_id"`        // 国家ID
 	StateProvinceId uint64 `json:"state_province_id"` // 省/州ID
-	City            string `json:"city"`            // 城市
-	Address1        string `json:"address1"`        // 地址行1
-	Address2        string `json:"address2"`        // 地址行2
-	ZipPostalCode   string `json:"zip_postal_code"` // 邮编
-	PhoneNumber     string `json:"phone_number"`    // 电话
-	FaxNumber       string `json:"fax_number"`      // 传真
+	City            string `json:"city"`              // 城市
+	Address1        string `json:"address1"`          // 地址行1
+	Address2        string `json:"address2"`          // 地址行2
+	ZipPostalCode   string `json:"zip_postal_code"`   // 邮编
+	PhoneNumber     string `json:"phone_number"`      // 电话
+	FaxNumber       string `json:"fax_number"`        // 传真
 }
 
 // Empty 空响应

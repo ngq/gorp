@@ -52,11 +52,11 @@ func DefaultTenantOptions() TenantOptions {
 // Example:
 //
 //	router.Use(httpmiddleware.Tenant(httpmiddleware.DefaultTenantOptions()))
-func Tenant(opts TenantOptions) transportcontract.HTTPMiddleware {
+func Tenant(opts TenantOptions) transportcontract.Middleware {
 	opts = normalizeTenantOptions(opts)
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil {
 				if next != nil {
 					next(c)
@@ -74,9 +74,13 @@ func Tenant(opts TenantOptions) transportcontract.HTTPMiddleware {
 			}
 
 			if tenant != "" {
-				c.SetContext(supportcontract.NewTenantContext(c.Context(), tenant))
+				c.Set("tenant", tenant)
+				// Also update gin.Request.Context for context.Context value propagation
+				if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+					gc.Request = gc.Request.WithContext(supportcontract.NewTenantContext(gc.Request.Context(), tenant))
+				}
 				if opts.WriteHeader && opts.HeaderName != "" {
-					c.Header(opts.HeaderName, tenant)
+					c.SetHeader(opts.HeaderName, tenant)
 				}
 			}
 
@@ -124,7 +128,7 @@ func normalizeTenantOptions(opts TenantOptions) TenantOptions {
 // resolveTenant resolves tenant identity from request param, header, query, or default.
 //
 // resolveTenant 从请求参数、请求头、查询参数或默认值中解析租户标识。
-func resolveTenant(c transportcontract.HTTPContext, opts TenantOptions) string {
+func resolveTenant(c transportcontract.Context, opts TenantOptions) string {
 	for _, key := range opts.ParamKeys {
 		if value := strings.TrimSpace(c.Param(key)); value != "" {
 			return value

@@ -6,6 +6,6 @@ import (
 )
 
 // RegisterRoutes 挂载 starter 默认业务路由。
-func RegisterRoutes(router gorp.HTTPRouter) {
+func RegisterRoutes(router gorp.Router) {
 	router.GET("/api/ping", handler.Ping)
 }

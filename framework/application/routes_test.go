@@ -27,7 +27,7 @@ func TestWithHTTPRoutesComposesWithSetup(t *testing.T) {
 		seq = append(seq, "setup")
 		return nil
 	}).apply(&cfg)
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		seq = append(seq, "routes")
 		return nil
 	}).apply(&cfg)
@@ -66,11 +66,11 @@ func TestWithHTTPRoutesNilRegistrarIsNoOp(t *testing.T) {
 func TestWithHTTPRoutesExecuteInOptionOrder(t *testing.T) {
 	cfg := runConfig{}
 	seq := make([]string, 0, 2)
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		seq = append(seq, "r1")
 		return nil
 	}).apply(&cfg)
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		seq = append(seq, "r2")
 		return nil
 	}).apply(&cfg)
@@ -90,7 +90,7 @@ func TestWithHTTPRoutesExecuteInOptionOrder(t *testing.T) {
 func TestWithHTTPRoutesWrapsRouteRegistrationError(t *testing.T) {
 	cfg := runConfig{}
 	cause := fmt.Errorf("register routes failed")
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		return cause
 	}).apply(&cfg)
 	err := cfg.setup(testHTTPRuntime())
@@ -110,7 +110,7 @@ func TestWithHTTPRoutesWrapsRouteRegistrationError(t *testing.T) {
 func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenRuntimeIsNil(t *testing.T) {
 	cfg := runConfig{}
 	called := false
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		called = true
 		return nil
 	}).apply(&cfg)
@@ -131,7 +131,7 @@ func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenRuntimeIsNil(t *testing.T) {
 func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenEngineIsNil(t *testing.T) {
 	cfg := runConfig{}
 	called := false
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		called = true
 		return nil
 	}).apply(&cfg)
@@ -152,7 +152,7 @@ func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenEngineIsNil(t *testing.T) {
 func TestWithHTTPRoutesReturnsRuntimeUnavailableWhenContainerIsNil(t *testing.T) {
 	cfg := runConfig{}
 	called := false
-	WithHTTPRoutes(func(router transportcontract.HTTPRouter, container runtimecontract.Container) error {
+	WithHTTPRoutes(func(router transportcontract.Router, container runtimecontract.Container) error {
 		called = true
 		return nil
 	}).apply(&cfg)
@@ -174,17 +174,17 @@ func testHTTPRuntime() *HTTPRuntime {
 
 type testRouter struct{}
 
-func (testRouter) Use(middleware ...transportcontract.HTTPMiddleware) {}
-func (testRouter) Group(prefix string, middleware ...transportcontract.HTTPMiddleware) transportcontract.HTTPRouter {
+func (testRouter) Use(middleware ...transportcontract.Middleware) {}
+func (testRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return testRouter{}
 }
-func (testRouter) Handle(method, path string, handler transportcontract.HTTPHandler)         {}
-func (testRouter) HandleFunc(method, path string, handlerFunc transportcontract.HTTPHandler) {}
-func (testRouter) GET(path string, handler transportcontract.HTTPHandler)                    {}
-func (testRouter) POST(path string, handler transportcontract.HTTPHandler)                   {}
-func (testRouter) PUT(path string, handler transportcontract.HTTPHandler)                    {}
-func (testRouter) DELETE(path string, handler transportcontract.HTTPHandler)                 {}
-func (testRouter) Mount(path string, handler http.Handler)                                   {}
+func (testRouter) Handle(method, path string, handler transportcontract.Handler)         {}
+func (testRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {}
+func (testRouter) GET(path string, handler transportcontract.Handler)                    {}
+func (testRouter) POST(path string, handler transportcontract.Handler)                   {}
+func (testRouter) PUT(path string, handler transportcontract.Handler)                    {}
+func (testRouter) DELETE(path string, handler transportcontract.Handler)                 {}
+func (testRouter) Mount(path string, handler http.Handler)                               {}
 
 type testContainer struct{}
 
@@ -204,4 +204,4 @@ func (testContainer) RegisterProviders(providers ...runtimecontract.ServiceProvi
 }
 func (testContainer) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
 func (testContainer) DebugPrint() string                                  { return "" }
-func (testContainer) ProviderDAG() runtimecontract.ProviderDAG             { return runtimecontract.ProviderDAG{} }
+func (testContainer) ProviderDAG() runtimecontract.ProviderDAG            { return runtimecontract.ProviderDAG{} }

@@ -37,7 +37,7 @@ func TestBindAndValidateJSONStoresValidatedBody(t *testing.T) {
 	}
 
 	router.POST("/validate", func(c *gin.Context) {
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		input := &struct {
 			Name string `json:"name"`
 		}{}
@@ -84,7 +84,7 @@ func TestBindAndValidateJSONReturnsUnifiedError(t *testing.T) {
 	}
 
 	router.POST("/validate", func(c *gin.Context) {
-		httpCtx := newHTTPContext(c)
+		httpCtx := newContext(c)
 		input := &struct {
 			Name string `json:"name"`
 		}{}

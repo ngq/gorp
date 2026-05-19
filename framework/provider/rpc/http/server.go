@@ -42,11 +42,11 @@ func NewServer(cfg *transportcontract.RPCConfig, c runtimecontract.Container) *S
 
 // Register stores a service handler for later registration as HTTP route.
 // Implements transportcontract.RPCServer.Register.
-// Handler must implement transportcontract.HTTPHandler.
+// Handler must implement transportcontract.Handler.
 //
 // Register 存储服务 handler，供后续注册为 HTTP 路由。
 // 实现 transportcontract.RPCServer.Register。
-// Handler 必须实现 transportcontract.HTTPHandler。
+// Handler 必须实现 transportcontract.Handler。
 func (s *Server) Register(service string, handler any) error {
 	s.routes.Store(service, handler)
 	return nil
@@ -76,7 +76,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.routes.Range(func(key, value any) bool {
 		service := key.(string)
-		handler, ok := value.(transportcontract.HTTPHandler)
+		handler, ok := value.(transportcontract.Handler)
 		if !ok || handler == nil {
 			return true
 		}

@@ -33,9 +33,9 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 // 中文说明：
 // - `gorp` 的公开心智模型：framework + starter templates + developer toolchain；
 // - 一级命令分为三层：
-//   1. 默认起步主命令：`new`；
-//   2. 高频开发命令：`proto / model`；
-//   3. 按需进入的辅助工具链：`template / provider / middleware / command / doc / swagger / openapi / version`；
+//  1. 默认起步主命令：`new`；
+//  2. 高频开发命令：`proto / model`；
+//  3. 按需进入的辅助工具链：`template / provider / middleware / command / doc / swagger / openapi / version`；
 //
 // - legacy runtime 命令（app / grpc / cron / build / dev / deploy）已退役；
 // - 用户通过项目自己的 `cmd/*/main.go` 启动服务，不依赖 CLI runtime。

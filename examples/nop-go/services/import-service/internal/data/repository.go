@@ -249,10 +249,10 @@ func (r *importErrorRepo) GetByHistoryID(ctx context.Context, historyID uint64) 
 
 // 常见错误
 var (
-	ErrProfileNotFound  = errors.New("profile not found")
-	ErrHistoryNotFound  = errors.New("history not found")
-	ErrInvalidFileType  = errors.New("invalid file type")
-	ErrFileNotFound     = errors.New("file not found")
-	ErrImportFailed     = errors.New("import failed")
-	ErrExportFailed     = errors.New("export failed")
+	ErrProfileNotFound = errors.New("profile not found")
+	ErrHistoryNotFound = errors.New("history not found")
+	ErrInvalidFileType = errors.New("invalid file type")
+	ErrFileNotFound    = errors.New("file not found")
+	ErrImportFailed    = errors.New("import failed")
+	ErrExportFailed    = errors.New("export failed")
 )

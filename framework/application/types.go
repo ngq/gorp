@@ -47,19 +47,19 @@ type SetupFunc func(*HTTPRuntime) error
 // HTTPRouteRegistrar defines the default HTTP route registration callback contract.
 //
 // HTTPRouteRegistrar 定义默认 HTTP 路由注册回调契约。
-type HTTPRouteRegistrar func(router transportcontract.HTTPRouter, container runtimecontract.Container) error
+type HTTPRouteRegistrar func(router transportcontract.Router, container runtimecontract.Container) error
 
 // HTTPServiceOptions is the minimal HTTP options view exposed by the application package.
 //
 // HTTPServiceOptions 是 application 包暴露的最小 HTTP 选项视图。
 type HTTPServiceOptions struct {
-	DisableRedis   bool
-	DisableGorm    bool
-	DisableMetrics bool
-	GovernanceMode resiliencecontract.GovernanceMode
-	HTTPMode       resiliencecontract.HTTPMode // HTTP 模式维度：contract 或 gin
-	GovernanceDisable []string
-	GovernanceEnable  []string
+	DisableRedis        bool
+	DisableGorm         bool
+	DisableMetrics      bool
+	GovernanceMode      resiliencecontract.GovernanceMode
+	HTTPMode            resiliencecontract.HTTPMode // HTTP 模式维度：contract 或 gin
+	GovernanceDisable   []string
+	GovernanceEnable    []string
 	GovernanceProviders map[string]string
 }
 

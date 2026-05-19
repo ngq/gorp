@@ -7,14 +7,14 @@ import (
 
 // ShoppingCart 购物车
 type ShoppingCart struct {
-	ID           uint64        `gorm:"primaryKey" json:"id"`
-	CustomerID   uint64        `gorm:"uniqueIndex" json:"customer_id"`
-	SessionID    string        `gorm:"size:64;uniqueIndex" json:"session_id"`
-	CouponCode   string        `gorm:"size:64" json:"coupon_code"`
-	Subtotal     float64       `gorm:"type:decimal(10,2);default:0" json:"subtotal"`
-	Discount     float64       `gorm:"type:decimal(10,2);default:0" json:"discount"`
-	CreatedAt    time.Time     `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt    time.Time     `gorm:"autoUpdateTime" json:"updated_at"`
+	ID         uint64    `gorm:"primaryKey" json:"id"`
+	CustomerID uint64    `gorm:"uniqueIndex" json:"customer_id"`
+	SessionID  string    `gorm:"size:64;uniqueIndex" json:"session_id"`
+	CouponCode string    `gorm:"size:64" json:"coupon_code"`
+	Subtotal   float64   `gorm:"type:decimal(10,2);default:0" json:"subtotal"`
+	Discount   float64   `gorm:"type:decimal(10,2);default:0" json:"discount"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	Items []CartItem `gorm:"foreignKey:CartID" json:"items,omitempty"`
 }
@@ -44,9 +44,9 @@ func (CartItem) TableName() string {
 
 // Wishlist 愿望清单
 type Wishlist struct {
-	ID         uint64          `gorm:"primaryKey" json:"id"`
-	CustomerID uint64          `gorm:"not null;uniqueIndex" json:"customer_id"`
-	CreatedAt  time.Time       `gorm:"autoCreateTime" json:"created_at"`
+	ID         uint64    `gorm:"primaryKey" json:"id"`
+	CustomerID uint64    `gorm:"not null;uniqueIndex" json:"customer_id"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	Items []WishlistItem `gorm:"foreignKey:WishlistID" json:"items,omitempty"`
 }
@@ -81,13 +81,13 @@ type UpdateCartItemRequest struct {
 }
 
 type CartResponse struct {
-	ID         uint64            `json:"id"`
+	ID         uint64             `json:"id"`
 	Items      []CartItemResponse `json:"items"`
-	ItemCount  int               `json:"item_count"`
-	Subtotal   float64           `json:"subtotal"`
-	Discount   float64           `json:"discount"`
-	Total      float64           `json:"total"`
-	CouponCode string            `json:"coupon_code"`
+	ItemCount  int                `json:"item_count"`
+	Subtotal   float64            `json:"subtotal"`
+	Discount   float64            `json:"discount"`
+	Total      float64            `json:"total"`
+	CouponCode string             `json:"coupon_code"`
 }
 
 type CartItemResponse struct {

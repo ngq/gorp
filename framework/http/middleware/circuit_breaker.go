@@ -21,9 +21,9 @@ import (
 // CircuitBreaker protects HTTP requests with the configured circuit breaker.
 //
 // CircuitBreaker 使用给定的熔断器保护 HTTP 请求。
-func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if cb == nil {
 				if next != nil {
 					next(c)
@@ -32,23 +32,23 @@ func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) trans
 			}
 
 			target := circuitBreakerResource(c, resource)
-			if err := cb.Allow(c.Context(), target); err != nil {
+			if err := cb.Allow(c, target); err != nil {
 				respondCircuitBreakerOpen(c)
 				return
 			}
 
 			defer func() {
 				if rec := recover(); rec != nil {
-					cb.RecordFailure(c.Context(), target, fmt.Errorf("panic: %v", rec))
+					cb.RecordFailure(c, target, fmt.Errorf("panic: %v", rec))
 					panic(rec)
 				}
 
 				status := c.ResponseStatus()
 				if status >= http.StatusInternalServerError {
-					cb.RecordFailure(c.Context(), target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
+					cb.RecordFailure(c, target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
 					return
 				}
-				cb.RecordSuccess(c.Context(), target)
+				cb.RecordSuccess(c, target)
 			}()
 
 			if next != nil {
@@ -61,7 +61,7 @@ func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) trans
 // circuitBreakerResource resolves the breaker resource key for the current request.
 //
 // circuitBreakerResource 解析当前请求对应的熔断资源 key。
-func circuitBreakerResource(c transportcontract.HTTPContext, resource string) string {
+func circuitBreakerResource(c transportcontract.Context, resource string) string {
 	if strings.TrimSpace(resource) != "" {
 		return resource
 	}
@@ -104,7 +104,7 @@ func sanitizeCircuitBreakerHTTPRoute(route string) string {
 // respondCircuitBreakerOpen writes the unified service-unavailable response for open breakers.
 //
 // respondCircuitBreakerOpen 在熔断器打开时输出统一的服务不可用响应。
-func respondCircuitBreakerOpen(c transportcontract.HTTPContext) {
+func respondCircuitBreakerOpen(c transportcontract.Context) {
 	if gc, ok := unwrapGinContext(c); ok {
 		writeGinResponseHeaders(gc)
 		resp := Response{

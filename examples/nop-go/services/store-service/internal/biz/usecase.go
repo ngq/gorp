@@ -11,9 +11,9 @@ import (
 
 // StoreUseCase 店铺用例
 type StoreUseCase struct {
-	storeRepo   data.StoreRepository
-	vendorRepo  data.VendorRepository
-	svRepo      data.StoreVendorRepository
+	storeRepo  data.StoreRepository
+	vendorRepo data.VendorRepository
+	svRepo     data.StoreVendorRepository
 }
 
 // NewStoreUseCase 创建店铺用例
@@ -29,17 +29,17 @@ func (uc *StoreUseCase) CreateStore(ctx context.Context, req *models.StoreCreate
 	}
 
 	store := &models.Store{
-		Name:             req.Name,
-		URL:              req.URL,
-		SSL:              req.SSL,
-		Hosts:            req.Hosts,
+		Name:              req.Name,
+		URL:               req.URL,
+		SSL:               req.SSL,
+		Hosts:             req.Hosts,
 		DefaultLanguageID: req.DefaultLanguageID,
-		DisplayOrder:     req.DisplayOrder,
-		CompanyName:      req.CompanyName,
-		CompanyAddress:   req.CompanyAddress,
-		CompanyPhone:     req.CompanyPhone,
-		CompanyEmail:     req.CompanyEmail,
-		Active:           req.Active,
+		DisplayOrder:      req.DisplayOrder,
+		CompanyName:       req.CompanyName,
+		CompanyAddress:    req.CompanyAddress,
+		CompanyPhone:      req.CompanyPhone,
+		CompanyEmail:      req.CompanyEmail,
+		Active:            req.Active,
 	}
 
 	if err := uc.storeRepo.Create(ctx, store); err != nil {
@@ -151,14 +151,14 @@ func (uc *VendorUseCase) CreateVendor(ctx context.Context, req *models.VendorCre
 	}
 
 	vendor := &models.Vendor{
-		Name:                            req.Name,
-		Email:                           req.Email,
-		Description:                     req.Description,
-		AdminComment:                    req.AdminComment,
-		AddressID:                       req.AddressID,
-		Active:                          req.Active,
-		DisplayOrder:                    req.DisplayOrder,
-		AllowCustomersToContactVendors:  req.AllowCustomersToContactVendors,
+		Name:                           req.Name,
+		Email:                          req.Email,
+		Description:                    req.Description,
+		AdminComment:                   req.AdminComment,
+		AddressID:                      req.AddressID,
+		Active:                         req.Active,
+		DisplayOrder:                   req.DisplayOrder,
+		AllowCustomersToContactVendors: req.AllowCustomersToContactVendors,
 	}
 
 	if err := uc.vendorRepo.Create(ctx, vendor); err != nil {

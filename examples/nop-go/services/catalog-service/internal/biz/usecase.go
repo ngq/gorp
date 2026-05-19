@@ -22,10 +22,10 @@ import (
 // - 包括商品创建、查询、更新、删除等操作;
 // - 处理商品分类关联和状态管理。
 type ProductUseCase struct {
-	productRepo     data.ProductRepository
-	categoryRepo    data.CategoryRepository
+	productRepo      data.ProductRepository
+	categoryRepo     data.CategoryRepository
 	manufacturerRepo data.ManufacturerRepository
-	pictureRepo     data.ProductPictureRepository
+	pictureRepo      data.ProductPictureRepository
 }
 
 // NewProductUseCase 创建商品用例
@@ -36,10 +36,10 @@ func NewProductUseCase(
 	pictureRepo data.ProductPictureRepository,
 ) *ProductUseCase {
 	return &ProductUseCase{
-		productRepo:     productRepo,
-		categoryRepo:    categoryRepo,
+		productRepo:      productRepo,
+		categoryRepo:     categoryRepo,
 		manufacturerRepo: manufacturerRepo,
-		pictureRepo:     pictureRepo,
+		pictureRepo:      pictureRepo,
 	}
 }
 
@@ -432,8 +432,8 @@ func (uc *ManufacturerUseCase) ListManufacturers(ctx context.Context) ([]*models
 
 // ProductPictureUseCase 商品图片用例
 type ProductPictureUseCase struct {
-	pictureRepo  data.ProductPictureRepository
-	productRepo  data.ProductRepository
+	pictureRepo data.ProductPictureRepository
+	productRepo data.ProductRepository
 }
 
 // NewProductPictureUseCase 创建商品图片用例

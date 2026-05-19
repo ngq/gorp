@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/ngq/gorp/framework/container"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
@@ -33,31 +35,31 @@ type customResponse struct {
 
 type customResponder struct{}
 
-func (s *responderSpy) Success(transportcontract.HTTPContext, any) {
+func (s *responderSpy) Success(transportcontract.Context, any) {
 	s.calls = append(s.calls, "success")
 }
 
-func (s *responderSpy) SuccessWithMessage(transportcontract.HTTPContext, string, any) {
+func (s *responderSpy) SuccessWithMessage(transportcontract.Context, string, any) {
 	s.calls = append(s.calls, "success_with_message")
 }
 
-func (s *responderSpy) SuccessWithStatus(transportcontract.HTTPContext, int, any) {
+func (s *responderSpy) SuccessWithStatus(transportcontract.Context, int, any) {
 	s.calls = append(s.calls, "success_with_status")
 }
 
-func (s *responderSpy) Error(transportcontract.HTTPContext, error) {
+func (s *responderSpy) Error(transportcontract.Context, error) {
 	s.calls = append(s.calls, "error")
 }
 
-func (s *responderSpy) BadRequest(transportcontract.HTTPContext, string) {
+func (s *responderSpy) BadRequest(transportcontract.Context, string) {
 	s.calls = append(s.calls, "bad_request")
 }
 
-func (s *responderSpy) InternalError(transportcontract.HTTPContext, string) {
+func (s *responderSpy) InternalError(transportcontract.Context, string) {
 	s.calls = append(s.calls, "internal_error")
 }
 
-func (customResponder) Success(c transportcontract.HTTPContext, data any) {
+func (customResponder) Success(c transportcontract.Context, data any) {
 	c.JSON(http.StatusOK, customResponse{
 		Success: true,
 		Message: "ok",
@@ -65,7 +67,7 @@ func (customResponder) Success(c transportcontract.HTTPContext, data any) {
 	})
 }
 
-func (customResponder) SuccessWithMessage(c transportcontract.HTTPContext, message string, data any) {
+func (customResponder) SuccessWithMessage(c transportcontract.Context, message string, data any) {
 	c.JSON(http.StatusOK, customResponse{
 		Success: true,
 		Message: message,
@@ -73,7 +75,7 @@ func (customResponder) SuccessWithMessage(c transportcontract.HTTPContext, messa
 	})
 }
 
-func (customResponder) SuccessWithStatus(c transportcontract.HTTPContext, status int, data any) {
+func (customResponder) SuccessWithStatus(c transportcontract.Context, status int, data any) {
 	c.JSON(status, customResponse{
 		Success: true,
 		Message: "ok",
@@ -81,25 +83,166 @@ func (customResponder) SuccessWithStatus(c transportcontract.HTTPContext, status
 	})
 }
 
-func (customResponder) Error(c transportcontract.HTTPContext, err error) {
+func (customResponder) Error(c transportcontract.Context, err error) {
 	c.JSON(http.StatusBadRequest, customResponse{
 		Success: false,
 		Message: err.Error(),
 	})
 }
 
-func (customResponder) BadRequest(c transportcontract.HTTPContext, message string) {
+func (customResponder) BadRequest(c transportcontract.Context, message string) {
 	c.JSON(http.StatusBadRequest, customResponse{
 		Success: false,
 		Message: message,
 	})
 }
 
-func (customResponder) InternalError(c transportcontract.HTTPContext, message string) {
+func (customResponder) InternalError(c transportcontract.Context, message string) {
 	c.JSON(http.StatusInternalServerError, customResponse{
 		Success: false,
 		Message: message,
 	})
+}
+
+// testResponseContext implements Context for testing
+type testResponseContext struct {
+	gin      *gin.Context
+	captured *responseCapture
+}
+
+func (c *testResponseContext) Deadline() (deadline time.Time, ok bool) {
+	return c.gin.Request.Context().Deadline()
+}
+
+func (c *testResponseContext) Done() <-chan struct{} {
+	return c.gin.Request.Context().Done()
+}
+
+func (c *testResponseContext) Err() error {
+	return c.gin.Request.Context().Err()
+}
+
+func (c *testResponseContext) Value(key any) any {
+	return c.gin.Request.Context().Value(key)
+}
+
+func (c *testResponseContext) Request() *http.Request {
+	return c.gin.Request
+}
+
+func (c *testResponseContext) Response() http.ResponseWriter {
+	return c.gin.Writer
+}
+
+func (c *testResponseContext) Param(key string) string {
+	return c.gin.Param(key)
+}
+
+func (c *testResponseContext) Query(key string) string {
+	return c.gin.Query(key)
+}
+
+func (c *testResponseContext) DefaultQuery(key, defaultValue string) string {
+	return c.gin.DefaultQuery(key, defaultValue)
+}
+
+func (c *testResponseContext) GetHeader(key string) string {
+	return c.gin.GetHeader(key)
+}
+
+func (c *testResponseContext) SetHeader(key, value string) {
+	c.gin.Header(key, value)
+}
+
+func (c *testResponseContext) Bind(obj any) error {
+	return c.gin.ShouldBind(obj)
+}
+
+func (c *testResponseContext) BindJSON(obj any) error {
+	return c.gin.ShouldBindJSON(obj)
+}
+
+func (c *testResponseContext) BindQuery(obj any) error {
+	return c.gin.ShouldBindQuery(obj)
+}
+
+func (c *testResponseContext) JSON(status int, body any) {
+	c.captured.status = status
+	c.captured.body = body
+}
+
+func (c *testResponseContext) String(status int, body string) {
+	c.captured.status = status
+	c.captured.body = body
+}
+
+func (c *testResponseContext) XML(status int, body any) {
+	c.captured.status = status
+	c.captured.body = body
+}
+
+func (c *testResponseContext) Data(status int, contentType string, body []byte) {
+	c.captured.status = status
+	c.captured.header.Set("Content-Type", contentType)
+	c.captured.body = body
+}
+
+func (c *testResponseContext) Redirect(status int, location string) {
+	c.captured.status = status
+	c.captured.header.Set("Location", location)
+}
+
+func (c *testResponseContext) Status(code int) {
+	c.captured.status = code
+}
+
+func (c *testResponseContext) RoutePath() string {
+	return c.gin.FullPath()
+}
+
+func (c *testResponseContext) ResponseStatus() int {
+	return c.captured.status
+}
+
+func (c *testResponseContext) Get(key string) any {
+	val, _ := c.gin.Get(key)
+	return val
+}
+
+func (c *testResponseContext) Set(key string, value any) {
+	c.gin.Set(key, value)
+}
+
+func (c *testResponseContext) Abort(status int) {
+	c.gin.AbortWithStatus(status)
+}
+
+func (c *testResponseContext) AbortWithJSON(status int, body any) {
+	c.captured.status = status
+	c.captured.body = body
+	c.gin.Abort()
+}
+
+func (c *testResponseContext) IsAborted() bool {
+	return c.gin.IsAborted()
+}
+
+func (c *testResponseContext) Next() {
+	c.gin.Next()
+}
+
+func newResponseTestContext(t *testing.T, ctx context.Context) (Context, *responseCapture) {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	ginCtx.Request = req
+
+	captured := &responseCapture{header: make(http.Header)}
+	testCtx := &testResponseContext{gin: ginCtx, captured: captured}
+	return testCtx, captured
 }
 
 func TestSuccessFallsBackToDefaultResponder(t *testing.T) {
@@ -159,39 +302,4 @@ func TestSuccessCanUseCustomBusinessResponseShape(t *testing.T) {
 	require.True(t, resp.Success)
 	require.Equal(t, "ok", resp.Message)
 	require.Equal(t, map[string]any{"id": 7}, resp.Result)
-}
-
-func newResponseTestContext(t *testing.T, ctx context.Context) (HTTPContext, *responseCapture) {
-	t.Helper()
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
-	captured := &responseCapture{header: make(http.Header)}
-	httpCtx := transportcontract.NewDefaultHTTPContext(req.Context(), req)
-	httpCtx.SetHeaderFuncs(func(key string) string {
-		return captured.header.Get(key)
-	}, func(key, value string) {
-		captured.header.Set(key, value)
-	})
-	httpCtx.SetResponseFuncs(func(status int, body any) {
-		captured.status = status
-		captured.body = body
-	}, func(status int, body string) {
-		captured.status = status
-		captured.body = body
-	}, func(status int, body any) {
-		captured.status = status
-		captured.body = body
-	}, func(status int, contentType string, body []byte) {
-		captured.status = status
-		captured.header.Set("Content-Type", contentType)
-		captured.body = body
-	}, func(status int, location string) {
-		captured.status = status
-		captured.header.Set("Location", location)
-	}, func(status int) {
-		captured.status = status
-	}, func() int {
-		return captured.status
-	})
-	return httpCtx, captured
 }

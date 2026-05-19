@@ -13,36 +13,36 @@ import (
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	"github.com/redis/go-redis/v9"
 )
 
 // ClusterMessage represents a message broadcast across nodes.
 //
 // ClusterMessage 表示跨节点广播的消息。
 type ClusterMessage struct {
-	Type      string `json:"type"`       // "broadcast", "room", "user"
-	RoomID    string `json:"room_id"`    // for room broadcast
-	UserID    string `json:"user_id"`    // for user-specific message
-	Message   string `json:"message"`    // text message
-	Binary    []byte `json:"binary"`     // binary message (base64)
-	IsBinary  bool   `json:"is_binary"`  // whether this is a binary message
-	SenderID  string `json:"sender_id"`  // node ID of sender
-	Timestamp int64  `json:"timestamp"`  // unix timestamp
+	Type      string `json:"type"`      // "broadcast", "room", "user"
+	RoomID    string `json:"room_id"`   // for room broadcast
+	UserID    string `json:"user_id"`   // for user-specific message
+	Message   string `json:"message"`   // text message
+	Binary    []byte `json:"binary"`    // binary message (base64)
+	IsBinary  bool   `json:"is_binary"` // whether this is a binary message
+	SenderID  string `json:"sender_id"` // node ID of sender
+	Timestamp int64  `json:"timestamp"` // unix timestamp
 }
 
 // ClusterServer implements WebSocketClusterServer with Redis Pub/Sub.
 //
 // ClusterServer 使用 Redis Pub/Sub 实现 WebSocketClusterServer。
 type ClusterServer struct {
-	*Server                    // embed single-node server
-	config   *transportcontract.WebSocketClusterConfig
-	redis    *redis.Client
-	nodeID   string
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	rooms    sync.Map // roomID -> map[transportcontract.WebSocketConn]bool
+	*Server // embed single-node server
+	config  *transportcontract.WebSocketClusterConfig
+	redis   *redis.Client
+	nodeID  string
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	rooms   sync.Map // roomID -> map[transportcontract.WebSocketConn]bool
 }
 
 // NewClusterServer creates a new cluster-enabled WebSocket server.

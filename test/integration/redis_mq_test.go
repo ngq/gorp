@@ -162,8 +162,8 @@ func TestRedisNativeClient(t *testing.T) {
 	}
 
 	cfg := &integrationcontract.MessageQueueConfig{
-		Type:           "redis",
-		RedisAddr:      getEnvOrDefault("GORP_TEST_REDIS_ADDR", "localhost:6379"),
+		Type:      "redis",
+		RedisAddr: getEnvOrDefault("GORP_TEST_REDIS_ADDR", "localhost:6379"),
 	}
 
 	queue, err := redismq.NewQueue(cfg)

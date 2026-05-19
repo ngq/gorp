@@ -30,8 +30,8 @@ func (s *CustomerGRPCServer) ValidateCustomer(ctx context.Context, req *customer
 func (s *CustomerGRPCServer) GetCustomer(ctx context.Context, req *customer.GetCustomerRequest) (*customer.GetCustomerResponse, error) {
 	// TODO: 实现获取客户信息
 	return &customer.GetCustomerResponse{
-		ID:        req.CustomerID,
-		IsActive:  true,
+		ID:       req.CustomerID,
+		IsActive: true,
 	}, nil
 }
 

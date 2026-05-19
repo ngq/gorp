@@ -96,10 +96,10 @@ func isFromTrustedProxy(remoteAddr string) bool {
 // IPAllowlist allows only requests whose client IP matches the configured entries.
 //
 // IPAllowlist 仅允许客户端 IP 命中配置项的请求继续执行。
-func IPAllowlist(allowed ...string) transportcontract.HTTPMiddleware {
+func IPAllowlist(allowed ...string) transportcontract.Middleware {
 	rules := parseIPRules(allowed)
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if len(rules) == 0 {
 				if next != nil {
 					next(c)
@@ -123,10 +123,10 @@ func IPAllowlist(allowed ...string) transportcontract.HTTPMiddleware {
 // IPDenylist rejects requests whose client IP matches the configured entries.
 //
 // IPDenylist 拒绝客户端 IP 命中配置项的请求。
-func IPDenylist(denied ...string) transportcontract.HTTPMiddleware {
+func IPDenylist(denied ...string) transportcontract.Middleware {
 	rules := parseIPRules(denied)
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if len(rules) == 0 {
 				if next != nil {
 					next(c)
@@ -182,9 +182,9 @@ func parseIPRules(values []string) []ipRule {
 //
 // requestClientIP 从请求头或远端地址中提取客户端 IP。
 // X-Forwarded-For 和 X-Real-IP 头仅在请求来自可信反向代理时
-//（通过 SetTrustedProxies 配置）才会被使用。
+// （通过 SetTrustedProxies 配置）才会被使用。
 // 否则这些头将被忽略，因为它们可被任何客户端伪造。
-func requestClientIP(c transportcontract.HTTPContext) string {
+func requestClientIP(c transportcontract.Context) string {
 	if c == nil {
 		return ""
 	}
@@ -243,7 +243,7 @@ func matchesIPRules(rawIP string, rules []ipRule) bool {
 // respondIPForbidden writes the unified forbidden response for IP policy failures.
 //
 // respondIPForbidden 为 IP 策略拒绝场景输出统一无权限响应。
-func respondIPForbidden(c transportcontract.HTTPContext) {
+func respondIPForbidden(c transportcontract.Context) {
 	if gc, ok := unwrapGinContext(c); ok {
 		writeGinResponseHeaders(gc)
 		resp := Response{

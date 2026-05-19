@@ -1,4 +1,4 @@
-﻿// Package service 瀹㈡埛鏈嶅姟HTTP灞?
+// Package service 瀹㈡埛鏈嶅姟HTTP灞?
 package service
 
 import (
@@ -193,10 +193,10 @@ func (s *CustomerService) UpdateProfile(c *gin.Context) {
 	}
 
 	var req struct {
-		FirstName string     `json:"first_name"`
-		LastName  string     `json:"last_name"`
-		Gender    string     `json:"gender"`
-		Birthday  *string    `json:"birthday"`
+		FirstName string  `json:"first_name"`
+		LastName  string  `json:"last_name"`
+		Gender    string  `json:"gender"`
+		Birthday  *string `json:"birthday"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -293,18 +293,18 @@ func (s *CustomerService) CreateAddress(c *gin.Context) {
 	}
 
 	address := &models.Address{
-		CustomerID:  customerID,
-		FirstName:   req.FirstName,
-		LastName:    req.LastName,
-		Email:       req.Email,
-		Phone:       req.Phone,
-		Company:     req.Company,
-		Country:     req.Country,
-		State:       req.State,
-		City:        req.City,
-		Address1:    req.Address1,
-		Address2:    req.Address2,
-		ZipCode:     req.ZipCode,
+		CustomerID: customerID,
+		FirstName:  req.FirstName,
+		LastName:   req.LastName,
+		Email:      req.Email,
+		Phone:      req.Phone,
+		Company:    req.Company,
+		Country:    req.Country,
+		State:      req.State,
+		City:       req.City,
+		Address1:   req.Address1,
+		Address2:   req.Address2,
+		ZipCode:    req.ZipCode,
 	}
 
 	if err := s.addressUC.CreateAddress(c.Request.Context(), address); err != nil {

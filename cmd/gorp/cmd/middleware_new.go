@@ -13,7 +13,7 @@ import (
 //
 // 中文说明：
 // - 目录为 `app/http/middleware/<name>/`。
-// - 文件默认创建 `middleware.go`，并提供一个 `Middleware()` 返回 `gorp.HTTPMiddleware`；
+// - 文件默认创建 `middleware.go`，并提供一个 `Middleware()` 返回 `gorp.Middleware`；
 // - 它只生成最小可运行骨架，真正业务逻辑需要后续手写。
 var middlewareNewCmd = &cobra.Command{
 	Use:   "new",
@@ -49,7 +49,7 @@ import (
 	gorp "%s"
 )
 
-// Middleware 返回该中间件的 framework HTTPMiddleware。
+// Middleware 返回该中间件的 framework Middleware。
 //
 // 使用示例：
 // - c.Get(key) 获取中间件传递的数据
@@ -57,9 +57,9 @@ import (
 // - c.Abort(status) 中止请求链
 // - c.AbortWithJSON(status, body) 中止并返回 JSON 响应
 // - c.Next() 继续执行下一个 handler
-func Middleware() gorp.HTTPMiddleware {
-	return func(next gorp.HTTPHandler) gorp.HTTPHandler {
-		return func(c gorp.HTTPContext) {
+func Middleware() gorp.Middleware {
+	return func(next gorp.Handler) gorp.Handler {
+		return func(c gorp.Context) {
 			// 示例：认证检查
 			// token := c.GetHeader("Authorization")
 			// if token == "" {

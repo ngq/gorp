@@ -34,9 +34,9 @@ var (
 // MetricsMiddleware records basic HTTP request metrics for the current request.
 //
 // MetricsMiddleware 为当前请求记录基础 HTTP 指标。
-func MetricsMiddleware() transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func MetricsMiddleware() transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			start := time.Now()
 			if next != nil {
 				next(c)

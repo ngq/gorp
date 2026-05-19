@@ -28,18 +28,20 @@ type exportDLockContainerStub struct {
 	lock datacontract.DistributedLock
 }
 
-func (s *exportDLockContainerStub) Bind(string, runtimecontract.Factory, bool)                      {}
-func (s *exportDLockContainerStub) NamedBind(string, string, runtimecontract.Factory, bool)          {}
-func (s *exportDLockContainerStub) IsBind(string) bool                                               { return true }
-func (s *exportDLockContainerStub) IsBindNamed(string, string) bool                                  { return false }
-func (s *exportDLockContainerStub) MustMake(key string) any                                          { v, _ := s.Make(key); return v }
-func (s *exportDLockContainerStub) MustMakeNamed(string, string) any                                 { return nil }
-func (s *exportDLockContainerStub) RegisterCloser(string, io.Closer)                                 {}
-func (s *exportDLockContainerStub) Destroy() error                                                   { return nil }
-func (s *exportDLockContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo              { return nil }
-func (s *exportDLockContainerStub) DebugPrint() string                                               { return "" }
-func (s *exportDLockContainerStub) ProviderDAG() runtimecontract.ProviderDAG                          { return runtimecontract.ProviderDAG{} }
-func (s *exportDLockContainerStub) MakeNamed(string, string) (any, error)                            { return nil, nil }
+func (s *exportDLockContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (s *exportDLockContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (s *exportDLockContainerStub) IsBind(string) bool                                      { return true }
+func (s *exportDLockContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (s *exportDLockContainerStub) MustMake(key string) any                                 { v, _ := s.Make(key); return v }
+func (s *exportDLockContainerStub) MustMakeNamed(string, string) any                        { return nil }
+func (s *exportDLockContainerStub) RegisterCloser(string, io.Closer)                        {}
+func (s *exportDLockContainerStub) Destroy() error                                          { return nil }
+func (s *exportDLockContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo     { return nil }
+func (s *exportDLockContainerStub) DebugPrint() string                                      { return "" }
+func (s *exportDLockContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
+func (s *exportDLockContainerStub) MakeNamed(string, string) (any, error) { return nil, nil }
 func (s *exportDLockContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
 	return nil
 }

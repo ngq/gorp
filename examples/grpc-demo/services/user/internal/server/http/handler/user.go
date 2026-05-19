@@ -18,11 +18,11 @@ func NewUserHandler(user *service.UserService) *UserHandler {
 	return &UserHandler{user: user}
 }
 
-func (h *UserHandler) List(c gorp.HTTPContext) {
+func (h *UserHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.user.List(c.Context(), page, size)
+	items, total, err := h.user.List(c, page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -41,14 +41,14 @@ func (h *UserHandler) List(c gorp.HTTPContext) {
 	})
 }
 
-func (h *UserHandler) GetByID(c gorp.HTTPContext) {
+func (h *UserHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
-	user, err := h.user.GetByID(c.Context(), uint(id))
+	user, err := h.user.GetByID(c, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "user not found"})
 		return
@@ -57,14 +57,14 @@ func (h *UserHandler) GetByID(c gorp.HTTPContext) {
 	gorp.Success(c, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
 }
 
-func (h *UserHandler) Create(c gorp.HTTPContext) {
+func (h *UserHandler) Create(c gorp.Context) {
 	var req request.CreateUser
 	if err := c.BindJSON(&req); err != nil {
 		gorp.BadRequest(c, err.Error())
 		return
 	}
 
-	user, err := h.user.Create(c.Context(), service.CreateUserRequest{
+	user, err := h.user.Create(c, service.CreateUserRequest{
 		Username: req.Username,
 		Email:    req.Email,
 	})
@@ -76,14 +76,14 @@ func (h *UserHandler) Create(c gorp.HTTPContext) {
 	gorp.SuccessWithStatus(c, http.StatusCreated, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
 }
 
-func (h *UserHandler) Delete(c gorp.HTTPContext) {
+func (h *UserHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		gorp.BadRequest(c, "invalid id")
 		return
 	}
 
-	if err := h.user.Delete(c.Context(), uint(id)); err != nil {
+	if err := h.user.Delete(c, uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

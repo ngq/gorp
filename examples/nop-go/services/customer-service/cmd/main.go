@@ -26,8 +26,8 @@ import (
 	"fmt"
 	"os"
 
-	"nop-go/shared/bootstrap"
 	"nop-go/services/customer-service/internal/models"
+	"nop-go/shared/bootstrap"
 
 	_ "nop-go/services/customer-service/docs" // swagger docs
 

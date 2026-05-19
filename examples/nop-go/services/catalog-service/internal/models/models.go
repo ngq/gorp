@@ -19,29 +19,29 @@ import (
 // - 支持简单商品和组合商品两种类型;
 // - 包含商品基本信息、SEO 信息、发布状态等。
 type Product struct {
-	ID               uint64    `gorm:"primaryKey" json:"id"`
-	SKU              string    `gorm:"size:64;uniqueIndex;not null" json:"sku"`
-	Name             string    `gorm:"size:256;not null" json:"name"`
-	ShortDescription string    `gorm:"size:512" json:"short_description"`
-	FullDescription  string    `gorm:"type:text" json:"full_description"`
-	ManufacturerID   *uint64   `gorm:"index" json:"manufacturer_id"`
-	ProductType      string    `gorm:"size:16;default:'simple'" json:"product_type"` // simple, grouped
-	IsPublished      bool      `gorm:"default:false" json:"is_published"`
-	ShowOnHomepage   bool      `gorm:"default:false" json:"show_on_homepage"`
-	DisplayOrder     int       `gorm:"default:0" json:"display_order"`
-	SEOSlug          string    `gorm:"size:256" json:"seo_slug"`
-	MetaKeywords     string    `gorm:"size:256" json:"meta_keywords"`
-	MetaDescription  string    `gorm:"size:256" json:"meta_description"`
-	CreatedAt        time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID               uint64     `gorm:"primaryKey" json:"id"`
+	SKU              string     `gorm:"size:64;uniqueIndex;not null" json:"sku"`
+	Name             string     `gorm:"size:256;not null" json:"name"`
+	ShortDescription string     `gorm:"size:512" json:"short_description"`
+	FullDescription  string     `gorm:"type:text" json:"full_description"`
+	ManufacturerID   *uint64    `gorm:"index" json:"manufacturer_id"`
+	ProductType      string     `gorm:"size:16;default:'simple'" json:"product_type"` // simple, grouped
+	IsPublished      bool       `gorm:"default:false" json:"is_published"`
+	ShowOnHomepage   bool       `gorm:"default:false" json:"show_on_homepage"`
+	DisplayOrder     int        `gorm:"default:0" json:"display_order"`
+	SEOSlug          string     `gorm:"size:256" json:"seo_slug"`
+	MetaKeywords     string     `gorm:"size:256" json:"meta_keywords"`
+	MetaDescription  string     `gorm:"size:256" json:"meta_description"`
+	CreatedAt        time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt        time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt        *time.Time `gorm:"index" json:"deleted_at"`
 
 	// 关联
-	Manufacturer    *Manufacturer     `gorm:"foreignKey:ManufacturerID" json:"manufacturer,omitempty"`
-	Categories      []Category        `gorm:"many2many:product_categories;" json:"categories,omitempty"`
-	Pictures        []ProductPicture  `gorm:"foreignKey:ProductID" json:"pictures,omitempty"`
-	AttributeMaps   []ProductAttributeMapping `gorm:"foreignKey:ProductID" json:"attribute_maps,omitempty"`
-	Reviews         []ProductReview   `gorm:"foreignKey:ProductID" json:"reviews,omitempty"`
+	Manufacturer  *Manufacturer             `gorm:"foreignKey:ManufacturerID" json:"manufacturer,omitempty"`
+	Categories    []Category                `gorm:"many2many:product_categories;" json:"categories,omitempty"`
+	Pictures      []ProductPicture          `gorm:"foreignKey:ProductID" json:"pictures,omitempty"`
+	AttributeMaps []ProductAttributeMapping `gorm:"foreignKey:ProductID" json:"attribute_maps,omitempty"`
+	Reviews       []ProductReview           `gorm:"foreignKey:ProductID" json:"reviews,omitempty"`
 }
 
 // TableName 表名
@@ -68,9 +68,9 @@ type Category struct {
 	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// 关联
-	Parent   *Category   `gorm:"foreignKey:ParentID" json:"parent,omitempty"`
-	Children []Category  `gorm:"foreignKey:ParentID" json:"children,omitempty"`
-	Products []Product   `gorm:"many2many:product_categories;" json:"products,omitempty"`
+	Parent   *Category  `gorm:"foreignKey:ParentID" json:"parent,omitempty"`
+	Children []Category `gorm:"foreignKey:ParentID" json:"children,omitempty"`
+	Products []Product  `gorm:"many2many:product_categories;" json:"products,omitempty"`
 }
 
 // TableName 表名
@@ -116,8 +116,8 @@ type ProductCategory struct {
 	DisplayOrder int    `gorm:"default:0" json:"display_order"`
 
 	// 关联
-	Product   *Product   `gorm:"foreignKey:ProductID" json:"product,omitempty"`
-	Category  *Category  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	Product  *Product  `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Category *Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 }
 
 // TableName 表名
@@ -153,14 +153,14 @@ func (ProductAttribute) TableName() string {
 // - 支持价格调整和重量调整;
 // - 可设置默认选中状态。
 type ProductAttributeValue struct {
-	ID                uint64    `gorm:"primaryKey" json:"id"`
-	ProductAttributeID uint64   `gorm:"not null;index" json:"product_attribute_id"`
-	Name              string    `gorm:"size:128;not null" json:"name"`
-	PriceAdjustment   float64   `gorm:"type:decimal(10,2);default:0" json:"price_adjustment"`
-	WeightAdjustment  float64   `gorm:"type:decimal(10,3);default:0" json:"weight_adjustment"`
-	IsPreSelected     bool      `gorm:"default:false" json:"is_pre_selected"`
-	DisplayOrder      int       `gorm:"default:0" json:"display_order"`
-	CreatedAt         time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID                 uint64    `gorm:"primaryKey" json:"id"`
+	ProductAttributeID uint64    `gorm:"not null;index" json:"product_attribute_id"`
+	Name               string    `gorm:"size:128;not null" json:"name"`
+	PriceAdjustment    float64   `gorm:"type:decimal(10,2);default:0" json:"price_adjustment"`
+	WeightAdjustment   float64   `gorm:"type:decimal(10,3);default:0" json:"weight_adjustment"`
+	IsPreSelected      bool      `gorm:"default:false" json:"is_pre_selected"`
+	DisplayOrder       int       `gorm:"default:0" json:"display_order"`
+	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	// 关联
 	Attribute *ProductAttribute `gorm:"foreignKey:ProductAttributeID" json:"attribute,omitempty"`
@@ -227,16 +227,16 @@ func (ProductPicture) TableName() string {
 // - 支持 1-5 星评分;
 // - 包含审核状态和有用度统计。
 type ProductReview struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	ProductID   uint64    `gorm:"not null;index" json:"product_id"`
-	CustomerID  uint64    `gorm:"not null;index" json:"customer_id"`
-	Rating      int       `gorm:"not null;check:rating >= 1 AND rating <= 5" json:"rating"`
-	Title       string    `gorm:"size:256" json:"title"`
-	ReviewText  string    `gorm:"type:text" json:"review_text"`
-	IsApproved  bool      `gorm:"default:false" json:"is_approved"`
-	HelpfulYes  int       `gorm:"default:0" json:"helpful_yes"`
-	HelpfulNo   int       `gorm:"default:0" json:"helpful_no"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID         uint64    `gorm:"primaryKey" json:"id"`
+	ProductID  uint64    `gorm:"not null;index" json:"product_id"`
+	CustomerID uint64    `gorm:"not null;index" json:"customer_id"`
+	Rating     int       `gorm:"not null;check:rating >= 1 AND rating <= 5" json:"rating"`
+	Title      string    `gorm:"size:256" json:"title"`
+	ReviewText string    `gorm:"type:text" json:"review_text"`
+	IsApproved bool      `gorm:"default:false" json:"is_approved"`
+	HelpfulYes int       `gorm:"default:0" json:"helpful_yes"`
+	HelpfulNo  int       `gorm:"default:0" json:"helpful_no"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	// 关联
 	Product *Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
@@ -254,10 +254,10 @@ func (ProductReview) TableName() string {
 // - 用于商品筛选和对比(如屏幕尺寸、内存大小等);
 // - 与商品属性不同,规格属性用于筛选而非选择。
 type ProductSpecificationAttribute struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"size:128;not null" json:"name"`
-	DisplayOrder int      `gorm:"default:0" json:"display_order"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID           uint64    `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"size:128;not null" json:"name"`
+	DisplayOrder int       `gorm:"default:0" json:"display_order"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	// 关联
 	Options []ProductSpecificationAttributeOption `gorm:"foreignKey:SpecificationAttributeID" json:"options,omitempty"`
@@ -270,11 +270,11 @@ func (ProductSpecificationAttribute) TableName() string {
 
 // ProductSpecificationAttributeOption 规格属性选项
 type ProductSpecificationAttributeOption struct {
-	ID                    uint64    `gorm:"primaryKey" json:"id"`
-	SpecificationAttributeID uint64 `gorm:"not null;index" json:"specification_attribute_id"`
-	Name                  string    `gorm:"size:128;not null" json:"name"`
-	DisplayOrder          int       `gorm:"default:0" json:"display_order"`
-	CreatedAt             time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID                       uint64    `gorm:"primaryKey" json:"id"`
+	SpecificationAttributeID uint64    `gorm:"not null;index" json:"specification_attribute_id"`
+	Name                     string    `gorm:"size:128;not null" json:"name"`
+	DisplayOrder             int       `gorm:"default:0" json:"display_order"`
+	CreatedAt                time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 // TableName 表名
@@ -284,12 +284,12 @@ func (ProductSpecificationAttributeOption) TableName() string {
 
 // ProductSpecificationAttributeMapping 商品规格映射
 type ProductSpecificationAttributeMapping struct {
-	ID                           uint64    `gorm:"primaryKey" json:"id"`
-	ProductID                    uint64    `gorm:"not null;index" json:"product_id"`
-	SpecificationAttributeOptionID uint64  `gorm:"not null;index" json:"specification_attribute_option_id"`
-	IsVisibleOnProductPage       bool      `gorm:"default:true" json:"is_visible_on_product_page"`
-	DisplayOrder                 int       `gorm:"default:0" json:"display_order"`
-	CreatedAt                    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID                             uint64    `gorm:"primaryKey" json:"id"`
+	ProductID                      uint64    `gorm:"not null;index" json:"product_id"`
+	SpecificationAttributeOptionID uint64    `gorm:"not null;index" json:"specification_attribute_option_id"`
+	IsVisibleOnProductPage         bool      `gorm:"default:true" json:"is_visible_on_product_page"`
+	DisplayOrder                   int       `gorm:"default:0" json:"display_order"`
+	CreatedAt                      time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 // TableName 表名
@@ -303,10 +303,10 @@ func (ProductSpecificationAttributeMapping) TableName() string {
 // - 商品之间的关联推荐;
 // - 如搭配购买、相关商品等。
 type RelatedProduct struct {
-	ProductID1       uint64 `gorm:"not null" json:"product_id_1"`
-	ProductID2       uint64 `gorm:"not null" json:"product_id_2"`
-	DisplayOrder     int    `gorm:"default:0" json:"display_order"`
-	IsBidirectional  bool   `gorm:"default:false" json:"is_bidirectional"`
+	ProductID1      uint64 `gorm:"not null" json:"product_id_1"`
+	ProductID2      uint64 `gorm:"not null" json:"product_id_2"`
+	DisplayOrder    int    `gorm:"default:0" json:"display_order"`
+	IsBidirectional bool   `gorm:"default:false" json:"is_bidirectional"`
 
 	// 关联
 	Product1 *Product `gorm:"foreignKey:ProductID1" json:"product1,omitempty"`
@@ -332,20 +332,20 @@ type ProductListRequest struct {
 
 // ProductResponse 商品响应
 type ProductResponse struct {
-	ID               uint64             `json:"id"`
-	SKU              string             `json:"sku"`
-	Name             string             `json:"name"`
-	ShortDescription string             `json:"short_description"`
-	FullDescription  string             `json:"full_description"`
-	ProductType      string             `json:"product_type"`
-	IsPublished      bool               `json:"is_published"`
-	ShowOnHomepage   bool               `json:"show_on_homepage"`
-	Manufacturer     *ManufacturerInfo  `json:"manufacturer,omitempty"`
-	Categories       []CategoryInfo     `json:"categories,omitempty"`
-	MainPicture      *ProductPictureInfo `json:"main_picture,omitempty"`
+	ID               uint64               `json:"id"`
+	SKU              string               `json:"sku"`
+	Name             string               `json:"name"`
+	ShortDescription string               `json:"short_description"`
+	FullDescription  string               `json:"full_description"`
+	ProductType      string               `json:"product_type"`
+	IsPublished      bool                 `json:"is_published"`
+	ShowOnHomepage   bool                 `json:"show_on_homepage"`
+	Manufacturer     *ManufacturerInfo    `json:"manufacturer,omitempty"`
+	Categories       []CategoryInfo       `json:"categories,omitempty"`
+	MainPicture      *ProductPictureInfo  `json:"main_picture,omitempty"`
 	Pictures         []ProductPictureInfo `json:"pictures,omitempty"`
-	SEOSlug          string             `json:"seo_slug"`
-	CreatedAt        string             `json:"created_at"`
+	SEOSlug          string               `json:"seo_slug"`
+	CreatedAt        string               `json:"created_at"`
 }
 
 // ManufacturerInfo 品牌简要信息
@@ -420,11 +420,11 @@ func ToProductResponse(p *Product) ProductResponse {
 
 // CategoryTreeResponse 分类树响应
 type CategoryTreeResponse struct {
-	ID           uint64                `json:"id"`
-	Name         string                `json:"name"`
-	Level        int                   `json:"level"`
-	DisplayOrder int                   `json:"display_order"`
-	IsPublished  bool                  `json:"is_published"`
+	ID           uint64                 `json:"id"`
+	Name         string                 `json:"name"`
+	Level        int                    `json:"level"`
+	DisplayOrder int                    `json:"display_order"`
+	IsPublished  bool                   `json:"is_published"`
 	Children     []CategoryTreeResponse `json:"children,omitempty"`
 }
 

@@ -120,22 +120,22 @@ type ProviderInfo struct {
 //
 // ProviderDAGNode 表示 provider 依赖图中的一个节点。
 type ProviderDAGNode struct {
-	Name       string   // Provider 名称
-	Provides   []string // 提供的契约键
-	DependsOn  []string // 依赖的契约键
-	IsDefer    bool     // 是否延迟加载
-	Loaded     bool     // 是否已加载
-	Booted     bool     // 是否已启动
+	Name      string   // Provider 名称
+	Provides  []string // 提供的契约键
+	DependsOn []string // 依赖的契约键
+	IsDefer   bool     // 是否延迟加载
+	Loaded    bool     // 是否已加载
+	Booted    bool     // 是否已启动
 }
 
 // ProviderDAG represents the provider dependency graph.
 //
 // ProviderDAG 表示 provider 依赖图。
 type ProviderDAG struct {
-	Nodes    []ProviderDAGNode // 所有节点
-	Edges    []DAGEdge         // 依赖边
-	Cycles   [][]string        // 检测到的循环依赖
-	LoadOrder []string         // 推荐加载顺序
+	Nodes     []ProviderDAGNode // 所有节点
+	Edges     []DAGEdge         // 依赖边
+	Cycles    [][]string        // 检测到的循环依赖
+	LoadOrder []string          // 推荐加载顺序
 }
 
 // DAGEdge represents a dependency edge in the DAG.

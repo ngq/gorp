@@ -20,8 +20,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	otelprovider "github.com/ngq/gorp/contrib/tracing/otel"
+	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 )
 
 // ============================================================
@@ -29,8 +29,8 @@ import (
 // 说明：13 阶段 middleware chain 是每请求必经路径。
 // ============================================================
 
-// mockHTTPMiddlewareChain 模拟完整 HTTP middleware chain（13 阶段）
-func mockHTTPMiddlewareChain() []gin.HandlerFunc {
+// mockMiddlewareChain 模拟完整 middleware chain（13 阶段）
+func mockMiddlewareChain() []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		// 1. request_identity
 		func(c *gin.Context) {
@@ -82,12 +82,12 @@ func mockHTTPMiddlewareChain() []gin.HandlerFunc {
 	}
 }
 
-// BenchmarkHTTPMiddlewareChain_Full 测试完整 13 阶段 middleware chain
-func BenchmarkHTTPMiddlewareChain_Full(b *testing.B) {
+// BenchmarkMiddlewareChain_Full 测试完整 13 阶段 middleware chain
+func BenchmarkMiddlewareChain_Full(b *testing.B) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	chain := mockHTTPMiddlewareChain()
+	chain := mockMiddlewareChain()
 	for _, mw := range chain {
 		router.Use(mw)
 	}
@@ -104,8 +104,8 @@ func BenchmarkHTTPMiddlewareChain_Full(b *testing.B) {
 	}
 }
 
-// BenchmarkHTTPMiddlewareChain_5Stages 测试 5 阶段 middleware chain（简化场景）
-func BenchmarkHTTPMiddlewareChain_5Stages(b *testing.B) {
+// BenchmarkMiddlewareChain_5Stages 测试 5 阶段 middleware chain（简化场景）
+func BenchmarkMiddlewareChain_5Stages(b *testing.B) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
@@ -141,8 +141,8 @@ func BenchmarkHTTPMiddlewareChain_5Stages(b *testing.B) {
 	}
 }
 
-// BenchmarkHTTPMiddlewareChain_Short 测试短路场景（middleware 提前终止）
-func BenchmarkHTTPMiddlewareChain_Short(b *testing.B) {
+// BenchmarkMiddlewareChain_Short 测试短路场景（middleware 提前终止）
+func BenchmarkMiddlewareChain_Short(b *testing.B) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
@@ -166,8 +166,8 @@ func BenchmarkHTTPMiddlewareChain_Short(b *testing.B) {
 	}
 }
 
-// BenchmarkHTTPMiddlewareChain_NoMiddleware 测试无 middleware 的纯 handler
-func BenchmarkHTTPMiddlewareChain_NoMiddleware(b *testing.B) {
+// BenchmarkMiddlewareChain_NoMiddleware 测试无 middleware 的纯 handler
+func BenchmarkMiddlewareChain_NoMiddleware(b *testing.B) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
@@ -183,8 +183,8 @@ func BenchmarkHTTPMiddlewareChain_NoMiddleware(b *testing.B) {
 	}
 }
 
-// BenchmarkHTTPMiddleware_PanicRecovery 测试 panic recovery 开销
-func BenchmarkHTTPMiddleware_PanicRecovery(b *testing.B) {
+// BenchmarkMiddleware_PanicRecovery 测试 panic recovery 开销
+func BenchmarkMiddleware_PanicRecovery(b *testing.B) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
@@ -208,8 +208,8 @@ func BenchmarkHTTPMiddleware_PanicRecovery(b *testing.B) {
 	}
 }
 
-// BenchmarkHTTPMiddleware_PanicRecovery_Active 测试 panic recovery 实际捕获开销
-func BenchmarkHTTPMiddleware_PanicRecovery_Active(b *testing.B) {
+// BenchmarkMiddleware_PanicRecovery_Active 测试 panic recovery 实际捕获开销
+func BenchmarkMiddleware_PanicRecovery_Active(b *testing.B) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 

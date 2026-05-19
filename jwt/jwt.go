@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
-	"github.com/ngq/gorp/framework/container"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	frameworkjwt "github.com/ngq/gorp/framework/provider/auth/jwt"
 )
@@ -51,9 +51,9 @@ func SecretFromConfig(cfg datacontract.Config) string {
 // Example:
 //
 //	router.Use(jwt.AuthMiddleware(jwtSvc, "user"))
-func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType string) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if jwtSvc == nil {
 				c.JSON(401, map[string]any{"error": "jwt service is not configured"})
 				return
@@ -79,10 +79,9 @@ func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType stri
 				c.JSON(403, map[string]any{"error": "unexpected subject type: " + claims.SubjectType})
 				return
 			}
-			ctx := securitycontract.NewJWTClaimsContext(c.Context(), claims)
-			ctx = securitycontract.NewSubjectIDContext(ctx, claims.SubjectID)
-			ctx = securitycontract.NewSubjectTypeContext(ctx, claims.SubjectType)
-			c.SetContext(ctx)
+			c.Set(ContextJWTClaimsKey, claims)
+			c.Set(ContextSubjectIDKey, claims.SubjectID)
+			c.Set(ContextSubjectTypeKey, claims.SubjectType)
 			if next != nil {
 				next(c)
 			}

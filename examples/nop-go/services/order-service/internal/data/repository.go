@@ -156,9 +156,9 @@ func (r *giftCardRepo) Redeem(ctx context.Context, code string, customerID uint6
 	return r.db.WithContext(ctx).Model(&models.GiftCard{}).
 		Where("code = ? AND is_active = ? AND is_redeemed = ?", code, true, false).
 		Updates(map[string]interface{}{
-			"is_redeemed":  true,
-			"customer_id":  customerID,
-			"redeemed_at":  now,
+			"is_redeemed": true,
+			"customer_id": customerID,
+			"redeemed_at": now,
 		}).Error
 }
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ngq/gorp"
 	orderdata "grpc-demo/services/order/internal/data"
 	orderhttp "grpc-demo/services/order/internal/server/http"
-	"github.com/ngq/gorp"
 )
 
 // main 是 order 服务的主入口。

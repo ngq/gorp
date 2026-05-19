@@ -16,6 +16,22 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// unwrapGinContext extracts the raw gin.Context from a transport Context.
+func unwrapGinContext(c transportcontract.Context) (*gin.Context, bool) {
+	type ginContextProvider interface {
+		GinContext() *gin.Context
+	}
+	provider, ok := c.(ginContextProvider)
+	if !ok {
+		return nil, false
+	}
+	gc := provider.GinContext()
+	if gc == nil {
+		return nil, false
+	}
+	return gc, true
+}
+
 // HeaderCarrier wraps http.Header to implement MetadataCarrier interface.
 // Core logic: Delegate Get/Set/Add operations to underlying http.Header.
 //
@@ -63,12 +79,19 @@ func (c *HeaderCarrier) Values(key string) []string {
 //
 // MetadataMiddleware 创建 HTTP 中间件，用于提取元数据。
 // 核心逻辑：从请求头提取元数据、注入到 context。
-func MetadataMiddleware(propagator transportcontract.MetadataPropagator) transportcontract.HTTPMiddleware {
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+func MetadataMiddleware(propagator transportcontract.MetadataPropagator) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			carrier := NewHeaderCarrier(c.Request().Header)
-			ctx := propagator.Extract(c.Context(), carrier)
-			c.SetContext(ctx)
+			ctx := propagator.Extract(c, carrier)
+			// Check if metadata was extracted
+			if md, ok := transportcontract.FromServerContext(ctx); ok && md != nil {
+				c.Set("metadata", md)
+			}
+			// Update gin.Request.Context for context.Context value propagation
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				gc.Request = gc.Request.WithContext(ctx)
+			}
 			if next != nil {
 				next(c)
 			}

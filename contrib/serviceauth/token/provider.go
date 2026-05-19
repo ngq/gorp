@@ -91,7 +91,7 @@ func getServiceAuthConfig(c runtimecontract.Container) (*securitycontract.Servic
 		authCfg.TokenSecret = secret
 	} else {
 		authCfg.TokenSecret = defaultTokenSecret
-			slog.Error("serviceauth.token: token secret not configured, using default — MUST change in production!")
+		slog.Error("serviceauth.token: token secret not configured, using default — MUST change in production!")
 	}
 	if issuer := configprovider.GetStringAny(cfg, "serviceauth.token.issuer", "service_auth.token.issuer", "service_auth.token_issuer"); issuer != "" {
 		authCfg.TokenIssuer = issuer

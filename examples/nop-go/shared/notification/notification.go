@@ -52,10 +52,10 @@ type SendSMSResponse struct {
 
 // SendOrderNotificationRequest 发送订单通知请求
 type SendOrderNotificationRequest struct {
-	CustomerID        uint64
-	OrderID           uint64
-	NotificationType  string // created, paid, shipped, delivered, cancelled
-	ExtraData         map[string]string
+	CustomerID       uint64
+	OrderID          uint64
+	NotificationType string // created, paid, shipped, delivered, cancelled
+	ExtraData        map[string]string
 }
 
 // SendOrderNotificationResponse 发送订单通知响应
@@ -66,10 +66,10 @@ type SendOrderNotificationResponse struct {
 
 // SendPaymentNotificationRequest 发送支付通知请求
 type SendPaymentNotificationRequest struct {
-	CustomerID        uint64
-	PaymentID         uint64
-	NotificationType  string // created, success, failed, refunded
-	ExtraData         map[string]string
+	CustomerID       uint64
+	PaymentID        uint64
+	NotificationType string // created, success, failed, refunded
+	ExtraData        map[string]string
 }
 
 // SendPaymentNotificationResponse 发送支付通知响应

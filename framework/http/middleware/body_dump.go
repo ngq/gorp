@@ -44,10 +44,10 @@ type HTTPExchangeCapture struct {
 //
 // DefaultSensitiveHeaders 是默认的敏感头键列表，捕获时排除以避免泄露凭证和安全令牌。
 var DefaultSensitiveHeaders = map[string]struct{}{
-	"authorization":   {},
-	"cookie":          {},
-	"x-csrf-token":    {},
-	"x-xsrf-token":    {},
+	"authorization":       {},
+	"cookie":              {},
+	"x-csrf-token":        {},
+	"x-xsrf-token":        {},
 	"proxy-authorization": {},
 	"www-authenticate":    {},
 }
@@ -67,8 +67,8 @@ type BodyDumpOptions struct {
 	// SensitiveHeaders 是捕获时要排除的头部键集合（大小写不敏感）。
 	// 若为 nil 则使用 DefaultSensitiveHeaders。设为空 map 可捕获所有头部。
 	SensitiveHeaders map[string]struct{}
-	Skip             func(transportcontract.HTTPContext) bool
-	OnCapture        func(transportcontract.HTTPContext, *HTTPExchangeCapture)
+	Skip             func(transportcontract.Context) bool
+	OnCapture        func(transportcontract.Context, *HTTPExchangeCapture)
 }
 
 // BodyDump captures request-response exchange details and forwards them to the configured callback.
@@ -81,15 +81,15 @@ type BodyDumpOptions struct {
 //	    CaptureRequestBody:  true,
 //	    CaptureResponseBody: true,
 //	    MaxBodyBytes:        4096,
-//	    OnCapture: func(ctx gorp.HTTPContext, dump *httpmiddleware.HTTPExchangeCapture) {
+//	    OnCapture: func(ctx gorp.Context, dump *httpmiddleware.HTTPExchangeCapture) {
 //	        // consume captured exchange
 //	    },
 //	}))
-func BodyDump(opts BodyDumpOptions) transportcontract.HTTPMiddleware {
+func BodyDump(opts BodyDumpOptions) transportcontract.Middleware {
 	opts = normalizeBodyDumpOptions(opts)
 
-	return func(next transportcontract.HTTPHandler) transportcontract.HTTPHandler {
-		return func(c transportcontract.HTTPContext) {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
 			if c == nil {
 				if next != nil {
 					next(c)
@@ -110,13 +110,13 @@ func BodyDump(opts BodyDumpOptions) transportcontract.HTTPMiddleware {
 				RequestHeaders:  map[string]string{},
 				ResponseHeaders: map[string]string{},
 			}
-			if requestID, ok := supportcontract.FromRequestIDContext(c.Context()); ok {
+			if requestID, ok := supportcontract.FromRequestIDContext(c); ok {
 				dump.RequestID = requestID
 			}
-			if traceID, ok := supportcontract.FromTraceIDContext(c.Context()); ok {
+			if traceID, ok := supportcontract.FromTraceIDContext(c); ok {
 				dump.TraceID = traceID
 			}
-			if tenant, ok := supportcontract.FromTenantContext(c.Context()); ok {
+			if tenant, ok := supportcontract.FromTenantContext(c); ok {
 				dump.Tenant = tenant
 			}
 			if opts.CaptureRequestHeaders {
@@ -127,7 +127,10 @@ func BodyDump(opts BodyDumpOptions) transportcontract.HTTPMiddleware {
 			if req := c.Request(); req != nil && req.Body != nil && opts.CaptureRequestBody {
 				requestCapture = newCaptureReadCloser(req.Body, opts.MaxBodyBytes)
 				req.Body = requestCapture
-				c.SetRequest(req)
+				// Update the underlying gin.Context if available
+				if gc, ok := unwrapGinContext(c); ok && gc != nil {
+					gc.Request.Body = requestCapture
+				}
 			}
 
 			var responseCapture *captureResponseWriter
@@ -280,7 +283,7 @@ func normalizeBodyDumpOptions(opts BodyDumpOptions) BodyDumpOptions {
 // requestMethod returns the current HTTP method.
 //
 // requestMethod 返回当前 HTTP 方法。
-func requestMethod(c transportcontract.HTTPContext) string {
+func requestMethod(c transportcontract.Context) string {
 	if c == nil || c.Request() == nil {
 		return ""
 	}
@@ -290,7 +293,7 @@ func requestMethod(c transportcontract.HTTPContext) string {
 // requestPath returns the current URL path or route path fallback.
 //
 // requestPath 返回当前 URL 路径，必要时回退到 route path。
-func requestPath(c transportcontract.HTTPContext) string {
+func requestPath(c transportcontract.Context) string {
 	if c != nil && c.Request() != nil && c.Request().URL != nil {
 		return c.Request().URL.Path
 	}
@@ -303,7 +306,7 @@ func requestPath(c transportcontract.HTTPContext) string {
 // requestHeaders returns the current request header set.
 //
 // requestHeaders 返回当前请求头集合。
-func requestHeaders(c transportcontract.HTTPContext) http.Header {
+func requestHeaders(c transportcontract.Context) http.Header {
 	if c == nil || c.Request() == nil {
 		return http.Header{}
 	}

@@ -9,21 +9,21 @@ import (
 
 // Store 店铺
 type Store struct {
-	ID             uint           `gorm:"primaryKey" json:"id"`
-	Name           string         `gorm:"size:255;not null" json:"name"`
-	URL            string         `gorm:"size:255" json:"url"`
-	SSL            bool           `json:"ssl"`
-	Hosts          string         `gorm:"type:text" json:"hosts"`          // 多个域名用逗号分隔
-	DefaultLanguageID uint        `json:"default_language_id"`
-	DisplayOrder   int            `json:"display_order"`
-	CompanyName    string         `gorm:"size:255" json:"company_name"`
-	CompanyAddress string         `gorm:"size:500" json:"company_address"`
-	CompanyPhone   string         `gorm:"size:50" json:"company_phone"`
-	CompanyEmail   string         `gorm:"size:100" json:"company_email"`
-	Active         bool           `json:"active"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                uint           `gorm:"primaryKey" json:"id"`
+	Name              string         `gorm:"size:255;not null" json:"name"`
+	URL               string         `gorm:"size:255" json:"url"`
+	SSL               bool           `json:"ssl"`
+	Hosts             string         `gorm:"type:text" json:"hosts"` // 多个域名用逗号分隔
+	DefaultLanguageID uint           `json:"default_language_id"`
+	DisplayOrder      int            `json:"display_order"`
+	CompanyName       string         `gorm:"size:255" json:"company_name"`
+	CompanyAddress    string         `gorm:"size:500" json:"company_address"`
+	CompanyPhone      string         `gorm:"size:50" json:"company_phone"`
+	CompanyEmail      string         `gorm:"size:100" json:"company_email"`
+	Active            bool           `json:"active"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName 指定表名
@@ -33,18 +33,18 @@ func (Store) TableName() string {
 
 // Vendor 供应商
 type Vendor struct {
-	ID              uint           `gorm:"primaryKey" json:"id"`
-	Name            string         `gorm:"size:255;not null" json:"name"`
-	Email           string         `gorm:"size:100" json:"email"`
-	Description     string         `gorm:"type:text" json:"description"`
-	AdminComment    string         `gorm:"type:text" json:"admin_comment"`
-	AddressID       uint           `json:"address_id"`
-	Active          bool           `json:"active"`
-	DisplayOrder    int            `json:"display_order"`
-	AllowCustomersToContactVendors bool `json:"allow_customers_to_contact"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                             uint           `gorm:"primaryKey" json:"id"`
+	Name                           string         `gorm:"size:255;not null" json:"name"`
+	Email                          string         `gorm:"size:100" json:"email"`
+	Description                    string         `gorm:"type:text" json:"description"`
+	AdminComment                   string         `gorm:"type:text" json:"admin_comment"`
+	AddressID                      uint           `json:"address_id"`
+	Active                         bool           `json:"active"`
+	DisplayOrder                   int            `json:"display_order"`
+	AllowCustomersToContactVendors bool           `json:"allow_customers_to_contact"`
+	CreatedAt                      time.Time      `json:"created_at"`
+	UpdatedAt                      time.Time      `json:"updated_at"`
+	DeletedAt                      gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName 指定表名
@@ -81,54 +81,54 @@ func (VendorNote) TableName() string {
 
 // StoreCreateRequest 店铺创建请求
 type StoreCreateRequest struct {
-	Name             string `json:"name" binding:"required"`
-	URL              string `json:"url"`
-	SSL              bool   `json:"ssl"`
-	Hosts            string `json:"hosts"`
-	DefaultLanguageID uint  `json:"default_language_id"`
-	DisplayOrder     int    `json:"display_order"`
-	CompanyName      string `json:"company_name"`
-	CompanyAddress   string `json:"company_address"`
-	CompanyPhone     string `json:"company_phone"`
-	CompanyEmail     string `json:"company_email"`
-	Active           bool   `json:"active"`
+	Name              string `json:"name" binding:"required"`
+	URL               string `json:"url"`
+	SSL               bool   `json:"ssl"`
+	Hosts             string `json:"hosts"`
+	DefaultLanguageID uint   `json:"default_language_id"`
+	DisplayOrder      int    `json:"display_order"`
+	CompanyName       string `json:"company_name"`
+	CompanyAddress    string `json:"company_address"`
+	CompanyPhone      string `json:"company_phone"`
+	CompanyEmail      string `json:"company_email"`
+	Active            bool   `json:"active"`
 }
 
 // StoreUpdateRequest 店铺更新请求
 type StoreUpdateRequest struct {
-	Name             string `json:"name"`
-	URL              string `json:"url"`
-	SSL              *bool  `json:"ssl"`
-	Hosts            string `json:"hosts"`
-	DefaultLanguageID uint  `json:"default_language_id"`
-	DisplayOrder     *int   `json:"display_order"`
-	CompanyName      string `json:"company_name"`
-	CompanyAddress   string `json:"company_address"`
-	CompanyPhone     string `json:"company_phone"`
-	CompanyEmail     string `json:"company_email"`
-	Active           *bool  `json:"active"`
+	Name              string `json:"name"`
+	URL               string `json:"url"`
+	SSL               *bool  `json:"ssl"`
+	Hosts             string `json:"hosts"`
+	DefaultLanguageID uint   `json:"default_language_id"`
+	DisplayOrder      *int   `json:"display_order"`
+	CompanyName       string `json:"company_name"`
+	CompanyAddress    string `json:"company_address"`
+	CompanyPhone      string `json:"company_phone"`
+	CompanyEmail      string `json:"company_email"`
+	Active            *bool  `json:"active"`
 }
 
 // VendorCreateRequest 供应商创建请求
 type VendorCreateRequest struct {
-	Name            string `json:"name" binding:"required"`
-	Email           string `json:"email" binding:"email"`
-	Description     string `json:"description"`
-	AdminComment    string `json:"admin_comment"`
-	AddressID       uint   `json:"address_id"`
-	Active          bool   `json:"active"`
-	DisplayOrder    int    `json:"display_order"`
-	AllowCustomersToContactVendors bool `json:"allow_customers_to_contact"`
+	Name                           string `json:"name" binding:"required"`
+	Email                          string `json:"email" binding:"email"`
+	Description                    string `json:"description"`
+	AdminComment                   string `json:"admin_comment"`
+	AddressID                      uint   `json:"address_id"`
+	Active                         bool   `json:"active"`
+	DisplayOrder                   int    `json:"display_order"`
+	AllowCustomersToContactVendors bool   `json:"allow_customers_to_contact"`
 }
 
 // VendorUpdateRequest 供应商更新请求
 type VendorUpdateRequest struct {
-	Name            string `json:"name"`
-	Email           string `json:"email"`
-	Description     string `json:"description"`
-	AdminComment    string `json:"admin_comment"`
-	AddressID       uint   `json:"address_id"`
-	Active          *bool  `json:"active"`
-	DisplayOrder    *int   `json:"display_order"`
-	AllowCustomersToContactVendors *bool `json:"allow_customers_to_contact"`
+	Name                           string `json:"name"`
+	Email                          string `json:"email"`
+	Description                    string `json:"description"`
+	AdminComment                   string `json:"admin_comment"`
+	AddressID                      uint   `json:"address_id"`
+	Active                         *bool  `json:"active"`
+	DisplayOrder                   *int   `json:"display_order"`
+	AllowCustomersToContactVendors *bool  `json:"allow_customers_to_contact"`
 }

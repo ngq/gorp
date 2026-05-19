@@ -154,10 +154,10 @@ func GetHTTP(c runtimecontract.Container) (transportcontract.HTTP, error) {
 	return MakeWith[transportcontract.HTTP](c, transportcontract.HTTPKey)
 }
 
-// GetHTTPRouter resolves the HTTP router facade from the container.
+// GetRouter resolves the HTTP router facade from the container.
 //
-// GetHTTPRouter 从容器中解析 HTTP 路由门面。
-func GetHTTPRouter(c runtimecontract.Container) (transportcontract.HTTPRouter, error) {
+// GetRouter 从容器中解析 HTTP 路由门面。
+func GetRouter(c runtimecontract.Container) (transportcontract.Router, error) {
 	httpSvc, err := GetHTTP(c)
 	if err != nil {
 		return nil, err
@@ -206,10 +206,10 @@ func GetDBOrPanic(c runtimecontract.Container) (*gormdb.DB, *sqlx.DB) {
 	return MustMakeWith[*gormdb.DB](c, datacontract.GormKey), MustMakeWith[*sqlx.DB](c, datacontract.SQLXKey)
 }
 
-// GetHTTPRouterOrPanic resolves the HTTP router facade and panics on failure.
+// GetRouterOrPanic resolves the HTTP router facade and panics on failure.
 //
-// GetHTTPRouterOrPanic 解析 HTTP 路由门面，失败时 panic。
-func GetHTTPRouterOrPanic(c runtimecontract.Container) transportcontract.HTTPRouter {
+// GetRouterOrPanic 解析 HTTP 路由门面，失败时 panic。
+func GetRouterOrPanic(c runtimecontract.Container) transportcontract.Router {
 	httpSvc := GetHTTPOrPanic(c)
 	return httpSvc.Router()
 }
@@ -470,11 +470,11 @@ func MakeHTTP(c runtimecontract.Container) (transportcontract.HTTP, error) {
 	return GetHTTP(c)
 }
 
-// MakeHTTPRouter is an alias for GetHTTPRouter.
+// MakeRouter is an alias for GetRouter.
 //
-// MakeHTTPRouter 是 GetHTTPRouter 的别名。
-func MakeHTTPRouter(c runtimecontract.Container) (transportcontract.HTTPRouter, error) {
-	return GetHTTPRouter(c)
+// MakeRouter 是 GetRouter 的别名。
+func MakeRouter(c runtimecontract.Container) (transportcontract.Router, error) {
+	return GetRouter(c)
 }
 
 // MustMakeLogger is an alias for GetLoggerOrPanic.
@@ -512,11 +512,11 @@ func MustMakeDB(c runtimecontract.Container) (*gormdb.DB, *sqlx.DB) {
 	return GetDBOrPanic(c)
 }
 
-// MustMakeHTTPRouter is an alias for GetHTTPRouterOrPanic.
+// MustMakeRouter is an alias for GetRouterOrPanic.
 //
-// MustMakeHTTPRouter 是 GetHTTPRouterOrPanic 的别名。
-func MustMakeHTTPRouter(c runtimecontract.Container) transportcontract.HTTPRouter {
-	return GetHTTPRouterOrPanic(c)
+// MustMakeRouter 是 GetRouterOrPanic 的别名。
+func MustMakeRouter(c runtimecontract.Container) transportcontract.Router {
+	return GetRouterOrPanic(c)
 }
 
 // MustMakeHTTP is an alias for GetHTTPOrPanic.

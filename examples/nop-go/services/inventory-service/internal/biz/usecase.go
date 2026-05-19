@@ -22,11 +22,11 @@ type ReserveStockRequest struct {
 
 // InventoryUseCase 库存服务用例
 type InventoryUseCase struct {
-	inventoryRepo    data.InventoryRepository
-	warehouseRepo    data.WarehouseRepository
-	reservationRepo  data.StockReservationRepository
-	logRepo          data.InventoryLogRepository
-	lockMgr          *dlock.LockManager
+	inventoryRepo   data.InventoryRepository
+	warehouseRepo   data.WarehouseRepository
+	reservationRepo data.StockReservationRepository
+	logRepo         data.InventoryLogRepository
+	lockMgr         *dlock.LockManager
 }
 
 // NewInventoryUseCase 创建库存用例
@@ -38,11 +38,11 @@ func NewInventoryUseCase(
 	lockMgr *dlock.LockManager,
 ) *InventoryUseCase {
 	return &InventoryUseCase{
-		inventoryRepo:    inventoryRepo,
-		warehouseRepo:    warehouseRepo,
-		reservationRepo:  reservationRepo,
-		logRepo:          logRepo,
-		lockMgr:          lockMgr,
+		inventoryRepo:   inventoryRepo,
+		warehouseRepo:   warehouseRepo,
+		reservationRepo: reservationRepo,
+		logRepo:         logRepo,
+		lockMgr:         lockMgr,
 	}
 }
 

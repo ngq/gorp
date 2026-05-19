@@ -106,13 +106,13 @@ type PathItem struct {
 
 // Operation represents OpenAPI operation.
 type Operation struct {
-	Summary     string              `json:"summary,omitempty" yaml:"summary,omitempty"`
-	Description string              `json:"description,omitempty" yaml:"description,omitempty"`
-	OperationID string              `json:"operationId" yaml:"operationId"`
-	Tags        []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Parameters  []Parameter         `json:"parameters,omitempty" yaml:"parameters,omitempty"`
-	RequestBody *RequestBody        `json:"requestBody,omitempty" yaml:"requestBody,omitempty"`
-	Responses   map[string]Response `json:"responses" yaml:"responses"`
+	Summary     string                `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Description string                `json:"description,omitempty" yaml:"description,omitempty"`
+	OperationID string                `json:"operationId" yaml:"operationId"`
+	Tags        []string              `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Parameters  []Parameter           `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	RequestBody *RequestBody          `json:"requestBody,omitempty" yaml:"requestBody,omitempty"`
+	Responses   map[string]Response   `json:"responses" yaml:"responses"`
 	Security    []map[string][]string `json:"security,omitempty" yaml:"security,omitempty"`
 }
 
@@ -127,8 +127,8 @@ type Parameter struct {
 
 // RequestBody represents OpenAPI request body.
 type RequestBody struct {
-	Required bool              `json:"required,omitempty" yaml:"required,omitempty"`
-	Content  map[string]Media  `json:"content" yaml:"content"`
+	Required bool             `json:"required,omitempty" yaml:"required,omitempty"`
+	Content  map[string]Media `json:"content" yaml:"content"`
 }
 
 // Media represents OpenAPI media type.
@@ -138,8 +138,8 @@ type Media struct {
 
 // Response represents OpenAPI response.
 type Response struct {
-	Description string             `json:"description,omitempty" yaml:"description,omitempty"`
-	Content     map[string]Media   `json:"content,omitempty" yaml:"content,omitempty"`
+	Description string           `json:"description,omitempty" yaml:"description,omitempty"`
+	Content     map[string]Media `json:"content,omitempty" yaml:"content,omitempty"`
 }
 
 // Schema represents OpenAPI schema.
@@ -158,16 +158,16 @@ type Schema struct {
 
 // OpenAPIComponents represents OpenAPI components section.
 type OpenAPIComponents struct {
-	Schemas         map[string]Schema          `json:"schemas,omitempty" yaml:"schemas,omitempty"`
-	SecuritySchemes map[string]SecurityScheme  `json:"securitySchemes,omitempty" yaml:"securitySchemes,omitempty"`
+	Schemas         map[string]Schema         `json:"schemas,omitempty" yaml:"schemas,omitempty"`
+	SecuritySchemes map[string]SecurityScheme `json:"securitySchemes,omitempty" yaml:"securitySchemes,omitempty"`
 }
 
 // SecurityScheme represents OpenAPI security scheme.
 type SecurityScheme struct {
-	Type        string `json:"type" yaml:"type"`
-	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
-	In          string `json:"in,omitempty" yaml:"in,omitempty"`
-	Scheme      string `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+	Type         string `json:"type" yaml:"type"`
+	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
+	In           string `json:"in,omitempty" yaml:"in,omitempty"`
+	Scheme       string `json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	BearerFormat string `json:"bearerFormat,omitempty" yaml:"bearerFormat,omitempty"`
 }
 

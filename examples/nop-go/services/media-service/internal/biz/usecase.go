@@ -18,22 +18,22 @@ import (
 
 // StorageConfig 存储配置
 type StorageConfig struct {
-	Type       string
-	LocalPath  string
-	URLPrefix  string
-	S3Bucket   string
-	S3Region   string
+	Type        string
+	LocalPath   string
+	URLPrefix   string
+	S3Bucket    string
+	S3Region    string
 	S3AccessKey string
 	S3SecretKey string
 }
 
 // MediaUseCase 媒体用例
 type MediaUseCase struct {
-	pictureRepo  data.PictureRepository
-	productPicRepo data.ProductPictureRepository
+	pictureRepo     data.PictureRepository
+	productPicRepo  data.ProductPictureRepository
 	categoryPicRepo data.CategoryPictureRepository
-	documentRepo data.DocumentRepository
-	storageConfig StorageConfig
+	documentRepo    data.DocumentRepository
+	storageConfig   StorageConfig
 }
 
 // NewMediaUseCase 创建媒体用例
@@ -45,11 +45,11 @@ func NewMediaUseCase(
 	storageConfig StorageConfig,
 ) *MediaUseCase {
 	return &MediaUseCase{
-		pictureRepo:    pictureRepo,
-		productPicRepo: productPicRepo,
+		pictureRepo:     pictureRepo,
+		productPicRepo:  productPicRepo,
 		categoryPicRepo: categoryPicRepo,
-		documentRepo:   documentRepo,
-		storageConfig:  storageConfig,
+		documentRepo:    documentRepo,
+		storageConfig:   storageConfig,
 	}
 }
 

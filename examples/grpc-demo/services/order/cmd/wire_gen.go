@@ -6,8 +6,8 @@ package main
 
 import (
 	"github.com/ngq/gorp"
-	"grpc-demo/services/order/internal/service"
 	"gorm.io/gorm"
+	"grpc-demo/services/order/internal/service"
 )
 
 func wireOrderServices(db *gorm.DB, userConnFactory gorp.GRPCConnFactory, dlock gorp.DistributedLock) (*service.Services, error) {
