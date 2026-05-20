@@ -1,1 +1,4 @@
 *.exe
+
+# CLI binary
+cmd/gorp/gorp

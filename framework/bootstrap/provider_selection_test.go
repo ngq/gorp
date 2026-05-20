@@ -5,6 +5,9 @@
 // - 验证各 provider backend 的 Select 优先級（backend key > config > code disable > default）。
 // - 验证 RegisterSelectedMicroserviceProviders 的重载、传播与降级行为。
 // - 验证 governance override 链路的优先级顺序。
+//
+// 注意：contrib 组件现在是独立模块，这些测试验证框架选择逻辑，
+// 当 contrib provider 未注册时，会回退到 noop/local provider。
 package bootstrap
 
 import (
@@ -52,19 +55,22 @@ func (s *selectorConfigStub) Reload(ctx context.Context) error { return nil }
 
 // =============================================================================
 // Provider 选择测试 - Select 和 Fallback 行为
+// 注意：contrib 组件是独立模块，未注册时会回退到 noop/local
 // =============================================================================
 
 func TestSelectConfigSourceProvider_PrefersBackendKey(t *testing.T) {
+	// nacos 是 contrib 组件，未注册时回退到 local
 	cfg := &selectorConfigStub{values: map[string]any{"configsource.backend": "nacos"}}
-	if got := SelectConfigSourceProvider(cfg).Name(); got != "configsource.nacos" {
-		t.Fatalf("expected configsource.nacos, got %s", got)
+	if got := SelectConfigSourceProvider(cfg).Name(); got != "configsource.local" {
+		t.Fatalf("expected configsource.local (nacos not registered), got %s", got)
 	}
 }
 
 func TestSelectDiscoveryProvider_PrefersBackendKey(t *testing.T) {
+	// eureka 是 contrib 组件，未注册时回退到 noop
 	cfg := &selectorConfigStub{values: map[string]any{"discovery.backend": "eureka"}}
-	if got := SelectDiscoveryProvider(cfg).Name(); got != "registry.eureka" {
-		t.Fatalf("expected discovery.eureka, got %s", got)
+	if got := SelectDiscoveryProvider(cfg).Name(); got != "discovery.noop" {
+		t.Fatalf("expected discovery.noop (eureka not registered), got %s", got)
 	}
 }
 
@@ -104,14 +110,16 @@ func TestSelectDistributedLockProvider_FallsBackToNoop(t *testing.T) {
 }
 
 func TestSelectCircuitBreakerProvider_AcceptsBackendAndEnabled(t *testing.T) {
+	// sentinel 是 contrib 组件，未注册时回退到 noop
 	backendCfg := &selectorConfigStub{values: map[string]any{"circuit_breaker.backend": "sentinel"}}
-	if got := SelectCircuitBreakerProvider(backendCfg).Name(); got != "circuitbreaker.sentinel" {
-		t.Fatalf("expected circuitbreaker.sentinel, got %s", got)
+	if got := SelectCircuitBreakerProvider(backendCfg).Name(); got != "circuitbreaker.noop" {
+		t.Fatalf("expected circuitbreaker.noop (sentinel not registered), got %s", got)
 	}
 
+	// enabled=true 但 contrib 未注册，回退到 noop
 	enabledCfg := &selectorConfigStub{values: map[string]any{"circuit_breaker.enabled": true}}
-	if got := SelectCircuitBreakerProvider(enabledCfg).Name(); got != "circuitbreaker.sentinel" {
-		t.Fatalf("expected enabled config to select sentinel, got %s", got)
+	if got := SelectCircuitBreakerProvider(enabledCfg).Name(); got != "circuitbreaker.noop" {
+		t.Fatalf("expected circuitbreaker.noop (sentinel not registered), got %s", got)
 	}
 
 	noopCfg := &selectorConfigStub{values: map[string]any{"circuit_breaker.backend": "noop"}}
@@ -121,6 +129,7 @@ func TestSelectCircuitBreakerProvider_AcceptsBackendAndEnabled(t *testing.T) {
 }
 
 func TestSelectLoadSheddingProvider_AcceptsBackendAndEnabled(t *testing.T) {
+	// semaphore 是 framework 内建 provider
 	backendCfg := &selectorConfigStub{values: map[string]any{"load_shedding.backend": "semaphore"}}
 	if got := SelectLoadSheddingProvider(backendCfg).Name(); got != "loadshedding.semaphore" {
 		t.Fatalf("expected loadshedding.semaphore, got %s", got)
@@ -138,19 +147,20 @@ func TestSelectLoadSheddingProvider_AcceptsBackendAndEnabled(t *testing.T) {
 }
 
 func TestSelectDTMProvider_AcceptsBackendDriverAndEnabled(t *testing.T) {
+	// dtmsdk 是 contrib 组件，未注册时回退到 noop
 	backendCfg := &selectorConfigStub{values: map[string]any{"dtm.backend": "dtmsdk"}}
-	if got := SelectDTMProvider(backendCfg).Name(); got != "dtm.sdk" {
-		t.Fatalf("expected dtm.sdk, got %s", got)
+	if got := SelectDTMProvider(backendCfg).Name(); got != "dtm.noop" {
+		t.Fatalf("expected dtm.noop (dtmsdk not registered), got %s", got)
 	}
 
 	driverCfg := &selectorConfigStub{values: map[string]any{"dtm.driver": "sdk"}}
-	if got := SelectDTMProvider(driverCfg).Name(); got != "dtm.sdk" {
-		t.Fatalf("expected dtm.sdk via driver key, got %s", got)
+	if got := SelectDTMProvider(driverCfg).Name(); got != "dtm.noop" {
+		t.Fatalf("expected dtm.noop (dtmsdk not registered), got %s", got)
 	}
 
 	enabledCfg := &selectorConfigStub{values: map[string]any{"dtm.enabled": true}}
-	if got := SelectDTMProvider(enabledCfg).Name(); got != "dtm.sdk" {
-		t.Fatalf("expected enabled dtm to select sdk provider, got %s", got)
+	if got := SelectDTMProvider(enabledCfg).Name(); got != "dtm.noop" {
+		t.Fatalf("expected dtm.noop (dtmsdk not registered), got %s", got)
 	}
 
 	noopCfg := &selectorConfigStub{values: map[string]any{"dtm.backend": "noop"}}
@@ -174,28 +184,29 @@ func TestSelectDTMProvider_FallsBackToNoop(t *testing.T) {
 }
 
 func TestSelectTracingProvider_AcceptsEnabledAndBackends(t *testing.T) {
-	backendCases := map[string]string{
-		"otel":   "tracing.otel",
-		"otlp":   "tracing.otel",
-		"grpc":   "tracing.otel",
-		"http":   "tracing.otel",
-		"stdout": "tracing.otel",
-		"noop":   "tracing.noop",
-	}
-	for backend, expected := range backendCases {
+	// otel 是 contrib 组件，未注册时回退到 noop
+	backendCases := []string{"otel", "otlp", "grpc", "http", "stdout"}
+	for _, backend := range backendCases {
 		cfg := &selectorConfigStub{values: map[string]any{"tracing.backend": backend}}
-		if got := SelectTracingProvider(cfg).Name(); got != expected {
-			t.Fatalf("backend %s expected %s, got %s", backend, expected, got)
+		if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
+			t.Fatalf("backend %s: expected tracing.noop (otel not registered), got %s", backend, got)
 		}
 	}
 
+	noopCfg := &selectorConfigStub{values: map[string]any{"tracing.backend": "noop"}}
+	if got := SelectTracingProvider(noopCfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected tracing.noop, got %s", got)
+	}
+
+	// enabled=true 但 contrib 未注册，回退到 noop
 	enabledCfg := &selectorConfigStub{values: map[string]any{"tracing.enabled": true}}
-	if got := SelectTracingProvider(enabledCfg).Name(); got != "tracing.otel" {
-		t.Fatalf("expected enabled tracing to select tracing.otel, got %s", got)
+	if got := SelectTracingProvider(enabledCfg).Name(); got != "tracing.noop" {
+		t.Fatalf("expected tracing.noop (otel not registered), got %s", got)
 	}
 }
 
 func TestSelectMetadataProvider_AcceptsEnabledAndPrefix(t *testing.T) {
+	// metadata.default 是 framework 内建 provider
 	enabledCfg := &selectorConfigStub{values: map[string]any{"metadata.enabled": true}}
 	if got := SelectMetadataProvider(enabledCfg).Name(); got != "metadata.default" {
 		t.Fatalf("expected enabled metadata to select metadata.default, got %s", got)
@@ -213,14 +224,16 @@ func TestSelectMetadataProvider_AcceptsEnabledAndPrefix(t *testing.T) {
 }
 
 func TestSelectServiceAuthProvider_AcceptsEnabledAndMode(t *testing.T) {
+	// token 是 contrib 组件，未注册时回退到 noop
 	enabledCfg := &selectorConfigStub{values: map[string]any{"service_auth.enabled": true}}
-	if got := SelectServiceAuthProvider(enabledCfg).Name(); got != "serviceauth.token" {
-		t.Fatalf("expected enabled serviceauth to select serviceauth.token, got %s", got)
+	if got := SelectServiceAuthProvider(enabledCfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected serviceauth.noop (token not registered), got %s", got)
 	}
 
+	// mtls 是 contrib 组件，未注册时回退到 noop
 	mtlsCfg := &selectorConfigStub{values: map[string]any{"service_auth.mode": "mtls"}}
-	if got := SelectServiceAuthProvider(mtlsCfg).Name(); got != "serviceauth.mtls" {
-		t.Fatalf("expected serviceauth.mtls, got %s", got)
+	if got := SelectServiceAuthProvider(mtlsCfg).Name(); got != "serviceauth.noop" {
+		t.Fatalf("expected serviceauth.noop (mtls not registered), got %s", got)
 	}
 
 	noopCfg := &selectorConfigStub{values: map[string]any{"service_auth.backend": "noop"}}
@@ -230,9 +243,10 @@ func TestSelectServiceAuthProvider_AcceptsEnabledAndMode(t *testing.T) {
 }
 
 func TestSelectMessageQueueProvider_AcceptsEnabledAndBackend(t *testing.T) {
+	// redis MQ 是 contrib 组件，未注册时回退到 noop
 	enabledCfg := &selectorConfigStub{values: map[string]any{"message_queue.enabled": true}}
-	if got := SelectMessageQueueProvider(enabledCfg).Name(); got != "messagequeue.redis" {
-		t.Fatalf("expected enabled message queue to select messagequeue.redis, got %s", got)
+	if got := SelectMessageQueueProvider(enabledCfg).Name(); got != "messagequeue.noop" {
+		t.Fatalf("expected messagequeue.noop (redis mq not registered), got %s", got)
 	}
 
 	noopCfg := &selectorConfigStub{values: map[string]any{"message_queue.backend": "noop"}}
@@ -241,32 +255,25 @@ func TestSelectMessageQueueProvider_AcceptsEnabledAndBackend(t *testing.T) {
 	}
 }
 
-// TestSelectMessageQueueProvider_AcceptsContribBackends verifies that Kafka, RabbitMQ and RocketMQ
-// contrib providers are resolved when their backend key is set in config.
+// TestSelectMessageQueueProvider_AcceptsContribBackends verifies that when contrib backends
+// are specified but not registered, the selector falls back to noop.
 //
-// TestSelectMessageQueueProvider_AcceptsContribBackends 验证配置 Kafka/RabbitMQ/RocketMQ 后端时能正确解析到对应 provider。
+// TestSelectMessageQueueProvider_AcceptsContribBackends 验证当指定 contrib 后端但未注册时，选择器回退到 noop。
 func TestSelectMessageQueueProvider_AcceptsContribBackends(t *testing.T) {
-	cases := []struct {
-		backend  string
-		expected string
-	}{
-		{"kafka", "messagequeue.kafka"},
-		{"rabbitmq", "messagequeue.rabbitmq"},
-		{"rocketmq", "messagequeue.rocketmq"},
-		{"redis", "messagequeue.redis"},
-	}
-	for _, tc := range cases {
-		cfg := &selectorConfigStub{values: map[string]any{"message_queue.backend": tc.backend}}
-		if got := SelectMessageQueueProvider(cfg).Name(); got != tc.expected {
-			t.Errorf("backend=%s: expected %s, got %s", tc.backend, tc.expected, got)
+	cases := []string{"kafka", "rabbitmq", "rocketmq", "redis"}
+	for _, backend := range cases {
+		cfg := &selectorConfigStub{values: map[string]any{"message_queue.backend": backend}}
+		if got := SelectMessageQueueProvider(cfg).Name(); got != "messagequeue.noop" {
+			t.Errorf("backend=%s: expected messagequeue.noop (contrib not registered), got %s", backend, got)
 		}
 	}
 }
 
 func TestSelectDistributedLockProvider_AcceptsEnabledAndBackend(t *testing.T) {
+	// redis dlock 是 contrib 组件，未注册时回退到 noop
 	enabledCfg := &selectorConfigStub{values: map[string]any{"distributed_lock.enabled": true}}
-	if got := SelectDistributedLockProvider(enabledCfg).Name(); got != "dlock.redis" {
-		t.Fatalf("expected enabled distributed lock to select dlock.redis, got %s", got)
+	if got := SelectDistributedLockProvider(enabledCfg).Name(); got != "dlock.noop" {
+		t.Fatalf("expected dlock.noop (redis not registered), got %s", got)
 	}
 
 	noopCfg := &selectorConfigStub{values: map[string]any{"distributed_lock.backend": "noop"}}

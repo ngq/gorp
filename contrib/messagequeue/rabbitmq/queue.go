@@ -12,7 +12,6 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -161,7 +160,7 @@ func (q *Queue) As(target any) bool {
 	if q == nil || q.conn == nil {
 		return false
 	}
-	return internalnative.As(q.conn, target)
+	return As(q.conn, target)
 }
 
 // NativeMQClient implements NativeMQClientProvider interface.

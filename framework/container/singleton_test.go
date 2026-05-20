@@ -35,15 +35,16 @@ func TestSingleton_BasicResolution(t *testing.T) {
 	require.Equal(t, int32(1), calls.Load())
 }
 
-// TestSingleton_FactoryErrorNotCached verifies that a singleton factory error
-// is NOT cached — subsequent Make calls will retry the factory.
-// This is the correct behavior: caching an error would permanently prevent
-// recovery from transient failures.
+// TestSingleton_FactoryErrorCached verifies that a singleton factory error
+// IS cached — subsequent Make calls will return the cached error.
+// This prevents infinite retry loops when factory keeps failing.
+// The error can be cleared by calling Refresh() or re-binding the factory.
 //
-// TestSingleton_FactoryErrorNotCached 验证单例工厂错误不被缓存——
-// 后续 Make 调用将重试工厂。
-// 这是正确的行为：缓存错误会永久阻止从瞬态故障中恢复。
-func TestSingleton_FactoryErrorNotCached(t *testing.T) {
+// TestSingleton_FactoryErrorCached 验证单例工厂错误被缓存——
+// 后续 Make 调用将返回缓存的错误。
+// 这可以防止 factory 持续失败时的无限重试循环。
+// 可以通过调用 Refresh() 或重新绑定 factory 来清除错误。
+func TestSingleton_FactoryErrorCached(t *testing.T) {
 	c := New()
 	calls := atomic.Int32{}
 	c.Bind("failing", func(runtimecontract.Container) (any, error) {
@@ -57,9 +58,9 @@ func TestSingleton_FactoryErrorNotCached(t *testing.T) {
 
 	_, err = c.Make("failing")
 	require.Error(t, err)
-	// Factory is called again because error is not cached.
-	// 工厂再次被调用，因为错误不被缓存。
-	require.Equal(t, int32(2), calls.Load())
+	// Factory is NOT called again because error is cached.
+	// 工厂不再被调用，因为错误被缓存。
+	require.Equal(t, int32(1), calls.Load())
 }
 
 // TestSingleton_SelfReferenceReturnsError verifies that a singleton factory

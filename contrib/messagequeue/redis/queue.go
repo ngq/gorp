@@ -7,7 +7,6 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/ngq/gorp/contrib/internal/native"
 	"github.com/ngq/gorp/contrib/messagequeue"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
@@ -91,7 +90,7 @@ func (q *Queue) As(target any) bool {
 	if q == nil || q.client == nil {
 		return false
 	}
-	return native.As(q.client, target)
+	return As(q.client, target)
 }
 
 // NativeMQClient implements NativeMQClientProvider interface.

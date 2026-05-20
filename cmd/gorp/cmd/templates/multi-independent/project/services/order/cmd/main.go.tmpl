@@ -7,6 +7,9 @@ import (
 	orderdata "{{.ModuleName}}/services/order/internal/data"
 	orderhttp "{{.ModuleName}}/services/order/internal/server/http"
 	"{{.FrameworkModule}}"
+{{- if .IsMicroGovernance }}
+	_ "{{.ModuleName}}/shared" // 微服务治理组件统一导入
+{{- end }}
 {{- if .IsGinHTTPMode }}
 	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
 {{- end }}

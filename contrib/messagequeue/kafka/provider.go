@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/basemq"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -18,7 +17,7 @@ import (
 
 // Provider implements runtimecontract.ServiceProvider for Kafka message queue.
 type Provider struct {
-	basemq.BaseMQProvider
+	BaseMQProvider
 }
 
 // NewProvider creates a new Kafka message queue provider.

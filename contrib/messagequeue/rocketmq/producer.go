@@ -14,7 +14,6 @@ import (
 
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -197,7 +196,7 @@ func (p *rocketmqPublisher) As(target any) bool {
 	if p == nil || p.queue == nil || p.queue.producer == nil {
 		return false
 	}
-	return internalnative.As(p.queue.producer, target)
+	return As(p.queue.producer, target)
 }
 
 // NativePublisher implements NativePublisherProvider interface.

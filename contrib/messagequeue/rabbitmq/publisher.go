@@ -12,7 +12,6 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -183,7 +182,7 @@ func (p *rabbitPublisher) As(target any) bool {
 	if p == nil || p.queue == nil || p.queue.conn == nil {
 		return false
 	}
-	return internalnative.As(p.queue.conn, target)
+	return As(p.queue.conn, target)
 }
 
 // NativePublisher implements NativePublisherProvider interface.

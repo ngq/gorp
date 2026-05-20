@@ -9,7 +9,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseregistry"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -18,7 +17,7 @@ import (
 
 // Provider 提供 Polaris 服务发现实现。
 type Provider struct {
-	baseregistry.BaseRegistryProvider
+	BaseRegistryProvider
 }
 
 // NewProvider creates a new Polaris provider instance.

@@ -46,10 +46,10 @@ func TestExportedJWTHelpers(t *testing.T) {
 	jwtSvc := NewService("secret", "issuer", "aud")
 	containerStub := &exportJWTContainerStub{jwtSvc: jwtSvc}
 
-	made, err := Make(containerStub)
+	made, err := Get(containerStub)
 	require.NoError(t, err)
 	require.Same(t, jwtSvc, made)
-	require.Same(t, jwtSvc, MustMake(containerStub))
+	require.Same(t, jwtSvc, GetOrPanic(containerStub))
 
 	claims := jwtSvc.NewClaims(1, "admin", "alice", []string{"owner"}, 60)
 	token, err := jwtSvc.Sign(claims)

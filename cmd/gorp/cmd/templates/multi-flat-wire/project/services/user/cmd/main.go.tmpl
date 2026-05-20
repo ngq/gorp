@@ -8,6 +8,9 @@ import (
 	usergrpc "{{.ModuleName}}/services/user/internal/server/grpc"
 	userhttp "{{.ModuleName}}/services/user/internal/server/http"
 	"{{.FrameworkModule}}"
+{{- if .IsMicroGovernance }}
+	_ "{{.ModuleName}}/shared" // 微服务治理组件统一导入
+{{- end }}
 {{- if .IsGinHTTPMode }}
 	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
 {{- end }}

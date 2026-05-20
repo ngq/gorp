@@ -8,9 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseregistry"
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/contrib/registry/internal/lifecycle"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -36,7 +33,7 @@ var (
 //   - 说明：已完成 P2 第一版最小注册/发现闭环，具备 Register / Deregister / Discover 与 fake client 行为测试；
 //     但当前仍未覆盖完整心跳、实例治理与 SDK 产品化语义。
 type Provider struct {
-	baseregistry.BaseRegistryProvider
+	BaseRegistryProvider
 }
 
 func NewProvider() *Provider {
@@ -245,7 +242,7 @@ func (r *Registry) Underlying() any {
 }
 
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.Underlying(), target)
+	return As(r.Underlying(), target)
 }
 
 func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportcontract.ServiceInstance, error) {
@@ -337,7 +334,7 @@ func (r *Registry) startHeartbeatLocked(name, addr string, meta map[string]strin
 	renewCtx, cancel := context.WithCancel(context.Background())
 	r.renewals[key] = cancel
 	go func() {
-		lifecycle.RunHeartbeatLoop(renewCtx, lifecycle.HeartbeatLoopConfig{
+		RunHeartbeatLoop(renewCtx, HeartbeatLoopConfig{
 			Interval:     r.config.HeartbeatInterval,
 			RetryBackoff: r.config.HeartbeatRetryBackoff,
 			Heartbeat: func(ctx context.Context) error {

@@ -36,7 +36,6 @@ import (
 	sentinel "github.com/alibaba/sentinel-golang/api"
 	sentinelcb "github.com/alibaba/sentinel-golang/core/circuitbreaker"
 	"github.com/alibaba/sentinel-golang/core/isolation"
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -362,7 +361,7 @@ func (cb *SentinelCircuitBreaker) Close() error {
 }
 
 func (cb *SentinelCircuitBreaker) As(target any) bool {
-	return internalnative.As(cb.Underlying(), target)
+	return As(cb.Underlying(), target)
 }
 
 type SentinelRateLimiter struct {
@@ -428,7 +427,7 @@ func (rl *SentinelRateLimiter) Underlying() any {
 }
 
 func (rl *SentinelRateLimiter) As(target any) bool {
-	return internalnative.As(rl.Underlying(), target)
+	return As(rl.Underlying(), target)
 }
 
 // Close is a no-op for the rate limiter.

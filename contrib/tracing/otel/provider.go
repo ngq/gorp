@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -222,7 +221,7 @@ func (p *TracerProviderWrapper) Underlying() any {
 }
 
 func (p *TracerProviderWrapper) As(target any) bool {
-	return internalnative.As(p.provider, target)
+	return As(p.provider, target)
 }
 
 type TracerWrapper struct {
@@ -289,7 +288,7 @@ func (t *TracerWrapper) Underlying() any {
 }
 
 func (t *TracerWrapper) As(target any) bool {
-	return internalnative.As(t.tracer, target)
+	return As(t.tracer, target)
 }
 
 type SpanWrapper struct {
@@ -363,7 +362,7 @@ func (s *SpanWrapper) Underlying() any {
 }
 
 func (s *SpanWrapper) As(target any) bool {
-	return internalnative.As(s.span, target)
+	return As(s.span, target)
 }
 
 type noopSpan struct{}

@@ -14,7 +14,6 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -168,7 +167,7 @@ func (s *rocketmqSubscriber) As(target any) bool {
 		return false
 	}
 	for _, c := range s.queue.consumers {
-		return internalnative.As(c, target)
+		return As(c, target)
 	}
 	return false
 }

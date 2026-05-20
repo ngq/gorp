@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
-	"github.com/ngq/gorp/contrib/registry/internal/lifecycle"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -308,7 +306,7 @@ func (r *Registry) Underlying() any {
 // As 在可能时将当前原生客户端投射到请求的目标。
 // 支持投射到 HTTPClientProvider 接口获取 http.Client。
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.client, target)
+	return As(r.client, target)
 }
 
 // startHeartbeatLocked starts the heartbeat goroutine for an instance.
@@ -328,7 +326,7 @@ func (r *Registry) startHeartbeatLocked(name, addr string) {
 	r.renewals[key] = cancel
 
 	go func() {
-		lifecycle.RunHeartbeatLoop(renewCtx, lifecycle.HeartbeatLoopConfig{
+		RunHeartbeatLoop(renewCtx, HeartbeatLoopConfig{
 			Interval:     r.config.HeartbeatInterval,
 			RetryBackoff: r.config.HeartbeatRetryBackoff,
 			Heartbeat: func(ctx context.Context) error {

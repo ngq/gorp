@@ -57,10 +57,10 @@ func TestExportedRetryHelpers(t *testing.T) {
 	stub := &exportRetryStub{}
 	containerStub := &exportRetryContainerStub{retry: stub}
 
-	retrySvc, err := Make(containerStub)
+	retrySvc, err := Get(containerStub)
 	require.NoError(t, err)
 	require.Same(t, stub, retrySvc)
-	require.Same(t, stub, MustMake(containerStub))
+	require.Same(t, stub, GetOrPanic(containerStub))
 
 	err = Do(context.Background(), containerStub, func() error { return nil })
 	require.NoError(t, err)

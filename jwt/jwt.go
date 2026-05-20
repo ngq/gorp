@@ -21,15 +21,15 @@ const (
 type JWTClaims = securitycontract.JWTClaims
 type JWTService = securitycontract.JWTService
 
-// Make returns the business JWT service from the container.
-// Make 从容器获取业务 JWT 服务。
-func Make(c runtimecontract.Container) (securitycontract.JWTService, error) {
+// Get returns the business JWT service from the container.
+// Get 从容器获取业务 JWT 服务。
+func Get(c runtimecontract.Container) (securitycontract.JWTService, error) {
 	return container.MakeWith[securitycontract.JWTService](c, securitycontract.AuthJWTKey)
 }
 
-// MustMake returns the business JWT service from the container and panics on failure.
-// MustMake 从容器获取业务 JWT 服务，失败 panic。
-func MustMake(c runtimecontract.Container) securitycontract.JWTService {
+// GetOrPanic returns the business JWT service from the container and panics on failure.
+// GetOrPanic 从容器获取业务 JWT 服务，失败 panic。
+func GetOrPanic(c runtimecontract.Container) securitycontract.JWTService {
 	return frameworkjwt.MustMakeJWTService(c)
 }
 

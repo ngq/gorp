@@ -66,10 +66,10 @@ func TestExportedValidateHelpers(t *testing.T) {
 	stub := &exportValidatorStub{}
 	containerStub := &exportValidateContainerStub{validator: stub}
 
-	validatorSvc, err := Make(containerStub)
+	validatorSvc, err := Get(containerStub)
 	require.NoError(t, err)
 	require.Same(t, stub, validatorSvc)
-	require.Same(t, stub, MustMake(containerStub))
+	require.Same(t, stub, GetOrPanic(containerStub))
 
 	err = Validate(context.Background(), containerStub, struct{ Name string }{Name: "alice"})
 	require.NoError(t, err)

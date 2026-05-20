@@ -8,7 +8,6 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -112,13 +111,13 @@ func (s *redisSubscriber) As(target any) bool {
 	}
 	// 如果 pubsub 存在，尝试转换它
 	if s.queue.pubsub != nil {
-		if internalnative.As(s.queue.pubsub, target) {
+		if As(s.queue.pubsub, target) {
 			return true
 		}
 	}
 	// 否则尝试转换 client
 	if s.queue.client != nil {
-		return internalnative.As(s.queue.client, target)
+		return As(s.queue.client, target)
 	}
 	return false
 }

@@ -13,7 +13,6 @@ import (
 
 	"github.com/IBM/sarama"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -131,7 +130,7 @@ func (p *kafkaPublisher) As(target any) bool {
 	if p == nil || p.queue == nil || p.queue.syncProducer == nil {
 		return false
 	}
-	return internalnative.As(p.queue.syncProducer, target)
+	return As(p.queue.syncProducer, target)
 }
 
 // NativePublisher implements NativePublisherProvider interface.

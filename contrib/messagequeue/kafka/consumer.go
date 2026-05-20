@@ -15,7 +15,6 @@ import (
 
 	"github.com/IBM/sarama"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -196,7 +195,7 @@ func (s *kafkaSubscriber) As(target any) bool {
 	if s == nil || s.queue == nil || s.queue.client == nil {
 		return false
 	}
-	return internalnative.As(s.queue.client, target)
+	return As(s.queue.client, target)
 }
 
 // NativeSubscriber implements NativeSubscriberProvider interface.

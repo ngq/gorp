@@ -32,8 +32,6 @@ import (
 	"sync/atomic"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/ngq/gorp/contrib/internal/baseregistry"
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -42,7 +40,7 @@ import (
 
 // Provider 提供 Consul 服务发现实现。
 type Provider struct {
-	baseregistry.BaseRegistryProvider
+	BaseRegistryProvider
 }
 
 // NewProvider creates a new Consul registry provider.
@@ -101,7 +99,7 @@ func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
 		discCfg.ConsulToken = token
 	}
 
-	sc := baseregistry.ReadServiceConfig(cfg)
+	sc := ReadServiceConfig(cfg)
 	discCfg.ServiceName = sc.ServiceName
 	discCfg.ServiceAddr = sc.ServiceAddr
 	discCfg.ServicePort = sc.ServicePort
@@ -286,7 +284,7 @@ func (r *Registry) Underlying() any {
 }
 
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.client, target)
+	return As(r.client, target)
 }
 
 func (r *Registry) buildHealthCheck(serviceID, host string, port int) *api.AgentServiceCheck {

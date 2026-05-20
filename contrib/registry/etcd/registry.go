@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -268,7 +267,7 @@ func (r *Registry) Underlying() any {
 //
 // As 在可能时将当前原生客户端投射到请求的目标。
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.Underlying(), target)
+	return As(r.Underlying(), target)
 }
 
 // keepAliveLoop runs the lease keepalive loop.

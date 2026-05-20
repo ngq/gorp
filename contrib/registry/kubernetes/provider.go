@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseregistry"
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -35,7 +33,7 @@ var (
 
 // Provider provides Kubernetes-based service discovery.
 type Provider struct {
-	baseregistry.BaseRegistryProvider
+	BaseRegistryProvider
 }
 
 // NewProvider creates a new Kubernetes registry provider.
@@ -242,7 +240,7 @@ func (r *Registry) Underlying() any {
 }
 
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.Underlying(), target)
+	return As(r.Underlying(), target)
 }
 
 type clientGoDiscoveryClient struct {

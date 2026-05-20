@@ -8,7 +8,6 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -100,7 +99,7 @@ func (p *redisPublisher) As(target any) bool {
 	if p == nil || p.queue == nil || p.queue.client == nil {
 		return false
 	}
-	return native.As(p.queue.client, target)
+	return As(p.queue.client, target)
 }
 
 // NativePublisher implements NativePublisherProvider interface.

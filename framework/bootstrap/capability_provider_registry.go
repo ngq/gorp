@@ -10,30 +10,6 @@ package bootstrap
 import (
 	"fmt"
 
-	circuitbreakersentinel "github.com/ngq/gorp/contrib/circuitbreaker/sentinel"
-	configsourceapollo "github.com/ngq/gorp/contrib/configsource/apollo"
-	configsourceconsul "github.com/ngq/gorp/contrib/configsource/consul"
-	configsourceetcd "github.com/ngq/gorp/contrib/configsource/etcd"
-	configsourcekubernetes "github.com/ngq/gorp/contrib/configsource/kubernetes"
-	configsourcenacos "github.com/ngq/gorp/contrib/configsource/nacos"
-	configsourcepolaris "github.com/ngq/gorp/contrib/configsource/polaris"
-	dlockredis "github.com/ngq/gorp/contrib/dlock/redis"
-	dtmsdk "github.com/ngq/gorp/contrib/dtm/dtmsdk"
-	mqkafka "github.com/ngq/gorp/contrib/messagequeue/kafka"
-	mqrabbitmq "github.com/ngq/gorp/contrib/messagequeue/rabbitmq"
-	mqredis "github.com/ngq/gorp/contrib/messagequeue/redis"
-	mqrocketmq "github.com/ngq/gorp/contrib/messagequeue/rocketmq"
-	discoveryconsul "github.com/ngq/gorp/contrib/registry/consul"
-	discoveryetcd "github.com/ngq/gorp/contrib/registry/etcd"
-	discoveryeureka "github.com/ngq/gorp/contrib/registry/eureka"
-	discoverykubernetes "github.com/ngq/gorp/contrib/registry/kubernetes"
-	discoverynacos "github.com/ngq/gorp/contrib/registry/nacos"
-	discoverypolaris "github.com/ngq/gorp/contrib/registry/polaris"
-	discoveryservicecomb "github.com/ngq/gorp/contrib/registry/servicecomb"
-	discoveryzookeeper "github.com/ngq/gorp/contrib/registry/zookeeper"
-	serviceauthmtls "github.com/ngq/gorp/contrib/serviceauth/mtls"
-	serviceauthtoken "github.com/ngq/gorp/contrib/serviceauth/token"
-	tracingotel "github.com/ngq/gorp/contrib/tracing/otel"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	circuitbreakernoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
 	configsourcelocal "github.com/ngq/gorp/framework/provider/configsource/local"
@@ -171,29 +147,23 @@ func RegisterWebSocketProviderFactory(key string, factory providerFactory) {
 	webSocketProviderFactories.register(key, factory)
 }
 
+// RegisterDistributedLockProviderFactory registers a distributed-lock provider factory.
+//
+// RegisterDistributedLockProviderFactory 注册分布式锁 provider factory。
+func RegisterDistributedLockProviderFactory(key string, factory providerFactory) {
+	distributedLockProviderFactories.register(key, factory)
+}
+
 var (
+	// 内建 provider（noop 和 framework provider）
 	configSourceProviderFactories = providerFactoryRegistry{
-		"consul":     func() runtimecontract.ServiceProvider { return configsourceconsul.NewProvider() },
-		"etcd":       func() runtimecontract.ServiceProvider { return configsourceetcd.NewProvider() },
-		"apollo":     func() runtimecontract.ServiceProvider { return configsourceapollo.NewProvider() },
-		"nacos":      func() runtimecontract.ServiceProvider { return configsourcenacos.NewProvider() },
-		"kubernetes": func() runtimecontract.ServiceProvider { return configsourcekubernetes.NewProvider() },
-		"polaris":    func() runtimecontract.ServiceProvider { return configsourcepolaris.NewProvider() },
-		"noop":       func() runtimecontract.ServiceProvider { return configsourcenoop.NewProvider() },
-		"local":      func() runtimecontract.ServiceProvider { return configsourcelocal.NewProvider() },
-		"":           func() runtimecontract.ServiceProvider { return configsourcelocal.NewProvider() },
+		"noop":  func() runtimecontract.ServiceProvider { return configsourcenoop.NewProvider() },
+		"local": func() runtimecontract.ServiceProvider { return configsourcelocal.NewProvider() },
+		"":      func() runtimecontract.ServiceProvider { return configsourcelocal.NewProvider() },
 	}
 	discoveryProviderFactories = providerFactoryRegistry{
-		"consul":      func() runtimecontract.ServiceProvider { return discoveryconsul.NewProvider() },
-		"etcd":        func() runtimecontract.ServiceProvider { return discoveryetcd.NewProvider() },
-		"nacos":       func() runtimecontract.ServiceProvider { return discoverynacos.NewProvider() },
-		"zookeeper":   func() runtimecontract.ServiceProvider { return discoveryzookeeper.NewProvider() },
-		"kubernetes":  func() runtimecontract.ServiceProvider { return discoverykubernetes.NewProvider() },
-		"polaris":     func() runtimecontract.ServiceProvider { return discoverypolaris.NewProvider() },
-		"eureka":      func() runtimecontract.ServiceProvider { return discoveryeureka.NewProvider() },
-		"servicecomb": func() runtimecontract.ServiceProvider { return discoveryservicecomb.NewProvider() },
-		"noop":        func() runtimecontract.ServiceProvider { return discoverynoop.NewProvider() },
-		"":            func() runtimecontract.ServiceProvider { return discoverynoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return discoverynoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return discoverynoop.NewProvider() },
 	}
 	selectorProviderFactories = providerFactoryRegistry{
 		"random":   func() runtimecontract.ServiceProvider { return selectorrandom.NewProvider() },
@@ -210,13 +180,8 @@ var (
 		"":     func() runtimecontract.ServiceProvider { return rpcnoop.NewProvider() },
 	}
 	tracingProviderFactories = providerFactoryRegistry{
-		"otel":   func() runtimecontract.ServiceProvider { return tracingotel.NewProvider() },
-		"otlp":   func() runtimecontract.ServiceProvider { return tracingotel.NewProvider() },
-		"grpc":   func() runtimecontract.ServiceProvider { return tracingotel.NewProvider() },
-		"http":   func() runtimecontract.ServiceProvider { return tracingotel.NewProvider() },
-		"stdout": func() runtimecontract.ServiceProvider { return tracingotel.NewProvider() },
-		"noop":   func() runtimecontract.ServiceProvider { return tracingnoop.NewProvider() },
-		"":       func() runtimecontract.ServiceProvider { return tracingnoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return tracingnoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return tracingnoop.NewProvider() },
 	}
 	metadataProviderFactories = providerFactoryRegistry{
 		"default": func() runtimecontract.ServiceProvider { return metadatadefault.NewProvider() },
@@ -224,15 +189,12 @@ var (
 		"":        func() runtimecontract.ServiceProvider { return metadatanoop.NewProvider() },
 	}
 	serviceAuthProviderFactories = providerFactoryRegistry{
-		"token": func() runtimecontract.ServiceProvider { return serviceauthtoken.NewProvider() },
-		"mtls":  func() runtimecontract.ServiceProvider { return serviceauthmtls.NewProvider() },
-		"noop":  func() runtimecontract.ServiceProvider { return serviceauthnoop.NewProvider() },
-		"":      func() runtimecontract.ServiceProvider { return serviceauthnoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return serviceauthnoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return serviceauthnoop.NewProvider() },
 	}
 	circuitBreakerProviderFactories = providerFactoryRegistry{
-		"sentinel": func() runtimecontract.ServiceProvider { return circuitbreakersentinel.NewProvider() },
-		"noop":     func() runtimecontract.ServiceProvider { return circuitbreakernoop.NewProvider() },
-		"":         func() runtimecontract.ServiceProvider { return circuitbreakernoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return circuitbreakernoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return circuitbreakernoop.NewProvider() },
 	}
 	loadShedderProviderFactories = providerFactoryRegistry{
 		"semaphore": func() runtimecontract.ServiceProvider { return loadsheddingprovider.NewProvider() },
@@ -240,23 +202,16 @@ var (
 		"":          func() runtimecontract.ServiceProvider { return loadsheddingnoop.NewProvider() },
 	}
 	dtmProviderFactories = providerFactoryRegistry{
-		"sdk":    func() runtimecontract.ServiceProvider { return dtmsdk.NewProvider() },
-		"dtmsdk": func() runtimecontract.ServiceProvider { return dtmsdk.NewProvider() },
-		"noop":   func() runtimecontract.ServiceProvider { return dtmnoop.NewProvider() },
-		"":       func() runtimecontract.ServiceProvider { return dtmnoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return dtmnoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return dtmnoop.NewProvider() },
 	}
 	messageQueueProviderFactories = providerFactoryRegistry{
-		"redis":    func() runtimecontract.ServiceProvider { return mqredis.NewProvider() },
-		"kafka":    func() runtimecontract.ServiceProvider { return mqkafka.NewProvider() },
-		"rabbitmq": func() runtimecontract.ServiceProvider { return mqrabbitmq.NewProvider() },
-		"rocketmq": func() runtimecontract.ServiceProvider { return mqrocketmq.NewProvider() },
-		"noop":     func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
-		"":         func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return mqnoop.NewProvider() },
 	}
 	distributedLockProviderFactories = providerFactoryRegistry{
-		"redis": func() runtimecontract.ServiceProvider { return dlockredis.NewProvider() },
-		"noop":  func() runtimecontract.ServiceProvider { return dlocknoop.NewProvider() },
-		"":      func() runtimecontract.ServiceProvider { return dlocknoop.NewProvider() },
+		"noop": func() runtimecontract.ServiceProvider { return dlocknoop.NewProvider() },
+		"":     func() runtimecontract.ServiceProvider { return dlocknoop.NewProvider() },
 	}
 	retryProviderFactories = providerFactoryRegistry{
 		"default": func() runtimecontract.ServiceProvider { return retryprovider.NewProvider() },
@@ -292,23 +247,9 @@ func defaultTracingProvider() runtimecontract.ServiceProvider {
 	return tracingnoop.NewProvider()
 }
 
-// enabledTracingProvider returns the tracing provider used when tracing is explicitly enabled.
-//
-// enabledTracingProvider 返回 tracing 显式启用时使用的 provider。
-func enabledTracingProvider() runtimecontract.ServiceProvider {
-	return tracingotel.NewProvider()
-}
-
 // defaultMetadataProvider returns the default metadata provider used by bootstrap fallbacks.
 //
 // defaultMetadataProvider 返回 bootstrap 回退路径使用的默认 metadata provider。
 func defaultMetadataProvider() runtimecontract.ServiceProvider {
 	return metadatanoop.NewProvider()
-}
-
-// enabledMetadataProvider returns the metadata provider used when propagation is explicitly enabled.
-//
-// enabledMetadataProvider 返回 metadata 透传显式启用时使用的 provider。
-func enabledMetadataProvider() runtimecontract.ServiceProvider {
-	return metadatadefault.NewProvider()
 }

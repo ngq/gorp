@@ -13,7 +13,6 @@ import (
 
 	"github.com/IBM/sarama"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -157,7 +156,7 @@ func (q *Queue) As(target any) bool {
 	if q == nil || q.client == nil {
 		return false
 	}
-	return internalnative.As(q.client, target)
+	return As(q.client, target)
 }
 
 // NativeMQClient implements NativeMQClientProvider interface.

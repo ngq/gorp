@@ -49,17 +49,17 @@ type CustomValidateFunc = datacontract.CustomValidateFunc
 // CustomRuleConfig 是自定义规则配置契约的顶层别名。
 type CustomRuleConfig = datacontract.CustomRuleConfig
 
-// Make returns the unified validator from the container.
+// Get returns the unified validator from the container.
 //
-// Make 从容器获取统一校验器。
-func Make(c runtimecontract.Container) (datacontract.Validator, error) {
+// Get 从容器获取统一校验器。
+func Get(c runtimecontract.Container) (datacontract.Validator, error) {
 	return container.MakeValidator(c)
 }
 
-// MustMake returns the unified validator from the container and panics on failure.
+// GetOrPanic returns the unified validator from the container and panics on failure.
 //
-// MustMake 从容器获取统一校验器，失败时 panic。
-func MustMake(c runtimecontract.Container) datacontract.Validator {
+// GetOrPanic 从容器获取统一校验器，失败时 panic。
+func GetOrPanic(c runtimecontract.Container) datacontract.Validator {
 	return container.MustMakeValidator(c)
 }
 
@@ -71,7 +71,7 @@ func MustMake(c runtimecontract.Container) datacontract.Validator {
 //
 //	err := validate.Validate(ctx, c, &CreateUserRequest{Name: "alice"})
 func Validate(ctx context.Context, c runtimecontract.Container, obj any) error {
-	validatorSvc, err := Make(c)
+	validatorSvc, err := Get(c)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func Validate(ctx context.Context, c runtimecontract.Container, obj any) error {
 //
 // ValidateVar 使用容器中的校验器校验单个字段值。
 func ValidateVar(ctx context.Context, c runtimecontract.Container, field any, tag string) error {
-	validatorSvc, err := Make(c)
+	validatorSvc, err := Get(c)
 	if err != nil {
 		return err
 	}

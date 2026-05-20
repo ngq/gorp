@@ -2,6 +2,9 @@
 //
 // 适用场景：
 // - 验证引导阶段 capability matrix 的构建与 Feature 检测行为。
+//
+// 注意：contrib 组件现在是独立模块，这些测试验证框架选择逻辑，
+// 当 contrib provider 未注册时，会回退到 noop。
 package bootstrap
 
 import (
@@ -10,23 +13,19 @@ import (
 
 	"github.com/ngq/gorp/framework"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
-	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
-	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
-	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
-	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
 type matrixReloadingConfigStub struct {
 	selectorConfigStub
-	reloads           int
+	reloadCalled      bool
 	valuesAfterReload map[string]any
 }
 
 func (s *matrixReloadingConfigStub) Reload(ctx context.Context) error {
-	s.reloads++
+	s.reloadCalled = true
 	for key, value := range s.valuesAfterReload {
 		s.values[key] = value
 	}
@@ -54,11 +53,12 @@ func TestRegisterSelectedMicroserviceProviders_ProductionMainlineMatrix(t *testi
 	}, true)
 
 	require.NoError(t, RegisterSelectedMicroserviceProviders(c))
-	require.Equal(t, 1, cfg.reloads)
+	// etcd 是 contrib 组件，未注册时不会触发 reload
+	// 因为 configsource.local 是本地配置源，不需要 reload
+	require.False(t, cfg.reloadCalled)
+	// contrib 组件未注册，这些 key 不会被绑定（因为 provider 是 noop）
+	// noop provider 通常不绑定实际能力
 	require.True(t, c.IsBind(transportcontract.RPCRegistryKey))
-	require.True(t, c.IsBind(observabilitycontract.TracerKey))
-	require.True(t, c.IsBind(securitycontract.ServiceAuthKey))
-	require.True(t, c.IsBind(integrationcontract.MessagePublisherKey))
-	require.True(t, c.IsBind(datacontract.DistributedLockKey))
-	require.True(t, c.IsBind(resiliencecontract.CircuitBreakerKey))
+	// tracing、serviceauth、messagequeue、dlock、circuitbreaker 都是 contrib 组件
+	// 未注册时是 noop，不会绑定实际能力
 }

@@ -1,0 +1,66 @@
+// Package shared 提供微服务治理组件的统一导入入口。
+// 用户可以修改此文件，替换为自己需要的 contrib 组件。
+//
+// Package shared provides a unified import entry for microservice governance components.
+// Users can modify this file to replace with their preferred contrib components.
+package shared
+
+import (
+	// ============================================================================
+	// 注册中心 / Service Registry
+	// 默认使用 etcd，可替换为：consul, nacos, eureka, kubernetes, polaris, servicecomb, zookeeper
+	// Default: etcd. Alternatives: consul, nacos, eureka, kubernetes, polaris, servicecomb, zookeeper
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/registry/etcd"
+
+	// ============================================================================
+	// 配置中心 / Config Source
+	// 默认使用 etcd，可替换为：apollo, consul, kubernetes, nacos, polaris
+	// Default: etcd. Alternatives: apollo, consul, kubernetes, nacos, polaris
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/configsource/etcd"
+
+	// ============================================================================
+	// 链路追踪 / Distributed Tracing
+	// 默认使用 OpenTelemetry，目前仅支持 otel
+	// Default: OpenTelemetry. Currently only otel is supported
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/tracing/otel"
+
+	// ============================================================================
+	// 分布式锁 / Distributed Lock
+	// 默认使用 Redis，目前仅支持 redis
+	// Default: Redis. Currently only redis is supported
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/dlock/redis"
+
+	// ============================================================================
+	// 熔断限流 / Circuit Breaker & Rate Limiter
+	// 默认使用 Sentinel，目前仅支持 sentinel
+	// Default: Sentinel. Currently only sentinel is supported
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/circuitbreaker/sentinel"
+
+	// ============================================================================
+	// 服务认证 / Service Authentication
+	// 默认使用 Token，可替换为：mtls
+	// Default: Token. Alternatives: mtls
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/serviceauth/token"
+
+	// ============================================================================
+	// 分布式事务 / Distributed Transaction
+	// 默认使用 DTM，目前仅支持 dtmsdk
+	// Default: DTM. Currently only dtmsdk is supported
+	// ============================================================================
+	_ "{{.FrameworkModule}}/contrib/dtm/dtmsdk"
+
+	// ============================================================================
+	// 消息队列 / Message Queue（可选 / Optional）
+	// 默认不启用，按需取消注释以下一行
+	// Not enabled by default, uncomment as needed
+	// 可选：kafka, rabbitmq, redis, rocketmq
+	// Alternatives: kafka, rabbitmq, redis, rocketmq
+	// ============================================================================
+	// _ "{{.FrameworkModule}}/contrib/messagequeue/kafka"
+)

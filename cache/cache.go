@@ -17,22 +17,22 @@ var ErrCacheMiss = datacontract.ErrCacheMiss
 // Cache 是统一缓存契约的顶层别名。
 type Cache = datacontract.Cache
 
-// Make returns the unified cache service from the container.
-// Make 从容器获取统一缓存服务。
-func Make(c runtimecontract.Container) (datacontract.Cache, error) {
+// GetService returns the unified cache service from the container.
+// GetService 从容器获取统一缓存服务。
+func GetService(c runtimecontract.Container) (datacontract.Cache, error) {
 	return container.MakeCache(c)
 }
 
-// MustMake returns the unified cache service from the container and panics on failure.
-// MustMake 从容器获取统一缓存服务，失败 panic。
-func MustMake(c runtimecontract.Container) datacontract.Cache {
+// GetServiceOrPanic returns the unified cache service from the container and panics on failure.
+// GetServiceOrPanic 从容器获取统一缓存服务，失败 panic。
+func GetServiceOrPanic(c runtimecontract.Container) datacontract.Cache {
 	return container.MustMakeCache(c)
 }
 
 // Get reads a cache value by key.
 // Get 读取缓存。
 func Get(ctx context.Context, c runtimecontract.Container, key string) (string, error) {
-	cacheSvc, err := Make(c)
+	cacheSvc, err := GetService(c)
 	if err != nil {
 		return "", err
 	}
@@ -42,7 +42,7 @@ func Get(ctx context.Context, c runtimecontract.Container, key string) (string, 
 // Set writes a cache value with ttl.
 // Set 写入缓存。
 func Set(ctx context.Context, c runtimecontract.Container, key, value string, ttl time.Duration) error {
-	cacheSvc, err := Make(c)
+	cacheSvc, err := GetService(c)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func Set(ctx context.Context, c runtimecontract.Container, key, value string, tt
 // Del deletes a cache key.
 // Del 删除缓存。
 func Del(ctx context.Context, c runtimecontract.Container, key string) error {
-	cacheSvc, err := Make(c)
+	cacheSvc, err := GetService(c)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func Del(ctx context.Context, c runtimecontract.Container, key string) error {
 // MGet reads multiple cache keys in one call.
 // MGet 批量读取缓存。
 func MGet(ctx context.Context, c runtimecontract.Container, keys ...string) (map[string]string, error) {
-	cacheSvc, err := Make(c)
+	cacheSvc, err := GetService(c)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func MGet(ctx context.Context, c runtimecontract.Container, keys ...string) (map
 //	    return loadUserJSON(ctx, 42)
 //	})
 func Remember(ctx context.Context, c runtimecontract.Container, key string, ttl time.Duration, fn func(context.Context) (string, error)) (string, error) {
-	cacheSvc, err := Make(c)
+	cacheSvc, err := GetService(c)
 	if err != nil {
 		return "", err
 	}

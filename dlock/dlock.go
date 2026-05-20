@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	contribredis "github.com/ngq/gorp/contrib/dlock/redis"
 	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -18,28 +17,22 @@ type DistributedLock = datacontract.DistributedLock
 // DistributedLockConfig 是分布式锁配置契约的顶层别名。
 type DistributedLockConfig = datacontract.DistributedLockConfig
 
-// Make returns the distributed lock service from the container.
-// Make 从容器获取分布式锁服务。
-func Make(c runtimecontract.Container) (datacontract.DistributedLock, error) {
-	return container.MakeDistributedLock(c)
+// Get returns the distributed lock service from the container.
+// Get 从容器获取分布式锁服务。
+func Get(c runtimecontract.Container) (datacontract.DistributedLock, error) {
+	return container.GetDistributedLock(c)
 }
 
-// MustMake returns the distributed lock service from the container and panics on failure.
-// MustMake 从容器获取分布式锁服务，失败 panic。
-func MustMake(c runtimecontract.Container) datacontract.DistributedLock {
-	return container.MustMakeDistributedLock(c)
-}
-
-// NewRedisLock creates a Redis-based distributed lock implementation.
-// NewRedisLock 创建 Redis 分布式锁实现。
-func NewRedisLock(cfg *datacontract.DistributedLockConfig) (datacontract.DistributedLock, error) {
-	return contribredis.NewLock(cfg)
+// GetOrPanic returns the distributed lock service from the container and panics on failure.
+// GetOrPanic 从容器获取分布式锁服务，失败 panic。
+func GetOrPanic(c runtimecontract.Container) datacontract.DistributedLock {
+	return container.GetDistributedLockOrPanic(c)
 }
 
 // Lock acquires a lock using the distributed lock service from the container.
 // Lock 使用容器中的分布式锁获取锁。
 func Lock(ctx context.Context, c runtimecontract.Container, key string, ttl time.Duration) error {
-	lockSvc, err := Make(c)
+	lockSvc, err := Get(c)
 	if err != nil {
 		return err
 	}
@@ -49,7 +42,7 @@ func Lock(ctx context.Context, c runtimecontract.Container, key string, ttl time
 // TryLock tries to acquire a lock using the distributed lock service from the container.
 // TryLock 使用容器中的分布式锁尝试获取锁。
 func TryLock(ctx context.Context, c runtimecontract.Container, key string, ttl time.Duration) (bool, error) {
-	lockSvc, err := Make(c)
+	lockSvc, err := Get(c)
 	if err != nil {
 		return false, err
 	}
@@ -59,7 +52,7 @@ func TryLock(ctx context.Context, c runtimecontract.Container, key string, ttl t
 // Unlock releases a lock using the distributed lock service from the container.
 // Unlock 使用容器中的分布式锁释放锁。
 func Unlock(ctx context.Context, c runtimecontract.Container, key string) error {
-	lockSvc, err := Make(c)
+	lockSvc, err := Get(c)
 	if err != nil {
 		return err
 	}
@@ -75,7 +68,7 @@ func Unlock(ctx context.Context, c runtimecontract.Container, key string) error 
 //	    return processOrder(ctx, 42)
 //	})
 func WithLock(ctx context.Context, c runtimecontract.Container, key string, ttl time.Duration, fn func() error) error {
-	lockSvc, err := Make(c)
+	lockSvc, err := Get(c)
 	if err != nil {
 		return err
 	}

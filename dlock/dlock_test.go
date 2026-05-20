@@ -59,10 +59,10 @@ func TestExportedDLockHelpers(t *testing.T) {
 	stub := &exportDLockStub{}
 	containerStub := &exportDLockContainerStub{lock: stub}
 
-	lockSvc, err := Make(containerStub)
+	lockSvc, err := Get(containerStub)
 	require.NoError(t, err)
 	require.Same(t, stub, lockSvc)
-	require.Same(t, stub, MustMake(containerStub))
+	require.Same(t, stub, GetOrPanic(containerStub))
 
 	err = Lock(context.Background(), containerStub, "k", time.Second)
 	require.NoError(t, err)

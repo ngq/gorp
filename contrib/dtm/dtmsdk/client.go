@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -74,7 +73,7 @@ func (c *DTMClient) Underlying() any {
 //
 // As 尝试将 DTMClient 转换为目标类型。
 func (c *DTMClient) As(target any) bool {
-	return internalnative.As(c, target)
+	return As(c, target)
 }
 
 // Close closes the underlying HTTP client connections.

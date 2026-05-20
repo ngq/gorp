@@ -5,6 +5,9 @@
 // - 验证各 provider backend 的 Select 优先級（backend key > config > code disable > default）。
 // - 验证 RegisterSelectedMicroserviceProviders 的重载、传播与降级行为。
 // - 验证 governance override 链路的优先级顺序。
+//
+// 注意：contrib 组件现在是独立模块，这些测试验证框架选择逻辑，
+// 当 contrib provider 未注册时，会回退到 noop。
 package bootstrap
 
 import (
@@ -53,7 +56,7 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 		}
 	}
 
-	// serviceauth 没有被代码关闭，应该仍走配置的 token 模式
+	// serviceauth 没有被代码关闭，但 contrib 未注册，所以是 noop
 	assertBoundKey(t, c, securitycontract.ServiceAuthKey)
 }
 
@@ -98,9 +101,10 @@ func TestOverridePriorityChainForSingleFeature(t *testing.T) {
 	}
 
 	// 级别3：模式默认值 —— microservice 模式下 tracing 默认为 otel
+	// 但 contrib 未注册，回退到 noop
 	modeCfg := &selectorConfigStub{values: map[string]any{"governance.mode": "micro"}}
-	if got := SelectTracingProviderWithMode(modeCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.otel" {
-		t.Fatalf("priority 3 (mode default): expected tracing.otel, got %s", got)
+	if got := SelectTracingProviderWithMode(modeCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.noop" {
+		t.Fatalf("priority 3 (mode default): expected tracing.noop (otel not registered), got %s", got)
 	}
 
 	// 级别2：配置显式覆盖 —— 配置中 governance.providers.tracing = noop 优先于模式默认
@@ -113,8 +117,9 @@ func TestOverridePriorityChainForSingleFeature(t *testing.T) {
 	}
 
 	// 级别1：代码显式覆盖 —— 通过 overlay 注入的代码覆盖优先于配置
+	// 但 contrib 未注册，即使指定 otel 也回退到 noop
 	overlayCfg := overlayGovernanceConfig(configOverrideCfg, nil, nil, map[string]string{"tracing": "otel"})
-	if got := SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.otel" {
-		t.Fatalf("priority 1 (code override): expected tracing.otel, got %s", got)
+	if got := SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.noop" {
+		t.Fatalf("priority 1 (code override): expected tracing.noop (otel not registered), got %s", got)
 	}
 }

@@ -28,6 +28,9 @@ func (s *exportCacheStub) Del(context.Context, string) error { return nil }
 func (s *exportCacheStub) MGet(context.Context, ...string) (map[string]string, error) {
 	return map[string]string{"k": s.value}, nil
 }
+func (s *exportCacheStub) MSet(context.Context, map[string]string, time.Duration) error {
+	return nil
+}
 func (s *exportCacheStub) Remember(ctx context.Context, key string, ttl time.Duration, fn func(context.Context) (string, error)) (string, error) {
 	return fn(ctx)
 }
@@ -67,10 +70,10 @@ func TestExportedCacheHelpers(t *testing.T) {
 	stub := &exportCacheStub{value: "v1"}
 	containerStub := &exportCacheContainerStub{cache: stub}
 
-	cacheSvc, err := Make(containerStub)
+	cacheSvc, err := GetService(containerStub)
 	require.NoError(t, err)
 	require.Same(t, stub, cacheSvc)
-	require.Same(t, stub, MustMake(containerStub))
+	require.Same(t, stub, GetServiceOrPanic(containerStub))
 
 	value, err := Get(context.Background(), containerStub, "k")
 	require.NoError(t, err)

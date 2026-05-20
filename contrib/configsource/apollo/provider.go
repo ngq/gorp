@@ -8,14 +8,13 @@ package apollo
 import (
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供 Apollo 配置中心实现。
 type Provider struct {
-	baseconfigsource.BaseConfigSourceProvider
+	BaseConfigSourceProvider
 }
 
 // NewProvider creates a new Apollo provider instance.
@@ -48,7 +47,7 @@ type ApolloConfig struct {
 // getApolloConfig 从容器的 config binding 中提取 Apollo 配置。
 // 使用 GetStringFallback 单路径读取，消除 cfg.Get()+cfg.GetString() 双读冗余。
 func getApolloConfig(c runtimecontract.Container) (*ApolloConfig, error) {
-	cfg, err := baseconfigsource.ReadConfig(c)
+	cfg, err := ReadConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -60,22 +59,22 @@ func getApolloConfig(c runtimecontract.Container) (*ApolloConfig, error) {
 		WatchRetryInterval: time.Second,
 	}
 
-	apolloCfg.AppID = baseconfigsource.GetStringFallback(cfg, "apollo", "app_id")
-	apolloCfg.Cluster = baseconfigsource.GetStringFallback(cfg, "apollo", "cluster")
+	apolloCfg.AppID = GetStringFallback(cfg, "apollo", "app_id")
+	apolloCfg.Cluster = GetStringFallback(cfg, "apollo", "cluster")
 	if apolloCfg.Cluster == "" {
 		apolloCfg.Cluster = "default"
 	}
-	apolloCfg.Namespace = baseconfigsource.GetStringFallback(cfg, "apollo", "namespace")
+	apolloCfg.Namespace = GetStringFallback(cfg, "apollo", "namespace")
 	if apolloCfg.Namespace == "" {
 		apolloCfg.Namespace = "application"
 	}
-	apolloCfg.MetaServer = baseconfigsource.GetStringFallback(cfg, "apollo", "meta_server")
-	apolloCfg.AccessKey = baseconfigsource.GetStringFallback(cfg, "apollo", "access_key")
+	apolloCfg.MetaServer = GetStringFallback(cfg, "apollo", "meta_server")
+	apolloCfg.AccessKey = GetStringFallback(cfg, "apollo", "access_key")
 
-	if d := baseconfigsource.GetDurationSecondsFallback(cfg, "apollo", "poll_interval_seconds"); d > 0 {
+	if d := GetDurationSecondsFallback(cfg, "apollo", "poll_interval_seconds"); d > 0 {
 		apolloCfg.PollInterval = d
 	}
-	if d := baseconfigsource.GetDurationMillisFallback(cfg, "apollo", "watch_retry_interval_ms"); d > 0 {
+	if d := GetDurationMillisFallback(cfg, "apollo", "watch_retry_interval_ms"); d > 0 {
 		apolloCfg.WatchRetryInterval = d
 	}
 

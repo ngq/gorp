@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"gopkg.in/yaml.v3"
@@ -38,7 +36,7 @@ var (
 
 // Provider 提供 Kubernetes ConfigMap 配置源实现。
 type Provider struct {
-	baseconfigsource.BaseConfigSourceProvider
+	BaseConfigSourceProvider
 }
 
 func NewProvider() *Provider {
@@ -68,7 +66,7 @@ type KubernetesConfig struct {
 }
 
 func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error) {
-	cfg, err := baseconfigsource.ReadConfig(c)
+	cfg, err := ReadConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -80,26 +78,26 @@ func getKubernetesConfig(c runtimecontract.Container) (*KubernetesConfig, error)
 		PollInterval: defaultKubernetesConfigPoll,
 	}
 
-	k8sCfg.Namespace = baseconfigsource.GetStringFallback(cfg, "kubernetes", "namespace")
+	k8sCfg.Namespace = GetStringFallback(cfg, "kubernetes", "namespace")
 	if k8sCfg.Namespace == "" {
 		k8sCfg.Namespace = defaultNamespace
 	}
-	k8sCfg.ConfigMapName = baseconfigsource.GetStringFallback(cfg, "kubernetes", "configmap_name")
-	k8sCfg.DataKey = baseconfigsource.GetStringFallback(cfg, "kubernetes", "data_key")
-	if inCluster, ok := baseconfigsource.GetBoolFallback(cfg, "kubernetes", "in_cluster"); ok {
+	k8sCfg.ConfigMapName = GetStringFallback(cfg, "kubernetes", "configmap_name")
+	k8sCfg.DataKey = GetStringFallback(cfg, "kubernetes", "data_key")
+	if inCluster, ok := GetBoolFallback(cfg, "kubernetes", "in_cluster"); ok {
 		k8sCfg.InCluster = inCluster
 	}
-	k8sCfg.KubeConfigPath = baseconfigsource.GetStringFallback(cfg, "kubernetes", "kubeconfig_path")
-	k8sCfg.APIServer = baseconfigsource.GetStringFallback(cfg, "kubernetes", "api_server")
-	k8sCfg.BearerToken = baseconfigsource.GetStringFallback(cfg, "kubernetes", "bearer_token")
-	k8sCfg.CAFile = baseconfigsource.GetStringFallback(cfg, "kubernetes", "ca_file")
-	if skipVerify, ok := baseconfigsource.GetBoolFallback(cfg, "kubernetes", "insecure_skip_verify"); ok {
+	k8sCfg.KubeConfigPath = GetStringFallback(cfg, "kubernetes", "kubeconfig_path")
+	k8sCfg.APIServer = GetStringFallback(cfg, "kubernetes", "api_server")
+	k8sCfg.BearerToken = GetStringFallback(cfg, "kubernetes", "bearer_token")
+	k8sCfg.CAFile = GetStringFallback(cfg, "kubernetes", "ca_file")
+	if skipVerify, ok := GetBoolFallback(cfg, "kubernetes", "insecure_skip_verify"); ok {
 		k8sCfg.InsecureSkipVerify = skipVerify
 	}
-	if autoReload, ok := baseconfigsource.GetBoolFallback(cfg, "kubernetes", "auto_reload"); ok {
+	if autoReload, ok := GetBoolFallback(cfg, "kubernetes", "auto_reload"); ok {
 		k8sCfg.AutoReload = autoReload
 	}
-	if d := baseconfigsource.GetDurationSecondsFallback(cfg, "kubernetes", "poll_interval_seconds"); d > 0 {
+	if d := GetDurationSecondsFallback(cfg, "kubernetes", "poll_interval_seconds"); d > 0 {
 		k8sCfg.PollInterval = d
 	}
 
@@ -189,7 +187,7 @@ func (s *ConfigSource) Underlying() any {
 }
 
 func (s *ConfigSource) As(target any) bool {
-	return internalnative.As(s.Underlying(), target)
+	return As(s.Underlying(), target)
 }
 
 func (s *ConfigSource) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {

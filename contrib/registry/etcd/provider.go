@@ -24,7 +24,6 @@ package etcd
 import (
 	"errors"
 
-	"github.com/ngq/gorp/contrib/internal/baseregistry"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -33,7 +32,7 @@ import (
 
 // Provider 提供 etcd 服务发现实现。
 type Provider struct {
-	baseregistry.BaseRegistryProvider
+	BaseRegistryProvider
 }
 
 // NewProvider creates a new etcd registry provider.
@@ -118,7 +117,7 @@ func getDiscoveryConfig(c runtimecontract.Container) (*DiscoveryConfig, error) {
 		discCfg.LeaseTTL = int64(ttl)
 	}
 
-	sc := baseregistry.ReadServiceConfig(cfg)
+	sc := ReadServiceConfig(cfg)
 	discCfg.ServiceName = sc.ServiceName
 	discCfg.ServiceAddr = sc.ServiceAddr
 	discCfg.ServicePort = sc.ServicePort

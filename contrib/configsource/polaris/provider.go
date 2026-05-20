@@ -8,14 +8,13 @@ package polaris
 import (
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供 Polaris 配置中心实现。
 type Provider struct {
-	baseconfigsource.BaseConfigSourceProvider
+	BaseConfigSourceProvider
 }
 
 // NewProvider creates a new Polaris provider instance.
@@ -53,7 +52,7 @@ type PolarisConfig struct {
 // 使用 GetStringFallback，以 configsource.polaris.* 为主路径，
 // config.polaris.* 为回退路径，与其他 ConfigSource provider 统一。
 func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
-	cfg, err := baseconfigsource.ReadConfig(c)
+	cfg, err := ReadConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -64,19 +63,19 @@ func getPolarisConfig(c runtimecontract.Container) (*PolarisConfig, error) {
 		WatchRetryInterval: time.Second,
 	}
 
-	polarisCfg.ServerAddress = baseconfigsource.GetStringFallback(cfg, "polaris", "server_address")
-	polarisCfg.Namespace = baseconfigsource.GetStringFallback(cfg, "polaris", "namespace")
+	polarisCfg.ServerAddress = GetStringFallback(cfg, "polaris", "server_address")
+	polarisCfg.Namespace = GetStringFallback(cfg, "polaris", "namespace")
 	if polarisCfg.Namespace == "" {
 		polarisCfg.Namespace = "default"
 	}
-	polarisCfg.FileGroup = baseconfigsource.GetStringFallback(cfg, "polaris", "file_group")
-	polarisCfg.FileName = baseconfigsource.GetStringFallback(cfg, "polaris", "file_name")
-	polarisCfg.Token = baseconfigsource.GetStringFallback(cfg, "polaris", "token")
+	polarisCfg.FileGroup = GetStringFallback(cfg, "polaris", "file_group")
+	polarisCfg.FileName = GetStringFallback(cfg, "polaris", "file_name")
+	polarisCfg.Token = GetStringFallback(cfg, "polaris", "token")
 
-	if d := baseconfigsource.GetDurationSecondsFallback(cfg, "polaris", "poll_interval_seconds"); d > 0 {
+	if d := GetDurationSecondsFallback(cfg, "polaris", "poll_interval_seconds"); d > 0 {
 		polarisCfg.PollInterval = d
 	}
-	if d := baseconfigsource.GetDurationMillisFallback(cfg, "polaris", "watch_retry_interval_ms"); d > 0 {
+	if d := GetDurationMillisFallback(cfg, "polaris", "watch_retry_interval_ms"); d > 0 {
 		polarisCfg.WatchRetryInterval = d
 	}
 

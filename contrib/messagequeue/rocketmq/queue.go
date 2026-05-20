@@ -15,7 +15,6 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/producer"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
@@ -135,7 +134,7 @@ func (q *Queue) As(target any) bool {
 	if q == nil || q.producer == nil {
 		return false
 	}
-	return internalnative.As(q.producer, target)
+	return As(q.producer, target)
 }
 
 // NativeMQClient implements NativeMQClientProvider interface.

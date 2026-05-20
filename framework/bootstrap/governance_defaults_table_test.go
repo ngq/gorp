@@ -144,7 +144,7 @@ func TestFormatGovernanceDefaultsDiagnosticOutput(t *testing.T) {
 	assert.True(t, strings.Contains(text, "Governance Defaults"), "should contain title")
 	assert.True(t, strings.Contains(text, "Feature Defaults"), "should contain feature section")
 	assert.True(t, strings.Contains(text, "Provider Defaults"), "should contain provider section")
-	assert.True(t, strings.Contains(text, "HTTP Middleware Defaults"), "should contain HTTP section")
+	assert.True(t, strings.Contains(text, "Middleware Defaults"), "should contain HTTP section")
 	assert.True(t, strings.Contains(text, "RPC Client Defaults"), "should contain RPC section")
 
 	// 验证关键默认值可见

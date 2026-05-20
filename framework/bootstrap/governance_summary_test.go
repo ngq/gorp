@@ -4,6 +4,9 @@
 // - 验证 HTTP Service runtime 的初始化、governance override 和 provider 注册行为。
 // - 验证 pprof / governance inspect 端点的路由注册与响应格式。
 // - 验证 governance summary 与 diagnostic 的构建与格式化逻辑。
+//
+// 注意：contrib 组件现在是独立模块，这些测试验证框架选择逻辑，
+// 当 contrib provider 未注册时，会回退到 noop。
 package bootstrap
 
 import (
@@ -35,7 +38,8 @@ func TestBuildGovernanceSummaryReportsOverridesAndProviders(t *testing.T) {
 	require.False(t, summary.FeatureDecisions["selector"].Enabled)
 	require.Equal(t, "config_override", summary.FeatureDecisions["selector"].Source)
 	require.Contains(t, summary.FeatureDecisions["retry"].Reason, "not part of the current governance mode defaults")
-	require.Equal(t, "mtls", summary.ProviderBackends["serviceauth"])
+	// mtls 是 contrib 组件，未注册时回退到 noop
+	require.Equal(t, "noop", summary.ProviderBackends["serviceauth"])
 	require.Equal(t, "noop", summary.ProviderBackends["selector"])
 	require.Equal(t, "config_override", summary.ProviderDecisions["serviceauth"].Source)
 	require.Contains(t, summary.ProviderDecisions["serviceauth"].Reason, "governance.providers.serviceauth")
@@ -155,7 +159,8 @@ func TestBuildGovernanceSummaryWithModeOverrideReportsCodeAndConfigSources(t *te
 	require.Equal(t, "code_override", summary.ModeSource)
 	require.Contains(t, summary.DisabledByConfig, "tracing")
 	require.Contains(t, summary.DisabledByCode, "selector")
-	require.Equal(t, "mtls", summary.ProviderBackends["serviceauth"])
+	// mtls 是 contrib 组件，未注册时回退到 noop
+	require.Equal(t, "noop", summary.ProviderBackends["serviceauth"])
 	require.Equal(t, "code_override", summary.ProviderDecisions["serviceauth"].Source)
 	require.Contains(t, summary.ProviderDecisions["serviceauth"].Reason, "startup option")
 	require.Equal(t, "noop", summary.ProviderBackends["selector"])
@@ -164,9 +169,9 @@ func TestBuildGovernanceSummaryWithModeOverrideReportsCodeAndConfigSources(t *te
 	require.Equal(t, "noop", summary.ProviderBackends["tracing"])
 	require.Equal(t, "config_override", summary.ProviderDecisions["tracing"].Source)
 	require.Contains(t, summary.ProviderDecisions["tracing"].Reason, "governance.disable")
-	require.Equal(t, "redis", summary.ProviderBackends["message_queue"])
+	// redis 是 contrib 组件，未注册时回退到 noop
+	require.Equal(t, "noop", summary.ProviderBackends["message_queue"])
 	require.Equal(t, "config_override", summary.ProviderDecisions["message_queue"].Source)
-	require.Contains(t, summary.ProviderDecisions["message_queue"].Reason, "message_queue.enabled")
 	require.Contains(t, summary.ConfigSnapshot, "startup.governance_mode_override")
 	require.Contains(t, summary.ConfigSnapshot, "startup.governance_disable")
 	require.Contains(t, summary.ConfigSnapshot, "startup.governance_providers")

@@ -26,15 +26,15 @@ func DefaultRetryPolicy() resiliencecontract.RetryPolicy {
 	return resiliencecontract.DefaultRetryPolicy()
 }
 
-// Make returns the unified retry service from the container.
-// Make 从容器获取统一重试服务。
-func Make(c runtimecontract.Container) (resiliencecontract.Retry, error) {
+// Get returns the unified retry service from the container.
+// Get 从容器获取统一重试服务。
+func Get(c runtimecontract.Container) (resiliencecontract.Retry, error) {
 	return container.MakeRetry(c)
 }
 
-// MustMake returns the unified retry service from the container and panics on failure.
-// MustMake 从容器获取统一重试服务，失败 panic。
-func MustMake(c runtimecontract.Container) resiliencecontract.Retry {
+// GetOrPanic returns the unified retry service from the container and panics on failure.
+// GetOrPanic 从容器获取统一重试服务，失败 panic。
+func GetOrPanic(c runtimecontract.Container) resiliencecontract.Retry {
 	return container.MustMakeRetry(c)
 }
 
@@ -47,7 +47,7 @@ func MustMake(c runtimecontract.Container) resiliencecontract.Retry {
 //	    return callRemote(ctx)
 //	})
 func Do(ctx context.Context, c runtimecontract.Container, fn func() error) error {
-	retrySvc, err := Make(c)
+	retrySvc, err := Get(c)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func Do(ctx context.Context, c runtimecontract.Container, fn func() error) error
 // DoWithResult executes a function with result using the retry service from the container.
 // DoWithResult 使用容器中的重试服务执行带返回值的函数。
 func DoWithResult(ctx context.Context, c runtimecontract.Container, fn func() (any, error)) (any, error) {
-	retrySvc, err := Make(c)
+	retrySvc, err := Get(c)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func DoWithResult(ctx context.Context, c runtimecontract.Container, fn func() (a
 // IsRetryable reports whether the given error is retryable.
 // IsRetryable 判断错误是否可重试。
 func IsRetryable(c runtimecontract.Container, err error) (bool, error) {
-	retrySvc, makeErr := Make(c)
+	retrySvc, makeErr := Get(c)
 	if makeErr != nil {
 		return false, makeErr
 	}

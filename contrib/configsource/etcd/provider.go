@@ -12,8 +12,6 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
@@ -21,7 +19,7 @@ import (
 
 // Provider implements runtimecontract.ServiceProvider for etcd config source.
 type Provider struct {
-	baseconfigsource.BaseConfigSourceProvider
+	BaseConfigSourceProvider
 }
 
 // NewProvider creates a new etcd config source provider.
@@ -38,7 +36,7 @@ func NewProvider() *Provider {
 }
 
 func getConfigSourceConfig(c runtimecontract.Container) (*datacontract.ConfigSourceConfig, error) {
-	cfg, err := baseconfigsource.ReadConfig(c)
+	cfg, err := ReadConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +201,7 @@ func (s *Source) Underlying() any {
 }
 
 func (s *Source) As(target any) bool {
-	return internalnative.As(s.client, target)
+	return As(s.client, target)
 }
 
 type etcdWatcher struct {
