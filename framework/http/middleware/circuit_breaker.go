@@ -15,12 +15,18 @@ import (
 	"strings"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 // CircuitBreaker protects HTTP requests with the configured circuit breaker.
 //
 // CircuitBreaker 使用给定的熔断器保护 HTTP 请求。
+//
+// 使用方式：
+//
+//	cb, _ := container.Make[resiliencecontract.CircuitBreaker](c, resiliencecontract.CircuitBreakerKey)
+//	router.Use(middleware.CircuitBreaker(cb, "external-api"))
 func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) transportcontract.Middleware {
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
@@ -31,6 +37,69 @@ func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) trans
 				return
 			}
 
+			target := circuitBreakerResource(c, resource)
+			if err := cb.Allow(c, target); err != nil {
+				respondCircuitBreakerOpen(c)
+				return
+			}
+
+			defer func() {
+				if rec := recover(); rec != nil {
+					cb.RecordFailure(c, target, fmt.Errorf("panic: %v", rec))
+					panic(rec)
+				}
+
+				status := c.ResponseStatus()
+				if status >= http.StatusInternalServerError {
+					cb.RecordFailure(c, target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
+					return
+				}
+				cb.RecordSuccess(c, target)
+			}()
+
+			if next != nil {
+				next(c)
+			}
+		}
+	}
+}
+
+// CircuitBreakerFromContainer 自动从容器获取熔断器并应用熔断中间件。
+// 无需手动从容器获取 circuit breaker，直接使用即可。
+//
+// 使用方式：
+//
+//	router.Use(middleware.CircuitBreakerFromContainer(container, "external-api"))
+//
+// 如果容器中未注册 CircuitBreaker，中间件会静默跳过（不报错）。
+func CircuitBreakerFromContainer(container runtimecontract.Container, resource string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			// 从容器获取熔断器
+			if container == nil || !container.IsBind(resiliencecontract.CircuitBreakerKey) {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			cbAny, err := container.Make(resiliencecontract.CircuitBreakerKey)
+			if err != nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			cb, ok := cbAny.(resiliencecontract.CircuitBreaker)
+			if !ok || cb == nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			// 获取熔断资源
 			target := circuitBreakerResource(c, resource)
 			if err := cb.Allow(c, target); err != nil {
 				respondCircuitBreakerOpen(c)

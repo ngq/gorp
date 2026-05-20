@@ -262,7 +262,17 @@ func (s *Server) newGRPCServer() *grpc.Server {
 		}
 	}
 
-	// 9. metrics (请求指标)
+	// 9. circuit breaker (从容器解析)
+	// circuit_breaker - 从容器解析
+	if s.c.IsBind(resiliencecontract.CircuitBreakerKey) {
+		if cbAny, err := s.c.Make(resiliencecontract.CircuitBreakerKey); err == nil {
+			if cb, ok := cbAny.(resiliencecontract.CircuitBreaker); ok {
+				unaryInterceptors = append(unaryInterceptors, circuitBreakerUnaryServerInterceptor(cb))
+			}
+		}
+	}
+
+	// 10. metrics (请求指标)
 	// metrics - 请求指标
 	unaryInterceptors = append(unaryInterceptors, metricsUnaryServerInterceptor())
 
@@ -318,6 +328,36 @@ func loadSheddingUnaryServerInterceptor(ls resiliencecontract.LoadShedder) grpc.
 			return callResp, callErr
 		}
 		return handler(ctx, req)
+	}
+}
+
+// circuitBreakerUnaryServerInterceptor creates a unary server interceptor for circuit breaker.
+// Rejects requests when the circuit breaker is open, and records success/failure.
+//
+// circuitBreakerUnaryServerInterceptor 创建熔断的一元服务端拦截器。
+// 当熔断器打开时拒绝请求，并记录成功/失败。
+func circuitBreakerUnaryServerInterceptor(cb resiliencecontract.CircuitBreaker) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if cb == nil {
+			return handler(ctx, req)
+		}
+
+		// 检查熔断器状态
+		if err := cb.Allow(ctx, info.FullMethod); err != nil {
+			return nil, status.Error(codes.Unavailable, "circuit breaker is open")
+		}
+
+		// 执行请求
+		resp, err := handler(ctx, req)
+
+		// 记录结果
+		if err != nil {
+			cb.RecordFailure(ctx, info.FullMethod, err)
+		} else {
+			cb.RecordSuccess(ctx, info.FullMethod)
+		}
+
+		return resp, err
 	}
 }
 

@@ -1,36 +1,50 @@
-// Package loadshedding 提供基于信号量的过载保护（LoadShedding）实现。
+// Package loadshedding 提供过载保护（LoadShedding）实现。
+//
+// 提供两种策略：
+// - semaphore：固定并发数控制（默认）
+// - bbr：基于 CPU + inflight 的自适应过载保护
 //
 // 适用场景：
 // - 微服务模式下默认启用，提供 HTTP/gRPC/RPC 统一的过载保护能力；
-// - 基于信号量控制每个资源（resource）的最大并发数；
-// - 支持全局默认并发上限和按资源粒度的独立策略配置；
-// - 当并发已满时立即拒绝请求（非阻塞 TryAcquire），返回过载错误。
+// - 当系统过载时立即拒绝请求，防止级联故障。
+//
+// 配置示例：
+//
+//	load_shedding:
+//	  enabled: true
+//	  strategy: bbr  # 或 semaphore
+//	  bbr:
+//	    cpu_threshold: 0.8
+//	    window_size: 10s
+//	    bucket_count: 100
 package loadshedding
 
 import (
 	"context"
 	"runtime"
 	"sync"
+	"time"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+
+	"github.com/ngq/gorp/framework/provider/loadshedding/bbr"
 )
 
-// Provider 是基于信号量的 LoadShedder 能力 provider。
+// Provider 是 LoadShedder 能力 provider。
 // 将 LoadShedding 契约实现注册到容器中，供 HTTP 中间件和 RPC 客户端使用。
 //
 // 中文说明：
-// - 默认最大并发数 = runtime.GOMAXPROCS(0) * 100；
-// - 支持通过配置 load_shedding.max_concurrency 自定义；
-// - 支持通过 load_shedding.resource_policies.<resource> 按资源粒度覆盖；
-// - 使用 semaphore.Weighted 实现非阻塞的并发控制。
+// - 根据 strategy 配置选择 semaphore 或 bbr 实现；
+// - semaphore：固定并发数控制，默认最大并发 = GOMAXPROCS * 100；
+// - bbr：自适应过载保护，根据 CPU + inflight 动态调整。
 type Provider struct{}
 
-// NewProvider 创建信号量式 LoadShedding provider。
+// NewProvider 创建 LoadShedding provider。
 func NewProvider() *Provider { return &Provider{} }
 
 // Name 返回 provider 唯一名称。
-func (p *Provider) Name() string { return "loadshedding.semaphore" }
+func (p *Provider) Name() string { return "loadshedding.provider" }
 
 // IsDefer 标记此 provider 延迟装载。
 func (p *Provider) IsDefer() bool { return true }
@@ -51,11 +65,23 @@ func (p *Provider) DependsOn() []string { return nil }
 func (p *Provider) Requires() []string { return nil }
 
 // Register 将 LoadShedder 实例注册到容器。
+//
+// 根据 strategy 配置选择实现：
+// - "semaphore" 或空：固定并发数控制
+// - "bbr"：自适应过载保护
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(resiliencecontract.LoadShedderKey, func(c runtimecontract.Container) (any, error) {
-		// 从容器中读取配置，构建 LoadSheddingConfig
 		cfg := loadSheddingConfigFromContainer(c)
-		return newSemaphoreLoadShedder(cfg), nil
+
+		// 根据策略选择实现
+		switch cfg.Strategy {
+		case "bbr":
+			bbrCfg := loadBBRConfigFromContainer(c)
+			return bbr.NewLoadShedder(bbrCfg), nil
+		default:
+			// 默认使用信号量实现
+			return newSemaphoreLoadShedder(cfg), nil
+		}
 	}, true)
 	return nil
 }
@@ -219,6 +245,58 @@ func loadSheddingConfigFromContainer(c runtimecontract.Container) resiliencecont
 	// 按资源粒度的策略配置
 	// 配置格式：load_shedding.resource_policies.<resource>.max_concurrency
 	cfg.ResourcePolicies = loadResourcePolicies(getter)
+
+	return cfg
+}
+
+// loadBBRConfigFromContainer 从容器中读取 BBR 策略配置。
+func loadBBRConfigFromContainer(c runtimecontract.Container) *bbr.Config {
+	cfg := bbr.DefaultConfig()
+
+	if c == nil || !c.IsBind("framework.config") {
+		return cfg
+	}
+
+	configAny, err := c.Make("framework.config")
+	if err != nil {
+		return cfg
+	}
+
+	type configGetter interface {
+		GetBool(key string) bool
+		GetString(key string) string
+		GetInt(key string) int
+		GetFloat64(key string) float64
+		Get(key string) any
+	}
+
+	getter, ok := configAny.(configGetter)
+	if !ok {
+		return cfg
+	}
+
+	// BBR 特定配置
+	if v := getter.GetFloat64("load_shedding.bbr.cpu_threshold"); v > 0 {
+		cfg.CPUThreshold = v
+	}
+	if v := getter.GetString("load_shedding.bbr.window_size"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.WindowSize = d
+		}
+	}
+	if v := getter.GetInt("load_shedding.bbr.bucket_count"); v > 0 {
+		cfg.BucketCount = v
+	}
+	if v := getter.GetString("load_shedding.bbr.cool_down"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.CoolDown = d
+		}
+	}
+	if v := getter.GetString("load_shedding.bbr.min_rt_threshold"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.MinRTThreshold = d
+		}
+	}
 
 	return cfg
 }

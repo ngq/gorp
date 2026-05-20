@@ -15,6 +15,7 @@ import (
 	configProvider "github.com/ngq/gorp/framework/provider/config"
 	cronProvider "github.com/ngq/gorp/framework/provider/cron"
 	ginProvider "github.com/ngq/gorp/framework/provider/gin"
+	healthProvider "github.com/ngq/gorp/framework/provider/health"
 	hostProvider "github.com/ngq/gorp/framework/provider/host"
 	logProvider "github.com/ngq/gorp/framework/provider/log"
 	gormProvider "github.com/ngq/gorp/framework/provider/orm/gorm"
@@ -86,8 +87,12 @@ func BusinessSimplificationProviders() []runtimecontract.ServiceProvider {
 }
 
 // DefaultCapabilityProviders returns the default non-foundation capability providers.
+// Includes health checker for aggregated health status reporting.
 //
 // DefaultCapabilityProviders 返回默认的非基础能力 provider 集合。
+// 包含健康检查器用于聚合健康状态报告。
 func DefaultCapabilityProviders() []runtimecontract.ServiceProvider {
-	return BusinessSimplificationProviders()
+	providers := BusinessSimplificationProviders()
+	providers = append(providers, healthProvider.NewProvider())
+	return providers
 }

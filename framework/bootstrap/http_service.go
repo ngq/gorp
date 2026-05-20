@@ -441,19 +441,33 @@ func AutoMigrateModels(rt *HTTPServiceRuntime, models ...any) error {
 }
 
 // RegisterHealthCheck registers the default health endpoint.
+// If HealthChecker is bound in container, uses aggregated health check.
+// Otherwise, falls back to simple health check.
 //
 // RegisterHealthCheck 注册默认健康检查端点。
+// 如果容器中绑定了 HealthChecker，使用聚合健康检查。
+// 否则回退到简单健康检查。
 func RegisterHealthCheck(router transportcontract.Router, serviceName string) {
 	if router == nil {
 		return
 	}
-	router.GET("/healthz", func(c transportcontract.Context) {
-		c.JSON(http.StatusOK, map[string]any{
-			"status":  "healthy",
-			"service": serviceName,
-			"version": "1.0.0",
-		})
-	})
+	// 使用简单健康检查（向后兼容）
+	// Use simple health check (backward compatible)
+	httpmiddleware.RegisterHealthEndpointsSimple(router, serviceName, "1.0.0")
+}
+
+// RegisterHealthCheckWithChecker registers health endpoints with HealthChecker.
+// Uses aggregated health check with dependency status.
+//
+// RegisterHealthCheckWithChecker 使用 HealthChecker 注册健康检查端点。
+// 使用聚合健康检查，包含依赖状态。
+func RegisterHealthCheckWithChecker(router transportcontract.Router, container runtimecontract.Container) {
+	if router == nil {
+		return
+	}
+	// 使用聚合健康检查
+	// Use aggregated health check
+	httpmiddleware.RegisterHealthEndpoints(router, container)
 }
 
 // RegisterMetricsEndpoint registers the default metrics endpoint.

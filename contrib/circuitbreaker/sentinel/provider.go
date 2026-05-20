@@ -1,7 +1,7 @@
 // Package sentinel provides Sentinel circuit breaker implementation for gorp.
 //
 // Sentinel 熔断降级 Provider，实现 resiliencecontract.CircuitBreaker 契约。
-// 支持熔断、限流、系统保护规则。
+// 支持熔断、隔离规则。
 //
 // 使用示例：
 //
@@ -22,6 +22,8 @@
 //  }
 //
 // 配置路径：circuitbreaker.sentinel.*
+//
+// 注意：此 Provider 仅提供熔断能力。限流能力由 framework/provider/ratelimiter 提供。
 package sentinel
 
 import (
@@ -48,7 +50,7 @@ var sentinelInitDefault = sentinel.InitDefault
 //
 // 中文说明：
 //   - 集成 Sentinel-golang；
-//   - 支持熔断、限流、系统保护；
+//   - 支持熔断、隔离规则；
 //   - 当前处于最小可验证治理闭环。
 //   - 当前状态：部分可用
 //   - 说明：已完成 P1 最小治理闭环，具备规则加载、状态记录与关键行为测试；
@@ -66,7 +68,7 @@ func (p *Provider) IsDefer() bool { return true }
 // Sentinel circuit breaker 依赖 Config 获取规则配置。
 func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey} }
 func (p *Provider) Provides() []string {
-	return []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}
+	return []string{resiliencecontract.CircuitBreakerKey}
 }
 
 func (p *Provider) Register(c runtimecontract.Container) error {
@@ -83,11 +85,6 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		cb := NewSentinelCircuitBreaker(cfg)
 		c.RegisterCloser(resiliencecontract.CircuitBreakerKey, cb)
 		return cb, nil
-	}, true)
-	c.Bind(resiliencecontract.RateLimiterKey, func(c runtimecontract.Container) (any, error) {
-		rl := NewSentinelRateLimiter(cfg)
-		c.RegisterCloser(resiliencecontract.RateLimiterKey, rl)
-		return rl, nil
 	}, true)
 	return nil
 }
@@ -363,85 +360,6 @@ func (cb *SentinelCircuitBreaker) Close() error {
 func (cb *SentinelCircuitBreaker) As(target any) bool {
 	return As(cb.Underlying(), target)
 }
-
-type SentinelRateLimiter struct {
-	cfg *resiliencecontract.CircuitBreakerConfig
-}
-
-func NewSentinelRateLimiter(cfg *resiliencecontract.CircuitBreakerConfig) *SentinelRateLimiter {
-	return &SentinelRateLimiter{cfg: cfg}
-}
-
-func (rl *SentinelRateLimiter) Allow(ctx context.Context, resource string) error {
-	entry, blockErr := sentinelEntry(resource)
-	if blockErr != nil {
-		return fmt.Errorf("circuitbreaker.sentinel: request blocked: %w", blockErr)
-	}
-	entry.Exit()
-	return nil
-}
-
-func (rl *SentinelRateLimiter) AllowN(ctx context.Context, resource string, n int) error {
-	for i := 0; i < n; i++ {
-		if err := rl.Allow(ctx, resource); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (rl *SentinelRateLimiter) Reserve(ctx context.Context, resource string) resiliencecontract.Reservation {
-	if err := rl.Allow(ctx, resource); err != nil {
-		return &sentinelReservation{ok: false}
-	}
-	return &sentinelReservation{ok: true}
-}
-
-func (rl *SentinelRateLimiter) Wait(ctx context.Context, resource string) error {
-	return rl.WaitTimeout(ctx, resource, 0)
-}
-
-func (rl *SentinelRateLimiter) WaitTimeout(ctx context.Context, resource string, timeout time.Duration) error {
-	if timeout <= 0 {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		return rl.Allow(ctx, resource)
-	}
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return rl.Allow(ctx, resource)
-	}
-}
-
-func (rl *SentinelRateLimiter) Underlying() any {
-	return sentinel.GlobalSlotChain()
-}
-
-func (rl *SentinelRateLimiter) As(target any) bool {
-	return As(rl.Underlying(), target)
-}
-
-// Close is a no-op for the rate limiter.
-// The underlying Sentinel engine is a global singleton managed by the Provider lifecycle.
-func (rl *SentinelRateLimiter) Close() error {
-	return nil
-}
-
-type sentinelReservation struct{ ok bool }
-
-func (r *sentinelReservation) OK() bool             { return r.ok }
-func (r *sentinelReservation) Delay() time.Duration { return 0 }
-func (r *sentinelReservation) Cancel()              {}
-func (r *sentinelReservation) CancelAt(time.Time)   {}
 
 // mapSentinelStrategy converts a string strategy name to the corresponding
 // sentinel Rule Strategy constant. Falls back to ErrorRatio for unknown values.

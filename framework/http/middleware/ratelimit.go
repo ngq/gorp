@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -30,6 +31,11 @@ type RateLimiter interface {
 // RateLimit applies a transport-level rate limiter and returns a unified 429 response when exceeded.
 //
 // RateLimit 应用 transport 层限流器，并在超限时返回统一的 429 响应。
+//
+// 使用方式：
+//
+//	limiter, _ := container.Make[resiliencecontract.RateLimiter](c, resiliencecontract.RateLimiterKey)
+//	router.Use(middleware.RateLimit(limiter, "api"))
 func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transportcontract.Middleware {
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
@@ -64,6 +70,77 @@ func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transpor
 				})
 				return
 			}
+			if next != nil {
+				next(c)
+			}
+		}
+	}
+}
+
+// RateLimitFromContainer 自动从容器获取限流器并应用限流中间件。
+// 无需手动从容器获取 limiter，直接使用即可。
+//
+// 使用方式：
+//
+//	router.Use(middleware.RateLimitFromContainer(container, "api"))
+//
+// 如果容器中未注册 RateLimiter，中间件会静默跳过（不报错）。
+func RateLimitFromContainer(container runtimecontract.Container, resource string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			// 从容器获取限流器
+			if container == nil || !container.IsBind(resiliencecontract.RateLimiterKey) {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			limiterAny, err := container.Make(resiliencecontract.RateLimiterKey)
+			if err != nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			limiter, ok := limiterAny.(resiliencecontract.RateLimiter)
+			if !ok || limiter == nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			// 获取限流目标
+			target := resource
+			if target == "" {
+				target = c.RoutePath()
+			}
+			if target == "" && c.Request() != nil && c.Request().URL != nil {
+				target = c.Request().Method + " " + c.Request().URL.Path
+			}
+
+			// 执行限流
+			if err := limiter.Allow(c, target); err != nil {
+				if gc, ok := unwrapGinContext(c); ok {
+					writeGinResponseHeaders(gc)
+					resp := Response{
+						Code:    CodeTooManyRequests,
+						Message: "rate limit exceeded",
+						Data:    nil,
+					}
+					gc.JSON(http.StatusTooManyRequests, resp)
+					gc.Abort()
+					return
+				}
+				c.JSON(http.StatusTooManyRequests, map[string]any{
+					"code":    CodeTooManyRequests,
+					"message": "rate limit exceeded",
+				})
+				return
+			}
+
 			if next != nil {
 				next(c)
 			}

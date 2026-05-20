@@ -96,6 +96,10 @@ func (l *ConcurrencyLimiter) release() {
 //
 // LoadShedding 在并发已满时立即拒绝请求。
 // 优先使用容器中的 LoadShedder 契约实现；若容器不可用则回退到本地 ConcurrencyLimiter。
+//
+// 使用方式：
+//
+//	router.Use(middleware.LoadShedding(500))  // 最大并发 500
 func LoadShedding(maxConcurrent int) transportcontract.Middleware {
 	limiter := NewConcurrencyLimiter(maxConcurrent)
 	return func(next transportcontract.Handler) transportcontract.Handler {
@@ -126,6 +130,64 @@ func LoadShedding(maxConcurrent int) transportcontract.Middleware {
 				return
 			}
 			defer limiter.release()
+
+			if next != nil {
+				next(c)
+			}
+		}
+	}
+}
+
+// LoadSheddingFromContainer 自动从容器获取过载保护器并应用过载保护中间件。
+// 无需手动从容器获取 shedder，直接使用即可。
+//
+// 使用方式：
+//
+//	router.Use(middleware.LoadSheddingFromContainer(container, "api"))
+//
+// 如果容器中未注册 LoadShedder，中间件会静默跳过（不报错）。
+func LoadSheddingFromContainer(container runtimecontract.Container, resource string) transportcontract.Middleware {
+	return func(next transportcontract.Handler) transportcontract.Handler {
+		return func(c transportcontract.Context) {
+			// 从容器获取过载保护器
+			if container == nil || !container.IsBind(resiliencecontract.LoadShedderKey) {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			shedderAny, err := container.Make(resiliencecontract.LoadShedderKey)
+			if err != nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			shedder, ok := shedderAny.(resiliencecontract.LoadShedder)
+			if !ok || shedder == nil {
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+
+			// 获取资源名称
+			target := resource
+			if target == "" {
+				target = c.RoutePath()
+			}
+			if target == "" && c.Request() != nil && c.Request().URL != nil {
+				target = c.Request().Method + " " + c.Request().URL.Path
+			}
+
+			// 执行过载保护
+			if err := shedder.Allow(c, target); err != nil {
+				respondServiceBusy(c, "server is busy")
+				return
+			}
+			defer shedder.Done(c, target, nil)
 
 			if next != nil {
 				next(c)
