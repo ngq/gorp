@@ -4,6 +4,13 @@ go 1.25
 
 require (
 	{{.FrameworkModule}} {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/circuitbreaker/sentinel {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/configsource/etcd {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/dlock/redis {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/dtm/dtmsdk {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/registry/etcd {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/serviceauth/token {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/tracing/otel {{.FrameworkVersion}}
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/wire v0.6.0
 	github.com/stretchr/testify v1.9.0
