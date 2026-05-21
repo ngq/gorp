@@ -23,6 +23,9 @@ var newOfflineWithDB bool
 var newOfflineWithSwagger bool
 var newOfflineFrameworkVersion string
 var newOfflineHTTP string
+var newOfflineLocalDev bool
+
+const defaultFrameworkVersion = "v0.1.0"
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)
@@ -53,18 +56,24 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	}
 
 	// 中文说明：
-	// - 如果用户指定了 --framework-version，则使用 GitHub 版本，不需要 replace；
-	// - 否则使用本地 replace 模式，询问框架源码路径。
-	needFrameworkPath := newOfflineFrameworkVersion == ""
+	// - 默认不生成 replace，go.mod 直接引用 GitHub 发布的框架模块；
+	// - 如果用户指定了 --framework-version，使用指定版本；
+	// - 如果用户指定了 --local，进入本地开发模式，使用 replace 指向本地框架源码路径。
+	needFrameworkPath := newOfflineLocalDev
 	project, name, err := promptProjectInput(in, cmd.OutOrStdout(), frameworkDefault, needFrameworkPath)
 	if err != nil {
 		return err
 	}
 
-	// 如果指定了版本，覆盖默认的版本和路径
-	if newOfflineFrameworkVersion != "" {
-		project.FrameworkVersion = newOfflineFrameworkVersion
-		project.FrameworkPath = "" // 清空路径，不生成 replace
+	// 确定框架版本：优先使用 --framework-version，否则用默认版本
+	fwVersion := newOfflineFrameworkVersion
+	if fwVersion == "" {
+		fwVersion = defaultFrameworkVersion
+	}
+	project.FrameworkVersion = fwVersion
+	// 非本地开发模式下清空 path，确保不生成 replace
+	if !newOfflineLocalDev {
+		project.FrameworkPath = ""
 	}
 	if newOfflineBackend == "" {
 		newOfflineBackend = string(datacontract.RuntimeBackendGorm)
@@ -116,7 +125,8 @@ func init() {
 	newCmd.Flags().StringVar(&newOfflineBackend, "backend", string(datacontract.RuntimeBackendGorm), "starter backend: gorm|ent")
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
-	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), if set, no replace directive will be generated")
+	newCmd.Flags().BoolVar(&newOfflineLocalDev, "local", false, "use local framework path with replace directive for development")
+	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), default "+defaultFrameworkVersion)
 	newCmd.Flags().StringVar(&newOfflineHTTP, "http", "", "HTTP mode: contract (default), gin")
 }
 
