@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	github.com/alibaba/sentinel-golang v1.0.4
-	github.com/ngq/gorp v0.0.0
+	github.com/ngq/gorp v0.1.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -28,5 +28,3 @@ require (
 	golang.org/x/text v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/ngq/gorp => ../../..

@@ -2,6 +2,5 @@ module github.com/ngq/gorp/contrib/configsource/etcd
 
 go 1.25.8
 
-require github.com/ngq/gorp v0.0.0
+require github.com/ngq/gorp v0.1.1
 
-replace github.com/ngq/gorp => ../../..

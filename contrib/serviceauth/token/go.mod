@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/ngq/gorp v0.0.0
+	github.com/ngq/gorp v0.1.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -28,4 +28,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/ngq/gorp => ../../..
