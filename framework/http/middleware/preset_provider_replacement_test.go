@@ -23,7 +23,7 @@ func TestGovernancePresetProviderReplacementChangesRuntimeBehavior(t *testing.T)
 	gin.SetMode(gin.TestMode)
 
 	// 场景 1：使用开放熔断器的治理集 → 请求被 503 拒绝
-	openBreakerRouter := gin.New()
+	openBreakerRouter := NewTestEngine()
 	applyTransportMiddleware(openBreakerRouter, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
 		API: RecommendedMiddlewareOptions{
 			DisableLocale:          true,
@@ -44,7 +44,7 @@ func TestGovernancePresetProviderReplacementChangesRuntimeBehavior(t *testing.T)
 	}
 
 	// 场景 2：使用允许通过的熔断器 → 请求正常 200
-	allowBreakerRouter := gin.New()
+	allowBreakerRouter := NewTestEngine()
 	applyTransportMiddleware(allowBreakerRouter, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
 		API: RecommendedMiddlewareOptions{
 			DisableLocale:          true,
@@ -65,7 +65,7 @@ func TestGovernancePresetProviderReplacementChangesRuntimeBehavior(t *testing.T)
 	}
 
 	// 场景 3：不提供熔断器（等效于替换为 noop）→ 请求正常 200
-	noBreakerRouter := gin.New()
+	noBreakerRouter := NewTestEngine()
 	applyTransportMiddleware(noBreakerRouter, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
 		API: RecommendedMiddlewareOptions{
 			DisableLocale:          true,

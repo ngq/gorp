@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -149,7 +150,7 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 	token, err := jwtSvc.Sign(claims)
 	require.NoError(t, err)
 
-	r := gin.New()
+	r := ginprovider.NewTestEngine()
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
@@ -191,7 +192,7 @@ func TestAuthMiddlewareRejectsMissingToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
-	r := gin.New()
+	r := ginprovider.NewTestEngine()
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
@@ -219,7 +220,7 @@ func TestAuthMiddlewareRejectsInvalidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
-	r := gin.New()
+	r := ginprovider.NewTestEngine()
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
@@ -251,7 +252,7 @@ func TestAuthMiddlewareRejectsWrongSubjectType(t *testing.T) {
 	token, err := jwtSvc.Sign(claims)
 	require.NoError(t, err)
 
-	r := gin.New()
+	r := ginprovider.NewTestEngine()
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := AuthMiddleware(jwtSvc, "customer")(func(inner transportcontract.Context) {
@@ -280,7 +281,7 @@ func TestAuthMiddlewareWithSkipPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtSvc := NewJWTService("secret", "issuer", "aud")
 
-	r := gin.New()
+	r := ginprovider.NewTestEngine()
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := AuthMiddleware(jwtSvc, "customer", WithSkipPaths("/health", "/login"))(func(inner transportcontract.Context) {
@@ -335,7 +336,7 @@ func TestAuthMiddlewareWithRequiredRoles(t *testing.T) {
 	userToken, err := jwtSvc.Sign(userClaims)
 	require.NoError(t, err)
 
-	r := gin.New()
+	r := ginprovider.NewTestEngine()
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := AuthMiddleware(jwtSvc, "user", WithRequiredRoles("admin"))(func(inner transportcontract.Context) {

@@ -164,6 +164,7 @@ func TestMetadataMiddlewareExtractsIntoContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	propagator := testMetadataPropagator{}
 	r := gin.New()
+	r.ContextWithFallback = true
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := MetadataMiddleware(propagator)(func(inner transportcontract.Context) {

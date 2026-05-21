@@ -21,7 +21,7 @@ import (
 func TestAuthorizationMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	unauthorizedRouter := gin.New()
+	unauthorizedRouter := NewTestEngine()
 	applyTransportMiddleware(unauthorizedRouter, RequireAuthorization())
 	unauthorizedRouter.GET("/secure", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -35,7 +35,7 @@ func TestAuthorizationMiddleware(t *testing.T) {
 		t.Fatalf("expected 401, got %d", unauthorizedRecorder.Code)
 	}
 
-	roleRouter := gin.New()
+	roleRouter := NewTestEngine()
 	applyTransportMiddleware(roleRouter, func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
 			claims := &securitycontract.JWTClaims{
@@ -69,7 +69,7 @@ func TestAuthorizationMiddleware(t *testing.T) {
 		t.Fatalf("expected authorized request 204, got %d", roleRecorder.Code)
 	}
 
-	forbiddenRouter := gin.New()
+	forbiddenRouter := NewTestEngine()
 	applyTransportMiddleware(forbiddenRouter, func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
 			claims := &securitycontract.JWTClaims{
@@ -110,7 +110,7 @@ func TestAuthorizationMiddleware(t *testing.T) {
 func TestLoggingMiddlewareWritesAccessLogWithRequestIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger := newStubLogger()
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, RequestIdentity(), LoggingMiddleware(logger))
 	router.GET("/logs/:id", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)

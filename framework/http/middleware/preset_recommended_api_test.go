@@ -18,7 +18,7 @@ import (
 // TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders 验证默认对外 API 预设行为。
 func TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, RecommendedAPIMiddlewareSet(nil, RecommendedMiddlewareOptions{})...)
 	router.GET("/orders/:id", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -54,7 +54,7 @@ func TestRecommendedAPIMiddlewareSetAppliesDefaultHeaders(t *testing.T) {
 // TestRecommendedAPIMiddlewareSetEnablesConfiguredCORS 验证推荐 API 预设中显式启用 CORS 的行为。
 func TestRecommendedAPIMiddlewareSetEnablesConfiguredCORS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	options := RecommendedMiddlewareOptions{
 		CORS: func() *CORSOptions {
 			opts := DefaultCORSOptions()

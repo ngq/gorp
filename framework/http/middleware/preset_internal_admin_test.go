@@ -18,7 +18,7 @@ import (
 // TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults 验证内网预设会关闭面向公网的默认能力。
 func TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, InternalAPIMiddlewareSet(nil, InternalMiddlewareOptions{})...)
 	router.GET("/internal/ping", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -51,7 +51,7 @@ func TestInternalAPIMiddlewareSetDisablesPublicFacingDefaults(t *testing.T) {
 // TestAdminAPIMiddlewareSetRequiresAuthorizationByDefault 验证管理预设的默认鉴权行为。
 func TestAdminAPIMiddlewareSetRequiresAuthorizationByDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, AdminAPIMiddlewareSet(nil, AdminMiddlewareOptions{})...)
 	router.GET("/admin/panel", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)

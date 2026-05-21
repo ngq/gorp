@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +37,7 @@ func TestRegisterGovernanceInspectEndpointsUsesGET(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsServesSummaryJSON(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode:               resiliencecontract.GovernanceModeMicro,
@@ -68,7 +69,7 @@ func TestRegisterGovernanceInspectEndpointsServesSummaryJSON(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsServesDiagnosticText(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode:            resiliencecontract.GovernanceModeMicro,
@@ -125,7 +126,7 @@ func TestRegisterGovernanceInspectEndpointsServesDiagnosticText(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsSupportsBriefView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode:               resiliencecontract.GovernanceModeMicro,
@@ -155,7 +156,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsBriefView(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsSupportsProvidersView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode: resiliencecontract.GovernanceModeMicro,
@@ -187,7 +188,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsProvidersView(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsSupportsFeaturesView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode: resiliencecontract.GovernanceModeMono,
@@ -212,7 +213,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsFeaturesView(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsSupportsConfigView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode:       resiliencecontract.GovernanceModeMicro,
@@ -241,7 +242,7 @@ func TestRegisterGovernanceInspectEndpointsSupportsConfigView(t *testing.T) {
 
 func TestRegisterGovernanceInspectEndpointsSupportsFullView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 	summary := GovernanceSummary{
 		Mode:            resiliencecontract.GovernanceModeMicro,

@@ -47,7 +47,7 @@ func TestHealthCheckHandler_Healthy(t *testing.T) {
 		},
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/healthz", func(c *gin.Context) {
 		HealthCheckHandler(checker)(newContext(c))
 	})
@@ -82,7 +82,7 @@ func TestHealthCheckHandler_Unhealthy(t *testing.T) {
 		},
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/healthz", func(c *gin.Context) {
 		HealthCheckHandler(checker)(newContext(c))
 	})
@@ -98,7 +98,7 @@ func TestHealthCheckHandler_Unhealthy(t *testing.T) {
 
 // TestHealthCheckHandler_NilChecker 测试 nil checker 返回 503
 func TestHealthCheckHandler_NilChecker(t *testing.T) {
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/healthz", func(c *gin.Context) {
 		HealthCheckHandler(nil)(newContext(c))
 	})
@@ -123,7 +123,7 @@ func TestReadinessHandler_Healthy(t *testing.T) {
 		},
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/readyz", func(c *gin.Context) {
 		ReadinessHandler(checker)(newContext(c))
 	})
@@ -157,7 +157,7 @@ func TestReadinessHandler_Degraded(t *testing.T) {
 		},
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/readyz", func(c *gin.Context) {
 		ReadinessHandler(checker)(newContext(c))
 	})
@@ -173,7 +173,7 @@ func TestReadinessHandler_Degraded(t *testing.T) {
 
 // TestLivenessHandler 测试存活检查返回 200
 func TestLivenessHandler(t *testing.T) {
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/livez", func(c *gin.Context) {
 		LivenessHandler()(newContext(c))
 	})
@@ -228,14 +228,14 @@ func (m *mockRouter) GET(path string, handler transportcontract.Handler) {
 	m.routes[path] = handler
 }
 
-func (m *mockRouter) POST(path string, handler transportcontract.Handler) {}
-func (m *mockRouter) PUT(path string, handler transportcontract.Handler)  {}
-func (m *mockRouter) DELETE(path string, handler transportcontract.Handler) {}
-func (m *mockRouter) PATCH(path string, handler transportcontract.Handler) {}
+func (m *mockRouter) POST(path string, handler transportcontract.Handler)    {}
+func (m *mockRouter) PUT(path string, handler transportcontract.Handler)     {}
+func (m *mockRouter) DELETE(path string, handler transportcontract.Handler)  {}
+func (m *mockRouter) PATCH(path string, handler transportcontract.Handler)   {}
 func (m *mockRouter) OPTIONS(path string, handler transportcontract.Handler) {}
-func (m *mockRouter) HEAD(path string, handler transportcontract.Handler)  {}
-func (m *mockRouter) ANY(path string, handler transportcontract.Handler)   {}
-func (m *mockRouter) Use(middleware ...transportcontract.Middleware)       {}
+func (m *mockRouter) HEAD(path string, handler transportcontract.Handler)    {}
+func (m *mockRouter) ANY(path string, handler transportcontract.Handler)     {}
+func (m *mockRouter) Use(middleware ...transportcontract.Middleware)         {}
 func (m *mockRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return m
 }
@@ -246,6 +246,6 @@ func (m *mockRouter) Handle(method, path string, handler transportcontract.Handl
 func (m *mockRouter) HandleFunc(method, path string, handler transportcontract.Handler) {
 	m.GET(path, handler)
 }
-func (m *mockRouter) Static(relativePath, root string)          {}
-func (m *mockRouter) StaticFile(relativePath, filepath string) {}
+func (m *mockRouter) Static(relativePath, root string)                 {}
+func (m *mockRouter) StaticFile(relativePath, filepath string)         {}
 func (m *mockRouter) StaticFS(relativePath string, fs http.FileSystem) {}

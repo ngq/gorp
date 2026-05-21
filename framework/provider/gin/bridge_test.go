@@ -26,7 +26,7 @@ import (
 // - RequestIdentity 写入的 request ID 在后续 Gin middleware 中可见。
 func TestAdaptMiddlewarePreservesRequestIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := NewTestEngine()
 
 	// 挂载 RequestIdentity middleware 通过 AdaptMiddleware
 	engine.Use(AdaptMiddleware(httpmiddleware.RequestIdentity()))
@@ -59,7 +59,7 @@ func TestAdaptMiddlewarePreservesRequestIdentity(t *testing.T) {
 // - RequestIdentity 设置的 trace ID 可在后续 Gin middleware 中通过 context 查到。
 func TestAdaptMiddlewareSyncsContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := NewTestEngine()
 
 	engine.Use(AdaptMiddleware(httpmiddleware.RequestIdentity()))
 
@@ -90,7 +90,7 @@ func TestAdaptMiddlewareSyncsContext(t *testing.T) {
 // - NativeEngine 从实现了 GINEngineProvider 的 service 中提取 *gin.Engine。
 func TestNativeEngineFromHTTPService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := NewTestEngine()
 	svc := &service{
 		engine: engine,
 		router: newRouter(&engine.RouterGroup),
@@ -124,7 +124,7 @@ func TestNativeEngineFromNonGinService(t *testing.T) {
 // - NativeRouterGroup 从 service 中提取原生路由组，供高级用户直接操作。
 func TestNativeRouterGroupFromHTTPService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := NewTestEngine()
 	svc := &service{
 		engine: engine,
 		router: newRouter(&engine.RouterGroup),
@@ -146,7 +146,7 @@ func TestNativeRouterGroupFromHTTPService(t *testing.T) {
 // - 执行顺序为：原生 Gin middleware → 框架抽象 middleware → handler。
 func TestMixedGinAndAbstractMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := NewTestEngine()
 
 	var order []string
 

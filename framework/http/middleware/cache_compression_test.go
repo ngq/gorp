@@ -18,7 +18,7 @@ import (
 // TestCacheControlWritesHeader 验证固定 Cache-Control 头输出。
 func TestCacheControlWritesHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, CacheControl("public, max-age=60"))
 	router.GET("/cache", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
@@ -38,7 +38,7 @@ func TestCacheControlWritesHeader(t *testing.T) {
 // TestETagWritesHeaderAndReturnsNotModifiedOnMatch 验证 ETag 生成与条件 304 响应。
 func TestETagWritesHeaderAndReturnsNotModifiedOnMatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, ETag())
 	router.GET("/etag", func(c *gin.Context) {
 		c.String(http.StatusOK, "payload")

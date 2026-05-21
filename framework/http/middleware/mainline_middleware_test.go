@@ -84,7 +84,7 @@ func applyTransportMiddleware(router *gin.Engine, middleware ...transportcontrac
 // TestTimeoutUsesUnifiedResponse 验证超时中间件会输出统一的超时响应。
 func TestTimeoutUsesUnifiedResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, Timeout(10*time.Millisecond))
 	router.GET("/slow", func(c *gin.Context) {
 		time.Sleep(50 * time.Millisecond)
@@ -112,7 +112,7 @@ func TestTimeoutUsesUnifiedResponse(t *testing.T) {
 // TestTimeoutNoopWhenDisabled 验证禁用超时后中间件不会改变请求流程。
 func TestTimeoutNoopWhenDisabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, Timeout(0))
 	router.GET("/fast", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -132,7 +132,7 @@ func TestTimeoutNoopWhenDisabled(t *testing.T) {
 // TestRateLimitUsesUnifiedResponse 验证限流中间件会返回统一的 429 响应。
 func TestRateLimitUsesUnifiedResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, RateLimit(denyContractLimiter{}, ""))
 	router.GET("/demo", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -160,7 +160,7 @@ func TestRateLimitUsesUnifiedResponse(t *testing.T) {
 // TestRateLimitUsesRoutePathAsResource 验证限流资源优先使用路由模板。
 func TestRateLimitUsesRoutePathAsResource(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	limiter := &captureLimiter{}
 	applyTransportMiddleware(router, RateLimit(limiter, ""))
 	router.GET("/orders/:id", func(c *gin.Context) {
@@ -181,7 +181,7 @@ func TestRateLimitUsesRoutePathAsResource(t *testing.T) {
 // TestRateLimitFallsBackToMethodAndURLPath 验证在没有路由模板时的资源回退键。
 func TestRateLimitFallsBackToMethodAndURLPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	limiter := &captureLimiter{}
 	applyTransportMiddleware(router, RateLimit(limiter, ""))
 	router.NoRoute(func(c *gin.Context) {
@@ -202,7 +202,7 @@ func TestRateLimitFallsBackToMethodAndURLPath(t *testing.T) {
 // TestIdempotencyCachesStatus 验证成功写请求会按状态码被回放。
 func TestIdempotencyCachesStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	store := NewMemoryIdempotencyStore()
 	hits := 0
 	applyTransportMiddleware(router, Idempotency(store, time.Minute))
@@ -234,7 +234,7 @@ func TestIdempotencyCachesStatus(t *testing.T) {
 // TestIdempotencyReplaysHeadersAndJSONBody 验证幂等回放会保留响应头和 JSON 响应体。
 func TestIdempotencyReplaysHeadersAndJSONBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	store := NewMemoryIdempotencyStore()
 	hits := 0
 	applyTransportMiddleware(router, Idempotency(store, time.Minute))
@@ -273,7 +273,7 @@ func TestIdempotencyReplaysHeadersAndJSONBody(t *testing.T) {
 // TestIdempotencyDoesNotCacheFailedResponse 验证失败响应不会被缓存回放。
 func TestIdempotencyDoesNotCacheFailedResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	store := NewMemoryIdempotencyStore()
 	hits := 0
 	applyTransportMiddleware(router, Idempotency(store, time.Minute))
@@ -310,7 +310,7 @@ func TestIdempotencyDoesNotCacheFailedResponse(t *testing.T) {
 // TestIdempotencySkipsCacheForUnsupportedMethod 验证不支持的方法会绕过幂等缓存。
 func TestIdempotencySkipsCacheForUnsupportedMethod(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	store := NewMemoryIdempotencyStore()
 	hits := 0
 	applyTransportMiddleware(router, Idempotency(store, time.Minute))

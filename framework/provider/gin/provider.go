@@ -105,6 +105,15 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		// Gin HTTP mode now has same governance auto-mount behavior as contract mode
 		// Users can disable via config or code if needed
 		engine := gin.New()
+		// Enable ContextWithFallback to allow gin.Context.Value() to delegate to
+		// Request.Context().Value() for non-string keys. This is required for
+		// proper context.Context value propagation when ginContext is used as
+		// a parent in context.WithValue chains.
+		//
+		// 启用 ContextWithFallback 以允许 gin.Context.Value() 委托到
+		// Request.Context().Value() 处理非字符串 key。当 ginContext 作为
+		// context.WithValue 链中的父 context 时，这是正确传播值的必要设置。
+		engine.ContextWithFallback = true
 		engine.Use(injectRequestContainer(c))
 		engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(getLogger(c))))
 		attachHTTPTransportMiddleware(engine, c)

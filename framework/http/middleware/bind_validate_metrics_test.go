@@ -23,7 +23,7 @@ import (
 // TestBindAndValidateJSONStoresValidatedBody 验证成功校验后会把已校验对象写入请求上下文。
 func TestBindAndValidateJSONStoresValidatedBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	validator := &stubValidator{
 		validateFn: func(ctx context.Context, obj any) error {
 			input, ok := obj.(*struct {
@@ -73,7 +73,7 @@ func TestBindAndValidateJSONStoresValidatedBody(t *testing.T) {
 // TestBindAndValidateJSONReturnsUnifiedError 验证统一校验错误输出与详情透传。
 func TestBindAndValidateJSONReturnsUnifiedError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	validator := &stubValidator{
 		validateFn: func(context.Context, any) error {
 			return resiliencecontract.BadRequest(
@@ -124,7 +124,7 @@ func TestMetricsMiddlewareRecordsRequestCount(t *testing.T) {
 	}
 	beforeCount := counterValue("gorp_http_requests_total", labels)
 
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, MetricsMiddleware())
 	router.GET("/metrics/:id", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)

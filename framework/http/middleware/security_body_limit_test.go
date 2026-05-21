@@ -23,7 +23,7 @@ import (
 func TestSecurityHeadersWritesDefaultsAndCustomValues(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	defaultRouter := gin.New()
+	defaultRouter := NewTestEngine()
 	applyTransportMiddleware(defaultRouter, SecurityHeaders(SecurityHeadersOptions{}))
 	defaultRouter.GET("/headers", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -43,7 +43,7 @@ func TestSecurityHeadersWritesDefaultsAndCustomValues(t *testing.T) {
 		t.Fatalf("unexpected Referrer-Policy %q", defaultRecorder.Header().Get("Referrer-Policy"))
 	}
 
-	customRouter := gin.New()
+	customRouter := NewTestEngine()
 	applyTransportMiddleware(customRouter, SecurityHeaders(SecurityHeadersOptions{
 		ContentSecurityPolicy: "default-src 'self'",
 		PermissionsPolicy:     "geolocation=()",
@@ -69,7 +69,7 @@ func TestSecurityHeadersWritesDefaultsAndCustomValues(t *testing.T) {
 // TestCompressionCompressesWhenAccepted 验证对声明支持 gzip 的客户端进行压缩。
 func TestCompressionCompressesWhenAccepted(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, Compression())
 	router.GET("/gzip", func(c *gin.Context) {
 		c.String(http.StatusOK, "payload")
@@ -107,7 +107,7 @@ func TestCompressionCompressesWhenAccepted(t *testing.T) {
 // TestCompressionSkipsWhenNotAccepted 验证客户端不接受 gzip 时会跳过压缩。
 func TestCompressionSkipsWhenNotAccepted(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, Compression())
 	router.GET("/plain", func(c *gin.Context) {
 		c.String(http.StatusOK, "payload")
@@ -130,7 +130,7 @@ func TestCompressionSkipsWhenNotAccepted(t *testing.T) {
 // TestBodyLimitAllowsSmallBodyAndRejectsLargeBody 验证请求体大小护栏对小包与超大包的处理。
 func TestBodyLimitAllowsSmallBodyAndRejectsLargeBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, BodyLimit(4))
 	router.POST("/upload", func(c *gin.Context) {
 		body, err := io.ReadAll(c.Request.Body)
@@ -166,7 +166,7 @@ func TestBodyLimitAllowsSmallBodyAndRejectsLargeBody(t *testing.T) {
 // TestSelectorWhenAppliesOnlyOnMatchedRoutes 验证基于谓词的中间件选择行为。
 func TestSelectorWhenAppliesOnlyOnMatchedRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, When(MatchPrefix("/admin"), SecurityHeaders(SecurityHeadersOptions{
 		XFrameOptions: "SAMEORIGIN",
 	})))

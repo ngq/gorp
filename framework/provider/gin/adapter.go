@@ -14,6 +14,25 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+// NewTestEngine creates a gin.Engine configured for testing with ContextWithFallback enabled.
+// This ensures gin.Context.Value() properly delegates to Request.Context().Value() for
+// non-string keys, which is required for context.Context value propagation.
+//
+// NewTestEngine 创建用于测试的 gin.Engine，启用 ContextWithFallback。
+// 确保 gin.Context.Value() 正确委托到 Request.Context().Value() 处理非字符串 key，
+// 这是 context.Context 值传播的必要设置。
+//
+// Example:
+//
+//	engine := NewTestEngine()
+//	engine.Use(YourMiddleware())
+//	engine.GET("/test", handler)
+func NewTestEngine() *gin.Engine {
+	engine := gin.New()
+	engine.ContextWithFallback = true
+	return engine
+}
+
 // AdaptMiddleware adapts a framework Middleware into a Gin.HandlerFunc.
 // This allows gorp governance middleware to be used directly on *gin.Engine or *gin.RouterGroup.
 //

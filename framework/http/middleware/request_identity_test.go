@@ -19,7 +19,7 @@ import (
 // TestRequestIdentityInjectsHeadersAndContext 验证请求标识的自动生成与传播。
 func TestRequestIdentityInjectsHeadersAndContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, RequestIdentity())
 	router.GET("/identity", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -51,7 +51,7 @@ func TestRequestIdentityInjectsHeadersAndContext(t *testing.T) {
 // TestRequestIdentityReusesProvidedHeaders 验证传入的 request id 与 trace id 会被保留。
 func TestRequestIdentityReusesProvidedHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, RequestIdentity())
 	router.GET("/identity", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)

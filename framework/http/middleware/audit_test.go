@@ -21,7 +21,7 @@ import (
 func TestAuditMiddlewareWritesActorAndOutcomeFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger := newStubLogger()
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router,
 		RequestIdentity(),
 		Locale(DefaultLocaleOptions()),

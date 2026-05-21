@@ -21,7 +21,7 @@ import (
 // TestLoadSheddingRejectsWhenConcurrentSlotsAreFull 验证无可用并发槽位时会快速失败。
 func TestLoadSheddingRejectsWhenConcurrentSlotsAreFull(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, LoadShedding(1))
 
 	started := make(chan struct{})
@@ -62,7 +62,7 @@ func TestLoadSheddingRejectsWhenConcurrentSlotsAreFull(t *testing.T) {
 // TestConcurrencyLimitWaitsForSlotWithinTimeout 验证会在配置的超时预算内等待空闲槽位。
 func TestConcurrencyLimitWaitsForSlotWithinTimeout(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router, ConcurrencyLimit(1, 100*time.Millisecond))
 
 	started := make(chan struct{})
@@ -113,7 +113,7 @@ func TestConcurrencyLimitWaitsForSlotWithinTimeout(t *testing.T) {
 // TestCircuitBreakerRejectsWhenOpen 验证熔断器打开时会返回统一的服务不可用响应。
 func TestCircuitBreakerRejectsWhenOpen(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	breaker := &stubCircuitBreaker{allowErr: errors.New("open")}
 	applyTransportMiddleware(router, CircuitBreaker(breaker, ""))
 	router.GET("/orders/:id", func(c *gin.Context) {
@@ -135,7 +135,7 @@ func TestCircuitBreakerRejectsWhenOpen(t *testing.T) {
 func TestCircuitBreakerRecordsSuccessAndFailureWithRouteResource(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	successBreaker := &stubCircuitBreaker{}
-	successRouter := gin.New()
+	successRouter := NewTestEngine()
 	applyTransportMiddleware(successRouter, CircuitBreaker(successBreaker, ""))
 	successRouter.GET("/orders/:id", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -153,7 +153,7 @@ func TestCircuitBreakerRecordsSuccessAndFailureWithRouteResource(t *testing.T) {
 	}
 
 	failureBreaker := &stubCircuitBreaker{}
-	failureRouter := gin.New()
+	failureRouter := NewTestEngine()
 	applyTransportMiddleware(failureRouter, CircuitBreaker(failureBreaker, ""))
 	failureRouter.GET("/orders/:id", func(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)

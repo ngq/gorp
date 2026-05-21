@@ -21,7 +21,7 @@ import (
 func TestIPAllowlistAndDenylist(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	allowRouter := gin.New()
+	allowRouter := NewTestEngine()
 	applyTransportMiddleware(allowRouter, IPAllowlist("10.0.0.0/8"))
 	allowRouter.GET("/admin", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -36,7 +36,7 @@ func TestIPAllowlistAndDenylist(t *testing.T) {
 		t.Fatalf("expected allowlist request 204, got %d", allowRecorder.Code)
 	}
 
-	denyRouter := gin.New()
+	denyRouter := NewTestEngine()
 	applyTransportMiddleware(denyRouter, IPDenylist("10.0.0.0/8"))
 	denyRouter.GET("/admin", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -62,7 +62,7 @@ func TestIPAllowlistWithTrustedProxies(t *testing.T) {
 	SetTrustedProxies([]string{"127.0.0.1"})
 	defer SetTrustedProxies(nil)
 
-	allowRouter := gin.New()
+	allowRouter := NewTestEngine()
 	applyTransportMiddleware(allowRouter, IPAllowlist("10.0.0.0/8"))
 	allowRouter.GET("/admin", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -88,7 +88,7 @@ func TestIPAllowlistRejectsSpoofedXFF(t *testing.T) {
 	// No trusted proxies configured — XFF should be ignored
 	// 未配置可信代理——XFF 应被忽略
 
-	allowRouter := gin.New()
+	allowRouter := NewTestEngine()
 	applyTransportMiddleware(allowRouter, IPAllowlist("10.0.0.0/8"))
 	allowRouter.GET("/admin", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -115,7 +115,7 @@ func TestIPAllowlistRejectsSpoofedXFF(t *testing.T) {
 func TestLocaleUsesQueryThenHeaderThenDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	queryRouter := gin.New()
+	queryRouter := NewTestEngine()
 	applyTransportMiddleware(queryRouter, Locale(DefaultLocaleOptions()))
 	queryRouter.GET("/locale", func(c *gin.Context) {
 		c.String(http.StatusOK, GetLocale(c))

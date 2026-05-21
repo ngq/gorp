@@ -22,7 +22,7 @@ import (
 func TestRecoveryMiddlewareRecoversAndLogsPanic(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger := newStubLogger()
-	router := gin.New()
+	router := NewTestEngine()
 	applyTransportMiddleware(router,
 		func(next transportcontract.Handler) transportcontract.Handler {
 			return func(c transportcontract.Context) {

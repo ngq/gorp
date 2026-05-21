@@ -190,7 +190,7 @@ func TestValidateBodyMiddleware_Success(t *testing.T) {
 		Email string `json:"email" validate:"required,email"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/users", ValidateBodyMiddleware(svc, &CreateUserReq{}), func(c *gin.Context) {
 		// 从上下文获取已校验对象
 		validatedBody, ok := supportcontract.FromValidatedBodyContext(c.Request.Context())
@@ -236,7 +236,7 @@ func TestValidateBodyMiddleware_ValidationFail(t *testing.T) {
 		Email string `json:"email" validate:"required,email"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/users", ValidateBodyMiddleware(svc, &CreateUserReq{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "should not reach here")
 	})
@@ -284,7 +284,7 @@ func TestValidateBodyMiddleware_InvalidJSON(t *testing.T) {
 		Name string `json:"name" validate:"required"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/users", ValidateBodyMiddleware(svc, &CreateUserReq{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "should not reach here")
 	})
@@ -341,7 +341,7 @@ func TestValidateQueryMiddleware_Success(t *testing.T) {
 		Size int `form:"size" validate:"required,gte=1,lte=100"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/items", ValidateQueryMiddleware(svc, &ListReq{}), func(c *gin.Context) {
 		validatedBody, ok := supportcontract.FromValidatedBodyContext(c.Request.Context())
 		if !ok {
@@ -382,7 +382,7 @@ func TestValidateQueryMiddleware_ValidationFail(t *testing.T) {
 		Size int `form:"size" validate:"required,gte=1,lte=100"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/items", ValidateQueryMiddleware(svc, &ListReq{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "should not reach here")
 	})
@@ -418,7 +418,7 @@ func TestBindAndValidateQueryStoresValidatedBody(t *testing.T) {
 		validateFn: func(ctx context.Context, obj any) error { return nil },
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.GET("/search", func(c *gin.Context) {
 		httpCtx := newContext(c)
 		input := &struct {
@@ -469,7 +469,7 @@ func TestBindAndValidateReturnsUnifiedError(t *testing.T) {
 		},
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/form", func(c *gin.Context) {
 		httpCtx := newContext(c)
 		input := &struct {
@@ -519,7 +519,7 @@ func TestValidateBodyMiddleware_JSONFieldNameConsistency(t *testing.T) {
 		Email    string `json:"email" validate:"required,email"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/users", ValidateBodyMiddleware(svc, &UserReq{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -570,7 +570,7 @@ func TestValidateBodyMiddleware_LocaleZh(t *testing.T) {
 		Name string `json:"name" validate:"required"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/test", ValidateBodyMiddleware(svc, &Req{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -609,7 +609,7 @@ func TestValidateBodyMiddleware_LocaleEn(t *testing.T) {
 		Name string `json:"name" validate:"required"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/test", ValidateBodyMiddleware(svc, &Req{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -662,7 +662,7 @@ func TestValidateBodyMiddleware_CustomValidator(t *testing.T) {
 		Phone string `json:"phone" validate:"required,mobile"`
 	}
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/sms", ValidateBodyMiddleware(svc, &PhoneReq{}), func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -695,7 +695,7 @@ func TestValidateBodyMiddleware_CustomValidator(t *testing.T) {
 func TestBindAndValidateJSON_NilValidator(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	router := gin.New()
+	router := NewTestEngine()
 	router.POST("/test", func(c *gin.Context) {
 		httpCtx := newContext(c)
 		input := &struct {

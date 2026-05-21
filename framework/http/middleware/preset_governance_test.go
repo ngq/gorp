@@ -76,7 +76,7 @@ func (allowCircuitBreaker) State(context.Context, string) resiliencecontract.Cir
 // TestRecommendedAPIMiddlewareSetAppliesBodyLimit 验证推荐 API 预设中的请求体限制保持生效。
 func TestRecommendedAPIMiddlewareSetAppliesBodyLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	options := RecommendedMiddlewareOptions{
 		BodyLimitBytes:         4,
 		DisableLocale:          true,
@@ -173,7 +173,7 @@ func TestDefaultHTTPServiceGovernanceSetAddsOptionalStagesInStableOrder(t *testi
 
 func TestDefaultHTTPServiceGovernanceSetRateLimitPrecedesBodyLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	called := false
 	applyTransportMiddleware(router, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
 		API: RecommendedMiddlewareOptions{
@@ -204,7 +204,7 @@ func TestDefaultHTTPServiceGovernanceSetRateLimitPrecedesBodyLimit(t *testing.T)
 
 func TestDefaultHTTPServiceGovernanceSetCircuitBreakerPrecedesBodyLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	called := false
 	applyTransportMiddleware(router, DefaultHTTPServiceGovernanceSet(nil, DefaultHTTPServiceGovernanceOptions{
 		API: RecommendedMiddlewareOptions{

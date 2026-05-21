@@ -57,7 +57,16 @@ func (c *ginContext) Err() error {
 }
 
 func (c *ginContext) Value(key any) any {
-	return c.gin.Request.Context().Value(key)
+	// Delegate to gin.Context's Value method first.
+	// gin.Context.Value checks its internal key-value store (c.Get) before
+	// falling back to Request.Context().Value, which avoids infinite recursion
+	// when ginContext is used as a parent in context.WithValue chains.
+	//
+	// 优先委托给 gin.Context 的 Value 方法。
+	// gin.Context.Value 会先检查其内部键值存储 (c.Get)，
+	// 然后才回退到 Request.Context().Value，避免了当 ginContext
+	// 作为 context.WithValue 链中的父 context 时产生无限递归。
+	return c.gin.Value(key)
 }
 
 // ========== Request/Response ==========

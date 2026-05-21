@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	ginprovider "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,7 @@ func TestRegisterPprofEndpointsUsesMount(t *testing.T) {
 
 func TestRegisterPprofEndpointsServesIndex(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 
 	RegisterPprofEndpoints(router)
@@ -58,7 +59,7 @@ func TestRegisterPprofEndpointsServesIndex(t *testing.T) {
 
 func TestRegisterPprofEndpointsRejectsPost(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	engine := gin.New()
+	engine := ginprovider.NewTestEngine()
 	router := &ginTestRouter{engine: engine}
 
 	RegisterPprofEndpoints(router)

@@ -203,6 +203,7 @@ func newTestContext(c *gin.Context) transportcontract.Context {
 func TestTracingMiddlewareSetsTraceHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.ContextWithFallback = true
 	r.Use(func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		wrapped := TracingMiddleware(testTracer{}, "svc")(func(inner transportcontract.Context) {

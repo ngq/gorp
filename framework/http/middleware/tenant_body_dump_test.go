@@ -22,7 +22,7 @@ import (
 // TestTenantResolvesFromParamAndWritesHeader 验证从路由参数解析租户以及可选响应头输出。
 func TestTenantResolvesFromParamAndWritesHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	opts := DefaultTenantOptions()
 	opts.WriteHeader = true
 	applyTransportMiddleware(router, Tenant(opts))
@@ -50,7 +50,7 @@ func TestTenantResolvesFromParamAndWritesHeader(t *testing.T) {
 // TestTenantRequiredRejectsMissingTenant 验证租户必填但缺失时会返回统一错误请求响应。
 func TestTenantRequiredRejectsMissingTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 	opts := DefaultTenantOptions()
 	opts.Required = true
 	applyTransportMiddleware(router, Tenant(opts))
@@ -72,7 +72,7 @@ func TestTenantRequiredRejectsMissingTenant(t *testing.T) {
 // TestBodyDumpCapturesExchange 验证请求响应捕获、租户透传以及有限长度截断。
 func TestBodyDumpCapturesExchange(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
+	router := NewTestEngine()
 
 	var captured *HTTPExchangeCapture
 	tenantOpts := DefaultTenantOptions()
