@@ -29,5 +29,11 @@ use (
 // 需等待 v0.1.2 发布后才能解除此 replace；详见 hade/docs/design/bug-list.md）
 replace (
 	github.com/ngq/gorp => ../..
+	github.com/ngq/gorp/contrib/circuitbreaker/sentinel => ../../contrib/circuitbreaker/sentinel
+	github.com/ngq/gorp/contrib/configsource/etcd => ../../contrib/configsource/etcd
+	github.com/ngq/gorp/contrib/dlock/redis => ../../contrib/dlock/redis
+	github.com/ngq/gorp/contrib/dtm/dtmsdk => ../../contrib/dtm/dtmsdk
+	github.com/ngq/gorp/contrib/registry/etcd => ../../contrib/registry/etcd
 	github.com/ngq/gorp/contrib/serviceauth/token => ../../contrib/serviceauth/token
+	github.com/ngq/gorp/contrib/tracing/otel => ../../contrib/tracing/otel
 )

@@ -1,0 +1,17 @@
+go 1.26
+
+use (
+	.
+	./shared
+	./services/user
+	./contrib/configsource/etcd
+	./contrib/dlock/redis
+	./contrib/dtm/dtmsdk
+	./contrib/registry/etcd
+	./contrib/serviceauth/token
+	./contrib/tracing/otel
+	./contrib/circuitbreaker/sentinel
+)
+
+// 注意：不使用 replace，因为根模块 github.com/ngq/gorp 已经在 use 中
+// contrib 子模块也通过 use 直接引用

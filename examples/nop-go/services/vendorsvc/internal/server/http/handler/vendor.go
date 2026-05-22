@@ -24,7 +24,7 @@ func (h *VendorHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.vendor.List(c, page, size)
+	items, total, err := h.vendor.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -57,7 +57,7 @@ func (h *VendorHandler) Create(c gorp.Context) {
 		return
 	}
 
-	vendor, err := h.vendor.Create(c, service.CreateVendorRequest{
+	vendor, err := h.vendor.Create(c.Context(), service.CreateVendorRequest{
 		Name:         req.Name,
 		Email:        req.Email,
 		Description:  req.Description,
@@ -86,7 +86,7 @@ func (h *VendorHandler) Update(c gorp.Context) {
 		return
 	}
 
-	vendor, err := h.vendor.Update(c, uint(id), service.UpdateVendorRequest{
+	vendor, err := h.vendor.Update(c.Context(), uint(id), service.UpdateVendorRequest{
 		Name:         req.Name,
 		Email:        req.Email,
 		Description:  req.Description,
@@ -109,7 +109,7 @@ func (h *VendorHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.vendor.Delete(c, uint(id)); err != nil {
+	if err := h.vendor.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -132,7 +132,7 @@ func (h *VendorHandler) GetApply(c gorp.Context) {
 		return
 	}
 
-	apply, err := h.vendor.GetApply(c, uint(applyID))
+	apply, err := h.vendor.GetApply(c.Context(), uint(applyID))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -149,7 +149,7 @@ func (h *VendorHandler) SubmitApply(c gorp.Context) {
 		return
 	}
 
-	apply, err := h.vendor.SubmitApply(c, service.VendorApplyRequest{
+	apply, err := h.vendor.SubmitApply(c.Context(), service.VendorApplyRequest{
 		Name:        req.Name,
 		Email:       req.Email,
 		Description: req.Description,

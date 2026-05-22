@@ -24,7 +24,7 @@ func (h *StoreHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.store.List(c, page, size)
+	items, total, err := h.store.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -59,7 +59,7 @@ func (h *StoreHandler) Create(c gorp.Context) {
 		return
 	}
 
-	store, err := h.store.Create(c, service.CreateStoreRequest{
+	store, err := h.store.Create(c.Context(), service.CreateStoreRequest{
 		Name:         req.Name,
 		Url:          req.Url,
 		SslEnabled:   req.SslEnabled,
@@ -88,7 +88,7 @@ func (h *StoreHandler) Update(c gorp.Context) {
 		return
 	}
 
-	store, err := h.store.Update(c, uint(id), service.UpdateStoreRequest{
+	store, err := h.store.Update(c.Context(), uint(id), service.UpdateStoreRequest{
 		Name:         req.Name,
 		Url:          req.Url,
 		SslEnabled:   req.SslEnabled,
@@ -111,7 +111,7 @@ func (h *StoreHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.store.Delete(c, uint(id)); err != nil {
+	if err := h.store.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

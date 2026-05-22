@@ -2,7 +2,7 @@
 # Tax Service Dockerfile
 # 税务服务 - 处理税率计算、税务合规
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

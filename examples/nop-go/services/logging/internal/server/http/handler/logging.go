@@ -21,7 +21,7 @@ func (h *LoggingHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.logging.List(c, page, size)
+	items, total, err := h.logging.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -47,7 +47,7 @@ func (h *LoggingHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	logging, err := h.logging.GetByID(c, uint(id))
+	logging, err := h.logging.GetByID(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "logging not found"})
 		return
@@ -63,7 +63,7 @@ func (h *LoggingHandler) Create(c gorp.Context) {
 		return
 	}
 
-	logging, err := h.logging.Create(c, service.CreateLoggingRequest{
+	logging, err := h.logging.Create(c.Context(), service.CreateLoggingRequest{
 		Username: req.Username,
 		Email:    req.Email,
 	})
@@ -82,7 +82,7 @@ func (h *LoggingHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.logging.Delete(c, uint(id)); err != nil {
+	if err := h.logging.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

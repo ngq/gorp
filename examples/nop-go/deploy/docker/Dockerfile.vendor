@@ -2,7 +2,7 @@
 # Vendor Service Dockerfile
 # 供应商服务 - 处理供应商管理、采购
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

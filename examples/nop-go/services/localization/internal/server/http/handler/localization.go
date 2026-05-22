@@ -69,7 +69,7 @@ func (h *LocalizationHandler) ListLanguages(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.loc.ListLanguages(c, page, size)
+	items, total, err := h.loc.ListLanguages(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -97,7 +97,7 @@ func (h *LocalizationHandler) CreateLanguage(c gorp.Context) {
 		return
 	}
 
-	lang, err := h.loc.CreateLanguage(c, service.CreateLanguageRequest{
+	lang, err := h.loc.CreateLanguage(c.Context(), service.CreateLanguageRequest{
 		Name:            req.Name,
 		LanguageCulture: req.LanguageCulture,
 		UniqueSeoCode:   req.UniqueSeoCode,
@@ -128,7 +128,7 @@ func (h *LocalizationHandler) UpdateLanguage(c gorp.Context) {
 		return
 	}
 
-	lang, err := h.loc.UpdateLanguage(c, uint(id), service.UpdateLanguageRequest{
+	lang, err := h.loc.UpdateLanguage(c.Context(), uint(id), service.UpdateLanguageRequest{
 		Name:            req.Name,
 		LanguageCulture: req.LanguageCulture,
 		UniqueSeoCode:   req.UniqueSeoCode,
@@ -153,7 +153,7 @@ func (h *LocalizationHandler) DeleteLanguage(c gorp.Context) {
 		return
 	}
 
-	if err := h.loc.DeleteLanguage(c, uint(id)); err != nil {
+	if err := h.loc.DeleteLanguage(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -172,7 +172,7 @@ func (h *LocalizationHandler) ListResources(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.loc.ListResources(c, uint(langID), page, size)
+	items, total, err := h.loc.ListResources(c.Context(), uint(langID), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -206,7 +206,7 @@ func (h *LocalizationHandler) AddResource(c gorp.Context) {
 		return
 	}
 
-	res, err := h.loc.AddResource(c, uint(langID), service.CreateLocaleResourceRequest{
+	res, err := h.loc.AddResource(c.Context(), uint(langID), service.CreateLocaleResourceRequest{
 		ResourceName: req.ResourceName,
 		ResourceValue: req.ResourceValue,
 	})
@@ -232,7 +232,7 @@ func (h *LocalizationHandler) UpdateResource(c gorp.Context) {
 		return
 	}
 
-	res, err := h.loc.UpdateResource(c, uint(id), service.UpdateLocaleResourceRequest{
+	res, err := h.loc.UpdateResource(c.Context(), uint(id), service.UpdateLocaleResourceRequest{
 		ResourceName:  req.ResourceName,
 		ResourceValue: req.ResourceValue,
 	})
@@ -252,7 +252,7 @@ func (h *LocalizationHandler) DeleteResource(c gorp.Context) {
 		return
 	}
 
-	if err := h.loc.DeleteResource(c, uint(id)); err != nil {
+	if err := h.loc.DeleteResource(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -268,7 +268,7 @@ func (h *LocalizationHandler) ExportResources(c gorp.Context) {
 		return
 	}
 
-	data, err := h.loc.ExportResources(c, uint(langID))
+	data, err := h.loc.ExportResources(c.Context(), uint(langID))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -300,7 +300,7 @@ func (h *LocalizationHandler) ImportResources(c gorp.Context) {
 		}
 	}
 
-	if err := h.loc.ImportResources(c, uint(langID), svcResources); err != nil {
+	if err := h.loc.ImportResources(c.Context(), uint(langID), svcResources); err != nil {
 		gorp.Error(c, err)
 		return
 	}

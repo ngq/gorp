@@ -2,7 +2,7 @@
 # Discount Service Dockerfile
 # 折扣服务 - 处理优惠券、促销活动、折扣规则
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

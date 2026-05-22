@@ -55,7 +55,7 @@ func (h *MessageHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.message.List(c, page, size)
+	items, total, err := h.message.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -83,7 +83,7 @@ func (h *MessageHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	tpl, err := h.message.GetByID(c, uint(id))
+	tpl, err := h.message.GetByID(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -100,7 +100,7 @@ func (h *MessageHandler) Create(c gorp.Context) {
 		return
 	}
 
-	tpl, err := h.message.Create(c, service.CreateMessageTemplateRequest{
+	tpl, err := h.message.Create(c.Context(), service.CreateMessageTemplateRequest{
 		Name:         req.Name,
 		Subject:      req.Subject,
 		Body:         req.Body,
@@ -129,7 +129,7 @@ func (h *MessageHandler) Update(c gorp.Context) {
 		return
 	}
 
-	tpl, err := h.message.Update(c, uint(id), service.UpdateMessageTemplateRequest{
+	tpl, err := h.message.Update(c.Context(), uint(id), service.UpdateMessageTemplateRequest{
 		Name:         req.Name,
 		Subject:      req.Subject,
 		Body:         req.Body,
@@ -152,7 +152,7 @@ func (h *MessageHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.message.Delete(c, uint(id)); err != nil {
+	if err := h.message.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -174,7 +174,7 @@ func (h *MessageHandler) Test(c gorp.Context) {
 		return
 	}
 
-	if err := h.message.Test(c, uint(id), req.ToEmail); err != nil {
+	if err := h.message.Test(c.Context(), uint(id), req.ToEmail); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -190,7 +190,7 @@ func (h *MessageHandler) Copy(c gorp.Context) {
 		return
 	}
 
-	tpl, err := h.message.Copy(c, uint(id))
+	tpl, err := h.message.Copy(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return

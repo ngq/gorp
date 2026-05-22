@@ -31,7 +31,7 @@ func (h *ShippingHandler) ListProviders(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取配送提供者列表
-	providers, total, err := h.uc.ListProviders(c, page, pageSize)
+	providers, total, err := h.uc.ListProviders(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *ShippingHandler) UpdateProvider(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新配送提供者
-	provider, err := h.uc.UpdateProvider(c, req)
+	provider, err := h.uc.UpdateProvider(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -81,7 +81,7 @@ func (h *ShippingHandler) ListMethods(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取配送方式列表
-	methods, total, err := h.uc.ListMethods(c, page, pageSize)
+	methods, total, err := h.uc.ListMethods(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -104,7 +104,7 @@ func (h *ShippingHandler) CreateMethod(c gorp.Context) {
 	}
 
 	// 调用业务层创建配送方式
-	method, err := h.uc.CreateMethod(c, req)
+	method, err := h.uc.CreateMethod(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -132,7 +132,7 @@ func (h *ShippingHandler) UpdateMethod(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新配送方式
-	method, err := h.uc.UpdateMethod(c, req)
+	method, err := h.uc.UpdateMethod(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -152,7 +152,7 @@ func (h *ShippingHandler) DeleteMethod(c gorp.Context) {
 	}
 
 	// 调用业务层删除配送方式
-	if err := h.uc.DeleteMethod(c, id); err != nil {
+	if err := h.uc.DeleteMethod(c.Context(), id); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -170,7 +170,7 @@ func (h *ShippingHandler) ListDeliveryDates(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取配送日期列表
-	dates, total, err := h.uc.ListDeliveryDates(c, page, pageSize)
+	dates, total, err := h.uc.ListDeliveryDates(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -193,7 +193,7 @@ func (h *ShippingHandler) CreateDeliveryDate(c gorp.Context) {
 	}
 
 	// 调用业务层创建配送日期
-	date, err := h.uc.CreateDeliveryDate(c, req)
+	date, err := h.uc.CreateDeliveryDate(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -221,7 +221,7 @@ func (h *ShippingHandler) UpdateDeliveryDate(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新配送日期
-	date, err := h.uc.UpdateDeliveryDate(c, req)
+	date, err := h.uc.UpdateDeliveryDate(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -240,7 +240,7 @@ func (h *ShippingHandler) ListWarehouses(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取仓库列表
-	warehouses, total, err := h.uc.ListWarehouses(c, page, pageSize)
+	warehouses, total, err := h.uc.ListWarehouses(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -263,7 +263,7 @@ func (h *ShippingHandler) CreateWarehouse(c gorp.Context) {
 	}
 
 	// 调用业务层创建仓库
-	warehouse, err := h.uc.CreateWarehouse(c, req)
+	warehouse, err := h.uc.CreateWarehouse(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -291,7 +291,7 @@ func (h *ShippingHandler) UpdateWarehouse(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新仓库
-	warehouse, err := h.uc.UpdateWarehouse(c, req)
+	warehouse, err := h.uc.UpdateWarehouse(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -316,7 +316,7 @@ func (h *ShippingHandler) EstimateShipping(c gorp.Context) {
 	}
 
 	// 调用业务层估算运费
-	estimates, err := h.uc.EstimateShipping(c, req)
+	estimates, err := h.uc.EstimateShipping(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return

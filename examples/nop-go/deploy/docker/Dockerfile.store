@@ -2,7 +2,7 @@
 # Store Service Dockerfile
 # 店铺服务 - 处理多店铺管理、店铺配置
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

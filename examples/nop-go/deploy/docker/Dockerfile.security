@@ -2,7 +2,7 @@
 # Security Service Dockerfile
 # 安全服务 - 处理认证、授权、安全审计
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

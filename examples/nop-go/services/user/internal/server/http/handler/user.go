@@ -41,7 +41,7 @@ func (h *UserHandler) Login(c gorp.Context) {
 		return
 	}
 
-	result, err := h.user.Login(c, req.Username, req.Password)
+	result, err := h.user.Login(c.Context(), req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, biz.ErrInvalidCredentials) || errors.Is(err, biz.ErrUserInactive) {
 			gorp.BadRequest(c, err.Error())
@@ -69,7 +69,7 @@ func (h *UserHandler) Logout(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.Logout(c, userID); err != nil {
+	if err := h.user.Logout(c.Context(), userID); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -87,7 +87,7 @@ func (h *UserHandler) Register(c gorp.Context) {
 		return
 	}
 
-	user, err := h.user.Register(c, req.Username, req.Email, req.Password)
+	user, err := h.user.Register(c.Context(), req.Username, req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, biz.ErrUsernameTaken) || errors.Is(err, biz.ErrEmailTaken) {
 			gorp.BadRequest(c, err.Error())
@@ -114,7 +114,7 @@ func (h *UserHandler) PasswordRecovery(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.PasswordRecovery(c, req.Email); err != nil {
+	if err := h.user.PasswordRecovery(c.Context(), req.Email); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -135,7 +135,7 @@ func (h *UserHandler) ConfirmPasswordRecovery(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.ConfirmPasswordRecovery(c, req.Token, req.NewPassword); err != nil {
+	if err := h.user.ConfirmPasswordRecovery(c.Context(), req.Token, req.NewPassword); err != nil {
 		if errors.Is(err, biz.ErrInvalidRecoveryToken) {
 			gorp.BadRequest(c, err.Error())
 			return
@@ -165,7 +165,7 @@ func (h *UserHandler) MultiFactorVerification(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.MultiFactorVerification(c, userID, req.Code); err != nil {
+	if err := h.user.MultiFactorVerification(c.Context(), userID, req.Code); err != nil {
 		if errors.Is(err, biz.ErrMFANotEnabled) || errors.Is(err, biz.ErrInvalidMFACode) {
 			gorp.BadRequest(c, err.Error())
 			return
@@ -191,7 +191,7 @@ func (h *UserHandler) GetUserInfo(c gorp.Context) {
 		return
 	}
 
-	user, err := h.user.GetUserInfo(c, userID)
+	user, err := h.user.GetUserInfo(c.Context(), userID)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -216,7 +216,7 @@ func (h *UserHandler) UpdateUserInfo(c gorp.Context) {
 		return
 	}
 
-	user, err := h.user.UpdateUserInfo(c, userID, req.Email, req.Phone)
+	user, err := h.user.UpdateUserInfo(c.Context(), userID, req.Email, req.Phone)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -241,7 +241,7 @@ func (h *UserHandler) ChangePassword(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.ChangePassword(c, userID, req.OldPassword, req.NewPassword); err != nil {
+	if err := h.user.ChangePassword(c.Context(), userID, req.OldPassword, req.NewPassword); err != nil {
 		if errors.Is(err, biz.ErrInvalidOldPassword) {
 			gorp.BadRequest(c, err.Error())
 			return
@@ -267,7 +267,7 @@ func (h *UserHandler) ListAddresses(c gorp.Context) {
 		return
 	}
 
-	addresses, err := h.user.ListAddresses(c, userID)
+	addresses, err := h.user.ListAddresses(c.Context(), userID)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -315,7 +315,7 @@ func (h *UserHandler) AddAddress(c gorp.Context) {
 		IsDefault:       req.IsDefault,
 	}
 
-	id, err := h.user.AddAddress(c, address)
+	id, err := h.user.AddAddress(c.Context(), address)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -365,7 +365,7 @@ func (h *UserHandler) UpdateAddress(c gorp.Context) {
 		IsDefault:       req.IsDefault,
 	}
 
-	if err := h.user.UpdateAddress(c, address); err != nil {
+	if err := h.user.UpdateAddress(c.Context(), address); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -389,7 +389,7 @@ func (h *UserHandler) DeleteAddress(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.DeleteAddress(c, userID, uint(addressID)); err != nil {
+	if err := h.user.DeleteAddress(c.Context(), userID, uint(addressID)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -411,7 +411,7 @@ func (h *UserHandler) GetAvatar(c gorp.Context) {
 		return
 	}
 
-	user, err := h.user.GetAvatar(c, userID)
+	user, err := h.user.GetAvatar(c.Context(), userID)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -439,7 +439,7 @@ func (h *UserHandler) UploadAvatar(c gorp.Context) {
 	}
 	defer file.Close()
 
-	avatarURL, err := h.user.UploadAvatar(c, userID, fileHeader)
+	avatarURL, err := h.user.UploadAvatar(c.Context(), userID, fileHeader)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -458,7 +458,7 @@ func (h *UserHandler) RemoveAvatar(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.RemoveAvatar(c, userID); err != nil {
+	if err := h.user.RemoveAvatar(c.Context(), userID); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -480,7 +480,7 @@ func (h *UserHandler) CheckUsername(c gorp.Context) {
 		return
 	}
 
-	available, err := h.user.CheckUsernameAvailability(c, req.Username)
+	available, err := h.user.CheckUsernameAvailability(c.Context(), req.Username)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -499,7 +499,7 @@ func (h *UserHandler) GetDownloadableProducts(c gorp.Context) {
 		return
 	}
 
-	products, err := h.user.GetDownloadableProducts(c, userID)
+	products, err := h.user.GetDownloadableProducts(c.Context(), userID)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -536,7 +536,7 @@ func (h *UserHandler) RemoveExternalAssociation(c gorp.Context) {
 		return
 	}
 
-	if err := h.user.RemoveExternalAssociation(c, userID, req.Provider); err != nil {
+	if err := h.user.RemoveExternalAssociation(c.Context(), userID, req.Provider); err != nil {
 		gorp.Error(c, err)
 		return
 	}

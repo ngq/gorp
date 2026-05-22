@@ -2,7 +2,7 @@
 # Plugin Service Dockerfile
 # 插件服务 - 处理插件加载、插件生命周期管理
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

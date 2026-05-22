@@ -27,7 +27,7 @@ func (h *CountryHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.directory.ListCountries(c, page, size)
+	items, total, err := h.directory.ListCountries(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -54,7 +54,7 @@ func (h *CountryHandler) Create(c gorp.Context) {
 		return
 	}
 
-	item, err := h.directory.CreateCountry(c, service.CreateCountryRequest{
+	item, err := h.directory.CreateCountry(c.Context(), service.CreateCountryRequest{
 		Name:           req.Name,
 		IsoCode2:       req.IsoCode2,
 		IsoCode3:       req.IsoCode3,
@@ -83,7 +83,7 @@ func (h *CountryHandler) Update(c gorp.Context) {
 		return
 	}
 
-	item, err := h.directory.UpdateCountry(c, uint(id), service.UpdateCountryRequest{
+	item, err := h.directory.UpdateCountry(c.Context(), uint(id), service.UpdateCountryRequest{
 		Name:           req.Name,
 		IsoCode2:       req.IsoCode2,
 		IsoCode3:       req.IsoCode3,
@@ -106,7 +106,7 @@ func (h *CountryHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.directory.DeleteCountry(c, uint(id)); err != nil {
+	if err := h.directory.DeleteCountry(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -151,7 +151,7 @@ func (h *StateHandler) ListByCountry(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.directory.ListStates(c, uint(countryID), page, size)
+	items, total, err := h.directory.ListStates(c.Context(), uint(countryID), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -184,7 +184,7 @@ func (h *StateHandler) Create(c gorp.Context) {
 		return
 	}
 
-	item, err := h.directory.CreateState(c, service.CreateStateRequest{
+	item, err := h.directory.CreateState(c.Context(), service.CreateStateRequest{
 		CountryID: uint(countryID),
 		Name:      req.Name,
 		IsoCode:   req.IsoCode,
@@ -211,7 +211,7 @@ func (h *StateHandler) Update(c gorp.Context) {
 		return
 	}
 
-	item, err := h.directory.UpdateState(c, uint(id), service.UpdateStateRequest{
+	item, err := h.directory.UpdateState(c.Context(), uint(id), service.UpdateStateRequest{
 		Name:    req.Name,
 		IsoCode: req.IsoCode,
 	})
@@ -231,7 +231,7 @@ func (h *StateHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.directory.DeleteState(c, uint(id)); err != nil {
+	if err := h.directory.DeleteState(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -268,7 +268,7 @@ func (h *CurrencyHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.directory.ListCurrencies(c, page, size)
+	items, total, err := h.directory.ListCurrencies(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -295,7 +295,7 @@ func (h *CurrencyHandler) Create(c gorp.Context) {
 		return
 	}
 
-	item, err := h.directory.CreateCurrency(c, service.CreateCurrencyRequest{
+	item, err := h.directory.CreateCurrency(c.Context(), service.CreateCurrencyRequest{
 		Name:     req.Name,
 		Code:     req.Code,
 		Symbol:   req.Symbol,
@@ -324,7 +324,7 @@ func (h *CurrencyHandler) Update(c gorp.Context) {
 		return
 	}
 
-	item, err := h.directory.UpdateCurrency(c, uint(id), service.UpdateCurrencyRequest{
+	item, err := h.directory.UpdateCurrency(c.Context(), uint(id), service.UpdateCurrencyRequest{
 		Name:     req.Name,
 		Code:     req.Code,
 		Symbol:   req.Symbol,
@@ -347,7 +347,7 @@ func (h *CurrencyHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.directory.DeleteCurrency(c, uint(id)); err != nil {
+	if err := h.directory.DeleteCurrency(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -371,7 +371,7 @@ func (h *CurrencyHandler) ApplyRates(c gorp.Context) {
 		}
 	}
 
-	if err := h.directory.ApplyRates(c, rates); err != nil {
+	if err := h.directory.ApplyRates(c.Context(), rates); err != nil {
 		gorp.Error(c, err)
 		return
 	}

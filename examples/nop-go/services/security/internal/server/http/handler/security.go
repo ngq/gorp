@@ -24,7 +24,7 @@ func (h *PermissionHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.permission.List(c, page, size)
+	items, total, err := h.permission.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -57,7 +57,7 @@ func (h *PermissionHandler) Create(c gorp.Context) {
 		return
 	}
 
-	perm, err := h.permission.Create(c, service.CreatePermissionRequest{
+	perm, err := h.permission.Create(c.Context(), service.CreatePermissionRequest{
 		Name:         req.Name,
 		SystemName:   req.SystemName,
 		Category:     req.Category,
@@ -85,7 +85,7 @@ func (h *PermissionHandler) Update(c gorp.Context) {
 		return
 	}
 
-	perm, err := h.permission.Update(c, uint(id), service.UpdatePermissionRequest{
+	perm, err := h.permission.Update(c.Context(), uint(id), service.UpdatePermissionRequest{
 		Name:         req.Name,
 		SystemName:   req.SystemName,
 		Category:     req.Category,
@@ -107,7 +107,7 @@ func (h *PermissionHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.permission.Delete(c, uint(id)); err != nil {
+	if err := h.permission.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -130,7 +130,7 @@ func (h *ACLHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.acl.List(c, page, size)
+	items, total, err := h.acl.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -162,7 +162,7 @@ func (h *ACLHandler) Create(c gorp.Context) {
 		return
 	}
 
-	record, err := h.acl.Create(c, service.CreateACLRequest{
+	record, err := h.acl.Create(c.Context(), service.CreateACLRequest{
 		UserID:       req.UserID,
 		PermissionID: req.PermissionID,
 	})
@@ -182,7 +182,7 @@ func (h *ACLHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.acl.Delete(c, uint(id)); err != nil {
+	if err := h.acl.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

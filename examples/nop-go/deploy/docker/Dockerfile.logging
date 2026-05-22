@@ -2,7 +2,7 @@
 # Logging Service Dockerfile
 # 日志服务 - 处理集中式日志收集、查询、分析
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

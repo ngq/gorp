@@ -3,7 +3,7 @@ module monolith
 go 1.25.8
 
 require (
-	github.com/ngq/gorp v0.0.0
+	github.com/ngq/gorp v0.1.3
 	gorm.io/gorm v1.31.1
 )
 

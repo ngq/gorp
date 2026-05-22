@@ -2,7 +2,7 @@
 # SEO Service Dockerfile
 # SEO服务 - 处理SEO优化、元数据管理
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

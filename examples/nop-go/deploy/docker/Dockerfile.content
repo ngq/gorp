@@ -2,7 +2,7 @@
 # Content Service Dockerfile
 # 内容管理服务 - 处理CMS、页面内容管理
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

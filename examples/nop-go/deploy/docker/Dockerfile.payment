@@ -2,7 +2,7 @@
 # Payment Service Dockerfile
 # 支付服务 - 处理订单支付、退款等金融操作
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

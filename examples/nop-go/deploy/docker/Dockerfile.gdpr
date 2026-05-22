@@ -2,7 +2,7 @@
 # GDPR Service Dockerfile
 # GDPR合规服务 - 处理数据隐私、用户数据导出/删除
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

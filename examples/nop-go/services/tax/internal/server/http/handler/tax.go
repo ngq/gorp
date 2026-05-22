@@ -31,7 +31,7 @@ func (h *TaxHandler) ListProviders(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取税务提供者列表
-	providers, total, err := h.uc.ListProviders(c, page, pageSize)
+	providers, total, err := h.uc.ListProviders(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *TaxHandler) UpdateProvider(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新税务提供者
-	provider, err := h.uc.UpdateProvider(c, req)
+	provider, err := h.uc.UpdateProvider(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -81,7 +81,7 @@ func (h *TaxHandler) ListCategories(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取税类别列表
-	categories, total, err := h.uc.ListCategories(c, page, pageSize)
+	categories, total, err := h.uc.ListCategories(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -104,7 +104,7 @@ func (h *TaxHandler) CreateCategory(c gorp.Context) {
 	}
 
 	// 调用业务层创建税类别
-	category, err := h.uc.CreateCategory(c, req)
+	category, err := h.uc.CreateCategory(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -132,7 +132,7 @@ func (h *TaxHandler) UpdateCategory(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新税类别
-	category, err := h.uc.UpdateCategory(c, req)
+	category, err := h.uc.UpdateCategory(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -152,7 +152,7 @@ func (h *TaxHandler) DeleteCategory(c gorp.Context) {
 	}
 
 	// 调用业务层删除税类别
-	if err := h.uc.DeleteCategory(c, id); err != nil {
+	if err := h.uc.DeleteCategory(c.Context(), id); err != nil {
 		gorp.Error(c, err)
 		return
 	}

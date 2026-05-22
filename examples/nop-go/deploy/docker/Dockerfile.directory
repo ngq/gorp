@@ -2,7 +2,7 @@
 # Directory Service Dockerfile
 # 目录服务 - 处理分类、目录结构管理
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

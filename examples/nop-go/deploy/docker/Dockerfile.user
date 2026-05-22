@@ -1,15 +1,52 @@
-FROM golang:1.22-alpine AS builder
+# nop-go 用户服务 Dockerfile
+#
+# 构建命令（在 examples/nop-go 目录执行）：
+#   docker build -t nop-go-user:latest -f deploy/docker/Dockerfile.user .
+#
+# 前提条件：gorp 已发布到 GitHub
+# 镜像大小：约 20MB
+
+# ============================================================
+# 构建阶段
+# ============================================================
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 
+ENV GOPROXY=https://goproxy.cn,direct,https://proxy.golang.org,direct
+
+# 复制 shared 模块
 COPY shared/ ./shared/
+
+# 复制 user 服务
 COPY services/user/ ./services/user/
 
-RUN cd /build/services/user && go build -o /user ./cmd
+# 创建 go.work
+RUN printf 'go 1.26\n\nuse (\n\t./shared\n\t./services/user\n)\n' > ./go.work
 
-FROM alpine:3.19
+# 移除 user/go.mod 中的本地 replace
+RUN sed -i '/^replace github\.com\/ngq\/gorp =>/d' ./services/user/go.mod
 
-RUN apk add --no-cache ca-certificates tzdata
+# 添加 nop-go/shared 的 require 和 replace
+RUN sed -i '/^require (/a\	nop-go/shared v0.0.0' ./services/user/go.mod && \
+    echo 'replace nop-go/shared => /build/shared' >> ./services/user/go.mod
+
+# 删除所有 go.sum，重新获取依赖
+RUN rm -f ./shared/go.sum ./services/user/go.sum
+
+# 重新 tidy 获取干净的依赖
+RUN cd /build/shared && go mod tidy
+RUN cd /build/services/user && go mod tidy
+
+# 构建
+RUN cd /build/services/user && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /user ./cmd
+
+# ============================================================
+# 运行阶段
+# ============================================================
+FROM scratch
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 

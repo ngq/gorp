@@ -2,7 +2,7 @@
 # Localization Service Dockerfile
 # 本地化服务 - 处理多语言、货币、时区转换
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

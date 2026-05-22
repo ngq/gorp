@@ -21,7 +21,7 @@ func (h *GdprHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.gdpr.List(c, page, size)
+	items, total, err := h.gdpr.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -47,7 +47,7 @@ func (h *GdprHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	gdpr, err := h.gdpr.GetByID(c, uint(id))
+	gdpr, err := h.gdpr.GetByID(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "gdpr not found"})
 		return
@@ -63,7 +63,7 @@ func (h *GdprHandler) Create(c gorp.Context) {
 		return
 	}
 
-	gdpr, err := h.gdpr.Create(c, service.CreateGdprRequest{
+	gdpr, err := h.gdpr.Create(c.Context(), service.CreateGdprRequest{
 		Username: req.Username,
 		Email:    req.Email,
 	})
@@ -82,7 +82,7 @@ func (h *GdprHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.gdpr.Delete(c, uint(id)); err != nil {
+	if err := h.gdpr.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

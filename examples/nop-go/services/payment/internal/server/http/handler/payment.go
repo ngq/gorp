@@ -29,7 +29,7 @@ func (h *PaymentHandler) ListPaymentMethods(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取支付方式列表
-	methods, total, err := h.uc.ListPaymentMethods(c, page, pageSize)
+	methods, total, err := h.uc.ListPaymentMethods(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -66,7 +66,7 @@ func (h *PaymentHandler) UpdatePaymentMethod(c gorp.Context) {
 	req.ID = uint(id)
 
 	// 调用业务层更新支付方式
-	method, err := h.uc.UpdatePaymentMethod(c, req)
+	method, err := h.uc.UpdatePaymentMethod(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -83,7 +83,7 @@ func (h *PaymentHandler) ListMethodRestrictions(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取支付方式限制列表
-	restrictions, total, err := h.uc.ListMethodRestrictions(c, page, pageSize)
+	restrictions, total, err := h.uc.ListMethodRestrictions(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -107,7 +107,7 @@ func (h *PaymentHandler) UpdateMethodRestrictions(c gorp.Context) {
 	}
 
 	// 调用业务层更新支付方式限制
-	restriction, err := h.uc.UpdateMethodRestrictions(c, req)
+	restriction, err := h.uc.UpdateMethodRestrictions(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return

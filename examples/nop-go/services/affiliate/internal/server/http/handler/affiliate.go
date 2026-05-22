@@ -24,7 +24,7 @@ func (h *AffiliateHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.affiliate.List(c, page, size)
+	items, total, err := h.affiliate.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -47,7 +47,7 @@ func (h *AffiliateHandler) Create(c gorp.Context) {
 		return
 	}
 
-	aff, err := h.affiliate.Create(c, service.CreateAffiliateRequest{
+	aff, err := h.affiliate.Create(c.Context(), service.CreateAffiliateRequest{
 		Name:   req.Name,
 		Url:    req.Url,
 		Active: req.Active,
@@ -74,7 +74,7 @@ func (h *AffiliateHandler) Update(c gorp.Context) {
 		return
 	}
 
-	aff, err := h.affiliate.Update(c, uint(id), service.UpdateAffiliateRequest{
+	aff, err := h.affiliate.Update(c.Context(), uint(id), service.UpdateAffiliateRequest{
 		Name:   req.Name,
 		Url:    req.Url,
 		Active: req.Active,
@@ -95,7 +95,7 @@ func (h *AffiliateHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.affiliate.Delete(c, uint(id)); err != nil {
+	if err := h.affiliate.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -114,7 +114,7 @@ func (h *AffiliateHandler) ListOrders(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.affiliate.ListOrders(c, uint(id), page, size)
+	items, total, err := h.affiliate.ListOrders(c.Context(), uint(id), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -140,7 +140,7 @@ func (h *AffiliateHandler) ListCustomers(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.affiliate.ListCustomers(c, uint(id), page, size)
+	items, total, err := h.affiliate.ListCustomers(c.Context(), uint(id), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return

@@ -21,7 +21,7 @@ func (h *PluginHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.plugin.List(c, page, size)
+	items, total, err := h.plugin.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -47,7 +47,7 @@ func (h *PluginHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	plugin, err := h.plugin.GetByID(c, uint(id))
+	plugin, err := h.plugin.GetByID(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "plugin not found"})
 		return
@@ -63,7 +63,7 @@ func (h *PluginHandler) Create(c gorp.Context) {
 		return
 	}
 
-	plugin, err := h.plugin.Create(c, service.CreatePluginRequest{
+	plugin, err := h.plugin.Create(c.Context(), service.CreatePluginRequest{
 		Username: req.Username,
 		Email:    req.Email,
 	})
@@ -82,7 +82,7 @@ func (h *PluginHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.plugin.Delete(c, uint(id)); err != nil {
+	if err := h.plugin.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

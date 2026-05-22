@@ -2,7 +2,7 @@
 # Affiliate Service Dockerfile
 # 联盟营销服务 - 处理推广员、佣金计算
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 

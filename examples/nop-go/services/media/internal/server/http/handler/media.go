@@ -44,7 +44,7 @@ func (h *MediaHandler) Upload(c gorp.Context) {
 		return
 	}
 
-	media, err := h.media.Upload(c, service.UploadMediaRequest{
+	media, err := h.media.Upload(c.Context(), service.UploadMediaRequest{
 		FileName: req.FileName,
 		MimeType: req.MimeType,
 		FileSize: req.FileSize,
@@ -67,7 +67,7 @@ func (h *MediaHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	media, err := h.media.GetByID(c, uint(id))
+	media, err := h.media.GetByID(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -84,7 +84,7 @@ func (h *MediaHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.media.Delete(c, uint(id)); err != nil {
+	if err := h.media.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

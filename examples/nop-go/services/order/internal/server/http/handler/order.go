@@ -56,7 +56,7 @@ func (h *OrderHandler) List(c gorp.Context) {
 	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	userID, _ := strconv.ParseUint(c.DefaultQuery("user_id", "0"), 10, 64)
 
-	items, total, err := h.orderSvc.List(c, uint(userID), page, size)
+	items, total, err := h.orderSvc.List(c.Context(), uint(userID), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -80,7 +80,7 @@ func (h *OrderHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	order, err := h.orderSvc.GetByID(c, uint(id))
+	order, err := h.orderSvc.GetByID(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -99,7 +99,7 @@ func (h *OrderHandler) Create(c gorp.Context) {
 		return
 	}
 
-	order, err := h.orderSvc.Create(c, &biz.Order{
+	order, err := h.orderSvc.Create(c.Context(), &biz.Order{
 		UserID:         req.UserID,
 		SubTotal:       req.SubTotal,
 		ShippingTotal:  req.ShippingTotal,
@@ -131,7 +131,7 @@ func (h *OrderHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.orderSvc.Delete(c, uint(id)); err != nil {
+	if err := h.orderSvc.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -149,7 +149,7 @@ func (h *OrderHandler) CancelOrder(c gorp.Context) {
 		return
 	}
 
-	if err := h.orderSvc.CancelOrder(c, uint(id)); err != nil {
+	if err := h.orderSvc.CancelOrder(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -170,7 +170,7 @@ func (h *OrderHandler) RefundOrder(c gorp.Context) {
 		return
 	}
 
-	if err := h.orderSvc.RefundOrder(c, uint(id)); err != nil {
+	if err := h.orderSvc.RefundOrder(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -191,7 +191,7 @@ func (h *OrderHandler) GetPDFInvoice(c gorp.Context) {
 		return
 	}
 
-	pdfData, err := h.orderSvc.GetPDFInvoice(c, uint(id))
+	pdfData, err := h.orderSvc.GetPDFInvoice(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -211,7 +211,7 @@ func (h *OrderHandler) RePostPayment(c gorp.Context) {
 		return
 	}
 
-	if err := h.orderSvc.RePostPayment(c, uint(id)); err != nil {
+	if err := h.orderSvc.RePostPayment(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -237,7 +237,7 @@ func (h *OrderHandler) GetShipmentDetail(c gorp.Context) {
 		return
 	}
 
-	shipment, err := h.orderSvc.GetShipment(c, uint(orderID), uint(shipmentID))
+	shipment, err := h.orderSvc.GetShipment(c.Context(), uint(orderID), uint(shipmentID))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -256,7 +256,7 @@ func (h *OrderHandler) Reorder(c gorp.Context) {
 		return
 	}
 
-	order, err := h.orderSvc.Reorder(c, uint(id))
+	order, err := h.orderSvc.Reorder(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -279,7 +279,7 @@ func (h *OrderHandler) GetShoppingCart(c gorp.Context) {
 		return
 	}
 
-	cart, err := h.cartSvc.GetCart(c, uint(userID))
+	cart, err := h.cartSvc.GetCart(c.Context(), uint(userID))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -298,7 +298,7 @@ func (h *OrderHandler) UpdateCart(c gorp.Context) {
 		return
 	}
 
-	if err := h.cartSvc.UpdateCart(c, req.ItemID, req.Quantity); err != nil {
+	if err := h.cartSvc.UpdateCart(c.Context(), req.ItemID, req.Quantity); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -319,7 +319,7 @@ func (h *OrderHandler) AddToCart(c gorp.Context) {
 		return
 	}
 
-	if err := h.cartSvc.AddToCart(c, &biz.ShoppingCartItem{
+	if err := h.cartSvc.AddToCart(c.Context(), &biz.ShoppingCartItem{
 		UserID:      req.UserID,
 		ProductID:   req.ProductID,
 		ProductName: req.ProductName,
@@ -347,7 +347,7 @@ func (h *OrderHandler) ApplyCoupon(c gorp.Context) {
 		return
 	}
 
-	if err := h.cartSvc.ApplyCoupon(c, req.UserID, req.CouponCode); err != nil {
+	if err := h.cartSvc.ApplyCoupon(c.Context(), req.UserID, req.CouponCode); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -368,7 +368,7 @@ func (h *OrderHandler) ApplyGiftCard(c gorp.Context) {
 		return
 	}
 
-	if err := h.cartSvc.ApplyGiftCard(c, req.UserID, req.GiftCardCode); err != nil {
+	if err := h.cartSvc.ApplyGiftCard(c.Context(), req.UserID, req.GiftCardCode); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -393,7 +393,7 @@ func (h *OrderHandler) GetWishlist(c gorp.Context) {
 		return
 	}
 
-	wishlist, err := h.wlSvc.GetWishlist(c, uint(userID))
+	wishlist, err := h.wlSvc.GetWishlist(c.Context(), uint(userID))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -412,7 +412,7 @@ func (h *OrderHandler) AddToWishlist(c gorp.Context) {
 		return
 	}
 
-	if err := h.wlSvc.AddToWishlist(c, &biz.WishlistItem{
+	if err := h.wlSvc.AddToWishlist(c.Context(), &biz.WishlistItem{
 		UserID:      req.UserID,
 		ProductID:   req.ProductID,
 		ProductName: req.ProductName,
@@ -441,7 +441,7 @@ func (h *OrderHandler) GetCheckout(c gorp.Context) {
 		return
 	}
 
-	checkout, err := h.coSvc.GetCheckout(c, uint(userID))
+	checkout, err := h.coSvc.GetCheckout(c.Context(), uint(userID))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -460,7 +460,7 @@ func (h *OrderHandler) SetBillingAddress(c gorp.Context) {
 		return
 	}
 
-	if err := h.coSvc.SetBillingAddress(c, req.UserID, req.AddressID); err != nil {
+	if err := h.coSvc.SetBillingAddress(c.Context(), req.UserID, req.AddressID); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -481,7 +481,7 @@ func (h *OrderHandler) SetShippingAddress(c gorp.Context) {
 		return
 	}
 
-	if err := h.coSvc.SetShippingAddress(c, req.UserID, req.AddressID); err != nil {
+	if err := h.coSvc.SetShippingAddress(c.Context(), req.UserID, req.AddressID); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -502,7 +502,7 @@ func (h *OrderHandler) SetShippingMethod(c gorp.Context) {
 		return
 	}
 
-	if err := h.coSvc.SetShippingMethod(c, req.UserID, req.ShippingMethod, req.ShippingCost); err != nil {
+	if err := h.coSvc.SetShippingMethod(c.Context(), req.UserID, req.ShippingMethod, req.ShippingCost); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -523,7 +523,7 @@ func (h *OrderHandler) SetPaymentMethod(c gorp.Context) {
 		return
 	}
 
-	if err := h.coSvc.SetPaymentMethod(c, req.UserID, req.PaymentMethod); err != nil {
+	if err := h.coSvc.SetPaymentMethod(c.Context(), req.UserID, req.PaymentMethod); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -544,7 +544,7 @@ func (h *OrderHandler) ConfirmCheckout(c gorp.Context) {
 		return
 	}
 
-	result, err := h.coSvc.Confirm(c, req.UserID)
+	result, err := h.coSvc.Confirm(c.Context(), req.UserID)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -565,7 +565,7 @@ func (h *OrderHandler) ListReturnRequests(c gorp.Context) {
 	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	userID, _ := strconv.ParseUint(c.DefaultQuery("user_id", "0"), 10, 64)
 
-	items, total, err := h.rrSvc.List(c, uint(userID), page, size)
+	items, total, err := h.rrSvc.List(c.Context(), uint(userID), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -589,7 +589,7 @@ func (h *OrderHandler) CreateReturnRequest(c gorp.Context) {
 		return
 	}
 
-	rr, err := h.rrSvc.Create(c, &biz.ReturnRequest{
+	rr, err := h.rrSvc.Create(c.Context(), &biz.ReturnRequest{
 		OrderID: req.OrderID,
 		UserID:  req.UserID,
 		Reason:  req.Reason,

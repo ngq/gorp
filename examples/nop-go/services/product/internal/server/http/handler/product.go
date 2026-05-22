@@ -37,7 +37,7 @@ func (h *ProductHandler) GetProductByID(c gorp.Context) {
 		return
 	}
 
-	product, err := h.product.GetByID(c, uint(id))
+	product, err := h.product.GetByID(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -74,7 +74,7 @@ func (h *ProductHandler) ListProducts(c gorp.Context) {
 		return
 	}
 
-	items, total, err := h.product.List(c, req.Page, req.Size, req.CategoryID, req.ManufacturerID, req.Keyword)
+	items, total, err := h.product.List(c.Context(), req.Page, req.Size, req.CategoryID, req.ManufacturerID, req.Keyword)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -115,7 +115,7 @@ func (h *ProductHandler) CreateProduct(c gorp.Context) {
 		return
 	}
 
-	product, err := h.product.Create(c, service.CreateProductRequest{
+	product, err := h.product.Create(c.Context(), service.CreateProductRequest{
 		Name:           req.Name,
 		ShortDesc:      req.ShortDesc,
 		FullDesc:       req.FullDesc,
@@ -167,7 +167,7 @@ func (h *ProductHandler) UpdateProduct(c gorp.Context) {
 		return
 	}
 
-	product, err := h.product.Update(c, uint(id), service.UpdateProductRequest{
+	product, err := h.product.Update(c.Context(), uint(id), service.UpdateProductRequest{
 		Name:           req.Name,
 		ShortDesc:      req.ShortDesc,
 		FullDesc:       req.FullDesc,
@@ -212,7 +212,7 @@ func (h *ProductHandler) DeleteProduct(c gorp.Context) {
 		return
 	}
 
-	if err := h.product.Delete(c, uint(id)); err != nil {
+	if err := h.product.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -244,7 +244,7 @@ func (h *CategoryHandler) GetCategoryByID(c gorp.Context) {
 		return
 	}
 
-	category, err := h.category.GetByID(c, uint(id))
+	category, err := h.category.GetByID(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -273,7 +273,7 @@ func (h *CategoryHandler) ListCategories(c gorp.Context) {
 		return
 	}
 
-	items, total, err := h.category.List(c, req.Page, req.Size)
+	items, total, err := h.category.List(c.Context(), req.Page, req.Size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -310,7 +310,7 @@ func (h *CategoryHandler) CreateCategory(c gorp.Context) {
 		return
 	}
 
-	category, err := h.category.Create(c, req.Name, req.Description, req.ParentID, req.SortOrder, req.IsPublished)
+	category, err := h.category.Create(c.Context(), req.Name, req.Description, req.ParentID, req.SortOrder, req.IsPublished)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -352,7 +352,7 @@ func (h *ManufacturerHandler) GetManufacturerByID(c gorp.Context) {
 		return
 	}
 
-	manufacturer, err := h.manufacturer.GetByID(c, uint(id))
+	manufacturer, err := h.manufacturer.GetByID(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -379,7 +379,7 @@ func (h *ManufacturerHandler) ListManufacturers(c gorp.Context) {
 		return
 	}
 
-	items, total, err := h.manufacturer.List(c, req.Page, req.Size)
+	items, total, err := h.manufacturer.List(c.Context(), req.Page, req.Size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -414,7 +414,7 @@ func (h *ManufacturerHandler) CreateManufacturer(c gorp.Context) {
 		return
 	}
 
-	manufacturer, err := h.manufacturer.Create(c, req.Name, req.Description, req.IsPublished)
+	manufacturer, err := h.manufacturer.Create(c.Context(), req.Name, req.Description, req.IsPublished)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -462,7 +462,7 @@ func (h *ProductReviewHandler) ListProductReviews(c gorp.Context) {
 		return
 	}
 
-	items, total, err := h.review.ListByProductID(c, uint(productID), req.Page, req.Size)
+	items, total, err := h.review.ListByProductID(c.Context(), uint(productID), req.Page, req.Size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -523,7 +523,7 @@ func (h *ProductReviewHandler) CreateProductReview(c gorp.Context) {
 		customerName = cname
 	}
 
-	review, err := h.review.Create(c, uint(productID), customerID, customerName, req.Title, req.Content, req.Rating)
+	review, err := h.review.Create(c.Context(), uint(productID), customerID, customerName, req.Title, req.Content, req.Rating)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -574,7 +574,7 @@ func (h *CatalogHandler) GetRecentlyViewed(c gorp.Context) {
 		limit = 10
 	}
 
-	items, err := h.product.GetRecentlyViewed(c, req.CustomerID, limit)
+	items, err := h.product.GetRecentlyViewed(c.Context(), req.CustomerID, limit)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -612,7 +612,7 @@ func (h *CatalogHandler) CompareProducts(c gorp.Context) {
 		return
 	}
 
-	items, err := h.product.CompareProducts(c, req.ProductIDs)
+	items, err := h.product.CompareProducts(c.Context(), req.ProductIDs)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -655,7 +655,7 @@ func (h *CatalogHandler) SearchProducts(c gorp.Context) {
 		return
 	}
 
-	items, total, err := h.product.Search(c, req.Keyword, req.Page, req.Size)
+	items, total, err := h.product.Search(c.Context(), req.Keyword, req.Page, req.Size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -697,7 +697,7 @@ func (h *CatalogHandler) SearchAutocomplete(c gorp.Context) {
 	}
 
 	// 搜索商品，提取名称作为自动完成建议
-	items, _, err := h.product.Search(c, req.Term, 1, 10)
+	items, _, err := h.product.Search(c.Context(), req.Term, 1, 10)
 	if err != nil {
 		gorp.Error(c, err)
 		return

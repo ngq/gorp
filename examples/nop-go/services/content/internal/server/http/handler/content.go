@@ -25,7 +25,7 @@ func NewContentHandler(content *service.ContentService) *ContentHandler {
 func (h *ContentHandler) ListBlog(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-	items, total, err := h.content.ListBlog(c, page, size)
+	items, total, err := h.content.ListBlog(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -40,7 +40,7 @@ func (h *ContentHandler) CreateBlog(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	blog, err := h.content.CreateBlog(c, service.CreateBlogRequest{
+	blog, err := h.content.CreateBlog(c.Context(), service.CreateBlogRequest{
 		Title: req.Title, Body: req.Body, Tags: req.Tags, AllowComments: req.AllowComments,
 	})
 	if err != nil {
@@ -62,7 +62,7 @@ func (h *ContentHandler) UpdateBlog(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	blog, err := h.content.UpdateBlog(c, uint(id), service.UpdateBlogRequest{
+	blog, err := h.content.UpdateBlog(c.Context(), uint(id), service.UpdateBlogRequest{
 		Title: req.Title, Body: req.Body, Tags: req.Tags, AllowComments: req.AllowComments,
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ func (h *ContentHandler) DeleteBlog(c gorp.Context) {
 		gorp.BadRequest(c, "无效的ID参数")
 		return
 	}
-	if err := h.content.DeleteBlog(c, uint(id)); err != nil {
+	if err := h.content.DeleteBlog(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -92,7 +92,7 @@ func (h *ContentHandler) DeleteBlog(c gorp.Context) {
 func (h *ContentHandler) ListNews(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-	items, total, err := h.content.ListNews(c, page, size)
+	items, total, err := h.content.ListNews(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -107,7 +107,7 @@ func (h *ContentHandler) CreateNews(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	news, err := h.content.CreateNews(c, service.CreateNewsRequest{
+	news, err := h.content.CreateNews(c.Context(), service.CreateNewsRequest{
 		Title: req.Title, Body: req.Body, AllowComments: req.AllowComments,
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func (h *ContentHandler) UpdateNews(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	news, err := h.content.UpdateNews(c, uint(id), service.UpdateNewsRequest{
+	news, err := h.content.UpdateNews(c.Context(), uint(id), service.UpdateNewsRequest{
 		Title: req.Title, Body: req.Body, AllowComments: req.AllowComments,
 	})
 	if err != nil {
@@ -146,7 +146,7 @@ func (h *ContentHandler) DeleteNews(c gorp.Context) {
 		gorp.BadRequest(c, "无效的ID参数")
 		return
 	}
-	if err := h.content.DeleteNews(c, uint(id)); err != nil {
+	if err := h.content.DeleteNews(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -159,7 +159,7 @@ func (h *ContentHandler) DeleteNews(c gorp.Context) {
 func (h *ContentHandler) ListTopic(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-	items, total, err := h.content.ListTopic(c, page, size)
+	items, total, err := h.content.ListTopic(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -174,7 +174,7 @@ func (h *ContentHandler) CreateTopic(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	topic, err := h.content.CreateTopic(c, service.CreateTopicRequest{
+	topic, err := h.content.CreateTopic(c.Context(), service.CreateTopicRequest{
 		Title: req.Title, Body: req.Body, IsPublished: req.IsPublished,
 	})
 	if err != nil {
@@ -196,7 +196,7 @@ func (h *ContentHandler) UpdateTopic(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	topic, err := h.content.UpdateTopic(c, uint(id), service.UpdateTopicRequest{
+	topic, err := h.content.UpdateTopic(c.Context(), uint(id), service.UpdateTopicRequest{
 		Title: req.Title, Body: req.Body, IsPublished: req.IsPublished,
 	})
 	if err != nil {
@@ -213,7 +213,7 @@ func (h *ContentHandler) DeleteTopic(c gorp.Context) {
 		gorp.BadRequest(c, "无效的ID参数")
 		return
 	}
-	if err := h.content.DeleteTopic(c, uint(id)); err != nil {
+	if err := h.content.DeleteTopic(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -226,7 +226,7 @@ func (h *ContentHandler) DeleteTopic(c gorp.Context) {
 func (h *ContentHandler) ListPoll(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-	items, total, err := h.content.ListPoll(c, page, size)
+	items, total, err := h.content.ListPoll(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -241,7 +241,7 @@ func (h *ContentHandler) CreatePoll(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	poll, err := h.content.CreatePoll(c, service.CreatePollRequest{
+	poll, err := h.content.CreatePoll(c.Context(), service.CreatePollRequest{
 		Name: req.Name, AllowSelectMultiple: req.AllowSelectMultiple,
 	})
 	if err != nil {
@@ -263,7 +263,7 @@ func (h *ContentHandler) UpdatePoll(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	poll, err := h.content.UpdatePoll(c, uint(id), service.UpdatePollRequest{
+	poll, err := h.content.UpdatePoll(c.Context(), uint(id), service.UpdatePollRequest{
 		Name: req.Name, AllowSelectMultiple: req.AllowSelectMultiple,
 	})
 	if err != nil {
@@ -280,7 +280,7 @@ func (h *ContentHandler) DeletePoll(c gorp.Context) {
 		gorp.BadRequest(c, "无效的ID参数")
 		return
 	}
-	if err := h.content.DeletePoll(c, uint(id)); err != nil {
+	if err := h.content.DeletePoll(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -299,7 +299,7 @@ func (h *ContentHandler) VotePoll(c gorp.Context) {
 		gorp.BadRequest(c, "请求参数无效: "+err.Error())
 		return
 	}
-	if err := h.content.VotePoll(c, uint(id), req.AnswerID); err != nil {
+	if err := h.content.VotePoll(c.Context(), uint(id), req.AnswerID); err != nil {
 		gorp.Error(c, err)
 		return
 	}

@@ -2,7 +2,7 @@
 # Shipping Service Dockerfile
 # 物流服务 - 处理订单配送、物流跟踪
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 
