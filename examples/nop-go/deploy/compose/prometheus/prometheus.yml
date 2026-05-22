@@ -1,0 +1,191 @@
+# ============================================================
+# Prometheus 配置文件
+# 用于监控 nop-go 微服务平台的所有服务
+# ============================================================
+
+global:
+  scrape_interval: 15s      # 默认抓取间隔
+  evaluation_interval: 15s  # 规则评估间隔
+  external_labels:
+    monitor: 'nop-go-monitor'
+
+# Alertmanager 配置（可选）
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+      # - alertmanager:9093
+
+# 规则文件（可选）
+rule_files:
+  # - "alerts.yml"
+
+# 抓取配置
+scrape_configs:
+  # ----------------------------------------------------------
+  # Prometheus 自身监控
+  # ----------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # ----------------------------------------------------------
+  # 基础设施服务
+  # ----------------------------------------------------------
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+        labels:
+          service: 'redis'
+
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysql:3306']
+        labels:
+          service: 'mysql'
+
+  # ----------------------------------------------------------
+  # 业务微服务监控
+  # 每个服务暴露 /metrics 端点
+  # ----------------------------------------------------------
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8081']
+        labels:
+          service: 'user'
+          type: 'business'
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:8082']
+        labels:
+          service: 'order'
+          type: 'business'
+
+  - job_name: 'product-service'
+    static_configs:
+      - targets: ['product-service:8083']
+        labels:
+          service: 'product'
+          type: 'business'
+
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['payment-service:8084']
+        labels:
+          service: 'payment'
+          type: 'business'
+
+  - job_name: 'shipping-service'
+    static_configs:
+      - targets: ['shipping-service:8085']
+        labels:
+          service: 'shipping'
+          type: 'business'
+
+  - job_name: 'discount-service'
+    static_configs:
+      - targets: ['discount-service:8086']
+        labels:
+          service: 'discount'
+          type: 'business'
+
+  - job_name: 'tax-service'
+    static_configs:
+      - targets: ['tax-service:8087']
+        labels:
+          service: 'tax'
+          type: 'business'
+
+  - job_name: 'media-service'
+    static_configs:
+      - targets: ['media-service:8088']
+        labels:
+          service: 'media'
+          type: 'business'
+
+  - job_name: 'message-service'
+    static_configs:
+      - targets: ['message-service:8089']
+        labels:
+          service: 'message'
+          type: 'business'
+
+  - job_name: 'localization-service'
+    static_configs:
+      - targets: ['localization-service:8090']
+        labels:
+          service: 'localization'
+          type: 'business'
+
+  - job_name: 'store-service'
+    static_configs:
+      - targets: ['store-service:8091']
+        labels:
+          service: 'store'
+          type: 'business'
+
+  - job_name: 'security-service'
+    static_configs:
+      - targets: ['security-service:8092']
+        labels:
+          service: 'security'
+          type: 'business'
+
+  - job_name: 'vendor-service'
+    static_configs:
+      - targets: ['vendor-service:8093']
+        labels:
+          service: 'vendor'
+          type: 'business'
+
+  - job_name: 'affiliate-service'
+    static_configs:
+      - targets: ['affiliate-service:8094']
+        labels:
+          service: 'affiliate'
+          type: 'business'
+
+  - job_name: 'content-service'
+    static_configs:
+      - targets: ['content-service:8095']
+        labels:
+          service: 'content'
+          type: 'business'
+
+  - job_name: 'directory-service'
+    static_configs:
+      - targets: ['directory-service:8096']
+        labels:
+          service: 'directory'
+          type: 'business'
+
+  - job_name: 'seo-service'
+    static_configs:
+      - targets: ['seo-service:8097']
+        labels:
+          service: 'seo'
+          type: 'business'
+
+  - job_name: 'gdpr-service'
+    static_configs:
+      - targets: ['gdpr-service:8098']
+        labels:
+          service: 'gdpr'
+          type: 'business'
+
+  - job_name: 'plugin-service'
+    static_configs:
+      - targets: ['plugin-service:8099']
+        labels:
+          service: 'plugin'
+          type: 'business'
+
+  - job_name: 'logging-service'
+    static_configs:
+      - targets: ['logging-service:8100']
+        labels:
+          service: 'logging'
+          type: 'business'

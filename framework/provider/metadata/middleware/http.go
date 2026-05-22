@@ -83,7 +83,7 @@ func MetadataMiddleware(propagator transportcontract.MetadataPropagator) transpo
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
 			carrier := NewHeaderCarrier(c.Request().Header)
-			ctx := propagator.Extract(c, carrier)
+			ctx := propagator.Extract(c.Context(), carrier)
 			// Check if metadata was extracted
 			if md, ok := transportcontract.FromServerContext(ctx); ok && md != nil {
 				c.Set("metadata", md)

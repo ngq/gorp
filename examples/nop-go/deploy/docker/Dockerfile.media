@@ -1,0 +1,29 @@
+# ============================================================
+# Media Service Dockerfile
+# 媒体服务 - 处理图片、视频、文件上传与管理
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/media/ ./services/media/
+
+RUN cd /build/services/media && go build -o /media ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/media/config/app.yaml ./config/app.yaml
+COPY --from=builder /media .
+
+# 创建媒体存储目录
+RUN mkdir -p /app/media
+
+EXPOSE 8088
+EXPOSE 9088
+
+ENTRYPOINT ["./media"]

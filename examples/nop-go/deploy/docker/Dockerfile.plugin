@@ -1,0 +1,29 @@
+# ============================================================
+# Plugin Service Dockerfile
+# 插件服务 - 处理插件加载、插件生命周期管理
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/plugin/ ./services/plugin/
+
+RUN cd /build/services/plugin && go build -o /plugin ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/plugin/config/app.yaml ./config/app.yaml
+COPY --from=builder /plugin .
+
+# 创建插件存储目录
+RUN mkdir -p /app/plugins
+
+EXPOSE 8099
+EXPOSE 9099
+
+ENTRYPOINT ["./plugin"]

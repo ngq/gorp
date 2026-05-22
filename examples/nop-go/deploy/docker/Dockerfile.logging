@@ -1,0 +1,26 @@
+# ============================================================
+# Logging Service Dockerfile
+# 日志服务 - 处理集中式日志收集、查询、分析
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/logging/ ./services/logging/
+
+RUN cd /build/services/logging && go build -o /logging ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/logging/config/app.yaml ./config/app.yaml
+COPY --from=builder /logging .
+
+EXPOSE 8100
+EXPOSE 9100
+
+ENTRYPOINT ["./logging"]

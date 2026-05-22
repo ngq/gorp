@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nop-go-staging
+
+resources:
+  - ../../base
+
+images:
+  - name: your-registry/nop-go-user-service
+    newName: your-registry/nop-go-user-service
+    newTag: staging
+  - name: your-registry/nop-go-order-service
+    newName: your-registry/nop-go-order-service
+    newTag: staging
+  - name: your-registry/nop-go-product-service
+    newName: your-registry/nop-go-product-service
+    newTag: staging
+
+patches:
+  - path: deployment-patch.yaml

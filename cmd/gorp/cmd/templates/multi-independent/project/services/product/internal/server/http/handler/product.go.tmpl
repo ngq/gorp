@@ -168,7 +168,7 @@ func (h *ProductHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.product.List(c, page, size)
+	items, total, err := h.product.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -202,7 +202,7 @@ func (h *ProductHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	product, err := h.product.GetByID(c, uint(id))
+	product, err := h.product.GetByID(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "product not found"})
 		return
@@ -226,7 +226,7 @@ func (h *ProductHandler) Create(c gorp.Context) {
 		return
 	}
 
-	product, err := h.product.Create(c, service.CreateProductRequest{
+	product, err := h.product.Create(c.Context(), service.CreateProductRequest{
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
@@ -255,7 +255,7 @@ func (h *ProductHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.product.Delete(c, uint(id)); err != nil {
+	if err := h.product.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -270,7 +270,7 @@ func (h *ProductHandler) PublishStockChanged(c gorp.Context) {
 		return
 	}
 
-	resp, err := h.product.PublishStockChanged(c, uint(id))
+	resp, err := h.product.PublishStockChanged(c.Context(), uint(id))
 	if err != nil {
 		gorp.Error(c, err)
 		return

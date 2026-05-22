@@ -1,0 +1,26 @@
+# ============================================================
+# SEO Service Dockerfile
+# SEO服务 - 处理SEO优化、元数据管理
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/seo/ ./services/seo/
+
+RUN cd /build/services/seo && go build -o /seo ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/seo/config/app.yaml ./config/app.yaml
+COPY --from=builder /seo .
+
+EXPOSE 8097
+EXPOSE 9097
+
+ENTRYPOINT ["./seo"]

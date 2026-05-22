@@ -44,7 +44,7 @@ func HealthCheckHandler(checker observabilitycontract.HealthChecker) transportco
 			return
 		}
 
-		report, err := checker.Check(c)
+		report, err := checker.Check(c.Context())
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, map[string]any{
 				"status":  "unhealthy",
@@ -119,7 +119,7 @@ func ReadinessHandler(checker observabilitycontract.HealthChecker) transportcont
 			return
 		}
 
-		report, err := checker.Check(c)
+		report, err := checker.Check(c.Context())
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, map[string]any{
 				"ready":   false,

@@ -31,7 +31,7 @@ func Timeout(timeout time.Duration) transportcontract.Middleware {
 				return
 			}
 
-			ctx, cancel := context.WithTimeout(c, timeout)
+			ctx, cancel := context.WithTimeout(c.Context(), timeout)
 			defer cancel()
 
 			done := make(chan struct{})

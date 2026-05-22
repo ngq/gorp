@@ -213,7 +213,7 @@ distributed_lock:
     addr: 127.0.0.1:6379
     password: ""
     db: 0
-  key_prefix: lock:
+  key_prefix: "lock:"
 
 # Cache 配置（优先使用 memory，避免本地单服务起步强依赖 Redis）
 cache:

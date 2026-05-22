@@ -32,11 +32,11 @@ func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.Midd
 			fields := make([]observabilitycontract.Field, 0, 2)
 			traceID := ""
 			requestID := ""
-			if tid, ok := supportcontract.FromTraceIDContext(c); ok && tid != "" {
+			if tid, ok := supportcontract.FromTraceIDContext(c.Context()); ok && tid != "" {
 				traceID = tid
 				fields = append(fields, observabilitycontract.Field{Key: "trace_id", Value: tid})
 			}
-			if rid, ok := supportcontract.FromRequestIDContext(c); ok && rid != "" {
+			if rid, ok := supportcontract.FromRequestIDContext(c.Context()); ok && rid != "" {
 				requestID = rid
 				fields = append(fields, observabilitycontract.Field{Key: "request_id", Value: rid})
 			}
@@ -83,7 +83,7 @@ func LoggingMiddleware(base observabilitycontract.Logger) transportcontract.Midd
 			if traceID != "" {
 				logFields = append(logFields, observabilitycontract.Field{Key: "trace_id", Value: traceID})
 			}
-			frameworkbizlog.Ctx(c).Info("http request", logFields...)
+			frameworkbizlog.Ctx(c.Context()).Info("http request", logFields...)
 		}
 	}
 }

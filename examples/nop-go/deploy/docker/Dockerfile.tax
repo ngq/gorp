@@ -1,0 +1,26 @@
+# ============================================================
+# Tax Service Dockerfile
+# 税务服务 - 处理税率计算、税务合规
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/tax/ ./services/tax/
+
+RUN cd /build/services/tax && go build -o /tax ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/tax/config/app.yaml ./config/app.yaml
+COPY --from=builder /tax .
+
+EXPOSE 8087
+EXPOSE 9087
+
+ENTRYPOINT ["./tax"]

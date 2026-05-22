@@ -10,8 +10,8 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
@@ -20,6 +20,10 @@ import (
 
 // ginContext implements Context by delegating to gin.Context.
 // This is used by bridge middleware to wrap Gin context.
+//
+// 注意：ginContext 不再实现 context.Context（不提供 Value/Done/Deadline/Err），
+// 调用方必须通过 c.Context() 显式获取标准 context.Context。
+// 这是为了避免 ginContext 被 context 链双向引用导致栈溢出。BUG-001。
 type ginContext struct {
 	gin *gin.Context
 }
@@ -41,31 +45,11 @@ func (c *ginContext) GinContext() *gin.Context {
 	return c.gin
 }
 
-// ========== context.Context delegation ==========
-
-func (c *ginContext) Deadline() (deadline time.Time, ok bool) {
-	return c.gin.Request.Context().Deadline()
-}
-
-func (c *ginContext) Done() <-chan struct{} {
-	return c.gin.Request.Context().Done()
-}
-
-func (c *ginContext) Err() error {
-	return c.gin.Request.Context().Err()
-}
-
-func (c *ginContext) Value(key any) any {
-	// Delegate to gin.Context's Value method first.
-	// gin.Context.Value checks its internal key-value store (c.Get) before
-	// falling back to Request.Context().Value, which avoids infinite recursion
-	// when ginContext is used as a parent in context.WithValue chains.
-	//
-	// 优先委托给 gin.Context 的 Value 方法。
-	// gin.Context.Value 会先检查其内部键值存储 (c.Get)，
-	// 然后才回退到 Request.Context().Value，避免了当 ginContext
-	// 作为 context.WithValue 链中的父 context 时产生无限递归。
-	return c.gin.Value(key)
+// Context 返回标准 context.Context（即 gin.Context.Request.Context()）。
+// 业务/中间件需要进行 context.WithTimeout/context.WithValue 等操作时，
+// 必须通过此方法获取标准 context，不能把 ginContext 直接当 context 用。
+func (c *ginContext) Context() context.Context {
+	return c.gin.Request.Context()
 }
 
 // ========== Request/Response ==========

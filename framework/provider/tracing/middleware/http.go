@@ -26,9 +26,9 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
 			carrier := &httpHeaderCarrier{c.Request().Header}
-			ctx, err := tracer.Extract(c, carrier)
+			ctx, err := tracer.Extract(c.Context(), carrier)
 			if err != nil {
-				ctx = c
+				ctx = c.Context()
 			}
 
 			spanName := fmt.Sprintf("HTTP %s %s", c.Request().Method, c.RoutePath())

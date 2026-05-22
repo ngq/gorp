@@ -6,10 +6,10 @@
 package jwt
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
@@ -23,20 +23,8 @@ type testContext struct {
 	gin *gin.Context
 }
 
-func (c *testContext) Deadline() (deadline time.Time, ok bool) {
-	return c.gin.Request.Context().Deadline()
-}
-
-func (c *testContext) Done() <-chan struct{} {
-	return c.gin.Request.Context().Done()
-}
-
-func (c *testContext) Err() error {
-	return c.gin.Request.Context().Err()
-}
-
-func (c *testContext) Value(key any) any {
-	return c.gin.Request.Context().Value(key)
+func (c *testContext) Context() context.Context {
+	return c.gin.Request.Context()
 }
 
 func (c *testContext) Request() *http.Request {

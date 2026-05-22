@@ -1,0 +1,104 @@
+app:
+  name: shipping-service
+  env: dev
+  address: ":8085"
+
+service:
+  name: shipping-service
+
+rpc:
+  mode: grpc
+  grpc:
+    address: ":9085"
+
+server:
+  http:
+    addr: ":8085"
+    mode: debug
+
+database:
+  driver: mysql
+  dsn: "admin:123456@tcp(192.168.3.250:3306)/nop_shipping?charset=utf8mb4&parseTime=True&loc=Local"
+
+redis:
+  addr: "${REDIS_ADDR:localhost:6379}"
+  password: ""
+  db: 0
+
+log:
+  level: debug
+
+tracing:
+  enabled: true
+  backend: otel
+  service_name: shipping-service
+  otel:
+    endpoint: "${JAEGER_ENDPOINT:localhost:4317}"
+  sampling_rate: 1.0
+
+metadata:
+  enabled: true
+  propagate_prefix:
+    - x-md-
+
+service_auth:
+  mode: token
+  token:
+    secret: "change-me-in-production"
+    issuer: "shipping-service"
+    audience: "internal"
+    expiry: 3600
+  allowed_services:
+    - order-service
+
+cache:
+  driver: memory
+
+distributed_lock:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+  key_prefix: "lock:"
+
+message_queue:
+  enabled: false
+  backend: redis
+  redis:
+    addr: "${REDIS_ADDR:localhost:6379}"
+    password: ""
+    db: 0
+
+# 治理覆盖配置
+governance:
+  disable: []
+  providers:
+    tracing: otel
+    selector: p2c_ewma
+    serviceauth: token
+    circuitbreaker: sentinel
+
+# circuit_breaker 配置
+circuit_breaker:
+  enabled: true
+  backend: sentinel
+  sentinel:
+    strategy: error_count
+    threshold: 50
+    retry_timeout_ms: 5000
+
+# selector 配置
+selector:
+  enabled: true
+  backend: p2c_ewma
+
+# 如需服务发现，可再开启
+# discovery:
+#   enabled: true
+#   type: consul
+#   consul:
+#     addr: "${CONSUL_ADDR:localhost:8500}"
+#     service_name: "shipping-service"
+#     service_port: 8081

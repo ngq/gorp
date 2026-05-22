@@ -1,0 +1,26 @@
+# ============================================================
+# Affiliate Service Dockerfile
+# 联盟营销服务 - 处理推广员、佣金计算
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/affiliate/ ./services/affiliate/
+
+RUN cd /build/services/affiliate && go build -o /affiliate ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/affiliate/config/app.yaml ./config/app.yaml
+COPY --from=builder /affiliate .
+
+EXPOSE 8094
+EXPOSE 9094
+
+ENTRYPOINT ["./affiliate"]

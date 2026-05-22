@@ -1,195 +1,274 @@
-.PHONY: all build clean test start-all stop-all swagger-install swagger-gen swagger-gen-% swagger-aggregate swagger-clean swagger-help docker-build docker-up docker-down docker-logs docker-status docker-clean docker-all
+# nop-go - nopCommerce 微服务重构项目
+# 基于 gorp multi-independent 模板构建
 
-# 服务列表
-SERVICES := catalog-service customer-service inventory-service price-service \
-            order-service payment-service shipping-service cart-service \
-            cms-service notification-service gateway-service admin-service \
-            store-service media-service localization-service affiliate-service \
-            seo-service import-service theme-service ai-service
+HARBOR_REGISTRY ?= harbor.example.com
+HARBOR_NAMESPACE ?= nop-go
+IMAGE_TAG ?= latest
 
-# 默认目标
-all: build
+# 所有服务列表
+SERVICES := user order product payment shipping discount tax media message localization store security vendor affiliate content directory seo gdpr plugin logging
 
-# 编译所有服务
+# 镜像名称
+USER_IMAGE := nop-go-user-service
+ORDER_IMAGE := nop-go-order-service
+PRODUCT_IMAGE := nop-go-product-service
+PAYMENT_IMAGE := nop-go-payment-service
+SHIPPING_IMAGE := nop-go-shipping-service
+DISCOUNT_IMAGE := nop-go-discount-service
+TAX_IMAGE := nop-go-tax-service
+MEDIA_IMAGE := nop-go-media-service
+MESSAGE_IMAGE := nop-go-message-service
+LOCALIZATION_IMAGE := nop-go-localization-service
+STORE_IMAGE := nop-go-store-service
+SECURITY_IMAGE := nop-go-security-service
+VENDOR_IMAGE := nop-go-vendor-service
+AFFILIATE_IMAGE := nop-go-affiliate-service
+CONTENT_IMAGE := nop-go-content-service
+DIRECTORY_IMAGE := nop-go-directory-service
+SEO_IMAGE := nop-go-seo-service
+GDPR_IMAGE := nop-go-gdpr-service
+PLUGIN_IMAGE := nop-go-plugin-service
+LOGGING_IMAGE := nop-go-logging-service
+
+.PHONY: all generate gen-wire build clean test tidy \
+        run-user run-order run-product run-payment run-shipping run-discount run-tax \
+        run-media run-message run-localization run-store run-security run-vendor \
+        run-affiliate run-content run-directory run-seo run-gdpr run-plugin run-logging \
+        deploy-local deploy-local-down build-images deploy-local-build harbor-tag harbor-push \
+        init-db
+
+all: tidy generate
+
+generate: gen-wire
+
+gen-wire:
+	@echo ">>> 生成 Wire 依赖注入代码..."
+	wire ./services/user/cmd
+	wire ./services/order/cmd
+	wire ./services/product/cmd
+	wire ./services/payment/cmd
+	wire ./services/shipping/cmd
+	wire ./services/discount/cmd
+	wire ./services/tax/cmd
+	wire ./services/media/cmd
+	wire ./services/message/cmd
+	wire ./services/localization/cmd
+	wire ./services/store/cmd
+	wire ./services/security/cmd
+	wire ./services/vendor/cmd
+	wire ./services/affiliate/cmd
+	wire ./services/content/cmd
+	wire ./services/directory/cmd
+	wire ./services/seo/cmd
+	wire ./services/gdpr/cmd
+	wire ./services/plugin/cmd
+	wire ./services/logging/cmd
+
 build:
-	@echo "Building all services..."
-	@for svc in $(SERVICES); do \
-		echo "Building $$svc..."; \
-		if [ -d "services/$$svc" ]; then \
-			cd services/$$svc && go build -o bin/$$svc ./cmd && cd ../..; \
-		fi; \
-	done
-	@echo "Build complete!"
+	@echo ">>> 编译所有服务..."
+	@mkdir -p bin
+	go build -o bin/user ./services/user/cmd
+	go build -o bin/order ./services/order/cmd
+	go build -o bin/product ./services/product/cmd
+	go build -o bin/payment ./services/payment/cmd
+	go build -o bin/shipping ./services/shipping/cmd
+	go build -o bin/discount ./services/discount/cmd
+	go build -o bin/tax ./services/tax/cmd
+	go build -o bin/media ./services/media/cmd
+	go build -o bin/message ./services/message/cmd
+	go build -o bin/localization ./services/localization/cmd
+	go build -o bin/store ./services/store/cmd
+	go build -o bin/security ./services/security/cmd
+	go build -o bin/vendor ./services/vendor/cmd
+	go build -o bin/affiliate ./services/affiliate/cmd
+	go build -o bin/content ./services/content/cmd
+	go build -o bin/directory ./services/directory/cmd
+	go build -o bin/seo ./services/seo/cmd
+	go build -o bin/gdpr ./services/gdpr/cmd
+	go build -o bin/plugin ./services/plugin/cmd
+	go build -o bin/logging ./services/logging/cmd
 
-# 清理编译产物
-clean:
-	@echo "Cleaning..."
-	@for svc in $(SERVICES); do \
-		rm -f services/$$svc/bin/$$svc; \
-	done
-	@echo "Clean complete!"
+tidy:
+	@echo ">>> 同步 Go workspace..."
+	go work sync
 
-# 运行测试
+# 运行单个服务
+run-user:
+	go run ./services/user/cmd
+
+run-order:
+	go run ./services/order/cmd
+
+run-product:
+	go run ./services/product/cmd
+
+run-payment:
+	go run ./services/payment/cmd
+
+run-shipping:
+	go run ./services/shipping/cmd
+
+run-discount:
+	go run ./services/discount/cmd
+
+run-tax:
+	go run ./services/tax/cmd
+
+run-media:
+	go run ./services/media/cmd
+
+run-message:
+	go run ./services/message/cmd
+
+run-localization:
+	go run ./services/localization/cmd
+
+run-store:
+	go run ./services/store/cmd
+
+run-security:
+	go run ./services/security/cmd
+
+run-vendor:
+	go run ./services/vendor/cmd
+
+run-affiliate:
+	go run ./services/affiliate/cmd
+
+run-content:
+	go run ./services/content/cmd
+
+run-directory:
+	go run ./services/directory/cmd
+
+run-seo:
+	go run ./services/seo/cmd
+
+run-gdpr:
+	go run ./services/gdpr/cmd
+
+run-plugin:
+	go run ./services/plugin/cmd
+
+run-logging:
+	go run ./services/logging/cmd
+
 test:
-	@echo "Running tests..."
-	go test ./... -v
+	@echo ">>> 运行所有测试..."
+	go test ./services/user/... ./services/order/... ./services/product/... \
+		./services/payment/... ./services/shipping/... ./services/discount/... \
+		./services/tax/... ./services/media/... ./services/message/... \
+		./services/localization/... ./services/store/... ./services/security/... \
+		./services/vendor/... ./services/affiliate/... ./services/content/... \
+		./services/directory/... ./services/seo/... ./services/gdpr/... \
+		./services/plugin/... ./services/logging/... ./shared/... -v -coverprofile=coverage.out
 
-# 启动所有服务（需要先启动基础设施）
-start-all:
-	@echo "Starting all services..."
-	@for svc in $(SERVICES); do \
-		echo "Starting $$svc..."; \
-		cd services/$$svc && go run ./cmd & cd ../..; \
-	done
+test-coverage: test
+	@echo ">>> 生成覆盖率报告..."
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "覆盖率报告已生成: coverage.html"
 
-# 停止所有服务
-stop-all:
-	@echo "Stopping all services..."
-	@killall main 2>/dev/null || true
+clean:
+	@echo ">>> 清理构建产物..."
+	rm -rf bin/
+	rm -f *.db
+	rm -f coverage.out coverage.html
 
-# 启动单个服务
-start-%:
-	@echo "Starting $*..."
-	cd services/$* && go run ./cmd
-
-# 数据库初始化
+# 初始化数据库
 init-db:
-	@echo "Initializing database..."
-	go run infra/init_db.go
+	@echo ">>> 初始化数据库..."
+	mysql -h 192.168.3.250 -P 3306 -u admin -p123456 < deploy/sql/init_databases.sql
 
-# 生成 Proto
-proto:
-	@echo "Generating proto files..."
-	protoc --go_out=. --go-grpc_out=. infra/proto/*.proto
+# Docker 镜像构建
+build-images:
+	@echo ">>> 构建 Docker 镜像..."
+	docker build -f deploy/docker/Dockerfile.user -t $(USER_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.order -t $(ORDER_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.product -t $(PRODUCT_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.payment -t $(PAYMENT_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.shipping -t $(SHIPPING_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.discount -t $(DISCOUNT_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.tax -t $(TAX_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.media -t $(MEDIA_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.message -t $(MESSAGE_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.localization -t $(LOCALIZATION_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.store -t $(STORE_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.security -t $(SECURITY_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.vendor -t $(VENDOR_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.affiliate -t $(AFFILIATE_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.content -t $(CONTENT_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.directory -t $(DIRECTORY_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.seo -t $(SEO_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.gdpr -t $(GDPR_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.plugin -t $(PLUGIN_IMAGE):$(IMAGE_TAG) .
+	docker build -f deploy/docker/Dockerfile.logging -t $(LOGGING_IMAGE):$(IMAGE_TAG) .
 
-# Docker 启动基础设施
-infra-up:
-	docker-compose up -d mysql redis
+deploy-local:
+	docker-compose -f deploy/compose/docker-compose.yaml up -d
 
-# Docker 停止基础设施
-infra-down:
-	docker-compose down
+deploy-local-down:
+	docker-compose -f deploy/compose/docker-compose.yaml down
 
-# ========== Swagger 文档生成 ==========
+deploy-local-build: build-images deploy-local
 
-# 安装 swag 工具
-swagger-install:
-	@echo "安装 swag 工具..."
-	@go install github.com/swaggo/swag/cmd/swag@latest
-	@echo "✓ swag 安装完成"
+harbor-tag:
+	docker tag $(USER_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(USER_IMAGE):$(IMAGE_TAG)
+	docker tag $(ORDER_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(ORDER_IMAGE):$(IMAGE_TAG)
+	docker tag $(PRODUCT_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(PRODUCT_IMAGE):$(IMAGE_TAG)
+	docker tag $(PAYMENT_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(PAYMENT_IMAGE):$(IMAGE_TAG)
+	docker tag $(SHIPPING_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(SHIPPING_IMAGE):$(IMAGE_TAG)
+	docker tag $(DISCOUNT_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(DISCOUNT_IMAGE):$(IMAGE_TAG)
+	docker tag $(TAX_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(TAX_IMAGE):$(IMAGE_TAG)
+	docker tag $(MEDIA_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(MEDIA_IMAGE):$(IMAGE_TAG)
+	docker tag $(MESSAGE_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(MESSAGE_IMAGE):$(IMAGE_TAG)
+	docker tag $(LOCALIZATION_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(LOCALIZATION_IMAGE):$(IMAGE_TAG)
+	docker tag $(STORE_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(STORE_IMAGE):$(IMAGE_TAG)
+	docker tag $(SECURITY_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(SECURITY_IMAGE):$(IMAGE_TAG)
+	docker tag $(VENDOR_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(VENDOR_IMAGE):$(IMAGE_TAG)
+	docker tag $(AFFILIATE_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(AFFILIATE_IMAGE):$(IMAGE_TAG)
+	docker tag $(CONTENT_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(CONTENT_IMAGE):$(IMAGE_TAG)
+	docker tag $(DIRECTORY_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(DIRECTORY_IMAGE):$(IMAGE_TAG)
+	docker tag $(SEO_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(SEO_IMAGE):$(IMAGE_TAG)
+	docker tag $(GDPR_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(GDPR_IMAGE):$(IMAGE_TAG)
+	docker tag $(PLUGIN_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(PLUGIN_IMAGE):$(IMAGE_TAG)
+	docker tag $(LOGGING_IMAGE):$(IMAGE_TAG) $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(LOGGING_IMAGE):$(IMAGE_TAG)
 
-# 为所有服务生成 swagger 文档
-swagger-gen:
-	@echo "=== 生成各服务 Swagger 文档 ==="
-	@for svc in $(SERVICES); do \
-		if [ -d "services/$$svc" ] && [ -f "services/$$svc/cmd/main.go" ]; then \
-			echo "处理 $$svc..."; \
-			cd services/$$svc && \
-			mkdir -p docs && \
-			swag init -g ./cmd/main.go -o ./docs --parseInternal --parseDependency 2>/dev/null || echo "  跳过 $$svc (缺少注解)"; \
-			cd ../..; \
-		fi; \
-	done
-	@echo "=== 完成 ==="
+harbor-push: build-images harbor-tag
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(USER_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(ORDER_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(PRODUCT_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(PAYMENT_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(SHIPPING_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(DISCOUNT_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(TAX_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(MEDIA_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(MESSAGE_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(LOCALIZATION_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(STORE_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(SECURITY_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(VENDOR_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(AFFILIATE_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(CONTENT_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(DIRECTORY_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(SEO_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(GDPR_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(PLUGIN_IMAGE):$(IMAGE_TAG)
+	docker push $(HARBOR_REGISTRY)/$(HARBOR_NAMESPACE)/$(LOGGING_IMAGE):$(IMAGE_TAG)
 
-# 为单个服务生成 swagger
-swagger-gen-%:
-	@echo "生成 $* swagger..."
-	@if [ -d "services/$*" ]; then \
-		cd services/$* && mkdir -p docs && swag init -g ./cmd/main.go -o ./docs --parseInternal --parseDependency; \
-	else \
-		echo "服务 $* 不存在"; \
-	fi
-
-# 生成聚合文档
-swagger-aggregate:
-	@echo "生成聚合文档..."
-	@mkdir -p docs/swagger
-	@cd scripts/gen-swagger && go run main.go
-	@echo "✓ 聚合文档生成完成: docs/swagger/index.html"
-
-# 清理所有 swagger 文档
-swagger-clean:
-	@echo "清理 swagger 文档..."
-	@for svc in $(SERVICES); do \
-		rm -rf services/$$svc/docs; \
-	done
-	@rm -rf docs/swagger
-	@echo "✓ 清理完成"
-
-# Swagger 帮助信息
-swagger-help:
-	@echo "Swagger 文档生成命令:"
-	@echo "  make swagger-install      安装 swag 工具"
-	@echo "  make swagger-gen          为所有服务生成 swagger 文档"
-	@echo "  make swagger-gen-<svc>    为单个服务生成 swagger 文档"
-	@echo "  make swagger-aggregate    生成聚合文档"
-	@echo "  make swagger-clean        清理所有 swagger 文档"
+# 帮助信息
+help:
+	@echo "nop-go - nopCommerce 微服务重构项目"
 	@echo ""
-	@echo "示例:"
-	@echo "  make swagger-gen-customer-service"
+	@echo "常用命令:"
+	@echo "  make all          - 初始化项目（tidy + generate）"
+	@echo "  make generate     - 生成 Wire 依赖注入代码"
+	@echo "  make build        - 编译所有服务"
+	@echo "  make test         - 运行所有测试"
+	@echo "  make test-coverage- 生成覆盖率报告"
+	@echo "  make run-<service>- 运行指定服务（如 run-user）"
+	@echo "  make deploy-local - 本地 Docker 部署"
+	@echo "  make init-db      - 初始化数据库"
 	@echo ""
-	@echo "访问方式:"
-	@echo "  各服务: http://localhost:{port}/swagger/index.html"
-	@echo "  网关聚合: http://localhost:8000/swagger"
-
-# ========== Docker 部署命令 ==========
-
-# Docker 构建镜像
-docker-build:
-	@echo "构建 Docker 镜像..."
-	docker-compose build --parallel
-
-# Docker 启动所有服务
-docker-up:
-	@echo "启动所有 Docker 服务..."
-	docker-compose up -d
-	@$(MAKE) docker-status
-
-# Docker 停止所有服务
-docker-down:
-	@echo "停止所有 Docker 服务..."
-	docker-compose down
-
-# Docker 查看日志
-docker-logs:
-	docker-compose logs -f
-
-# Docker 查看状态
-docker-status:
-	@echo "=== Docker 服务状态 ==="
-	@docker-compose ps
-	@echo ""
-	@echo "访问地址:"
-	@echo "  API 网关:     http://localhost:8000"
-	@echo "  Swagger UI:   http://localhost:8080"
-	@echo "  MySQL:        localhost:3306 (root / nop123456)"
-	@echo "  Redis:        localhost:6379"
-
-# Docker 清理
-docker-clean:
-	@echo "清理 Docker 容器和镜像..."
-	docker-compose down -v --rmi local
-	@echo "✓ 清理完成"
-
-# Docker 完整部署
-docker-all: swagger-gen docker-build
-	@echo "启动基础设施..."
-	docker-compose up -d mysql redis
-	@sleep 15
-	@echo "启动所有微服务..."
-	docker-compose up -d
-	@$(MAKE) docker-status
-
-# 查看服务状态
-status:
-	@echo "Service status:"
-	@curl -s http://localhost:8000/healthz 2>/dev/null && echo "gateway: OK" || echo "gateway: DOWN"
-	@for port in 8001 8002 8003 8004 8005 8007 8008 8009 8010 8011 8012 8013 8014 8015 8016 8017 8018 8019 8020; do \
-		result=$$(curl -s http://localhost:$$port/healthz 2>/dev/null); \
-		if [ -n "$$result" ]; then \
-			echo "Port $$port: OK"; \
-		else \
-			echo "Port $$port: DOWN"; \
-		fi; \
-	done
+	@echo "可用服务: user, order, product, payment, shipping, discount, tax,"
+	@echo "          media, message, localization, store, security, vendor,"
+	@echo "          affiliate, content, directory, seo, gdpr, plugin, logging"

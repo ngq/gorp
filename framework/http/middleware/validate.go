@@ -50,7 +50,7 @@ func validateBoundValue(c transportcontract.Context, validator datacontract.Vali
 	if validator == nil {
 		return nil
 	}
-	if err := validator.Validate(c, obj); err != nil {
+	if err := validator.Validate(c.Context(), obj); err != nil {
 		var appErr resiliencecontract.AppError
 		if !errors.As(err, &appErr) {
 			appErr = resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())

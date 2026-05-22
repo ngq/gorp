@@ -28,7 +28,7 @@ func RecoveryMiddleware() transportcontract.Middleware {
 			defer func() {
 				if rec := recover(); rec != nil {
 					stack := string(debug.Stack())
-					frameworkbizlog.Ctx(c).Error("http panic recovered",
+					frameworkbizlog.Ctx(c.Context()).Error("http panic recovered",
 						observabilitycontract.Field{Key: "panic", Value: rec},
 						observabilitycontract.Field{Key: "stack", Value: stack},
 					)

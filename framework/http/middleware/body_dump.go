@@ -110,13 +110,13 @@ func BodyDump(opts BodyDumpOptions) transportcontract.Middleware {
 				RequestHeaders:  map[string]string{},
 				ResponseHeaders: map[string]string{},
 			}
-			if requestID, ok := supportcontract.FromRequestIDContext(c); ok {
+			if requestID, ok := supportcontract.FromRequestIDContext(c.Context()); ok {
 				dump.RequestID = requestID
 			}
-			if traceID, ok := supportcontract.FromTraceIDContext(c); ok {
+			if traceID, ok := supportcontract.FromTraceIDContext(c.Context()); ok {
 				dump.TraceID = traceID
 			}
-			if tenant, ok := supportcontract.FromTenantContext(c); ok {
+			if tenant, ok := supportcontract.FromTenantContext(c.Context()); ok {
 				dump.Tenant = tenant
 			}
 			if opts.CaptureRequestHeaders {

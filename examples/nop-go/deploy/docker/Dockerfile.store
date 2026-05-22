@@ -1,0 +1,26 @@
+# ============================================================
+# Store Service Dockerfile
+# 店铺服务 - 处理多店铺管理、店铺配置
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/store/ ./services/store/
+
+RUN cd /build/services/store && go build -o /store ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/store/config/app.yaml ./config/app.yaml
+COPY --from=builder /store .
+
+EXPOSE 8091
+EXPOSE 9091
+
+ENTRYPOINT ["./store"]

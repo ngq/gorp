@@ -244,7 +244,7 @@ func (DefaultResponder) InternalError(c transportcontract.Context, message strin
 
 func responderFor(c transportcontract.Context) transportcontract.HTTPResponder {
 	if c != nil {
-		if containerAny, ok := supportcontract.FromContainerContext(c); ok {
+		if containerAny, ok := supportcontract.FromContainerContext(c.Context()); ok {
 			if container, ok := containerAny.(runtimecontract.Container); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
 				if responderAny, err := container.Make(transportcontract.HTTPResponderKey); err == nil {
 					if responder, ok := responderAny.(transportcontract.HTTPResponder); ok && responder != nil {
@@ -261,10 +261,10 @@ func writeResponseHeaders(c transportcontract.Context) {
 	if c == nil {
 		return
 	}
-	if requestID, ok := supportcontract.FromRequestIDContext(c); ok && requestID != "" {
+	if requestID, ok := supportcontract.FromRequestIDContext(c.Context()); ok && requestID != "" {
 		c.SetHeader("X-Request-Id", requestID)
 	}
-	if traceID, ok := supportcontract.FromTraceIDContext(c); ok && traceID != "" {
+	if traceID, ok := supportcontract.FromTraceIDContext(c.Context()); ok && traceID != "" {
 		c.SetHeader("X-Trace-Id", traceID)
 	}
 }

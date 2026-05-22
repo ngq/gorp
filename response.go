@@ -71,7 +71,7 @@ func InternalError(c Context, message string) {
 // responderFor 从上下文中解析 responder，缺省时回退到默认 responder。
 func responderFor(c Context) transportcontract.HTTPResponder {
 	if c != nil {
-		if container, ok := FromContainerContext(c); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
+		if container, ok := FromContainerContext(c.Context()); ok && container != nil && container.IsBind(transportcontract.HTTPResponderKey) {
 			if responderAny, err := container.Make(transportcontract.HTTPResponderKey); err == nil {
 				if responder, ok := responderAny.(transportcontract.HTTPResponder); ok && responder != nil {
 					return responder

@@ -182,7 +182,7 @@ func (h *OrderHandler) List(c gorp.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	items, total, err := h.order.List(c, page, size)
+	items, total, err := h.order.List(c.Context(), page, size)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -218,7 +218,7 @@ func (h *OrderHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	order, err := h.order.GetByID(c, uint(id))
+	order, err := h.order.GetByID(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "order not found"})
 		return
@@ -244,7 +244,7 @@ func (h *OrderHandler) Create(c gorp.Context) {
 		return
 	}
 
-	order, err := h.order.Create(c, service.CreateOrderRequest{
+	order, err := h.order.Create(c.Context(), service.CreateOrderRequest{
 		UserID:      req.UserID,
 		ProductID:   req.ProductID,
 		ProductName: req.ProductName,
@@ -276,7 +276,7 @@ func (h *OrderHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.order.Delete(c, uint(id)); err != nil {
+	if err := h.order.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -291,7 +291,7 @@ func (h *OrderHandler) GetOrderUser(c gorp.Context) {
 		return
 	}
 
-	resp, err := h.order.GetOrderUser(c, uint(id))
+	resp, err := h.order.GetOrderUser(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, map[string]any{"error": err.Error()})
 		return
@@ -315,7 +315,7 @@ func (h *OrderHandler) LockOrderDemo(c gorp.Context) {
 		return
 	}
 
-	resp, err := h.order.LockOrderDemo(c, uint(id))
+	resp, err := h.order.LockOrderDemo(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusConflict, map[string]any{"error": err.Error()})
 		return

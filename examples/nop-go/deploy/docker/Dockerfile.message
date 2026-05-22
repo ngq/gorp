@@ -1,0 +1,26 @@
+# ============================================================
+# Message Service Dockerfile
+# 消息服务 - 处理站内消息、通知推送
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/message/ ./services/message/
+
+RUN cd /build/services/message && go build -o /message ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/message/config/app.yaml ./config/app.yaml
+COPY --from=builder /message .
+
+EXPOSE 8089
+EXPOSE 9089
+
+ENTRYPOINT ["./message"]

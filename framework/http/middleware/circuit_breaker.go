@@ -38,23 +38,23 @@ func CircuitBreaker(cb resiliencecontract.CircuitBreaker, resource string) trans
 			}
 
 			target := circuitBreakerResource(c, resource)
-			if err := cb.Allow(c, target); err != nil {
+			if err := cb.Allow(c.Context(), target); err != nil {
 				respondCircuitBreakerOpen(c)
 				return
 			}
 
 			defer func() {
 				if rec := recover(); rec != nil {
-					cb.RecordFailure(c, target, fmt.Errorf("panic: %v", rec))
+					cb.RecordFailure(c.Context(), target, fmt.Errorf("panic: %v", rec))
 					panic(rec)
 				}
 
 				status := c.ResponseStatus()
 				if status >= http.StatusInternalServerError {
-					cb.RecordFailure(c, target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
+					cb.RecordFailure(c.Context(), target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
 					return
 				}
-				cb.RecordSuccess(c, target)
+				cb.RecordSuccess(c.Context(), target)
 			}()
 
 			if next != nil {
@@ -101,23 +101,23 @@ func CircuitBreakerFromContainer(container runtimecontract.Container, resource s
 
 			// 获取熔断资源
 			target := circuitBreakerResource(c, resource)
-			if err := cb.Allow(c, target); err != nil {
+			if err := cb.Allow(c.Context(), target); err != nil {
 				respondCircuitBreakerOpen(c)
 				return
 			}
 
 			defer func() {
 				if rec := recover(); rec != nil {
-					cb.RecordFailure(c, target, fmt.Errorf("panic: %v", rec))
+					cb.RecordFailure(c.Context(), target, fmt.Errorf("panic: %v", rec))
 					panic(rec)
 				}
 
 				status := c.ResponseStatus()
 				if status >= http.StatusInternalServerError {
-					cb.RecordFailure(c, target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
+					cb.RecordFailure(c.Context(), target, resiliencecontract.ServiceUnavailable(http.StatusText(status)))
 					return
 				}
-				cb.RecordSuccess(c, target)
+				cb.RecordSuccess(c.Context(), target)
 			}()
 
 			if next != nil {

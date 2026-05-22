@@ -183,11 +183,11 @@ func LoadSheddingFromContainer(container runtimecontract.Container, resource str
 			}
 
 			// 执行过载保护
-			if err := shedder.Allow(c, target); err != nil {
+			if err := shedder.Allow(c.Context(), target); err != nil {
 				respondServiceBusy(c, "server is busy")
 				return
 			}
-			defer shedder.Done(c, target, nil)
+			defer shedder.Done(c.Context(), target, nil)
 
 			if next != nil {
 				next(c)
@@ -202,7 +202,7 @@ func loadShedderFromContext(c transportcontract.Context) resiliencecontract.Load
 	if c == nil {
 		return nil
 	}
-	containerAny, ok := supportcontract.FromContainerContext(c)
+	containerAny, ok := supportcontract.FromContainerContext(c.Context())
 	if !ok {
 		return nil
 	}

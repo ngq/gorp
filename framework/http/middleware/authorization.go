@@ -116,7 +116,7 @@ func claimsFromContext(c transportcontract.Context) (*securitycontract.JWTClaims
 	if c == nil {
 		return nil, false
 	}
-	return securitycontract.FromJWTClaimsContext(c)
+	return securitycontract.FromJWTClaimsContext(c.Context())
 }
 
 // claimsRoleSet normalizes role values into a set for quick membership checks.

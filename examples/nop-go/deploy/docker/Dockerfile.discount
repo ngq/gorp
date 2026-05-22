@@ -1,0 +1,26 @@
+# ============================================================
+# Discount Service Dockerfile
+# 折扣服务 - 处理优惠券、促销活动、折扣规则
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/discount/ ./services/discount/
+
+RUN cd /build/services/discount && go build -o /discount ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/discount/config/app.yaml ./config/app.yaml
+COPY --from=builder /discount .
+
+EXPOSE 8086
+EXPOSE 9086
+
+ENTRYPOINT ["./discount"]

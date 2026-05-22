@@ -142,7 +142,7 @@ func (h *DemoHandler) Create(c gorp.Context) {
 		return
 	}
 
-	demo, err := h.svc.Create(c, req.Name)
+	demo, err := h.svc.Create(c.Context(), req.Name)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -159,7 +159,7 @@ func (h *DemoHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	demo, err := h.svc.GetByID(c, uint(id))
+	demo, err := h.svc.GetByID(c.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "not found"})
 		return
@@ -179,7 +179,7 @@ func (h *DemoHandler) List(c gorp.Context) {
 		pageSize = 10
 	}
 
-	demos, total, err := h.svc.List(c, page, pageSize)
+	demos, total, err := h.svc.List(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -212,7 +212,7 @@ func (h *DemoHandler) Update(c gorp.Context) {
 		return
 	}
 
-	demo, err := h.svc.Update(c, uint(id), req.Name)
+	demo, err := h.svc.Update(c.Context(), uint(id), req.Name)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -229,7 +229,7 @@ func (h *DemoHandler) Delete(c gorp.Context) {
 		return
 	}
 
-	if err := h.svc.Delete(c, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Context(), uint(id)); err != nil {
 		gorp.Error(c, err)
 		return
 	}

@@ -66,7 +66,7 @@ func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) trans
 
 			logger := base
 			if logger == nil {
-				logger = frameworkbizlog.Ctx(c)
+				logger = frameworkbizlog.Ctx(c.Context())
 			}
 
 			action := auditAction(c, opts)
@@ -100,16 +100,16 @@ func AuditMiddleware(base observabilitycontract.Logger, opts AuditOptions) trans
 			if route := c.RoutePath(); route != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "route", Value: route})
 			}
-			if rid, ok := supportcontract.FromRequestIDContext(c); ok && rid != "" {
+			if rid, ok := supportcontract.FromRequestIDContext(c.Context()); ok && rid != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "request_id", Value: rid})
 			}
-			if tid, ok := supportcontract.FromTraceIDContext(c); ok && tid != "" {
+			if tid, ok := supportcontract.FromTraceIDContext(c.Context()); ok && tid != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "trace_id", Value: tid})
 			}
-			if locale, ok := supportcontract.FromLocaleContext(c); ok && locale != "" {
+			if locale, ok := supportcontract.FromLocaleContext(c.Context()); ok && locale != "" {
 				fields = append(fields, observabilitycontract.Field{Key: "locale", Value: locale})
 			}
-			fields = append(fields, auditActorFields(c)...)
+			fields = append(fields, auditActorFields(c.Context())...)
 
 			logger.Info(event, fields...)
 		}

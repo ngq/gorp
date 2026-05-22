@@ -7,8 +7,8 @@
 package bootstrap
 
 import (
+	"context"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -54,20 +54,8 @@ var (
 	_ transportcontract.Context           = (*testContext)(nil)
 )
 
-func (c *testContext) Deadline() (deadline time.Time, ok bool) {
-	return c.gin.Request.Context().Deadline()
-}
-
-func (c *testContext) Done() <-chan struct{} {
-	return c.gin.Request.Context().Done()
-}
-
-func (c *testContext) Err() error {
-	return c.gin.Request.Context().Err()
-}
-
-func (c *testContext) Value(key any) any {
-	return c.gin.Request.Context().Value(key)
+func (c *testContext) Context() context.Context {
+	return c.gin.Request.Context()
 }
 
 func (c *testContext) Request() *http.Request {

@@ -27,7 +27,7 @@ func ServiceAuthMiddleware(authenticator securitycontract.ServiceAuthenticator) 
 
 			if authenticator != nil && (auth != "" || token != "") {
 				// Build context for authentication using standard context.Context
-				authCtx := context.Context(c)
+				authCtx := c.Context()
 				if auth != "" {
 					authCtx = context.WithValue(authCtx, "authorization", auth)
 				}

@@ -52,7 +52,7 @@ func RateLimit(limiter resiliencecontract.RateLimiter, resource string) transpor
 			if target == "" && c.Request() != nil && c.Request().URL != nil {
 				target = c.Request().Method + " " + c.Request().URL.Path
 			}
-			if err := limiter.Allow(c, target); err != nil {
+			if err := limiter.Allow(c.Context(), target); err != nil {
 				if gc, ok := unwrapGinContext(c); ok {
 					writeGinResponseHeaders(gc)
 					resp := Response{
@@ -122,7 +122,7 @@ func RateLimitFromContainer(container runtimecontract.Container, resource string
 			}
 
 			// 执行限流
-			if err := limiter.Allow(c, target); err != nil {
+			if err := limiter.Allow(c.Context(), target); err != nil {
 				if gc, ok := unwrapGinContext(c); ok {
 					writeGinResponseHeaders(gc)
 					resp := Response{

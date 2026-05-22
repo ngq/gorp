@@ -1,0 +1,26 @@
+# ============================================================
+# Shipping Service Dockerfile
+# 物流服务 - 处理订单配送、物流跟踪
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY shared/ ./shared/
+COPY services/shipping/ ./services/shipping/
+
+RUN cd /build/services/shipping && go build -o /shipping ./cmd
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY services/shipping/config/app.yaml ./config/app.yaml
+COPY --from=builder /shipping .
+
+EXPOSE 8085
+EXPOSE 9085
+
+ENTRYPOINT ["./shipping"]

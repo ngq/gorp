@@ -15,10 +15,16 @@ import (
 )
 
 // RequestContext 提供请求元数据访问。
-// 嵌入 context.Context 实现标准库集成。
-// 用于需要访问请求信息但不进行绑定/响应的场景。
+// 注意：与 context.Context 解耦 —— 业务/中间件如需获取标准 context.Context，
+// 必须通过 c.Context() 方法显式获取，禁止把 RequestContext 直接当作 context.Context 使用。
+// 这样做的根本原因：若直接嵌入 context.Context，provider 实现（如 ginContext）会与
+// Request().Context() 形成双向引用，标准库遍历 valueCtx 链时触发无限递归导致栈溢出。
+// 详见 docs/design/bug-list.md BUG-001。
 type RequestContext interface {
-	context.Context
+	// Context 返回标准 context.Context。
+	// 用于 context.WithTimeout/context.WithCancel/context.WithValue 等场景。
+	// 实现层应返回 Request().Context()，确保只返回纯标准 context，不再回包到 RequestContext。
+	Context() context.Context
 
 	// Request/Response
 	Request() *http.Request

@@ -28,6 +28,7 @@ redis:
 
 log:
   level: debug
+  format: console  # console, json
 
 tracing:
 {{- if .IsMicroGovernance }}
@@ -80,7 +81,7 @@ distributed_lock:
     addr: "${REDIS_ADDR:localhost:6379}"
     password: ""
     db: 0
-  key_prefix: lock:
+  key_prefix: "lock:"
 
 message_queue:
   enabled: false
