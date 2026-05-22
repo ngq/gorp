@@ -5,6 +5,8 @@
 package polaris
 
 import (
+	"errors"
+	"reflect"
 	"time"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -28,7 +30,7 @@ func ReadConfig(c runtimecontract.Container) (datacontract.Config, error) {
 }
 
 // ErrInvalidConfigService 表示 Config 服务类型无效。
-var ErrInvalidConfigService = configprovider.ErrInvalidConfigService
+var ErrInvalidConfigService = errors.New("invalid config service")
 
 // GetStringFallback 从配置中读取字符串，支持主路径和回退路径。
 //
@@ -119,4 +121,38 @@ func (p *BaseConfigSourceProvider) Register(c runtimecontract.Container) error {
 		return src, nil
 	}, true)
 	return nil
+}
+
+// As 将 source 投射到目标 target，支持类型断言和接口实现检查。
+func As(source any, target any) bool {
+	if target == nil {
+		return false
+	}
+	targetValue := reflect.ValueOf(target)
+	if targetValue.Kind() != reflect.Ptr || targetValue.IsNil() {
+		return false
+	}
+	sourceValue := reflect.ValueOf(source)
+	if !sourceValue.IsValid() {
+		return false
+	}
+	destination := targetValue.Elem()
+	if !destination.CanSet() {
+		return false
+	}
+	sourceType := sourceValue.Type()
+	destinationType := destination.Type()
+	if sourceType.AssignableTo(destinationType) {
+		destination.Set(sourceValue)
+		return true
+	}
+	if destinationType.Kind() == reflect.Interface && sourceType.Implements(destinationType) {
+		destination.Set(sourceValue)
+		return true
+	}
+	if sourceType.ConvertibleTo(destinationType) {
+		destination.Set(sourceValue.Convert(destinationType))
+		return true
+	}
+	return false
 }

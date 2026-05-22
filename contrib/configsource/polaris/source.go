@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 )
 
@@ -191,7 +190,7 @@ func (s *ConfigSource) Underlying() any {
 //
 // As 在可能时将当前原生客户端投射到请求的目标。
 func (s *ConfigSource) As(target any) bool {
-	return internalnative.As(s.Underlying(), target)
+	return As(s.Underlying(), target)
 }
 
 // Watch subscribes to source-side changes of a config key.

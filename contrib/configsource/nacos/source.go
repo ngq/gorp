@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 )
 
@@ -208,7 +207,7 @@ func (s *ConfigSource) Underlying() any {
 // 该方法实现了下探机制，允许用户将原生客户端转换为特定类型。
 // 例如：var client configclient.IConfigClient; source.As(&client)
 func (s *ConfigSource) As(target any) bool {
-	return internalnative.As(unwrapNacosNativeClient(s.client), target)
+	return As(unwrapNacosNativeClient(s.client), target)
 }
 
 // Watch subscribes to source-side changes of a config key.

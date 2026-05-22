@@ -8,14 +8,13 @@ package nacos
 import (
 	"time"
 
-	"github.com/ngq/gorp/contrib/internal/baseconfigsource"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
 
 // Provider 提供 Nacos 配置中心实现。
 type Provider struct {
-	baseconfigsource.BaseConfigSourceProvider
+	BaseConfigSourceProvider
 }
 
 // NewProvider creates a new Nacos provider instance.
@@ -49,7 +48,7 @@ type NacosConfig struct {
 // getNacosConfig 从容器的 config binding 中提取 Nacos 配置。
 // 使用 GetStringFallback 单路径读取，消除 cfg.Get()+cfg.GetString() 双读冗余。
 func getNacosConfig(c runtimecontract.Container) (*NacosConfig, error) {
-	cfg, err := baseconfigsource.ReadConfig(c)
+	cfg, err := ReadConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -60,20 +59,20 @@ func getNacosConfig(c runtimecontract.Container) (*NacosConfig, error) {
 		PollInterval: defaultNacosPollInterval,
 	}
 
-	nacosCfg.ServerAddr = baseconfigsource.GetStringFallback(cfg, "nacos", "server_addr")
-	if port := baseconfigsource.GetIntFallback(cfg, "nacos", "port"); port > 0 {
+	nacosCfg.ServerAddr = GetStringFallback(cfg, "nacos", "server_addr")
+	if port := GetIntFallback(cfg, "nacos", "port"); port > 0 {
 		nacosCfg.Port = port
 	}
-	nacosCfg.Namespace = baseconfigsource.GetStringFallback(cfg, "nacos", "namespace")
-	nacosCfg.Group = baseconfigsource.GetStringFallback(cfg, "nacos", "group")
+	nacosCfg.Namespace = GetStringFallback(cfg, "nacos", "namespace")
+	nacosCfg.Group = GetStringFallback(cfg, "nacos", "group")
 	if nacosCfg.Group == "" {
 		nacosCfg.Group = "DEFAULT_GROUP"
 	}
-	nacosCfg.DataID = baseconfigsource.GetStringFallback(cfg, "nacos", "data_id")
-	nacosCfg.Username = baseconfigsource.GetStringFallback(cfg, "nacos", "username")
-	nacosCfg.Password = baseconfigsource.GetStringFallback(cfg, "nacos", "password")
+	nacosCfg.DataID = GetStringFallback(cfg, "nacos", "data_id")
+	nacosCfg.Username = GetStringFallback(cfg, "nacos", "username")
+	nacosCfg.Password = GetStringFallback(cfg, "nacos", "password")
 
-	if d := baseconfigsource.GetDurationSecondsFallback(cfg, "nacos", "poll_interval_seconds"); d > 0 {
+	if d := GetDurationSecondsFallback(cfg, "nacos", "poll_interval_seconds"); d > 0 {
 		nacosCfg.PollInterval = d
 	}
 

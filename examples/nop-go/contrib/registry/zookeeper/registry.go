@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -375,7 +374,7 @@ func (r *Registry) Underlying() any {
 //
 // As 在可能时将当前原生后端投射到请求的目标。
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.Underlying(), target)
+	return As(r.Underlying(), target)
 }
 
 // zkBackend defines the internal backend interface for Zookeeper operations.

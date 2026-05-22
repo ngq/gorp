@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	internalnative "github.com/ngq/gorp/contrib/internal/native"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -265,7 +264,7 @@ func (r *Registry) Underlying() any {
 //
 // As 在可能时将当前原生客户端投射到请求的目标。
 func (r *Registry) As(target any) bool {
-	return internalnative.As(r.Underlying(), target)
+	return As(r.Underlying(), target)
 }
 
 // polarisRegistryClient defines the internal client interface for registry operations.
