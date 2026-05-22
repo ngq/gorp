@@ -31,7 +31,7 @@ func (h *DiscountHandler) ListDiscounts(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取折扣列表
-	discounts, total, err := h.uc.ListDiscounts(c, page, pageSize)
+	discounts, total, err := h.uc.ListDiscounts(c.Context(), page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -54,7 +54,7 @@ func (h *DiscountHandler) CreateDiscount(c gorp.Context) {
 	}
 
 	// 调用业务层创建折扣
-	discount, err := h.uc.CreateDiscount(c, req)
+	discount, err := h.uc.CreateDiscount(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -82,7 +82,7 @@ func (h *DiscountHandler) UpdateDiscount(c gorp.Context) {
 	req.ID = id
 
 	// 调用业务层更新折扣
-	discount, err := h.uc.UpdateDiscount(c, req)
+	discount, err := h.uc.UpdateDiscount(c.Context(), req)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -102,7 +102,7 @@ func (h *DiscountHandler) DeleteDiscount(c gorp.Context) {
 	}
 
 	// 调用业务层删除折扣
-	if err := h.uc.DeleteDiscount(c, id); err != nil {
+	if err := h.uc.DeleteDiscount(c.Context(), id); err != nil {
 		gorp.Error(c, err)
 		return
 	}
@@ -127,7 +127,7 @@ func (h *DiscountHandler) ListDiscountProducts(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取折扣关联商品
-	products, total, err := h.uc.ListDiscountProducts(c, discountID, page, pageSize)
+	products, total, err := h.uc.ListDiscountProducts(c.Context(), discountID, page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -154,7 +154,7 @@ func (h *DiscountHandler) ListDiscountCategories(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取折扣关联分类
-	categories, total, err := h.uc.ListDiscountCategories(c, discountID, page, pageSize)
+	categories, total, err := h.uc.ListDiscountCategories(c.Context(), discountID, page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -181,7 +181,7 @@ func (h *DiscountHandler) ListDiscountManufacturers(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取折扣关联制造商
-	manufacturers, total, err := h.uc.ListDiscountManufacturers(c, discountID, page, pageSize)
+	manufacturers, total, err := h.uc.ListDiscountManufacturers(c.Context(), discountID, page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
@@ -208,7 +208,7 @@ func (h *DiscountHandler) ListDiscountUsageHistory(c gorp.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	// 调用业务层获取折扣使用历史
-	history, total, err := h.uc.ListDiscountUsageHistory(c, discountID, page, pageSize)
+	history, total, err := h.uc.ListDiscountUsageHistory(c.Context(), discountID, page, pageSize)
 	if err != nil {
 		gorp.Error(c, err)
 		return
