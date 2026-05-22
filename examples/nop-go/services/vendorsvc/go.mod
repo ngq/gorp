@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/wire v0.6.0
-	github.com/ngq/gorp v0.1.1
+	github.com/ngq/gorp v0.1.2
 	github.com/stretchr/testify v1.11.1
 	gorm.io/gorm v1.31.1
 )

@@ -3,7 +3,7 @@ module github.com/ngq/gorp/contrib/registry/etcd
 go 1.25.8
 
 require (
-	github.com/ngq/gorp v0.1.1
+	github.com/ngq/gorp v0.1.2
 	github.com/stretchr/testify v1.11.1
 	go.etcd.io/etcd/api/v3 v3.6.10
 	go.etcd.io/etcd/client/v3 v3.6.10

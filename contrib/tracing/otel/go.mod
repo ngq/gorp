@@ -3,7 +3,7 @@ module github.com/ngq/gorp/contrib/tracing/otel
 go 1.25.8
 
 require (
-	github.com/ngq/gorp v0.1.1
+	github.com/ngq/gorp v0.1.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0

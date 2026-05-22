@@ -25,7 +25,7 @@ var newOfflineFrameworkVersion string
 var newOfflineHTTP string
 var newOfflineLocalDev bool
 
-const defaultFrameworkVersion = "v0.1.1"
+const defaultFrameworkVersion = "v0.1.2"
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)

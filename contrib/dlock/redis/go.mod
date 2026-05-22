@@ -3,7 +3,7 @@ module github.com/ngq/gorp/contrib/dlock/redis
 go 1.25.8
 
 require (
-	github.com/ngq/gorp v0.1.1
+	github.com/ngq/gorp v0.1.2
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/stretchr/testify v1.11.1
 )
