@@ -41,15 +41,15 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5 // indirect
-	github.com/ngq/gorp/contrib/circuitbreaker/sentinel v0.0.0
-	github.com/ngq/gorp/contrib/configsource/consul v0.0.0
-	github.com/ngq/gorp/contrib/dlock/redis v0.0.0
-	github.com/ngq/gorp/contrib/messagequeue/kafka v0.0.0
-	github.com/ngq/gorp/contrib/messagequeue/redis v0.0.0
-	github.com/ngq/gorp/contrib/registry/consul v0.0.0
-	github.com/ngq/gorp/contrib/serviceauth/mtls v0.0.0
-	github.com/ngq/gorp/contrib/serviceauth/token v0.0.0
-	github.com/ngq/gorp/contrib/tracing/otel v0.0.0
+	github.com/ngq/gorp/contrib/circuitbreaker/sentinel v0.1.2
+	github.com/ngq/gorp/contrib/configsource/consul v0.1.2
+	github.com/ngq/gorp/contrib/dlock/redis v0.1.2
+	github.com/ngq/gorp/contrib/messagequeue/kafka v0.1.2
+	github.com/ngq/gorp/contrib/messagequeue/redis v0.1.2
+	github.com/ngq/gorp/contrib/registry/consul v0.1.2
+	github.com/ngq/gorp/contrib/serviceauth/mtls v0.1.2
+	github.com/ngq/gorp/contrib/serviceauth/token v0.1.2
+	github.com/ngq/gorp/contrib/tracing/otel v0.1.2
 	github.com/pkg/sftp v1.13.10
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rabbitmq/amqp091-go v1.10.0
@@ -215,8 +215,8 @@ require (
 
 require (
 	github.com/lxzan/gws v1.9.1
-	github.com/ngq/gorp/contrib/registry/etcd v0.0.0-00010101000000-000000000000
-	github.com/ngq/gorp/contrib/registry/nacos v0.0.0-00010101000000-000000000000
+	github.com/ngq/gorp/contrib/registry/etcd v0.1.2
+	github.com/ngq/gorp/contrib/registry/nacos v0.1.2
 )
 
 require (

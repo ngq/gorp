@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	github.com/alibaba/sentinel-golang v1.0.4
-	github.com/ngq/gorp v0.1.1
+	github.com/ngq/gorp v0.1.2
 	github.com/stretchr/testify v1.11.1
 )
 

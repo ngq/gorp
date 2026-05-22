@@ -3,7 +3,7 @@ module github.com/ngq/gorp/contrib/configsource/polaris
 go 1.25.8
 
 require (
-	github.com/ngq/gorp v0.0.0
+	github.com/ngq/gorp v0.1.2
 	github.com/stretchr/testify v1.11.1
 )
 
