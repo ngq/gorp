@@ -14,6 +14,8 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /build
 
 ENV GOPROXY=https://goproxy.cn,direct,https://proxy.golang.org,direct
+ENV GONOSUMDB=*
+ENV GONOSUMCHECK=*
 
 # 复制 shared 模块
 COPY shared/ ./shared/

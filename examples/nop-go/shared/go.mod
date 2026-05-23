@@ -3,13 +3,13 @@ module nop-go/shared
 go 1.25.8
 
 require (
-	github.com/ngq/gorp/contrib/circuitbreaker/sentinel v0.1.2
-	github.com/ngq/gorp/contrib/configsource/etcd v0.1.2
-	github.com/ngq/gorp/contrib/dlock/redis v0.1.2
-	github.com/ngq/gorp/contrib/dtm/dtmsdk v0.1.2
-	github.com/ngq/gorp/contrib/registry/etcd v0.1.2
-	github.com/ngq/gorp/contrib/serviceauth/token v0.1.2
-	github.com/ngq/gorp/contrib/tracing/otel v0.1.2
+	github.com/ngq/gorp/contrib/circuitbreaker/sentinel v0.1.3
+	github.com/ngq/gorp/contrib/configsource/etcd v0.1.3
+	github.com/ngq/gorp/contrib/dlock/redis v0.1.3
+	github.com/ngq/gorp/contrib/dtm/dtmsdk v0.1.3
+	github.com/ngq/gorp/contrib/registry/etcd v0.1.3
+	github.com/ngq/gorp/contrib/serviceauth/token v0.1.3
+	github.com/ngq/gorp/contrib/tracing/otel v0.1.3
 	github.com/spf13/viper v1.21.0
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
@@ -66,7 +66,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/ngq/gorp v0.1.2 // indirect
+	github.com/ngq/gorp v0.1.3 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
