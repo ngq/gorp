@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package content.v1;
+
+option go_package = "nop-go/services/content-service/api/content/v1;contentv1";
+
+// Messages generated from Go types
+
+// GetBlogReq 获取博客请求
+message GetBlogReq {
+  uint64 id = 1; // 博客ID
+}
+
+// GetBlogResp 获取博客响应
+message GetBlogResp {
+  uint64 id = 1; // 博客ID
+  string title = 2; // 标题
+  string content = 3; // 正文
+  string author = 4; // 作者
+  string status = 5; // 状态
+  string tags = 6; // 标签
+  string created_at = 7; // 创建时间
+  string updated_at = 8; // 更新时间
+}
+
+// ContentRPC 内容服务 gRPC 接口 —— 定义其他服务可能需要跨服务调用的方法。
+// 当前仅定义 GetBlog 供其他服务获取博客内容（如 admin 展示关联内容）。
+service ContentRPC {
+  // GetBlog 根据 ID 获取博客内容
+  rpc GetBlog(GetBlogReq) returns (GetBlogResp);
+}

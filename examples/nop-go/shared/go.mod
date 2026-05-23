@@ -1,6 +1,6 @@
 module nop-go/shared
 
-go 1.25.8
+go 1.26
 
 require (
 	github.com/ngq/gorp/contrib/circuitbreaker/sentinel v0.1.3
@@ -128,3 +128,6 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.46.1 // indirect
 )
+
+// genproto 歧义导入修复
+replace google.golang.org/genproto => ../deploy/docker/genproto-dummy

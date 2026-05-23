@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package catalog.v1;
+
+option go_package = "nop-go/services/catalog-service/api/catalog/v1;catalogv1";
+
+// Messages generated from Go types
+
+// GetProductReq 获取商品请求
+message GetProductReq {
+  uint32 id = 1; // 商品ID
+}
+
+// GetProductResp 获取商品响应
+message GetProductResp {
+  uint32 id = 1; // 商品ID
+  string name = 2; // 商品名称
+  string short_desc = 3; // 商品简介
+  string full_desc = 4; // 商品详细描述
+  string sku = 5; // SKU编码
+  double price = 6; // 售价
+  double old_price = 7; // 原价
+  double cost = 8; // 成本价
+  int32 stock = 9; // 库存数量
+  uint32 category_id = 10; // 分类ID
+  uint32 manufacturer_id = 11; // 制造商ID
+  bool is_published = 12; // 是否上架
+  int64 created_at = 13; // 创建时间
+  int64 updated_at = 14; // 更新时间
+}
+
+// ListProductsReq 获取商品列表请求
+message ListProductsReq {
+  int32 page = 1; // 页码
+  int32 size = 2; // 每页条数
+  uint32 category_id = 3; // 分类ID（可选）
+  uint32 manufacturer_id = 4; // 制造商ID（可选）
+  string keyword = 5; // 搜索关键词（可选）
+}
+
+// ListProductsResp 获取商品列表响应
+message ListProductsResp {
+  repeated GetProductResp items = 1; // 商品列表
+  int64 total = 2; // 总数
+}
+
+// GetCategoryReq 获取分类请求
+message GetCategoryReq {
+  uint32 id = 1; // 分类ID
+}
+
+// GetCategoryResp 获取分类响应
+message GetCategoryResp {
+  uint32 id = 1; // 分类ID
+  string name = 2; // 分类名称
+  string description = 3; // 分类描述
+  uint32 parent_id = 4; // 父分类ID
+  int32 sort_order = 5; // 排序权重
+  bool is_published = 6; // 是否启用
+  int64 created_at = 7; // 创建时间
+  int64 updated_at = 8; // 更新时间
+}
+
+// ListCountriesReq 获取国家列表请求
+message ListCountriesReq {
+  int32 page = 1; // 页码
+  int32 size = 2; // 每页条数
+}
+
+// ListCountriesResp 获取国家列表响应
+message ListCountriesResp {
+  repeated CountryItem items = 1; // 国家列表
+  int64 total = 2; // 总数
+}
+
+// CountryItem 国家条目
+message CountryItem {
+  uint32 id = 1; // 国家ID
+  string name = 2; // 国家名称
+  string iso_code2 = 3; // ISO 2字母代码
+  string iso_code3 = 4; // ISO 3字母代码
+  string address_format = 5; // 地址格式
+  bool postcode_required = 6; // 是否必填邮编
+  string created_at = 7; // 创建时间
+  string updated_at = 8; // 更新时间
+}
+
+// CatalogRPC 商品服务 gRPC 接口 —— 定义其他服务（trade-service、content-service）需要跨服务调用的方法。
+service CatalogRPC {
+  // GetProduct 根据 ID 获取商品信息（trade 结算时获取商品价格、content 商品展示时获取商品详情）
+  rpc GetProduct(GetProductReq) returns (GetProductResp);
+  // ListProducts 获取商品列表（trade 批量验证库存、content 商品展示列表）
+  rpc ListProducts(ListProductsReq) returns (ListProductsResp);
+  // GetCategory 根据 ID 获取分类信息（content 商品分类展示）
+  rpc GetCategory(GetCategoryReq) returns (GetCategoryResp);
+  // ListCountries 获取国家列表（trade 结算时选择配送国家）
+  rpc ListCountries(ListCountriesReq) returns (ListCountriesResp);
+}

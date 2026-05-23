@@ -1,0 +1,77 @@
+# nop-go 消息服务 Dockerfile
+#
+# 构建命令（在项目根目录 gin_plantfrom 执行）：
+#   docker build -t nop-go-message-service:latest -f examples/nop-go/deploy/docker/Dockerfile.message-service .
+#
+# 镜像大小：约 20MB
+
+# ============================================================
+# 构建阶段
+# ============================================================
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git
+
+WORKDIR /build
+
+ENV GOPROXY=https://goproxy.cn,direct,https://proxy.golang.org,direct
+ENV GONOSUMDB=*
+ENV GONOSUMCHECK=*
+
+# 复制框架源代码（gorp 框架根包 + contrib 子模块）
+COPY go.mod go.sum ./
+COPY *.go ./
+COPY framework/ ./framework/
+COPY cmd/ ./cmd/
+COPY contrib/ ./contrib/
+
+# 复制 shared 模块
+COPY examples/nop-go/shared/ ./examples/nop-go/shared/
+
+# 复制 message-service 服务
+COPY examples/nop-go/services/message-service/ ./examples/nop-go/services/message-service/
+
+# 复制 genproto-dummy（用于替代旧版 genproto 单模块，避免歧义导入）
+COPY examples/nop-go/deploy/docker/genproto-dummy/ ./genproto-dummy/
+
+# 创建 go.work，将主模块、shared、message-service 三个模块关联
+RUN printf 'go 1.26\n\nuse (\n\t.\n\t./examples/nop-go/shared\n\t./examples/nop-go/services/message-service\n)\n' > ./go.work
+
+# 修改 message-service/go.mod 中的 gorp replace 指令：从本地绝对路径改为容器内路径
+RUN sed -i 's|replace github\.com\/ngq\/gorp => .*|replace github.com/ngq/gorp => /build|' ./examples/nop-go/services/message-service/go.mod
+
+# 删除已有的 genproto replace 指令（避免与容器内路径冲突），再添加容器内路径
+# 将旧版 google.golang.org/genproto 单模块替换为空模块，避免与新版子模块产生歧义导入
+RUN sed -i '/replace google.golang.org\/genproto/d' ./go.mod
+RUN sed -i '/replace google.golang.org\/genproto/d' ./examples/nop-go/shared/go.mod
+RUN sed -i '/replace google.golang.org\/genproto/d' ./examples/nop-go/services/message-service/go.mod
+RUN echo 'replace google.golang.org/genproto => /build/genproto-dummy' >> ./go.mod
+RUN echo 'replace google.golang.org/genproto => /build/genproto-dummy' >> ./examples/nop-go/shared/go.mod
+RUN echo 'replace google.golang.org/genproto => /build/genproto-dummy' >> ./examples/nop-go/services/message-service/go.mod
+
+# 删除所有 go.sum（go.work 模式下会自动生成）
+RUN rm -f ./go.sum ./examples/nop-go/shared/go.sum ./examples/nop-go/services/message-service/go.sum
+
+# 重新 tidy 获取干净的依赖
+RUN cd /build && go mod tidy
+RUN cd /build/examples/nop-go/shared && go mod tidy
+RUN cd /build/examples/nop-go/services/message-service && go mod tidy
+
+# 构建
+RUN cd /build/examples/nop-go/services/message-service && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /message-service ./cmd
+
+# ============================================================
+# 运行阶段
+# ============================================================
+FROM scratch
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+WORKDIR /app
+
+COPY examples/nop-go/services/message-service/config/app.yaml ./config/app.yaml
+COPY --from=builder /message-service .
+
+EXPOSE 8086
+
+ENTRYPOINT ["./message-service"]

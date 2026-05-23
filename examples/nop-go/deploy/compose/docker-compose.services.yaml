@@ -2,9 +2,10 @@
 #
 # 使用外部 MySQL 和 Redis：
 # - MySQL: 192.168.3.250:3306 (admin/123456)
-# - Redis: 192.168.3.250:6379 (如有)
+# - Redis: 192.168.3.250:6379
 #
-# 启动方式：docker-compose -f docker-compose.services.yaml up -d
+# 启动方式：在项目根目录执行 docker-compose -f docker-compose.services.yaml up -d
+# 构建上下文：项目根目录（gin_plantfrom），Dockerfile 从根目录复制框架源码
 
 services:
   # ----------------------------------------------------------
@@ -57,18 +58,19 @@ services:
     restart: unless-stopped
 
   # ----------------------------------------------------------
-  # 业务微服务 (HTTP: 8081-8100)
+  # 业务微服务 (6 个领域服务)
   # 数据库配置通过环境变量指向外部 MySQL
   # ----------------------------------------------------------
 
-  # 1. 用户服务 (User Service)
+  # 1. 用户服务 (User Service) - 用户 + GDPR
   user-service:
     build:
-      context: ../../..
-      dockerfile: examples/nop-go/deploy/docker/Dockerfile.user
+      context: ../../../..
+      dockerfile: examples/nop-go/deploy/docker/Dockerfile.user-service
     container_name: nop-go-user
     ports:
       - "8081:8081"
+      - "9081:9081"  # gRPC 端口
     environment:
       APP_ENV: production
       DB_HOST: 192.168.3.250
@@ -82,169 +84,119 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # 2. 订单服务 (Order Service)
-  order-service:
+  # 2. 商品服务 (Catalog Service) - 商品 + 目录 + 媒体 + SEO
+  catalog-service:
     build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.order
-    container_name: nop-go-order
+      context: ../../../..
+      dockerfile: examples/nop-go/deploy/docker/Dockerfile.catalog-service
+    container_name: nop-go-catalog
     ports:
       - "8082:8082"
+      - "9082:9082"  # gRPC 端口
     environment:
       APP_ENV: production
       DB_HOST: 192.168.3.250
       DB_PORT: 3306
       DB_USER: admin
       DB_PASSWORD: "123456"
-      DB_NAME: nop_order
+      DB_NAME: nop_catalog
       REDIS_ADDR: 192.168.3.250:6379
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-      USER_SERVICE_ADDR: user-service:8081
-      PRODUCT_SERVICE_ADDR: product-service:8083
-      PAYMENT_SERVICE_ADDR: payment-service:8084
-      SHIPPING_SERVICE_ADDR: shipping-service:8085
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # 3. 交易服务 (Trade Service) - 订单 + 支付 + 物流 + 税务
+  trade-service:
+    build:
+      context: ../../../..
+      dockerfile: examples/nop-go/deploy/docker/Dockerfile.trade-service
+    container_name: nop-go-trade
+    ports:
+      - "8083:8083"
+      - "9083:9083"  # gRPC 端口
+    environment:
+      APP_ENV: production
+      DB_HOST: 192.168.3.250
+      DB_PORT: 3306
+      DB_USER: admin
+      DB_PASSWORD: "123456"
+      DB_NAME: nop_trade
+      REDIS_ADDR: 192.168.3.250:6379
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      # gRPC 服务间调用地址
+      USER_SERVICE_GRPC_ADDR: user-service:9081
+      CATALOG_SERVICE_GRPC_ADDR: catalog-service:9082
+      ADMIN_SERVICE_GRPC_ADDR: admin-service:9085
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - user-service
+      - catalog-service
+      - admin-service
+    restart: unless-stopped
+
+  # 4. 内容服务 (Content Service) - 内容 + 本地化 + 联盟
+  content-service:
+    build:
+      context: ../../../..
+      dockerfile: examples/nop-go/deploy/docker/Dockerfile.content-service
+    container_name: nop-go-content
+    ports:
+      - "8084:8084"
+      - "9084:9084"  # gRPC 端口
+    environment:
+      APP_ENV: production
+      DB_HOST: 192.168.3.250
+      DB_PORT: 3306
+      DB_USER: admin
+      DB_PASSWORD: "123456"
+      DB_NAME: nop_content
+      REDIS_ADDR: 192.168.3.250:6379
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      # gRPC 服务间调用地址
+      CATALOG_SERVICE_GRPC_ADDR: catalog-service:9082
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - catalog-service
+    restart: unless-stopped
+
+  # 5. 后台管理服务 (Admin Service) - 权限 + 插件 + 店铺 + 日志 + 折扣 + 供应商
+  admin-service:
+    build:
+      context: ../../../..
+      dockerfile: examples/nop-go/deploy/docker/Dockerfile.admin-service
+    container_name: nop-go-admin
+    ports:
+      - "8085:8085"
+      - "9085:9085"  # gRPC 端口
+    environment:
+      APP_ENV: production
+      DB_HOST: 192.168.3.250
+      DB_PORT: 3306
+      DB_USER: admin
+      DB_PASSWORD: "123456"
+      DB_NAME: nop_admin
+      REDIS_ADDR: 192.168.3.250:6379
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      # gRPC 服务间调用地址
+      USER_SERVICE_GRPC_ADDR: user-service:9081
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - user-service
     restart: unless-stopped
 
-  # 3. 商品服务 (Product Service)
-  product-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.product
-    container_name: nop-go-product
-    ports:
-      - "8083:8083"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_product
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 4. 支付服务 (Payment Service)
-  payment-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.payment
-    container_name: nop-go-payment
-    ports:
-      - "8084:8084"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_payment
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 5. 物流服务 (Shipping Service)
-  shipping-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.shipping
-    container_name: nop-go-shipping
-    ports:
-      - "8085:8085"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_shipping
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 6. 折扣服务 (Discount Service)
-  discount-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.discount
-    container_name: nop-go-discount
-    ports:
-      - "8086:8086"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_discount
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 7. 税务服务 (Tax Service)
-  tax-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.tax
-    container_name: nop-go-tax
-    ports:
-      - "8087:8087"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_tax
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 8. 媒体服务 (Media Service)
-  media-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.media
-    container_name: nop-go-media
-    ports:
-      - "8088:8088"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_media
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - media_storage:/app/media
-    restart: unless-stopped
-
-  # 9. 消息服务 (Message Service)
+  # 6. 消息服务 (Message Service) - 消息模板
   message-service:
     build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.message
+      context: ../../../..
+      dockerfile: examples/nop-go/deploy/docker/Dockerfile.message-service
     container_name: nop-go-message
     ports:
-      - "8089:8089"
+      - "8086:8086"
+      - "9086:9086"  # gRPC 端口
     environment:
       APP_ENV: production
       DB_HOST: 192.168.3.250
@@ -258,239 +210,6 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # 10. 本地化服务 (Localization Service)
-  localization-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.localization
-    container_name: nop-go-localization
-    ports:
-      - "8090:8090"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_localization
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 11. 店铺服务 (Store Service)
-  store-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.store
-    container_name: nop-go-store
-    ports:
-      - "8091:8091"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_store
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 12. 安全服务 (Security Service)
-  security-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.security
-    container_name: nop-go-security
-    ports:
-      - "8092:8092"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_security
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 13. 供应商服务 (Vendor Service)
-  vendor-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.vendor
-    container_name: nop-go-vendor
-    ports:
-      - "8093:8093"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_vendor
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 14. 联盟营销服务 (Affiliate Service)
-  affiliate-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.affiliate
-    container_name: nop-go-affiliate
-    ports:
-      - "8094:8094"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_affiliate
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 15. 内容管理服务 (Content Service)
-  content-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.content
-    container_name: nop-go-content
-    ports:
-      - "8095:8095"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_content
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 16. 目录服务 (Directory Service)
-  directory-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.directory
-    container_name: nop-go-directory
-    ports:
-      - "8096:8096"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_directory
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 17. SEO 服务 (SEO Service)
-  seo-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.seo
-    container_name: nop-go-seo
-    ports:
-      - "8097:8097"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_seo
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 18. GDPR 合规服务 (GDPR Service)
-  gdpr-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.gdpr
-    container_name: nop-go-gdpr
-    ports:
-      - "8098:8098"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_gdpr
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  # 19. 插件服务 (Plugin Service)
-  plugin-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.plugin
-    container_name: nop-go-plugin
-    ports:
-      - "8099:8099"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_plugin
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - plugin_storage:/app/plugins
-    restart: unless-stopped
-
-  # 20. 日志服务 (Logging Service)
-  logging-service:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.logging
-    container_name: nop-go-logging
-    ports:
-      - "8100:8100"
-    environment:
-      APP_ENV: production
-      DB_HOST: 192.168.3.250
-      DB_PORT: 3306
-      DB_USER: admin
-      DB_PASSWORD: "123456"
-      DB_NAME: nop_logging
-      REDIS_ADDR: 192.168.3.250:6379
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
 # ----------------------------------------------------------
 # 数据卷定义
 # ----------------------------------------------------------
@@ -498,10 +217,6 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
-    driver: local
-  media_storage:
-    driver: local
-  plugin_storage:
     driver: local
 
 # ----------------------------------------------------------

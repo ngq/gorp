@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package message.v1;
+
+option go_package = "nop-go/services/message-service/api/message/v1;messagev1";
+
+// Messages generated from Go types
+
+// GetMessageTemplateReq 获取消息模板请求
+message GetMessageTemplateReq {
+  uint32 id = 1; // 模板ID
+}
+
+// GetMessageTemplateResp 获取消息模板响应
+message GetMessageTemplateResp {
+  uint32 id = 1; // 模板ID
+  string name = 2; // 模板名称
+  string subject = 3; // 邮件主题
+  string body = 4; // 邮件正文
+  string email_account = 5; // 发件邮箱账号
+  bool is_active = 6; // 是否启用
+}
+
+// MessageRPC 消息服务 gRPC 接口 —— 定义其他服务需要跨服务调用的方法。
+// 任何服务需要发送通知邮件时，可通过 GetMessageTemplate 获取模板内容。
+service MessageRPC {
+  // GetMessageTemplate 根据 ID 获取消息模板（其他服务发送通知时获取模板内容）
+  rpc GetMessageTemplate(GetMessageTemplateReq) returns (GetMessageTemplateResp);
+}
