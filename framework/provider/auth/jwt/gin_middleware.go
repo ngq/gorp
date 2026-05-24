@@ -8,7 +8,7 @@
 // 中间件从 Authorization header 提取 Bearer token，验证后注入 context。
 // 支持 SkipPaths 选项跳过指定路径的认证。
 // Context 键：
-//   - ContextJWTClaimsKey: JWT claims
+//   - securitycontract.ContextJWTClaimsKey: JWT claims
 //   - ContextSubjectIDKey: Subject ID
 //   - ContextSubjectTypeKey: Subject type
 //
@@ -39,13 +39,11 @@ import (
 )
 
 // Context keys for storing JWT information in Gin context.
+// ContextJWTClaimsKey 已迁移至 securitycontract 包以避免循环依赖。
 //
 // Gin context 中存储 JWT 信息的键。
+// ContextJWTClaimsKey 已迁移至 securitycontract 包以避免循环依赖。
 const (
-	// ContextJWTClaimsKey is the key for JWT claims in Gin context.
-	//
-	// ContextJWTClaimsKey 是 Gin context 中 JWT claims 的键。
-	ContextJWTClaimsKey = "framework.jwt.claims"
 	// ContextSubjectIDKey is the key for subject ID in Gin context.
 	//
 	// ContextSubjectIDKey 是 Gin context 中主体 ID 的键。
@@ -205,7 +203,7 @@ func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType stri
 				c.JSON(http.StatusForbidden, map[string]any{"error": "insufficient role"})
 				return
 			}
-			c.Set(ContextJWTClaimsKey, claims)
+			c.Set(securitycontract.ContextJWTClaimsKey, claims)
 			c.Set(ContextSubjectIDKey, claims.SubjectID)
 			c.Set(ContextSubjectTypeKey, claims.SubjectType)
 			if next != nil {
