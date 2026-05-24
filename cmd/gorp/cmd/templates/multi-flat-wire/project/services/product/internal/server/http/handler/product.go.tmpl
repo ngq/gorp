@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 {{- else }}
 	gorp "{{.FrameworkModule}}"
+	"{{.FrameworkModule}}/framework/httpx"
 	"{{.ModuleName}}/services/product/internal/server/http/request"
 	"{{.ModuleName}}/services/product/internal/server/http/response"
 	"{{.ModuleName}}/services/product/internal/service"
@@ -170,7 +171,7 @@ func (h *ProductHandler) List(c gorp.Context) {
 
 	items, total, err := h.product.List(c.Context(), page, size)
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
@@ -187,7 +188,7 @@ func (h *ProductHandler) List(c gorp.Context) {
 		}
 	}
 
-	gorp.Success(c, response.ProductList{
+	httpx.Success(c, response.ProductList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -198,7 +199,7 @@ func (h *ProductHandler) List(c gorp.Context) {
 func (h *ProductHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -208,7 +209,7 @@ func (h *ProductHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	gorp.Success(c, response.Product{
+	httpx.Success(c, response.Product{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
@@ -222,7 +223,7 @@ func (h *ProductHandler) GetByID(c gorp.Context) {
 func (h *ProductHandler) Create(c gorp.Context) {
 	var req request.CreateProduct
 	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+		httpx.BadRequest(c, err.Error())
 		return
 	}
 
@@ -233,11 +234,11 @@ func (h *ProductHandler) Create(c gorp.Context) {
 		Stock:       req.Stock,
 	})
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.SuccessWithStatus(c, http.StatusCreated, response.Product{
+	httpx.SuccessWithStatus(c, http.StatusCreated, response.Product{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
@@ -251,12 +252,12 @@ func (h *ProductHandler) Create(c gorp.Context) {
 func (h *ProductHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.product.Delete(c.Context(), uint(id)); err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
@@ -266,17 +267,17 @@ func (h *ProductHandler) Delete(c gorp.Context) {
 func (h *ProductHandler) PublishStockChanged(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
 	resp, err := h.product.PublishStockChanged(c.Context(), uint(id))
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.Success(c, resp)
+	httpx.Success(c, resp)
 }
 
 func (h *ProductHandler) ConsumeStockChangedOnce(c gorp.Context) {
@@ -286,11 +287,11 @@ func (h *ProductHandler) ConsumeStockChangedOnce(c gorp.Context) {
 			c.JSON(http.StatusGatewayTimeout, map[string]any{"error": "consume timeout"})
 			return
 		}
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.Success(c, response.MQConsume{
+	httpx.Success(c, response.MQConsume{
 		Topic:   resp.Topic,
 		Body:    resp.Body,
 		Success: resp.Success,

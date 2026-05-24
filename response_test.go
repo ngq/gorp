@@ -3,6 +3,7 @@ package gorp
 import (
 	"context"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -126,6 +127,10 @@ func (c *testResponseContext) Value(key any) any {
 	return c.gin.Request.Context().Value(key)
 }
 
+func (c *testResponseContext) Context() context.Context {
+	return c.gin.Request.Context()
+}
+
 func (c *testResponseContext) Request() *http.Request {
 	return c.gin.Request
 }
@@ -144,6 +149,22 @@ func (c *testResponseContext) Query(key string) string {
 
 func (c *testResponseContext) DefaultQuery(key, defaultValue string) string {
 	return c.gin.DefaultQuery(key, defaultValue)
+}
+
+func (c *testResponseContext) DefaultIntQuery(key string, defaultValue int) int {
+	return defaultValue
+}
+
+func (c *testResponseContext) Int64Param(key string) (int64, error) {
+	return 0, nil
+}
+
+func (c *testResponseContext) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	return nil, nil, http.ErrNoCookie
+}
+
+func (c *testResponseContext) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
+	return nil
 }
 
 func (c *testResponseContext) GetHeader(key string) string {
@@ -204,9 +225,8 @@ func (c *testResponseContext) ResponseStatus() int {
 	return c.captured.status
 }
 
-func (c *testResponseContext) Get(key string) any {
-	val, _ := c.gin.Get(key)
-	return val
+func (c *testResponseContext) Get(key string) (any, bool) {
+	return c.gin.Get(key)
 }
 
 func (c *testResponseContext) Set(key string, value any) {

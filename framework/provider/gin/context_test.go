@@ -145,7 +145,7 @@ func TestGinContextValue_GinInternalStorage(t *testing.T) {
 		// c.Context().Value 走标准 context 链，返回 context 中的值
 		ctxValue = c.Context().Value("mykey")
 		// c.Get 走 gin 内部存储
-		ginValue = c.Get("mykey")
+		ginValue, _ = c.Get("mykey")
 
 		gc.JSON(http.StatusOK, gin.H{"ok": true})
 	})

@@ -21,12 +21,6 @@ import (
 // Success writes a successful HTTP response through the current responder chain.
 //
 // Success 通过当前 responder 链输出成功 HTTP 响应。
-//
-// Example:
-//
-//	func Ping(c gorp.Context) {
-//	    gorp.Success(c, map[string]any{"pong": true})
-//	}
 func Success(c Context, data any) {
 	responderFor(c).Success(c, data)
 }

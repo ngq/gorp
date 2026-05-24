@@ -7,6 +7,7 @@ package jwt
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -99,9 +100,8 @@ func (c *testContext) ResponseStatus() int {
 	return c.gin.Writer.Status()
 }
 
-func (c *testContext) Get(key string) any {
-	val, _ := c.gin.Get(key)
-	return val
+func (c *testContext) Get(key string) (any, bool) {
+	return c.gin.Get(key)
 }
 
 func (c *testContext) Set(key string, value any) {
@@ -122,6 +122,22 @@ func (c *testContext) IsAborted() bool {
 
 func (c *testContext) Next() {
 	c.gin.Next()
+}
+
+func (c *testContext) DefaultIntQuery(key string, defaultValue int) int {
+	return defaultValue
+}
+
+func (c *testContext) Int64Param(key string) (int64, error) {
+	return 0, nil
+}
+
+func (c *testContext) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	return nil, nil, http.ErrNoCookie
+}
+
+func (c *testContext) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
+	return nil
 }
 
 func newTestContext(c *gin.Context) transportcontract.Context {

@@ -1,6 +1,6 @@
 module github.com/ngq/gorp/contrib/circuitbreaker/sentinel
 
-go 1.25.8
+go 1.26
 
 require (
 	github.com/alibaba/sentinel-golang v1.0.4

@@ -110,12 +110,22 @@ func RequireAllRoles(roles ...string) transportcontract.Middleware {
 }
 
 // claimsFromContext extracts JWT claims from the current request context.
+// 优先从 Gin key-value store 读取（AuthMiddleware 写入路径），回退到标准 context.Context。
 //
 // claimsFromContext 从当前请求上下文中提取 JWT claims。
+// 优先从 Gin key-value store 读取（AuthMiddleware 写入路径），回退到标准 context.Context。
 func claimsFromContext(c transportcontract.Context) (*securitycontract.JWTClaims, bool) {
 	if c == nil {
 		return nil, false
 	}
+	// 主路径：AuthMiddleware 通过 c.Set(ContextJWTClaimsKey, claims) 写入
+	val, ok := c.Get(securitycontract.ContextJWTClaimsKey)
+	if ok {
+		if claims, valid := val.(*securitycontract.JWTClaims); valid && claims != nil {
+			return claims, true
+		}
+	}
+	// 回退路径：标准 context.Context（供非 Gin 场景使用）
 	return securitycontract.FromJWTClaimsContext(c.Context())
 }
 

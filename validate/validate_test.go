@@ -1,11 +1,11 @@
 // Application scenarios:
 // - Verify the top-level validate package exports and helper behavior.
-// - Protect validator aliasing and container-based validation helpers from regressions.
+// - Protect validator aliasing and context-based validation helpers from regressions.
 // - Document expected usage through focused export tests.
 //
 // 适用场景：
 // - 验证顶层 validate 包的导出能力和 helper 行为。
-// - 防止校验器别名和基于容器的校验 helper 回归。
+// - 防止校验器别名和基于 context 的校验 helper 回归。
 // - 通过聚焦型导出测试固化预期用法。
 package validate
 
@@ -16,9 +16,11 @@ import (
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	frameworkcontainer "github.com/ngq/gorp/framework/container"
 	"github.com/stretchr/testify/require"
 )
 
+// exportValidatorStub 实现校验器契约，所有方法均返回零值。
 type exportValidatorStub struct{}
 
 func (s *exportValidatorStub) Validate(context.Context, any) error            { return nil }
@@ -29,6 +31,7 @@ func (s *exportValidatorStub) RegisterCustom(string, datacontract.CustomValidate
 func (s *exportValidatorStub) SetLocale(string) error     { return nil }
 func (s *exportValidatorStub) TranslateError(error) error { return nil }
 
+// exportValidateContainerStub 实现容器契约，仅响应 ValidatorKey 的 Make 调用。
 type exportValidateContainerStub struct {
 	validator datacontract.Validator
 }
@@ -62,20 +65,32 @@ func (s *exportValidateContainerStub) Make(key string) (any, error) {
 	return nil, context.DeadlineExceeded
 }
 
+// setupTestContainer 注入 stub 容器到全局默认容器，测试结束后自动清理。
+func setupTestContainer(t *testing.T, validator datacontract.Validator) {
+	t.Helper()
+	stub := &exportValidateContainerStub{validator: validator}
+	frameworkcontainer.SetDefault(stub)
+	t.Cleanup(func() { frameworkcontainer.SetDefault(nil) })
+}
+
 func TestExportedValidateHelpers(t *testing.T) {
 	stub := &exportValidatorStub{}
-	containerStub := &exportValidateContainerStub{validator: stub}
+	setupTestContainer(t, stub)
+	ctx := context.Background()
 
-	validatorSvc, err := Get(containerStub)
+	// 验证 GetService 和 MustGetService
+	validatorSvc, err := GetService(ctx)
 	require.NoError(t, err)
 	require.Same(t, stub, validatorSvc)
-	require.Same(t, stub, GetOrPanic(containerStub))
+	require.Same(t, stub, MustGetService(ctx))
 
-	err = Validate(context.Background(), containerStub, struct{ Name string }{Name: "alice"})
+	// 验证 Validate 和 ValidateVar
+	err = Validate(ctx, struct{ Name string }{Name: "alice"})
 	require.NoError(t, err)
-	err = ValidateVar(context.Background(), containerStub, "alice@example.com", "required,email")
+	err = ValidateVar(ctx, "alice@example.com", "required,email")
 	require.NoError(t, err)
 
+	// 验证类型别名编译通过
 	var _ Validator = stub
 	var _ = ValidatorConfig{Enabled: true, Locale: "zh"}
 	var _ = ValidationError{Field: "name"}

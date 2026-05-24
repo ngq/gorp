@@ -1,5 +1,0 @@
-# middleware
-
-Project-level HTTP middleware lives here when needed.
-
-Use this directory for request-scoped middleware owned by the current starter project. Keep business rules in `internal/` and prefer framework application / capability entry points for shared infrastructure concerns.

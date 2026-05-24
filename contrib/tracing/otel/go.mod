@@ -1,6 +1,6 @@
 module github.com/ngq/gorp/contrib/tracing/otel
 
-go 1.25.8
+go 1.26
 
 require (
 	github.com/ngq/gorp v0.1.3

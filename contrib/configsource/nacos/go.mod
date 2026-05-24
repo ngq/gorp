@@ -1,6 +1,6 @@
 module github.com/ngq/gorp/contrib/configsource/nacos
 
-go 1.25.8
+go 1.26
 
 require (
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5

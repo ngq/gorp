@@ -90,7 +90,7 @@ func TestBodyDumpCapturesExchange(t *testing.T) {
 			OnCapture: func(ctx transportcontract.Context, dump *HTTPExchangeCapture) {
 				captured = dump
 				// Tenant is stored in context via c.Set()
-				if tenantVal := ctx.Get("tenant"); tenantVal != nil {
+				if tenantVal, ok := ctx.Get("tenant"); ok && tenantVal != nil {
 					if tenant, ok := tenantVal.(string); ok && dump.Tenant != tenant {
 						t.Fatalf("expected dump tenant %q to match context tenant %q", dump.Tenant, tenant)
 					}

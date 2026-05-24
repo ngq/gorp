@@ -11,6 +11,7 @@ package transport
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -36,6 +37,14 @@ type RequestContext interface {
 	// Query params
 	Query(key string) string
 	DefaultQuery(key, defaultValue string) string
+	DefaultIntQuery(key string, defaultValue int) int
+
+	// Typed param parsing
+	Int64Param(key string) (int64, error)
+
+	// File upload
+	FormFile(name string) (multipart.File, *multipart.FileHeader, error)
+	SaveUploadedFile(file *multipart.FileHeader, dst string) error
 
 	// Headers
 	GetHeader(key string) string
@@ -63,8 +72,10 @@ type ResponseContext interface {
 
 // MiddlewareContext 提供中间件控制流能力。
 // 用于中间件实现。
+// Get 返回 (value, exists)，与 Gin 原生语义对齐，
+// 可区分"key 不存在"和"key 存在但值为 nil"。
 type MiddlewareContext interface {
-	Get(key string) any
+	Get(key string) (any, bool)
 	Set(key string, value any)
 	Abort(status int)
 	AbortWithJSON(status int, body any)

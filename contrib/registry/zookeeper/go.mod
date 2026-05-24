@@ -1,6 +1,6 @@
 module github.com/ngq/gorp/contrib/registry/zookeeper
 
-go 1.25.8
+go 1.26
 
 require (
 	github.com/go-zookeeper/zk v1.0.4

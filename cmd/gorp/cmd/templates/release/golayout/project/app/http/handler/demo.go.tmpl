@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 {{- else }}
 	gorp "{{.FrameworkModule}}"
+	"{{.FrameworkModule}}/framework/httpx"
 	"{{.ModuleName}}/app/http/request"
 	"{{.ModuleName}}/app/http/response"
 	"{{.ModuleName}}/internal/biz"
@@ -138,24 +139,24 @@ func (h *DemoHandler) Delete(c *gin.Context) {
 func (h *DemoHandler) Create(c gorp.Context) {
 	var req request.CreateDemo
 	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+		httpx.BadRequest(c, err.Error())
 		return
 	}
 
 	demo, err := h.svc.Create(c.Context(), req.Name)
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.SuccessWithStatus(c, http.StatusCreated, toDemoResponse(demo))
+	httpx.SuccessWithStatus(c, http.StatusCreated, toDemoResponse(demo))
 }
 
 // GetByID 根据 ID 查询 Demo。
 func (h *DemoHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -165,7 +166,7 @@ func (h *DemoHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	gorp.Success(c, toDemoResponse(demo))
+	httpx.Success(c, toDemoResponse(demo))
 }
 
 // List 查询 Demo 列表。
@@ -181,7 +182,7 @@ func (h *DemoHandler) List(c gorp.Context) {
 
 	demos, total, err := h.svc.List(c.Context(), page, pageSize)
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
@@ -190,7 +191,7 @@ func (h *DemoHandler) List(c gorp.Context) {
 		items[i] = toDemoResponse(demo)
 	}
 
-	gorp.Success(c, &response.DemoList{
+	httpx.Success(c, &response.DemoList{
 		Items: items,
 		Total: total,
 		Page:  page,
@@ -202,35 +203,35 @@ func (h *DemoHandler) List(c gorp.Context) {
 func (h *DemoHandler) Update(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
 	var req request.UpdateDemo
 	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+		httpx.BadRequest(c, err.Error())
 		return
 	}
 
 	demo, err := h.svc.Update(c.Context(), uint(id), req.Name)
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.Success(c, toDemoResponse(demo))
+	httpx.Success(c, toDemoResponse(demo))
 }
 
 // Delete 删除 Demo。
 func (h *DemoHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.svc.Delete(c.Context(), uint(id)); err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 

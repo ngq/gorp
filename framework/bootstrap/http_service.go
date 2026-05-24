@@ -200,6 +200,7 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 		ServiceName: serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
+	container.SetDefault(rt.Container)
 
 	// 启动阶段 fail-fast 校验关键配置：缺失或无效的必填字段立即报错，
 	// 避免 viper 零值静默传播导致后续运行时错误难以排查。

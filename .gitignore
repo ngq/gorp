@@ -2,3 +2,7 @@
 
 # CLI binary
 cmd/gorp/gorp
+
+# Examples (独立 git 仓库)
+examples/
+

@@ -2,9 +2,10 @@ package handler
 
 import (
 	gorp "{{.FrameworkModule}}"
+	"{{.FrameworkModule}}/framework/httpx"
 )
 
 // Health 返回 starter 默认健康检查响应。
 func Health(c gorp.Context) {
-	gorp.Success(c, map[string]any{"status": "ok"})
+	httpx.Success(c, map[string]any{"status": "ok"})
 }

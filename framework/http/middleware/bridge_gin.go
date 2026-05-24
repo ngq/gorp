@@ -11,7 +11,9 @@ package middleware
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
@@ -76,6 +78,43 @@ func (c *ginContext) DefaultQuery(key, defaultValue string) string {
 	return c.gin.DefaultQuery(key, defaultValue)
 }
 
+// DefaultIntQuery 返回查询参数的整数值，解析失败或不存在时返回 defaultValue。
+func (c *ginContext) DefaultIntQuery(key string, defaultValue int) int {
+	s := c.gin.Query(key)
+	if s == "" {
+		return defaultValue
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return defaultValue
+	}
+	return v
+}
+
+// Int64Param 返回路径参数的 int64 值，解析失败时返回错误。
+func (c *ginContext) Int64Param(key string) (int64, error) {
+	s := c.gin.Param(key)
+	return strconv.ParseInt(s, 10, 64)
+}
+
+// FormFile 返回 multipart form 中指定名称的上传文件。
+func (c *ginContext) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	fileHeader, err := c.gin.FormFile(name)
+	if err != nil {
+		return nil, nil, err
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		return nil, fileHeader, err
+	}
+	return file, fileHeader, nil
+}
+
+// SaveUploadedFile 将上传的文件保存到指定路径。
+func (c *ginContext) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
+	return c.gin.SaveUploadedFile(file, dst)
+}
+
 // ========== Headers ==========
 
 func (c *ginContext) GetHeader(key string) string {
@@ -138,9 +177,8 @@ func (c *ginContext) ResponseStatus() int {
 
 // ========== Middleware support ==========
 
-func (c *ginContext) Get(key string) any {
-	val, _ := c.gin.Get(key)
-	return val
+func (c *ginContext) Get(key string) (any, bool) {
+	return c.gin.Get(key)
 }
 
 func (c *ginContext) Set(key string, value any) {

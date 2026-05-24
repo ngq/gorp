@@ -8,9 +8,11 @@ import (
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
+	frameworkcontainer "github.com/ngq/gorp/framework/container"
 	"github.com/stretchr/testify/require"
 )
 
+// exportCacheStub 实现缓存契约，用于测试验证 facade 函数转发是否正确。
 type exportCacheStub struct {
 	value string
 	key   string
@@ -35,60 +37,75 @@ func (s *exportCacheStub) Remember(ctx context.Context, key string, ttl time.Dur
 	return fn(ctx)
 }
 
-type exportCacheContainerStub struct {
+// exportContainerStub 最小化容器桩，仅实现 Make 以返回缓存桩实例。
+type exportContainerStub struct {
 	cache datacontract.Cache
 }
 
-func (s *exportCacheContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
-func (s *exportCacheContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
-func (s *exportCacheContainerStub) IsBind(string) bool                                      { return true }
-func (s *exportCacheContainerStub) IsBindNamed(string, string) bool                         { return false }
-func (s *exportCacheContainerStub) MustMake(key string) any                                 { v, _ := s.Make(key); return v }
-func (s *exportCacheContainerStub) MustMakeNamed(string, string) any                        { return nil }
-func (s *exportCacheContainerStub) RegisterCloser(string, io.Closer)                        {}
-func (s *exportCacheContainerStub) Destroy() error                                          { return nil }
-func (s *exportCacheContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo     { return nil }
-func (s *exportCacheContainerStub) DebugPrint() string                                      { return "" }
-func (s *exportCacheContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
-	return runtimecontract.ProviderDAG{}
-}
-func (s *exportCacheContainerStub) MakeNamed(string, string) (any, error) { return nil, nil }
-func (s *exportCacheContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
-	return nil
-}
-func (s *exportCacheContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
-	return nil
-}
-func (s *exportCacheContainerStub) Make(key string) (any, error) {
+func (s *exportContainerStub) Bind(string, runtimecontract.Factory, bool)              {}
+func (s *exportContainerStub) NamedBind(string, string, runtimecontract.Factory, bool) {}
+func (s *exportContainerStub) IsBind(string) bool                                      { return true }
+func (s *exportContainerStub) IsBindNamed(string, string) bool                         { return false }
+func (s *exportContainerStub) MustMake(key string) any                                 { v, _ := s.Make(key); return v }
+func (s *exportContainerStub) MustMakeNamed(string, string) any                        { return nil }
+func (s *exportContainerStub) Make(key string) (any, error) {
 	if key == datacontract.CacheKey {
 		return s.cache, nil
 	}
 	return nil, context.DeadlineExceeded
 }
+func (s *exportContainerStub) MakeNamed(string, string) (any, error) { return nil, nil }
+func (s *exportContainerStub) RegisterProvider(runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportContainerStub) RegisterProviders(...runtimecontract.ServiceProvider) error {
+	return nil
+}
+func (s *exportContainerStub) RegisterCloser(string, io.Closer)                    {}
+func (s *exportContainerStub) Destroy() error                                      { return nil }
+func (s *exportContainerStub) RegisteredProviders() []runtimecontract.ProviderInfo { return nil }
+func (s *exportContainerStub) DebugPrint() string                                  { return "" }
+func (s *exportContainerStub) ProviderDAG() runtimecontract.ProviderDAG {
+	return runtimecontract.ProviderDAG{}
+}
+
+// setupContainer 注入桩容器到全局默认，测试结束后自动清理。
+func setupContainer(cache datacontract.Cache) {
+	frameworkcontainer.SetDefault(&exportContainerStub{cache: cache})
+}
 
 func TestExportedCacheHelpers(t *testing.T) {
 	stub := &exportCacheStub{value: "v1"}
-	containerStub := &exportCacheContainerStub{cache: stub}
+	setupContainer(stub)
+	t.Cleanup(func() { frameworkcontainer.SetDefault(nil) })
 
-	cacheSvc, err := GetService(containerStub)
+	ctx := context.Background()
+
+	// GetService / MustGetService
+	cacheSvc, err := GetService(ctx)
 	require.NoError(t, err)
 	require.Same(t, stub, cacheSvc)
-	require.Same(t, stub, GetServiceOrPanic(containerStub))
+	require.Same(t, stub, MustGetService(ctx))
 
-	value, err := Get(context.Background(), containerStub, "k")
+	// Get
+	value, err := Get(ctx, "k")
 	require.NoError(t, err)
 	require.Equal(t, "v1", value)
 
-	err = Set(context.Background(), containerStub, "user:1", "alice", time.Minute)
+	// Set
+	err = Set(ctx, "user:1", "alice", time.Minute)
 	require.NoError(t, err)
 	require.Equal(t, "user:1", stub.key)
 	require.Equal(t, "alice", stub.value)
 	require.Equal(t, time.Minute, stub.ttl)
 
-	result, err := Remember(context.Background(), containerStub, "k", time.Second, func(context.Context) (string, error) {
+	// Remember
+	result, err := Remember(ctx, "k", time.Second, func(context.Context) (string, error) {
 		return "computed", nil
 	})
 	require.NoError(t, err)
 	require.Equal(t, "computed", result)
+
+	// ErrCacheMiss 别名
 	require.Same(t, datacontract.ErrCacheMiss, ErrCacheMiss)
 }

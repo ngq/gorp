@@ -145,6 +145,7 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (*GRPCSe
 		ServiceName: serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
+	container.SetDefault(rt.Container)
 
 	// 解析治理模式与摘要
 	// Resolve governance mode and summary

@@ -11,6 +11,13 @@ package security
 
 import "context"
 
+// ContextJWTClaimsKey 是 JWT claims 在 Gin context 中的存储键。
+// 统一定义在 securitycontract 包，避免 middleware 和 jwt provider 之间的循环依赖。
+//
+// ContextJWTClaimsKey is the key for JWT claims in Gin context.
+// Defined in securitycontract to avoid circular dependencies between middleware and jwt provider.
+const ContextJWTClaimsKey = "framework.jwt.claims"
+
 type jwtClaimsContextKey struct{}
 type subjectIDContextKey struct{}
 type subjectTypeContextKey struct{}

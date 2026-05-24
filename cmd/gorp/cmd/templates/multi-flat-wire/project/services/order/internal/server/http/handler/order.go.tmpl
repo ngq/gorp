@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 {{- else }}
 	gorp "{{.FrameworkModule}}"
+	"{{.FrameworkModule}}/framework/httpx"
 	"{{.ModuleName}}/services/order/internal/server/http/request"
 	"{{.ModuleName}}/services/order/internal/server/http/response"
 	"{{.ModuleName}}/services/order/internal/service"
@@ -184,7 +185,7 @@ func (h *OrderHandler) List(c gorp.Context) {
 
 	items, total, err := h.order.List(c.Context(), page, size)
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
@@ -203,7 +204,7 @@ func (h *OrderHandler) List(c gorp.Context) {
 		}
 	}
 
-	gorp.Success(c, response.OrderList{
+	httpx.Success(c, response.OrderList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -214,7 +215,7 @@ func (h *OrderHandler) List(c gorp.Context) {
 func (h *OrderHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -224,7 +225,7 @@ func (h *OrderHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	gorp.Success(c, response.Order{
+	httpx.Success(c, response.Order{
 		ID:          order.ID,
 		UserID:      order.UserID,
 		ProductID:   order.ProductID,
@@ -240,7 +241,7 @@ func (h *OrderHandler) GetByID(c gorp.Context) {
 func (h *OrderHandler) Create(c gorp.Context) {
 	var req request.CreateOrder
 	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+		httpx.BadRequest(c, err.Error())
 		return
 	}
 
@@ -252,11 +253,11 @@ func (h *OrderHandler) Create(c gorp.Context) {
 		TotalPrice:  req.TotalPrice,
 	})
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.SuccessWithStatus(c, http.StatusCreated, response.Order{
+	httpx.SuccessWithStatus(c, http.StatusCreated, response.Order{
 		ID:          order.ID,
 		UserID:      order.UserID,
 		ProductID:   order.ProductID,
@@ -272,12 +273,12 @@ func (h *OrderHandler) Create(c gorp.Context) {
 func (h *OrderHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.order.Delete(c.Context(), uint(id)); err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
@@ -287,7 +288,7 @@ func (h *OrderHandler) Delete(c gorp.Context) {
 func (h *OrderHandler) GetOrderUser(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -297,7 +298,7 @@ func (h *OrderHandler) GetOrderUser(c gorp.Context) {
 		return
 	}
 
-	gorp.Success(c, response.RemoteUser{
+	httpx.Success(c, response.RemoteUser{
 		ID:                resp.ID,
 		Username:          resp.Username,
 		Email:             resp.Email,
@@ -311,7 +312,7 @@ func (h *OrderHandler) GetOrderUser(c gorp.Context) {
 func (h *OrderHandler) LockOrderDemo(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -321,7 +322,7 @@ func (h *OrderHandler) LockOrderDemo(c gorp.Context) {
 		return
 	}
 
-	gorp.Success(c, response.LockDemo{
+	httpx.Success(c, response.LockDemo{
 		Key:     resp.Key,
 		Success: resp.Success,
 	})

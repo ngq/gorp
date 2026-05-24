@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 {{- else }}
 	gorp "{{.FrameworkModule}}"
+	"{{.FrameworkModule}}/framework/httpx"
 	"{{.ModuleName}}/services/user/internal/server/http/request"
 	"{{.ModuleName}}/services/user/internal/server/http/response"
 	"{{.ModuleName}}/services/user/internal/service"
@@ -113,7 +114,7 @@ func (h *UserHandler) List(c gorp.Context) {
 
 	items, total, err := h.user.List(c.Context(), page, size)
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
@@ -122,7 +123,7 @@ func (h *UserHandler) List(c gorp.Context) {
 		respItems[i] = response.User{ID: item.ID, Username: item.Username, Email: item.Email}
 	}
 
-	gorp.Success(c, response.UserList{
+	httpx.Success(c, response.UserList{
 		Items: respItems,
 		Total: total,
 		Page:  page,
@@ -134,7 +135,7 @@ func (h *UserHandler) List(c gorp.Context) {
 func (h *UserHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
@@ -144,14 +145,14 @@ func (h *UserHandler) GetByID(c gorp.Context) {
 		return
 	}
 
-	gorp.Success(c, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
+	httpx.Success(c, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
 }
 
 // Create 创建用户。
 func (h *UserHandler) Create(c gorp.Context) {
 	var req request.CreateUser
 	if err := c.BindJSON(&req); err != nil {
-		gorp.BadRequest(c, err.Error())
+		httpx.BadRequest(c, err.Error())
 		return
 	}
 
@@ -160,23 +161,23 @@ func (h *UserHandler) Create(c gorp.Context) {
 		Email:    req.Email,
 	})
 	if err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
-	gorp.SuccessWithStatus(c, http.StatusCreated, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
+	httpx.SuccessWithStatus(c, http.StatusCreated, response.User{ID: user.ID, Username: user.Username, Email: user.Email})
 }
 
 // Delete 删除用户。
 func (h *UserHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		gorp.BadRequest(c, "invalid id")
+		httpx.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.user.Delete(c.Context(), uint(id)); err != nil {
-		gorp.Error(c, err)
+		httpx.Error(c, err)
 		return
 	}
 
