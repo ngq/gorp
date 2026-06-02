@@ -1,7 +1,7 @@
 database:
-  driver: "sqlite"
+  driver: "mysql"
   backend: "gorm" # gorm|sqlx|ent（当前默认仍建议 gorm；ent 后续接入）
-  dsn: "file:demo.db?cache=shared&mode=rwc"
+  dsn: "root:123456@tcp(127.0.0.1:3306)/gorp_dev?charset=utf8mb4&parseTime=True&loc=Local"
   max_open_conns: 10
   max_idle_conns: 5
 

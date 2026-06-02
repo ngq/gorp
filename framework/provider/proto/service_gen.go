@@ -662,7 +662,8 @@ func generateMiddlewareLookupCode(svc ProtoService) string {
 }
 
 // generateRouteWithMiddlewareAutoMount 生成单个路由注册代码，支持自动挂载中间件。
-// 如果方法声明了 auth 或 middleware，生成带中间件的路由组。
+// 如果方法声明了 auth 或 middleware，生成接口级中间件路由注册。
+// 生成代码格式：r.GET("/path", mw1, mw2, handler)，中间件只对该路由端点生效。
 func generateRouteWithMiddlewareAutoMount(m ProtoMethod, ginPath string, hasRegistry bool) string {
 	var buf strings.Builder
 
@@ -671,7 +672,7 @@ func generateRouteWithMiddlewareAutoMount(m ProtoMethod, ginPath string, hasRegi
 	needsMiddleware := len(m.Middleware) > 0
 
 	if hasRegistry && (needsAuth || needsMiddleware) {
-		// 生成带中间件的路由组。
+		// 生成带中间件的路由注释。
 		buf.WriteString("\t// [AUTH")
 		if len(m.AuthRoles) > 0 {
 			buf.WriteString(" roles:")
@@ -700,8 +701,9 @@ func generateRouteWithMiddlewareAutoMount(m ProtoMethod, ginPath string, hasRegi
 			buf.WriteString("\t}\n")
 		}
 
-		// 生成路由组注册。
-		buf.WriteString("\tr.Group(\"\").Use(_" + m.Name + "Mws...)." + m.HTTPMethod + "(\"" + ginPath + "\", h." + m.Name + ")\n")
+		// 生成接口级中间件路由注册：r.GET("/path", mw1, mw2, handler)。
+		// 中间件只对该路由端点生效，等同 Gin 原生 r.GET("/path", mw1, mw2, handler)。
+		buf.WriteString("\tr." + m.HTTPMethod + "(\"" + ginPath + "\", append(_" + m.Name + "Mws, h." + m.Name + ")...)\n")
 	} else {
 		// 无中间件，直接注册。
 		if m.AuthRequired || len(m.AuthRoles) > 0 || len(m.Middleware) > 0 {

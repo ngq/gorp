@@ -120,7 +120,7 @@ func driverFromInspector(ins any) string {
 	if dg, ok := ins.(DriverGetter); ok {
 		return dg.Driver()
 	}
-	return "sqlite"
+	return "mysql"
 }
 
 func toGoName(s string) string {
@@ -137,35 +137,14 @@ func toGoName(s string) string {
 }
 
 // dbTypeToGo 根据数据库驱动和列类型返回对应的 Go 类型。
-// 支持 sqlite、mysql、postgres 三种驱动。
+// 支持 mysql、postgres 两种驱动。
 // 对于无法识别的类型，返回 string 作为安全默认值。
 func dbTypeToGo(driver, colType string) string {
 	switch driver {
-	case "sqlite", "sqlite3":
-		return sqliteTypeToGo(colType)
 	case "mysql":
 		return mysqlTypeToGo(colType)
 	case "pgx", "postgres":
 		return pgTypeToGo(colType)
-	default:
-		return sqliteTypeToGo(colType)
-	}
-}
-
-// sqliteTypeToGo 将 SQLite 列类型映射为 Go 类型。
-func sqliteTypeToGo(t string) string {
-	t = strings.ToUpper(t)
-	switch {
-	case strings.Contains(t, "INT"):
-		return "int64"
-	case strings.Contains(t, "CHAR"), strings.Contains(t, "TEXT"), strings.Contains(t, "CLOB"):
-		return "string"
-	case strings.Contains(t, "BLOB"):
-		return "[]byte"
-	case strings.Contains(t, "REAL"), strings.Contains(t, "FLOA"), strings.Contains(t, "DOUB"):
-		return "float64"
-	case strings.Contains(t, "BOOL"):
-		return "bool"
 	default:
 		return "string"
 	}

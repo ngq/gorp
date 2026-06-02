@@ -1,10 +1,10 @@
 // Package inspect provides database schema inspection service.
-// Supported drivers: sqlite/sqlite3, mysql, pgx (PostgreSQL).
-// The service queries information_schema or PRAGMA tables to get schema metadata.
+// Supported drivers: mysql, pgx (PostgreSQL).
+// The service queries information_schema tables to get schema metadata.
 //
 // 数据库 schema 检查服务包，提供表和列信息查询能力。
-// 支持的驱动：sqlite/sqlite3, mysql, pgx (PostgreSQL)。
-// 服务通过查询 information_schema 或 PRAGMA 表获取 schema 元数据。
+// 支持的驱动：mysql, pgx (PostgreSQL)。
+// 服务通过查询 information_schema 表获取 schema 元数据。
 // Eg:
 //
 //	// 注册 Provider（依赖 sqlx）
@@ -109,23 +109,12 @@ func (s *Service) Driver() string {
 }
 
 // Tables returns all table names in the database.
-// Core logic: Query driver-specific system tables (sqlite_master, information_schema.tables).
+// Core logic: Query driver-specific system tables (information_schema.tables).
 //
 // Tables 返回数据库中所有表的名称。
-// 核心逻辑：查询驱动特定的系统表（sqlite_master、information_schema.tables）。
+// 核心逻辑：查询驱动特定的系统表（information_schema.tables）。
 func (s *Service) Tables(ctx context.Context) ([]datacontract.Table, error) {
 	switch s.driver {
-	case "sqlite", "sqlite3":
-		var names []string
-		err := s.db.SelectContext(ctx, &names, `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
-		if err != nil {
-			return nil, err
-		}
-		out := make([]datacontract.Table, 0, len(names))
-		for _, n := range names {
-			out = append(out, datacontract.Table{Name: n})
-		}
-		return out, nil
 	case "mysql":
 		var names []string
 		err := s.db.SelectContext(ctx, &names, `
@@ -166,43 +155,12 @@ func (s *Service) Tables(ctx context.Context) ([]datacontract.Table, error) {
 }
 
 // Columns returns all column info for a specific table.
-// Core logic: Query driver-specific system tables (PRAGMA table_info, information_schema.columns).
+// Core logic: Query driver-specific system tables (information_schema.columns).
 //
 // Columns 返回指定表的所有列信息。
-// 核心逻辑：查询驱动特定的系统表（PRAGMA table_info、information_schema.columns）。
+// 核心逻辑：查询驱动特定的系统表（information_schema.columns）。
 func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Column, error) {
 	switch s.driver {
-	case "sqlite", "sqlite3":
-		type row struct {
-			CID     int            `db:"cid"`
-			Name    string         `db:"name"`
-			Type    string         `db:"type"`
-			NotNull int            `db:"notnull"`
-			Dflt    sql.NullString `db:"dflt_value"`
-			PK      int            `db:"pk"`
-		}
-		rows := make([]row, 0)
-		q := fmt.Sprintf("PRAGMA table_info(%s)", quoteSQLiteIdent(table))
-		if err := s.db.SelectContext(ctx, &rows, q); err != nil {
-			return nil, err
-		}
-		out := make([]datacontract.Column, 0, len(rows))
-		for _, r := range rows {
-			var d *string
-			if r.Dflt.Valid {
-				v := r.Dflt.String
-				d = &v
-			}
-			out = append(out, datacontract.Column{
-				Name:       r.Name,
-				Type:       r.Type,
-				NotNull:    r.NotNull == 1,
-				PrimaryKey: r.PK == 1,
-				DefaultVal: d,
-				Comment:    "", // SQLite 原生不支持列注释，保留空字符串。
-			})
-		}
-		return out, nil
 	case "mysql":
 		type row struct {
 			Name       string         `db:"column_name"`
@@ -309,21 +267,4 @@ func (s *Service) Columns(ctx context.Context, table string) ([]datacontract.Col
 	default:
 		return nil, fmt.Errorf("columns not implemented for driver: %s", s.driver)
 	}
-}
-
-// quoteSQLiteIdent quotes a SQLite identifier to handle special characters.
-// Core logic: Escape double quotes by doubling them, then wrap in quotes.
-//
-// quoteSQLiteIdent 对 SQLite 标识符进行引号包裹，处理特殊字符。
-// 核心逻辑：双引号转义为两个双引号，再用双引号包裹。
-func quoteSQLiteIdent(name string) string {
-	escaped := ""
-	for _, r := range name {
-		if r == '"' {
-			escaped += "\"\""
-			continue
-		}
-		escaped += string(r)
-	}
-	return "\"" + escaped + "\""
 }

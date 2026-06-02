@@ -1,9 +1,9 @@
 // Package gorm provides GORM ORM integration for gorp framework.
-// Supported drivers: sqlite/sqlite3, mysql, postgres/postgresql/pgsql.
+// Supported drivers: mysql, postgres/postgresql/pgsql.
 // Configuration via config.yaml:
 //
 // GORM ORM 包，提供基于 GORM 的数据库 ORM 能力。
-// 支持的驱动：sqlite/sqlite3, mysql, postgres/postgresql/pgsql。
+// 支持的驱动：mysql, postgres/postgresql/pgsql。
 // 通过 config.yaml 配置：
 //
 //	database:
@@ -36,9 +36,7 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	_ "modernc.org/sqlite"
 )
 
 // closerFunc 将 func() error 适配为 io.Closer 接口
@@ -111,22 +109,12 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			sqlDB     *sql.DB
 		)
 		switch dbc.Driver {
-		case "sqlite", "sqlite3":
-			conn, err := sql.Open("sqlite", dbc.DSN)
-			if err != nil {
-				return nil, err
-			}
-			sqlDB = conn
-			if err := applySQLDBPool(sqlDB, dbc); err != nil {
-				return nil, err
-			}
-			dialector = sqlite.Dialector{Conn: conn}
 		case "mysql":
 			dialector = mysql.Open(dbc.DSN)
 		case "postgres", "postgresql", "pgsql":
 			dialector = postgres.Open(dbc.DSN)
 		default:
-			return nil, fmt.Errorf("unknown db driver: %s", dbc.Driver)
+			return nil, fmt.Errorf("unsupported db driver: %s (supported: mysql, postgres)", dbc.Driver)
 		}
 
 		db, err := gorm.Open(dialector, &gorm.Config{Logger: newGormLogger(logger)})

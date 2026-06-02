@@ -1,11 +1,11 @@
 // Package sqlx provides SQLX ORM integration for gorp framework.
 // SQLX is a lighter alternative to GORM, suitable for scenarios requiring raw SQL.
-// Supported drivers: sqlite/sqlite3, mysql, postgres/postgresql/pgsql (via pgx).
+// Supported drivers:  mysql, postgres/postgresql/pgsql (via pgx).
 // Configuration via config.yaml:
 //
 // SQLX ORM 包，提供基于 jmoiron/sqlx 的轻量级数据库操作能力。
 // SQLX 是比 GORM 更轻量的选择，适用于需要原生 SQL 的场景。
-// 支持的驱动：sqlite/sqlite3, mysql, postgres/postgresql/pgsql（通过 pgx）。
+// 支持的驱动： mysql, postgres/postgresql/pgsql（通过 pgx）。
 // 通过 config.yaml 配置：
 //
 //	database:
@@ -38,7 +38,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "modernc.org/sqlite"
 )
 
 // closerFunc 将 func() error 适配为 io.Closer 接口
@@ -156,14 +155,12 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
 // normalizeDriver converts driver aliases to standard driver names.
-// Mapping: sqlite/sqlite3 -> sqlite, postgres/postgresql/pgsql -> pgx.
+// Mapping:  postgres/postgresql/pgsql -> pgx.
 //
 // normalizeDriver 将驱动别名转换为标准驱动名称。
-// 映射：sqlite/sqlite3 -> sqlite, postgres/postgresql/pgsql -> pgx。
+// 映射： postgres/postgresql/pgsql -> pgx。
 func normalizeDriver(driver string) (string, error) {
 	switch driver {
-	case "sqlite", "sqlite3":
-		return "sqlite", nil
 	case "mysql":
 		return "mysql", nil
 	case "postgres", "postgresql", "pgsql":

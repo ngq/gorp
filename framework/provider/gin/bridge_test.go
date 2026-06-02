@@ -214,3 +214,156 @@ func (n *nonGinHTTPService) Router() transportcontract.Router   { return nil }
 func (n *nonGinHTTPService) Server() *http.Server               { return nil }
 func (n *nonGinHTTPService) Run() error                         { return nil }
 func (n *nonGinHTTPService) Shutdown(ctx context.Context) error { return nil }
+func (n *nonGinHTTPService) UseGlobal(middleware ...transportcontract.Middleware) {}
+
+// TestRouteLevelMiddleware 验证接口级中间件只对指定路由生效，不影响其他路由。
+//
+// 中文说明：
+// - 通过 GET(path, handler, middleware...) 注册接口级中间件。
+// - 中间件只对该路由端点生效，其他路由不经过该中间件。
+func TestRouteLevelMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := NewTestEngine()
+	rt := newRouter(&engine.RouterGroup)
+
+	var order []string
+
+	// 接口级中间件：只在 /protected 路由上生效
+	authMW := func(next transportcontract.Handler) transportcontract.Handler {
+		return func(ctx transportcontract.Context) {
+			order = append(order, "auth-mw")
+			next(ctx)
+		}
+	}
+
+	// 带接口级中间件的路由
+	rt.GET("/protected", func(ctx transportcontract.Context) {
+		order = append(order, "protected-handler")
+	}, authMW)
+
+	// 不带接口级中间件的路由
+	rt.GET("/public", func(ctx transportcontract.Context) {
+		order = append(order, "public-handler")
+	})
+
+	// 请求 /protected：应经过 authMW → handler
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("protected route: expected status 200, got %d", w.Code)
+	}
+	if len(order) != 2 || order[0] != "auth-mw" || order[1] != "protected-handler" {
+		t.Errorf("protected route: expected [auth-mw, protected-handler], got %v", order)
+	}
+
+	// 请求 /public：不应经过 authMW
+	order = nil
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/public", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("public route: expected status 200, got %d", w.Code)
+	}
+	if len(order) != 1 || order[0] != "public-handler" {
+		t.Errorf("public route: expected [public-handler], got %v", order)
+	}
+}
+
+// TestRouteLevelMultipleMiddleware 验证多个接口级中间件按参数顺序执行。
+//
+// 中文说明：
+// - 多个 middleware 按参数顺序依次执行，最后执行 handler。
+// - 等同 Gin 的 r.GET("/path", mw1, mw2, handler) 行为。
+func TestRouteLevelMultipleMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := NewTestEngine()
+	rt := newRouter(&engine.RouterGroup)
+
+	var order []string
+
+	mw1 := func(next transportcontract.Handler) transportcontract.Handler {
+		return func(ctx transportcontract.Context) {
+			order = append(order, "mw1-before")
+			next(ctx)
+			order = append(order, "mw1-after")
+		}
+	}
+
+	mw2 := func(next transportcontract.Handler) transportcontract.Handler {
+		return func(ctx transportcontract.Context) {
+			order = append(order, "mw2-before")
+			next(ctx)
+			order = append(order, "mw2-after")
+		}
+	}
+
+	rt.GET("/test", func(ctx transportcontract.Context) {
+		order = append(order, "handler")
+	}, mw1, mw2)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	engine.ServeHTTP(w, req)
+
+	expected := []string{"mw1-before", "mw2-before", "handler", "mw2-after", "mw1-after"}
+	if len(order) != len(expected) {
+		t.Fatalf("expected %d entries, got %d: %v", len(expected), len(order), order)
+	}
+	for i, v := range expected {
+		if order[i] != v {
+			t.Errorf("position %d: expected %q, got %q", i, v, order[i])
+		}
+	}
+}
+
+// TestRouteLevelMiddlewareWithGroupMiddleware 验证接口级中间件与组级中间件的执行顺序。
+//
+// 中文说明：
+// - 执行顺序：组级中间件 → 接口级中间件 → handler。
+// - 接口级中间件在组级中间件之后执行。
+func TestRouteLevelMiddlewareWithGroupMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := NewTestEngine()
+	rt := newRouter(&engine.RouterGroup)
+
+	var order []string
+
+	// 组级中间件
+	groupMW := func(next transportcontract.Handler) transportcontract.Handler {
+		return func(ctx transportcontract.Context) {
+			order = append(order, "group-mw")
+			next(ctx)
+		}
+	}
+
+	api := rt.Group("/api", groupMW)
+
+	// 接口级中间件
+	routeMW := func(next transportcontract.Handler) transportcontract.Handler {
+		return func(ctx transportcontract.Context) {
+			order = append(order, "route-mw")
+			next(ctx)
+		}
+	}
+
+	api.GET("/users", func(ctx transportcontract.Context) {
+		order = append(order, "handler")
+	}, routeMW)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	engine.ServeHTTP(w, req)
+
+	expected := []string{"group-mw", "route-mw", "handler"}
+	if len(order) != len(expected) {
+		t.Fatalf("expected %d entries, got %d: %v", len(expected), len(order), order)
+	}
+	for i, v := range expected {
+		if order[i] != v {
+			t.Errorf("position %d: expected %q, got %q", i, v, order[i])
+		}
+	}
+}

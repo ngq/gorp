@@ -13,7 +13,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/mysql"    // mysql 驱动（golang-migrate 按需加载）
 	_ "github.com/golang-migrate/migrate/v4/database/postgres" // postgres 驱动
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"  // sqlite3 驱动
 	_ "github.com/golang-migrate/migrate/v4/source/file"       // file source（从本地文件系统加载迁移文件）
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -22,9 +21,8 @@ import (
 // dbConfig 对应 config/app.yaml 中的 database 配置段。
 //
 // 中文说明：
-// - driver：数据库驱动类型，支持 sqlite / mysql / postgres；
+// - driver：数据库驱动类型，支持 mysql / postgres；
 // - dsn：数据库连接字符串，格式因驱动不同而异：
-//   - sqlite：  "file:demo.db?cache=shared&mode=rwc"
 //   - mysql：   "user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true"
 //   - postgres："postgres://user:password@localhost:5432/dbname?sslmode=disable"
 type dbConfig struct {
@@ -264,11 +262,11 @@ func loadDBConfig() (*dbConfig, error) {
 	}
 
 	if cfg.Database == nil {
-		return nil, fmt.Errorf("配置文件 %s 中缺少 database 配置段\n请参考以下格式添加：\n\ndatabase:\n  driver: \"sqlite\"\n  dsn: \"file:demo.db?cache=shared&mode=rwc\"", configPath)
+		return nil, fmt.Errorf("配置文件 %s 中缺少 database 配置段\n请参考以下格式添加：\n\ndatabase:\n  driver: \"mysql\"\n  dsn: \"user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true\"", configPath)
 	}
 
 	if cfg.Database.Driver == "" {
-		return nil, fmt.Errorf("配置文件中 database.driver 为空\n请指定 driver（支持：sqlite / mysql / postgres）")
+		return nil, fmt.Errorf("配置文件中 database.driver 为空\n请指定 driver（支持：mysql / postgres）")
 	}
 
 	if cfg.Database.DSN == "" {
@@ -282,7 +280,6 @@ func loadDBConfig() (*dbConfig, error) {
 //
 // 中文说明：
 // - golang-migrate 对不同数据库的 DSN 格式有不同要求；
-// - sqlite3：直接使用 dsn 字符串；
 // - mysql：直接使用 dsn 字符串；
 // - postgres：直接使用 dsn 字符串；
 // - 返回格式为 "<driver>://<dsn>"，供 migrate.New() 使用。
@@ -291,9 +288,6 @@ func buildMigrateDSN(cfg *dbConfig) (string, error) {
 	dsn := strings.TrimSpace(cfg.DSN)
 
 	switch driver {
-	case "sqlite", "sqlite3":
-		// golang-migrate 的 sqlite3 驱动需要 "sqlite3://" 前缀
-		return "sqlite3://" + dsn, nil
 	case "mysql":
 		// golang-migrate 的 mysql 驱动需要 "mysql://" 前缀
 		return "mysql://" + dsn, nil
@@ -305,7 +299,7 @@ func buildMigrateDSN(cfg *dbConfig) (string, error) {
 		}
 		return dsn, nil
 	default:
-		return "", fmt.Errorf("不支持的数据库驱动：%s（支持：sqlite / mysql / postgres）", driver)
+		return "", fmt.Errorf("不支持的数据库驱动：%s（支持：mysql / postgres）", driver)
 	}
 }
 

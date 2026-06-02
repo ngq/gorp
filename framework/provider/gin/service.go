@@ -53,3 +53,27 @@ func (s *service) Shutdown(ctx context.Context) error { return s.srv.Shutdown(ct
 // GINEngine 返回底层 *gin.Engine，供 Gin-first 使用。
 // 实现 transportcontract.GINEngineProvider。
 func (s *service) GINEngine() any { return s.engine }
+
+// UseGlobal 注册全局级中间件，对所有路由生效。
+// 语义等同于 Gin 的 engine.Use()，区别于 Router.Use() 的组级语义。
+// 全局中间件在框架治理中间件之后、路由组中间件之前执行。
+//
+// UseGlobal registers global-level middleware that applies to all routes.
+// Semantically equivalent to Gin's engine.Use(), distinct from Router.Use() which is group-level.
+// Global middleware executes after framework governance middleware and before group-level middleware.
+func (s *service) UseGlobal(middleware ...transportcontract.Middleware) {
+	if s.engine == nil || len(middleware) == 0 {
+		return
+	}
+	adapted := make([]gin.HandlerFunc, 0, len(middleware))
+	for _, mw := range middleware {
+		if mw == nil {
+			continue
+		}
+		adapted = append(adapted, adaptMiddleware(mw))
+	}
+	if len(adapted) == 0 {
+		return
+	}
+	s.engine.Use(adapted...)
+}

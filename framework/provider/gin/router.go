@@ -62,52 +62,63 @@ func (r *router) Group(prefix string, middleware ...transportcontract.Middleware
 	return newRouter(r.group.Group(prefix, adapted...))
 }
 
-// Handle registers a route handler for the given method and path.
+// Handle 为指定 method 和 path 注册路由处理器，可选挂载接口级中间件。
+// 中间件只对该路由端点生效，不影响其他路由。
+// 执行顺序：中间件按参数顺序依次执行，最后执行 handler。
 //
-// Handle 为指定 method 和 path 注册路由处理器。
-func (r *router) Handle(method, path string, handler transportcontract.Handler) {
+// Handle registers a route handler for the given method and path,
+// with optional interface-level middleware that applies only to this route.
+// Middleware executes in argument order, then the handler runs last.
+func (r *router) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	if r == nil || r.group == nil || handler == nil {
 		return
 	}
-	r.group.Handle(method, path, adaptHandler(handler))
+	handlers := make([]gin.HandlerFunc, 0, len(middleware)+1)
+	for _, mw := range middleware {
+		if mw != nil {
+			handlers = append(handlers, adaptMiddleware(mw))
+		}
+	}
+	handlers = append(handlers, adaptHandler(handler))
+	r.group.Handle(method, path, handlers...)
 }
 
-// HandleFunc is a function-style alias for Handle.
+// HandleFunc 是 Handle 的函数式别名，支持可选接口级中间件。
 //
-// HandleFunc 是 Handle 的函数式别名。
-func (r *router) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {
+// HandleFunc is a function-style alias for Handle with optional interface-level middleware.
+func (r *router) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	if handlerFunc == nil {
 		return
 	}
-	r.Handle(method, path, handlerFunc)
+	r.Handle(method, path, handlerFunc, middleware...)
 }
 
-// GET registers a GET route handler.
+// GET 注册 GET 路由处理器，可选挂载接口级中间件。
 //
-// GET 注册 GET 路由处理器。
-func (r *router) GET(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodGet, path, handler)
+// GET registers a GET route handler with optional interface-level middleware.
+func (r *router) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodGet, path, handler, middleware...)
 }
 
-// POST registers a POST route handler.
+// POST 注册 POST 路由处理器，可选挂载接口级中间件。
 //
-// POST 注册 POST 路由处理器。
-func (r *router) POST(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodPost, path, handler)
+// POST registers a POST route handler with optional interface-level middleware.
+func (r *router) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPost, path, handler, middleware...)
 }
 
-// PUT registers a PUT route handler.
+// PUT 注册 PUT 路由处理器，可选挂载接口级中间件。
 //
-// PUT 注册 PUT 路由处理器。
-func (r *router) PUT(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodPut, path, handler)
+// PUT registers a PUT route handler with optional interface-level middleware.
+func (r *router) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPut, path, handler, middleware...)
 }
 
-// DELETE registers a DELETE route handler.
+// DELETE 注册 DELETE 路由处理器，可选挂载接口级中间件。
 //
-// DELETE 注册 DELETE 路由处理器。
-func (r *router) DELETE(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodDelete, path, handler)
+// DELETE registers a DELETE route handler with optional interface-level middleware.
+func (r *router) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodDelete, path, handler, middleware...)
 }
 
 // Mount exposes a standard http.Handler on the given path.

@@ -19,12 +19,12 @@ func (r *captureRouter) Group(prefix string, middleware ...Middleware) Router {
 	r.used = append(r.used, middleware...)
 	return r
 }
-func (r *captureRouter) Handle(method, path string, handler Handler)         {}
-func (r *captureRouter) HandleFunc(method, path string, handlerFunc Handler) {}
-func (r *captureRouter) GET(path string, handler Handler)                    {}
-func (r *captureRouter) POST(path string, handler Handler)                   {}
-func (r *captureRouter) PUT(path string, handler Handler)                    {}
-func (r *captureRouter) DELETE(path string, handler Handler)                 {}
+func (r *captureRouter) Handle(method, path string, handler Handler, middleware ...Middleware)         {}
+func (r *captureRouter) HandleFunc(method, path string, handlerFunc Handler, middleware ...Middleware) {}
+func (r *captureRouter) GET(path string, handler Handler, middleware ...Middleware)                    {}
+func (r *captureRouter) POST(path string, handler Handler, middleware ...Middleware)                   {}
+func (r *captureRouter) PUT(path string, handler Handler, middleware ...Middleware)                    {}
+func (r *captureRouter) DELETE(path string, handler Handler, middleware ...Middleware)                 {}
 func (r *captureRouter) Mount(path string, handler http.Handler)             {}
 
 func TestAdaptMiddlewareWrapsNextHandler(t *testing.T) {

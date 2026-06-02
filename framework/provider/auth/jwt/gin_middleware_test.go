@@ -166,7 +166,7 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 	})
 	r.GET("/me", func(c *gin.Context) {
 		// Claims are stored via c.Set()
-		claimsVal, exists := c.Get(ContextJWTClaimsKey)
+		claimsVal, exists := c.Get(securitycontract.ContextJWTClaimsKey)
 		require.True(t, exists)
 		gotClaims, ok := claimsVal.(*securitycontract.JWTClaims)
 		require.True(t, ok)

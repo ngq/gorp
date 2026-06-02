@@ -178,12 +178,12 @@ func (testRouter) Use(middleware ...transportcontract.Middleware) {}
 func (testRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return testRouter{}
 }
-func (testRouter) Handle(method, path string, handler transportcontract.Handler)         {}
-func (testRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {}
-func (testRouter) GET(path string, handler transportcontract.Handler)                    {}
-func (testRouter) POST(path string, handler transportcontract.Handler)                   {}
-func (testRouter) PUT(path string, handler transportcontract.Handler)                    {}
-func (testRouter) DELETE(path string, handler transportcontract.Handler)                 {}
+func (testRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)         {}
+func (testRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {}
+func (testRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                    {}
+func (testRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                   {}
+func (testRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                    {}
+func (testRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                 {}
 func (testRouter) Mount(path string, handler http.Handler)                               {}
 
 type testContainer struct{}

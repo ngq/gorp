@@ -11,9 +11,9 @@ app:
     idle_timeout_sec: 60
 
 # database:
-#   driver: "sqlite"     # sqlite|mysql|postgres
+#   driver: "mysql"      # mysql|postgres
 #   backend: "gorm"      # gorm|sqlx|ent（当前默认 gorm；ent 预留）
-#   dsn: "file:demo.db?cache=shared&mode=rwc"
+#   dsn: "user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true"
 #   max_open_conns: 10
 #   max_idle_conns: 5
 

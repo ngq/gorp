@@ -221,16 +221,16 @@ type mockRouter struct {
 	routes map[string]transportcontract.Handler
 }
 
-func (m *mockRouter) GET(path string, handler transportcontract.Handler) {
+func (m *mockRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	if m.routes == nil {
 		m.routes = make(map[string]transportcontract.Handler)
 	}
 	m.routes[path] = handler
 }
 
-func (m *mockRouter) POST(path string, handler transportcontract.Handler)    {}
-func (m *mockRouter) PUT(path string, handler transportcontract.Handler)     {}
-func (m *mockRouter) DELETE(path string, handler transportcontract.Handler)  {}
+func (m *mockRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)    {}
+func (m *mockRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)     {}
+func (m *mockRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)  {}
 func (m *mockRouter) PATCH(path string, handler transportcontract.Handler)   {}
 func (m *mockRouter) OPTIONS(path string, handler transportcontract.Handler) {}
 func (m *mockRouter) HEAD(path string, handler transportcontract.Handler)    {}
@@ -240,11 +240,11 @@ func (m *mockRouter) Group(prefix string, middleware ...transportcontract.Middle
 	return m
 }
 func (m *mockRouter) Mount(prefix string, handler http.Handler) {}
-func (m *mockRouter) Handle(method, path string, handler transportcontract.Handler) {
-	m.GET(path, handler)
+func (m *mockRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	m.GET(path, handler, middleware...)
 }
-func (m *mockRouter) HandleFunc(method, path string, handler transportcontract.Handler) {
-	m.GET(path, handler)
+func (m *mockRouter) HandleFunc(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	m.GET(path, handler, middleware...)
 }
 func (m *mockRouter) Static(relativePath, root string)                 {}
 func (m *mockRouter) StaticFile(relativePath, filepath string)         {}

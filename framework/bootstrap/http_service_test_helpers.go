@@ -28,15 +28,15 @@ func (r *recordingRouter) Use(middleware ...transportcontract.Middleware) {}
 func (r *recordingRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return r
 }
-func (r *recordingRouter) Handle(method, path string, handler transportcontract.Handler) {}
-func (r *recordingRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {
+func (r *recordingRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {}
+func (r *recordingRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {
 }
-func (r *recordingRouter) GET(path string, handler transportcontract.Handler) {
+func (r *recordingRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	r.gets = append(r.gets, path)
 }
-func (r *recordingRouter) POST(path string, handler transportcontract.Handler)   {}
-func (r *recordingRouter) PUT(path string, handler transportcontract.Handler)    {}
-func (r *recordingRouter) DELETE(path string, handler transportcontract.Handler) {}
+func (r *recordingRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)   {}
+func (r *recordingRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)    {}
+func (r *recordingRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {}
 func (r *recordingRouter) Mount(path string, handler http.Handler) {
 	r.mounted = append(r.mounted, path)
 }
@@ -204,31 +204,47 @@ func (r *ginTestRouter) Group(prefix string, middleware ...transportcontract.Mid
 	return wrapped
 }
 
-func (r *ginTestRouter) Handle(method, path string, handler transportcontract.Handler) {
-	r.engine.Handle(method, path, func(c *gin.Context) {
+func (r *ginTestRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	handlers := make([]gin.HandlerFunc, 0, len(middleware)+1)
+	for _, mw := range middleware {
+		if mw != nil {
+			handlers = append(handlers, func(c *gin.Context) {
+				httpCtx := newTestContext(c)
+				if wrapped := mw(func(inner transportcontract.Context) {
+					if inner != nil {
+						c.Next()
+					}
+				}); wrapped != nil {
+					wrapped(httpCtx)
+				}
+			})
+		}
+	}
+	handlers = append(handlers, func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		handler(httpCtx)
 	})
+	r.engine.Handle(method, path, handlers...)
 }
 
-func (r *ginTestRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {
-	r.Handle(method, path, handlerFunc)
+func (r *ginTestRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(method, path, handlerFunc, middleware...)
 }
 
-func (r *ginTestRouter) GET(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodGet, path, handler)
+func (r *ginTestRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodGet, path, handler, middleware...)
 }
 
-func (r *ginTestRouter) POST(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodPost, path, handler)
+func (r *ginTestRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPost, path, handler, middleware...)
 }
 
-func (r *ginTestRouter) PUT(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodPut, path, handler)
+func (r *ginTestRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPut, path, handler, middleware...)
 }
 
-func (r *ginTestRouter) DELETE(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodDelete, path, handler)
+func (r *ginTestRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodDelete, path, handler, middleware...)
 }
 
 func (r *ginTestRouter) Mount(path string, handler http.Handler) {
@@ -267,34 +283,47 @@ func (r *ginGroupTestRouter) Group(prefix string, middleware ...transportcontrac
 	return group
 }
 
-func (r *ginGroupTestRouter) Handle(method, path string, handler transportcontract.Handler) {
-	r.group.Handle(method, path, func(c *gin.Context) {
+func (r *ginGroupTestRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	handlers := make([]gin.HandlerFunc, 0, len(middleware)+1)
+	for _, mw := range middleware {
+		if mw != nil {
+			handlers = append(handlers, func(c *gin.Context) {
+				httpCtx := newTestContext(c)
+				if wrapped := mw(func(inner transportcontract.Context) {
+					if inner != nil {
+						c.Next()
+					}
+				}); wrapped != nil {
+					wrapped(httpCtx)
+				}
+			})
+		}
+	}
+	handlers = append(handlers, func(c *gin.Context) {
 		httpCtx := newTestContext(c)
 		handler(httpCtx)
 	})
+	r.group.Handle(method, path, handlers...)
 }
 
-func (r *ginGroupTestRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler) {
-	r.Handle(method, path, handlerFunc)
+func (r *ginGroupTestRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(method, path, handlerFunc, middleware...)
 }
 
-func (r *ginGroupTestRouter) GET(path string, handler transportcontract.Handler) {
-	r.group.Handle(http.MethodGet, path, func(c *gin.Context) {
-		httpCtx := newTestContext(c)
-		handler(httpCtx)
-	})
+func (r *ginGroupTestRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodGet, path, handler, middleware...)
 }
 
-func (r *ginGroupTestRouter) POST(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodPost, path, handler)
+func (r *ginGroupTestRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPost, path, handler, middleware...)
 }
 
-func (r *ginGroupTestRouter) PUT(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodPut, path, handler)
+func (r *ginGroupTestRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPut, path, handler, middleware...)
 }
 
-func (r *ginGroupTestRouter) DELETE(path string, handler transportcontract.Handler) {
-	r.Handle(http.MethodDelete, path, handler)
+func (r *ginGroupTestRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodDelete, path, handler, middleware...)
 }
 
 func (r *ginGroupTestRouter) Mount(path string, handler http.Handler) {

@@ -188,18 +188,10 @@ func parseError(err error) (int, string) {
 }
 
 // codeToHTTPStatus maps business error codes to HTTP status codes.
-// Business should override this function or provide custom mapping.
+// All responses return HTTP 200, error info is in JSON body.
 //
 // codeToHTTPStatus 将业务错误码映射到 HTTP 状态码。
-// 业务可以覆盖此函数或提供自定义映射。
+// 所有响应都返回 HTTP 200，错误信息在 JSON body 中。
 func codeToHTTPStatus(code int) int {
-	if code == CodeSuccess {
-		return http.StatusOK
-	}
-	// 默认：业务错误码 >= 1000 视为客户端错误，其他视为服务端错误
-	// Default: business codes >= 1000 are client errors, others are server errors
-	if code >= 1000 && code < 5000 {
-		return http.StatusBadRequest
-	}
-	return http.StatusInternalServerError
+	return http.StatusOK
 }

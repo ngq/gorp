@@ -76,12 +76,12 @@ type LogConfigSchema struct {
 // section exists and driver/dsn are non-empty.
 // If the user does not configure database, validation is skipped (DB is optional).
 type DatabaseConfigSchema struct {
-	// Driver 是数据库驱动，可选值：sqlite / mysql / postgres / pgx。
+	// Driver 是数据库驱动，可选值：mysql / postgres / pgx。
 	// 当 DSN 非空时，Driver 也必须提供。
 	//
-	// Driver is the database driver. Valid values: sqlite / mysql / postgres / pgx.
+	// Driver is the database driver. Valid values: mysql / postgres / pgx.
 	// When DSN is non-empty, Driver is also required.
-	Driver string `validate:"required_with=DSN,oneof=sqlite mysql postgres pgx" mapstructure:"driver"`
+	Driver string `validate:"required_with=DSN,oneof=mysql postgres pgx" mapstructure:"driver"`
 
 	// DSN 是数据库连接字符串，当 Driver 非空时必须提供。
 	//

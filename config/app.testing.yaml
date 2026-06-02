@@ -1,7 +1,7 @@
 database:
-  driver: "sqlite"
-  backend: "gorm" # 测试环境当前默认仍走 gorm，保持旧测试链路不变
-  dsn: "file:testdb?mode=memory&cache=shared"
+  driver: "mysql"
+  backend: "gorm" # 测试环境当前默认仍走 gorm
+  dsn: "root:123456@tcp(127.0.0.1:3306)/gorp_test?charset=utf8mb4&parseTime=True&loc=Local"
   max_open_conns: 5
   max_idle_conns: 5
 

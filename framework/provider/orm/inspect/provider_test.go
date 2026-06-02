@@ -6,53 +6,12 @@ package inspect
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
-	_ "modernc.org/sqlite"
 )
-
-// TestService_SQLiteTablesAndColumns verifies that the inspector service
-// can correctly query tables and columns from a SQLite database.
-//
-// TestService_SQLiteTablesAndColumns 验证 inspector service 能正确查询 SQLite 数据库的表和列信息。
-func TestService_SQLiteTablesAndColumns(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	require.NoError(t, err)
-	defer db.Close()
-
-	sx := sqlx.NewDb(db, "sqlite")
-	_, err = sx.Exec(`
-		CREATE TABLE users (
-			id INTEGER PRIMARY KEY,
-			name TEXT NOT NULL,
-			email TEXT DEFAULT 'n/a'
-		)
-	`)
-	require.NoError(t, err)
-
-	svc := &Service{db: sx, driver: "sqlite"}
-	ctx := context.Background()
-
-	tables, err := svc.Tables(ctx)
-	require.NoError(t, err)
-	require.Len(t, tables, 1)
-	require.Equal(t, "users", tables[0].Name)
-
-	cols, err := svc.Columns(ctx, "users")
-	require.NoError(t, err)
-	require.Len(t, cols, 3)
-	require.Equal(t, "id", cols[0].Name)
-	require.True(t, cols[0].PrimaryKey)
-	require.Equal(t, "name", cols[1].Name)
-	require.True(t, cols[1].NotNull)
-	require.Equal(t, "email", cols[2].Name)
-	require.NotNil(t, cols[2].DefaultVal)
-	require.Equal(t, "'n/a'", *cols[2].DefaultVal)
-}
 
 // TestService_MySQLTablesAndColumns verifies that the inspector service
 // can correctly query tables and columns from a MySQL database using SQL mock.

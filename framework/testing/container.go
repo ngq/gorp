@@ -31,7 +31,6 @@ type cleanupFunc func()
 
 // NewTestContainer builds a container configured for tests:
 // - APP_ENV=testing
-// - sqlite in-memory
 // - miniredis
 func NewTestContainer(t *testing.T) (runtimecontract.Container, cleanupFunc) {
 	require.NoError(t, ChdirRepoRoot())
