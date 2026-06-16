@@ -2,30 +2,6 @@ module github.com/ngq/gorp
 
 go 1.26
 
-// Contrib 模块 replace 指令（独立模块开发时使用本地路径�?// Contrib module replace directives (use local path for independent module development)
-replace (
-	github.com/ngq/gorp/contrib/circuitbreaker/sentinel => ./contrib/circuitbreaker/sentinel
-	github.com/ngq/gorp/contrib/configsource/apollo => ./contrib/configsource/apollo
-	github.com/ngq/gorp/contrib/configsource/consul => ./contrib/configsource/consul
-	github.com/ngq/gorp/contrib/configsource/etcd => ./contrib/configsource/etcd
-	github.com/ngq/gorp/contrib/configsource/kubernetes => ./contrib/configsource/kubernetes
-	github.com/ngq/gorp/contrib/configsource/nacos => ./contrib/configsource/nacos
-	github.com/ngq/gorp/contrib/dlock/redis => ./contrib/dlock/redis
-	github.com/ngq/gorp/contrib/dtm/dtmsdk => ./contrib/dtm/dtmsdk
-	github.com/ngq/gorp/contrib/messagequeue/kafka => ./contrib/messagequeue/kafka
-	github.com/ngq/gorp/contrib/messagequeue/rabbitmq => ./contrib/messagequeue/rabbitmq
-	github.com/ngq/gorp/contrib/messagequeue/redis => ./contrib/messagequeue/redis
-	github.com/ngq/gorp/contrib/messagequeue/rocketmq => ./contrib/messagequeue/rocketmq
-	github.com/ngq/gorp/contrib/registry/consul => ./contrib/registry/consul
-	github.com/ngq/gorp/contrib/registry/etcd => ./contrib/registry/etcd
-	github.com/ngq/gorp/contrib/registry/eureka => ./contrib/registry/eureka
-	github.com/ngq/gorp/contrib/registry/kubernetes => ./contrib/registry/kubernetes
-	github.com/ngq/gorp/contrib/registry/nacos => ./contrib/registry/nacos
-	github.com/ngq/gorp/contrib/serviceauth/mtls => ./contrib/serviceauth/mtls
-	github.com/ngq/gorp/contrib/serviceauth/token => ./contrib/serviceauth/token
-	github.com/ngq/gorp/contrib/tracing/otel => ./contrib/tracing/otel
-)
-
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/IBM/sarama v1.45.2

@@ -41,11 +41,15 @@ const CodeSuccess = 0
 // 业务错误码常量，与 HTTP 状态码对应但独立编码。
 // Business error code constants, mapped to HTTP status codes but independently encoded.
 const (
-	CodeBadRequest    = 1001 // 请求参数错误
-	CodeUnauthorized  = 1002 // 未认证
-	CodeForbidden     = 1003 // 无权限
-	CodeNotFound      = 1004 // 资源不存在
-	CodeInternalError = 1005 // 内部错误
+	CodeBadRequest         = 1001 // 请求参数错误
+	CodeUnauthorized       = 1002 // 未认证
+	CodeForbidden          = 1003 // 无权限
+	CodeNotFound           = 1004 // 资源不存在
+	CodeInternalError      = 1005 // 内部错误
+	CodeServiceUnavailable = 1006 // 服务不可用
+	CodeTooManyRequests    = 1007 // 限流
+	CodeConflict           = 1008 // 冲突
+	CodeValidationFailed   = 1009 // 校验失败
 )
 
 // BusinessError describes an error carrying business code and message semantics.
@@ -188,10 +192,32 @@ func parseError(err error) (int, string) {
 }
 
 // codeToHTTPStatus maps business error codes to HTTP status codes.
-// All responses return HTTP 200, error info is in JSON body.
+// Returns the appropriate HTTP status based on business error code semantics.
 //
 // codeToHTTPStatus 将业务错误码映射到 HTTP 状态码。
-// 所有响应都返回 HTTP 200，错误信息在 JSON body 中。
+// 根据业务错误码语义返回对应的 HTTP 状态码。
 func codeToHTTPStatus(code int) int {
-	return http.StatusOK
+	switch {
+	case code == CodeSuccess:
+		return http.StatusOK
+	case code == CodeBadRequest, code == CodeValidationFailed:
+		return http.StatusBadRequest
+	case code == CodeUnauthorized:
+		return http.StatusUnauthorized
+	case code == CodeForbidden:
+		return http.StatusForbidden
+	case code == CodeNotFound:
+		return http.StatusNotFound
+	case code == CodeConflict:
+		return http.StatusConflict
+	case code == CodeTooManyRequests:
+		return http.StatusTooManyRequests
+	case code == CodeServiceUnavailable:
+		return http.StatusServiceUnavailable
+	default:
+		if code >= 10000 {
+			return http.StatusOK
+		}
+		return http.StatusInternalServerError
+	}
 }
