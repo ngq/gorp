@@ -118,9 +118,10 @@ func TestBindAndValidateJSONReturnsUnifiedError(t *testing.T) {
 func TestMetricsMiddlewareRecordsRequestCount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	labels := map[string]string{
-		"method": http.MethodGet,
-		"path":   "/metrics/:id",
-		"status": "204",
+		"service": "default",
+		"method":  http.MethodGet,
+		"path":    "/metrics/:id",
+		"status":  "204",
 	}
 	beforeCount := counterValue("gorp_http_requests_total", labels)
 

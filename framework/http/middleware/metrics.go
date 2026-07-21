@@ -22,19 +22,23 @@ var (
 	httpRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "gorp_http_requests_total",
 		Help: "Total number of HTTP requests handled by Gin.",
-	}, []string{"method", "path", "status"})
+	}, []string{"service", "method", "path", "status"})
 
 	httpRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "gorp_http_request_duration_seconds",
 		Help:    "HTTP request latency in seconds.",
 		Buckets: prometheus.DefBuckets,
-	}, []string{"method", "path", "status"})
+	}, []string{"service", "method", "path", "status"})
 )
 
 // MetricsMiddleware records basic HTTP request metrics for the current request.
 //
 // MetricsMiddleware 为当前请求记录基础 HTTP 指标。
-func MetricsMiddleware() transportcontract.Middleware {
+func MetricsMiddleware(serviceNames ...string) transportcontract.Middleware {
+	serviceName := "default"
+	if len(serviceNames) > 0 && serviceNames[0] != "" {
+		serviceName = serviceNames[0]
+	}
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
 			start := time.Now()
@@ -56,8 +60,8 @@ func MetricsMiddleware() transportcontract.Middleware {
 			}
 			duration := time.Since(start).Seconds()
 
-			httpRequestsTotal.WithLabelValues(method, path, status).Inc()
-			httpRequestDuration.WithLabelValues(method, path, status).Observe(duration)
+			httpRequestsTotal.WithLabelValues(serviceName, method, path, status).Inc()
+			httpRequestDuration.WithLabelValues(serviceName, method, path, status).Observe(duration)
 		}
 	}
 }

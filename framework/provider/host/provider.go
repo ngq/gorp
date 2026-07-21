@@ -152,7 +152,13 @@ func (h *DefaultHost) Start(ctx context.Context) error {
 	h.running = true
 	h.mu.Unlock()
 
-	return h.manager.Start(ctx)
+	if err := h.manager.Start(ctx); err != nil {
+		h.mu.Lock()
+		h.running = false
+		h.mu.Unlock()
+		return err
+	}
+	return nil
 }
 
 // Stop shuts down all registered services.

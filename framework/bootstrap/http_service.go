@@ -79,6 +79,7 @@ type HTTPServiceRuntime struct {
 	Container         runtimecontract.Container
 	Logger            observabilitycontract.Logger
 	Router            transportcontract.Router
+	HTTPRegistry      transportcontract.HTTPRegistry
 	DB                *gormpkg.DB
 	Redis             datacontract.Redis
 	JWT               securitycontract.JWTService
@@ -190,14 +191,25 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 		return nil, fmt.Errorf("app.name is required in config file")
 	}
 
+	registry, err := container.MakeHTTPRegistry(c)
+	if err != nil {
+		return nil, fmt.Errorf("make HTTP service registry: %w", err)
+	}
+	defaultHTTP, hasDefault := registry.Default()
+	var router transportcontract.Router
+	if hasDefault && defaultHTTP != nil {
+		router = defaultHTTP.Router()
+	}
+
 	rt = &HTTPServiceRuntime{
-		App:         app,
-		Container:   c,
-		Logger:      container.MustMakeLogger(c),
-		Router:      container.MustMakeRouter(c),
-		Config:      cfg,
-		JWT:         container.MustMakeJWTService(c),
-		ServiceName: serviceName,
+		App:          app,
+		Container:    c,
+		Logger:       container.MustMakeLogger(c),
+		Router:       router,
+		HTTPRegistry: registry,
+		Config:       cfg,
+		JWT:          container.MustMakeJWTService(c),
+		ServiceName:  serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
 	container.SetDefault(rt.Container)
@@ -258,6 +270,48 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 	return rt, nil
 }
 
+// HTTP returns a named HTTP service. With no name it returns the default
+// single-service entry. It panics when the requested service is not configured,
+// matching the existing MustMake-style runtime helpers.
+func (rt *HTTPServiceRuntime) HTTP(names ...string) transportcontract.HTTP {
+	name := transportcontract.DefaultHTTPServiceName
+	if len(names) > 0 && names[0] != "" {
+		name = names[0]
+	}
+	if rt == nil || rt.HTTPRegistry == nil {
+		panic("HTTP service registry is not available")
+	}
+	service, ok := rt.HTTPRegistry.Get(name)
+	if !ok || service == nil {
+		panic(fmt.Sprintf("HTTP service is not configured: %s", name))
+	}
+	return service
+}
+
+// GetHTTP returns a named HTTP service without panicking.
+func (rt *HTTPServiceRuntime) GetHTTP(name string) (transportcontract.HTTP, error) {
+	if rt == nil || rt.HTTPRegistry == nil {
+		return nil, errors.New("HTTP service registry is not available")
+	}
+	if name == "" {
+		name = transportcontract.DefaultHTTPServiceName
+	}
+	service, ok := rt.HTTPRegistry.Get(name)
+	if !ok || service == nil {
+		return nil, fmt.Errorf("HTTP service is not configured: %s", name)
+	}
+	return service, nil
+}
+
+// UseHTTP applies shared business middleware to every configured HTTP service.
+// Service-specific middleware can still be added with rt.HTTP(name).Use(...).
+func (rt *HTTPServiceRuntime) UseHTTP(middleware ...transportcontract.Middleware) {
+	if rt == nil || rt.HTTPRegistry == nil {
+		return
+	}
+	rt.HTTPRegistry.Use(middleware...)
+}
+
 // buildHTTPProviders assembles the provider list used by the default HTTP mainline.
 //
 // buildHTTPProviders 组装默认 HTTP 主线使用的 provider 列表。
@@ -281,6 +335,12 @@ func buildHTTPProviders(opts HTTPServiceOptions) []runtimecontract.ServiceProvid
 // BootHTTPService 装配、配置并运行默认 HTTP 服务。
 // 服务名自动从配置 app.name 读取。
 func BootHTTPService(opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) error, setup func(*HTTPServiceRuntime) error) (retErr error) {
+	return BootHTTPServiceContext(context.Background(), opts, migrate, setup)
+}
+
+// BootHTTPServiceContext assembles and runs the HTTP service set with a parent
+// context. The context controls runtime cancellation and graceful shutdown.
+func BootHTTPServiceContext(ctx context.Context, opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) error, setup func(*HTTPServiceRuntime) error) (retErr error) {
 	rt, err := NewHTTPServiceRuntime(opts)
 	if err != nil {
 		return fmt.Errorf("initialize http runtime: %w", err)
@@ -309,21 +369,27 @@ func BootHTTPService(opts HTTPServiceOptions, migrate func(*HTTPServiceRuntime) 
 		}
 	}
 
-	RegisterHealthCheck(rt.Router, serviceName)
-	RegisterGovernanceInspectEndpoints(rt.Router, rt.GovernanceSummary)
-	if cronSvc, err := container.MakeCron(rt.Container); err == nil {
-		RegisterCronInspectEndpoints(rt.Router, cronSvc)
-	}
-	if !opts.DisableMetrics {
-		RegisterMetricsEndpoint(rt.Router)
-		rt.Router.Use(httpmiddleware.MetricsMiddleware())
-	}
-	if opts.EnablePprof {
-		RegisterPprofEndpoints(rt.Router)
+	for _, entry := range rt.HTTPRegistry.Entries() {
+		if entry.Service == nil {
+			continue
+		}
+		serviceRouter := entry.Service.Router()
+		RegisterHealthCheck(serviceRouter, serviceName+"/"+entry.Name)
+		RegisterGovernanceInspectEndpoints(serviceRouter, rt.GovernanceSummary)
+		if cronSvc, err := container.MakeCron(rt.Container); err == nil {
+			RegisterCronInspectEndpoints(serviceRouter, cronSvc)
+		}
+		if !opts.DisableMetrics {
+			RegisterMetricsEndpoint(serviceRouter)
+			serviceRouter.Use(httpmiddleware.MetricsMiddleware(entry.Name))
+		}
+		if opts.EnablePprof {
+			RegisterPprofEndpoints(serviceRouter)
+		}
 	}
 
 	// RunHTTP 成功后不再清理（服务正在运行）
-	return RunHTTP(rt.Container, rt.Logger)
+	return RunHTTPContext(ctx, rt.Container, rt.Logger)
 }
 
 // GetGorm returns the Gorm database handle.
@@ -503,32 +569,53 @@ func RegisterPprofEndpoints(router transportcontract.Router) {
 // RunHTTP 优先通过 host 能力运行 HTTP 服务。
 // 在微服务模式下，当容器绑定了 GRPCServerRegistrar 时，同时启动 gRPC 服务器。
 func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) error {
+	return RunHTTPContext(context.Background(), c, logger)
+}
+
+// RunHTTPContext runs all enabled HTTP services and stops them when either the
+// parent context or an operating-system shutdown signal is received.
+func RunHTTPContext(parent context.Context, c runtimecontract.Container, logger observabilitycontract.Logger) error {
+	if parent == nil {
+		parent = context.Background()
+	}
+	if err := parent.Err(); err != nil {
+		return err
+	}
+	registry, err := container.MakeHTTPRegistry(c)
+	if err != nil {
+		return fmt.Errorf("make HTTP service registry: %w", err)
+	}
+	entries := registry.Entries()
+
 	hostSvc, err := container.MakeHost(c)
 	if err != nil {
-		// Fall back to direct HTTP run mode when host capability is unavailable.
-		// 当 host 能力不可用时，回退到 HTTP 直跑模式。
-		return runHTTPDirectly(c, logger)
+		return runHTTPDirectlyContext(parent, c, entries, logger)
 	}
 
-	httpSvc, err := container.MakeHTTP(c)
-	if err != nil {
-		return fmt.Errorf("make http service: %w", err)
+	enabled := 0
+	for _, entry := range entries {
+		if !entry.Enabled || entry.Service == nil {
+			continue
+		}
+		enabled++
+		hostName := "http." + entry.Name
+		if err := hostSvc.RegisterService(hostName, host.NewHTTPService(hostName, entry.Service)); err != nil {
+			return fmt.Errorf("register HTTP service %s to host: %w", entry.Name, err)
+		}
 	}
-
-	httpHostable := host.NewHTTPService("http", httpSvc)
-	if err := hostSvc.RegisterService("http", httpHostable); err != nil {
-		return fmt.Errorf("register http service to host: %w", err)
+	if enabled == 0 {
+		return fmt.Errorf("no enabled HTTP service is configured")
 	}
 
 	// 在微服务模式下，尝试将 gRPC 服务器也注册到 host 统一管理
 	// In microservice mode, try to register gRPC server to host for unified management
 	grpcStarted := registerGRPCToHost(c, hostSvc, logger)
 
-	logger.Info("starting http server")
+	logger.Info("starting http services", observabilitycontract.Field{Key: "count", Value: enabled})
 	if grpcStarted {
 		logger.Info("starting grpc server")
 	}
-	if err := hostSvc.Start(context.Background()); err != nil {
+	if err := hostSvc.Start(parent); err != nil {
 		return err
 	}
 
@@ -536,7 +623,7 @@ func RunHTTP(c runtimecontract.Container, logger observabilitycontract.Logger) e
 	if runtime.GOOS != "windows" {
 		sigs = append(sigs, syscall.SIGTERM)
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), sigs...)
+	ctx, stop := signal.NotifyContext(parent, sigs...)
 	defer stop()
 	<-ctx.Done()
 
@@ -599,31 +686,34 @@ func registerGRPCToHost(c runtimecontract.Container, hostSvc runtimecontract.Hos
 //
 // runHTTPDirectly 在不使用 host 抽象的情况下直接运行 HTTP 服务。
 // 在微服务模式下，同时启动 gRPC 服务器。
-func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.Logger) error {
-	httpSvc, err := container.MakeHTTP(c)
-	if err != nil {
-		return fmt.Errorf("make http service: %w", err)
+func runHTTPDirectlyContext(parent context.Context, c runtimecontract.Container, entries []transportcontract.HTTPServiceEntry, logger observabilitycontract.Logger) error {
+	started := make([]transportcontract.HTTP, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.Enabled || entry.Service == nil {
+			continue
+		}
+		if err := entry.Service.Start(parent); err != nil {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			for i := len(started) - 1; i >= 0; i-- {
+				_ = started[i].Stop(shutdownCtx)
+			}
+			return fmt.Errorf("start HTTP service %s: %w", entry.Name, err)
+		}
+		started = append(started, entry.Service)
+	}
+	if len(started) == 0 {
+		return fmt.Errorf("no enabled HTTP service is configured")
 	}
 
-	logger.Info("starting http server (direct mode)")
+	logger.Info("starting http services (direct mode)", observabilitycontract.Field{Key: "count", Value: len(started)})
 
 	sigs := []os.Signal{os.Interrupt}
 	if runtime.GOOS != "windows" {
 		sigs = append(sigs, syscall.SIGTERM)
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), sigs...)
+	ctx, stop := signal.NotifyContext(parent, sigs...)
 	defer stop()
-
-	errCh := make(chan error, 1)
-	go func() {
-		if err := httpSvc.Run(); err != nil {
-			if errors.Is(err, http.ErrServerClosed) {
-				errCh <- nil
-				return
-			}
-			errCh <- err
-		}
-	}()
 
 	// 在直跑模式下，尝试同时启动 gRPC 服务器
 	// In direct mode, try to start gRPC server alongside HTTP
@@ -639,23 +729,8 @@ func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.L
 		}
 	}
 
-	select {
-	case <-ctx.Done():
-		logger.Info("shutdown signal received")
-	case err := <-errCh:
-		if err != nil {
-			// HTTP 服务器启动失败，优雅关闭已启动的 gRPC 服务器
-			if rpcServer != nil {
-				stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer stopCancel()
-				if stopErr := rpcServer.Stop(stopCtx); stopErr != nil {
-					logger.Info(fmt.Sprintf("grpc server stop failed during cleanup: %v", stopErr))
-				}
-			}
-			return err
-		}
-		return nil
-	}
+	<-ctx.Done()
+	logger.Info("shutdown signal received")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -670,8 +745,14 @@ func runHTTPDirectly(c runtimecontract.Container, logger observabilitycontract.L
 		}
 	}
 
-	if err := httpSvc.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("graceful shutdown failed: %w", err)
+	var shutdownErr error
+	for i := len(started) - 1; i >= 0; i-- {
+		if err := started[i].Stop(shutdownCtx); err != nil {
+			shutdownErr = errors.Join(shutdownErr, err)
+		}
+	}
+	if shutdownErr != nil {
+		return fmt.Errorf("graceful shutdown failed: %w", shutdownErr)
 	}
 	logger.Info("http server stopped gracefully")
 	return nil

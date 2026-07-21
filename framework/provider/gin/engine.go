@@ -41,7 +41,7 @@ func injectRequestContainer(c runtimecontract.Container) gin.HandlerFunc {
 // attachHTTPTransportMiddleware attaches optional transport-related middleware to the engine.
 //
 // attachHTTPTransportMiddleware 为 engine 挂载可选的 transport 相关中间件。
-func attachHTTPTransportMiddleware(engine *gin.Engine, c runtimecontract.Container) {
+func attachHTTPTransportMiddleware(engine *gin.Engine, c runtimecontract.Container, serviceNames ...string) {
 	if engine == nil {
 		return
 	}
@@ -49,7 +49,13 @@ func attachHTTPTransportMiddleware(engine *gin.Engine, c runtimecontract.Contain
 	if c.IsBind(observabilitycontract.TracerKey) {
 		if tracerAny, err := c.Make(observabilitycontract.TracerKey); err == nil {
 			if tracer, ok := tracerAny.(observabilitycontract.Tracer); ok {
-				serviceName := configprovider.GetStringAny(getConfig(c), "service.name", "tracing.service_name")
+				serviceName := ""
+				if len(serviceNames) > 0 {
+					serviceName = strings.TrimSpace(serviceNames[0])
+				}
+				if serviceName == "" {
+					serviceName = configprovider.GetStringAny(getConfig(c), "service.name", "tracing.service_name")
+				}
 				if serviceName == "" {
 					serviceName = "http-service"
 				}

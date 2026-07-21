@@ -49,25 +49,18 @@ func NewHTTPService(name string, h transportcontract.HTTP) *HTTPService {
 // Name 返回服务名称。
 func (s *HTTPService) Name() string { return s.name }
 
-// Start starts the HTTP server in background.
-// 非 ErrServerClosed 的错误会通过 slog.Error 记录。
+// Start binds the HTTP listener synchronously and serves in the background.
 //
-// Start 在后台启动 HTTP 服务器。
-// 非 ErrServerClosed 的错误会通过 slog.Error 记录。
+// Start 同步绑定 HTTP 监听地址，然后在后台提供服务。
 func (s *HTTPService) Start(ctx context.Context) error {
-	go func() {
-		if err := s.http.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("http server error", "error", err)
-		}
-	}()
-	return nil
+	return s.http.Start(ctx)
 }
 
 // Stop shuts down the HTTP server gracefully.
 //
 // Stop 优雅关闭 HTTP 服务器。
 func (s *HTTPService) Stop(ctx context.Context) error {
-	return s.http.Shutdown(ctx)
+	return s.http.Stop(ctx)
 }
 
 // CronService wraps runtimecontract.Cron as a Hostable service.

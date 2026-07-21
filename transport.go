@@ -26,9 +26,14 @@ type Container = runtime.Container
 //
 // Router 是 transport 层 Router 契约的顶层别名。
 type Router = transport.Router
+type HTTPService = transport.HTTP
+type HTTPRegistry = transport.HTTPRegistry
+type HTTPServiceEntry = transport.HTTPServiceEntry
 type RouteInfo = transport.RouteInfo
 type StreamWriter = transport.StreamWriter
 type SSEEvent = transport.SSEEvent
+
+const DefaultHTTPServiceName = transport.DefaultHTTPServiceName
 
 // Context is the top-level alias of the transport context contract.
 //
@@ -311,6 +316,11 @@ func BodyDump(opts BodyDumpOptions) Middleware {
 // MakeGRPCConnFactory 从容器中返回 proto-first gRPC 连接工厂。
 func MakeGRPCConnFactory(c Container) (GRPCConnFactory, error) {
 	return application.MakeGRPCConnFactory(c)
+}
+
+// MakeHTTPRegistry returns all HTTP services configured for this process.
+func MakeHTTPRegistry(c Container) (HTTPRegistry, error) {
+	return application.MakeHTTPRegistry(c)
 }
 
 // MakeGRPCServerRegistrar returns the proto-first gRPC server registrar from the container.

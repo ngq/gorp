@@ -115,6 +115,9 @@ func getConfig(c runtimecontract.Container) (*transportcontract.RPCConfig, error
 	if baseURL := configprovider.GetStringAny(cfg, "rpc.http.base_url", "rpc.base_url"); baseURL != "" {
 		rpcCfg.BaseURL = baseURL
 	}
+	if service := configprovider.GetStringAny(cfg, "rpc.http.service", "rpc.http_service"); service != "" {
+		rpcCfg.HTTPService = service
+	}
 	if timeout := configprovider.GetIntAny(cfg, "rpc.timeout_ms", "rpc.timeout"); timeout > 0 {
 		rpcCfg.TimeoutMS = timeout
 	}

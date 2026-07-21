@@ -9,18 +9,29 @@ package gin
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
+type routeSurface interface {
+	transportcontract.Router
+}
+
 type service struct {
-	srv    *http.Server
-	engine *gin.Engine
-	router transportcontract.Router
-	log    observabilitycontract.Logger
+	routeSurface
+	srv             *http.Server
+	engine          *gin.Engine
+	log             observabilitycontract.Logger
+	shutdownTimeout time.Duration
+	mu              sync.Mutex
+	listener        net.Listener
 }
 
 // service is the runtime HTTP service implementation built on top of Gin.
@@ -30,7 +41,7 @@ type service struct {
 // Router returns the framework router facade backed by Gin.
 //
 // Router 返回由 Gin 驱动的框架 Router 门面。
-func (s *service) Router() transportcontract.Router { return s.router }
+func (s *service) Router() transportcontract.Router { return s.routeSurface }
 
 // Server returns the underlying net/http server instance.
 //
@@ -42,10 +53,56 @@ func (s *service) Server() *http.Server { return s.srv }
 // Run 启动 HTTP 服务监听。
 func (s *service) Run() error { return s.srv.ListenAndServe() }
 
+// Start binds the address before returning, allowing lifecycle orchestration
+// to observe port conflicts and roll back already-started services.
+func (s *service) Start(context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.listener != nil {
+		return nil
+	}
+	listener, err := net.Listen("tcp", s.srv.Addr)
+	if err != nil {
+		return err
+	}
+	s.listener = listener
+	go func() {
+		if err := s.srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
+			s.log.Error("http server stopped unexpectedly", observabilitycontract.Field{Key: "error", Value: err})
+		}
+	}()
+	return nil
+}
+
+// Stop gracefully stops the HTTP server.
+func (s *service) Stop(ctx context.Context) error {
+	if s.shutdownTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.shutdownTimeout)
+		defer cancel()
+	}
+	return s.Shutdown(ctx)
+}
+
 // Shutdown gracefully stops the HTTP server.
 //
 // Shutdown 优雅关闭 HTTP 服务。
-func (s *service) Shutdown(ctx context.Context) error { return s.srv.Shutdown(ctx) }
+func (s *service) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	listener := s.listener
+	s.mu.Unlock()
+	err := s.srv.Shutdown(ctx)
+	// Shutdown closes listeners already tracked by http.Server. Closing the
+	// bound listener explicitly also covers the narrow Start/Serve handoff
+	// window where Serve has not registered it yet.
+	if listener != nil {
+		_ = listener.Close()
+	}
+	s.mu.Lock()
+	s.listener = nil
+	s.mu.Unlock()
+	return err
+}
 
 // GINEngine returns the underlying *gin.Engine for Gin-first usage.
 // Implements transportcontract.GINEngineProvider.

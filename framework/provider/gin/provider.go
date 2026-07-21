@@ -18,8 +18,8 @@
 package gin
 
 import (
+	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ngq/gorp/framework/container"
@@ -28,7 +28,7 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	httpmiddleware "github.com/ngq/gorp/framework/http/middleware"
-	configprovider "github.com/ngq/gorp/framework/provider/config"
+	"github.com/ngq/gorp/framework/http/serverconfig"
 )
 
 const httpEngineKey = "framework.http.engine"
@@ -64,7 +64,7 @@ func (p *Provider) IsDefer() bool { return false }
 //
 // Provides 声明该 provider 对外提供的服务键。
 func (p *Provider) Provides() []string {
-	return []string{transportcontract.HTTPKey, httpEngineKey, transportcontract.MiddlewareRegistryKey}
+	return []string{transportcontract.HTTPKey, transportcontract.HTTPRegistryKey, httpEngineKey, transportcontract.MiddlewareRegistryKey}
 }
 
 // DependsOn returns the keys this provider depends on.
@@ -99,80 +99,85 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		}, true)
 	}
 
-	c.Bind(httpEngineKey, func(c runtimecontract.Container) (any, error) {
-		// Gin HTTP 模式与契约模式统一：自动挂载治理 preset + transport middleware
-		// 用户不需要手动挂载，如需禁用可通过配置或代码显式关闭
-		// Gin HTTP mode now has same governance auto-mount behavior as contract mode
-		// Users can disable via config or code if needed
-		engine := gin.New()
-		// Enable ContextWithFallback to allow gin.Context.Value() to delegate to
-		// Request.Context().Value() for non-string keys. This is required for
-		// proper context.Context value propagation when ginContext is used as
-		// a parent in context.WithValue chains.
-		//
-		// 启用 ContextWithFallback 以允许 gin.Context.Value() 委托到
-		// Request.Context().Value() 处理非字符串 key。当 ginContext 作为
-		// context.WithValue 链中的父 context 时，这是正确传播值的必要设置。
-		engine.ContextWithFallback = true
-		engine.Use(injectRequestContainer(c))
-		engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(getLogger(c))))
-		attachHTTPTransportMiddleware(engine, c)
-		return engine, nil
-	}, true)
-
-	c.Bind(transportcontract.HTTPKey, func(c runtimecontract.Container) (any, error) {
-		// Config is optional — HTTP server uses defaults when config is absent
-		var cfg datacontract.Config
-		if c.IsBind(datacontract.ConfigKey) {
-			if resolved, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey); err == nil {
-				cfg = resolved
-			}
-		}
-
-		addr := ":8080"
-		readTimeout := 15 * time.Second
-		writeTimeout := 15 * time.Second
-		idleTimeout := 60 * time.Second
-
-		if cfg != nil {
-			if s := configprovider.GetStringAny(cfg, "server.http.addr", "app.address"); s != "" {
-				addr = s
-			}
-			if n := cfg.GetInt("app.http.read_timeout_sec"); n > 0 {
-				readTimeout = time.Duration(n) * time.Second
-			}
-			if n := cfg.GetInt("app.http.write_timeout_sec"); n > 0 {
-				writeTimeout = time.Duration(n) * time.Second
-			}
-			if n := cfg.GetInt("app.http.idle_timeout_sec"); n > 0 {
-				idleTimeout = time.Duration(n) * time.Second
-			}
-		}
-
-		engine, err := container.MakeWith[*gin.Engine](c, httpEngineKey)
+	c.Bind(transportcontract.HTTPRegistryKey, func(c runtimecontract.Container) (any, error) {
+		cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 		if err != nil {
 			return nil, err
 		}
-
-		log := getLogger(c)
-		srv := &http.Server{
-			Addr:         addr,
-			Handler:      engine,
-			ReadTimeout:  readTimeout,
-			WriteTimeout: writeTimeout,
-			IdleTimeout:  idleTimeout,
+		configs, err := serverconfig.Parse(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("parse HTTP services: %w", err)
 		}
+		entries := make([]transportcontract.HTTPServiceEntry, 0, len(configs))
+		for _, serviceConfig := range configs {
+			httpService := newService(c, serviceConfig)
+			entries = append(entries, transportcontract.HTTPServiceEntry{
+				Name: serviceConfig.Name, Service: httpService, Enabled: serviceConfig.Enabled,
+			})
+		}
+		return newHTTPRegistry(entries), nil
+	}, true)
 
-		log.Info("http server initialized", observabilitycontract.Field{Key: "addr", Value: addr})
-		return &service{
-			srv:    srv,
-			engine: engine,
-			router: newRouter(&engine.RouterGroup),
-			log:    log,
-		}, nil
+	c.Bind(transportcontract.HTTPKey, func(c runtimecontract.Container) (any, error) {
+		registry, err := container.MakeWith[transportcontract.HTTPRegistry](c, transportcontract.HTTPRegistryKey)
+		if err != nil {
+			return nil, err
+		}
+		service, ok := registry.Default()
+		if !ok {
+			return nil, fmt.Errorf("default HTTP service is not configured; use HTTPRegistry for named services")
+		}
+		return service, nil
+	}, true)
+
+	c.Bind(httpEngineKey, func(c runtimecontract.Container) (any, error) {
+		httpService, err := container.MakeWith[transportcontract.HTTP](c, transportcontract.HTTPKey)
+		if err != nil {
+			return nil, err
+		}
+		provider, ok := httpService.(transportcontract.GINEngineProvider)
+		if !ok {
+			return nil, fmt.Errorf("default HTTP service does not expose a Gin engine")
+		}
+		engine, ok := provider.GINEngine().(*gin.Engine)
+		if !ok || engine == nil {
+			return nil, fmt.Errorf("default HTTP service returned an invalid Gin engine")
+		}
+		return engine, nil
 	}, true)
 
 	return nil
+}
+
+func newService(c runtimecontract.Container, cfg serverconfig.Service) transportcontract.HTTP {
+	if cfg.Mode != "" {
+		gin.SetMode(cfg.Mode)
+	}
+	engine := gin.New()
+	engine.ContextWithFallback = true
+	engine.Use(injectRequestContainer(c))
+	logger := getLogger(c).With(
+		observabilitycontract.Field{Key: "http_service", Value: cfg.Name},
+		observabilitycontract.Field{Key: "addr", Value: cfg.Addr},
+	)
+	engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(logger)))
+	attachHTTPTransportMiddleware(engine, c, cfg.Name)
+	router := newRouter(&engine.RouterGroup, engine)
+	server := &http.Server{
+		Addr:         cfg.Addr,
+		Handler:      engine,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  cfg.IdleTimeout,
+	}
+	logger.Info("http server initialized", observabilitycontract.Field{Key: "enabled", Value: cfg.Enabled})
+	return &service{
+		routeSurface:    router,
+		srv:             server,
+		engine:          engine,
+		log:             logger,
+		shutdownTimeout: cfg.ShutdownTimeout,
+	}
 }
 
 // Boot warms up optional dependencies needed at startup.

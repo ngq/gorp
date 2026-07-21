@@ -154,6 +154,11 @@ func GetHTTP(c runtimecontract.Container) (transportcontract.HTTP, error) {
 	return MakeWith[transportcontract.HTTP](c, transportcontract.HTTPKey)
 }
 
+// GetHTTPRegistry resolves all HTTP service instances owned by the process.
+func GetHTTPRegistry(c runtimecontract.Container) (transportcontract.HTTPRegistry, error) {
+	return MakeWith[transportcontract.HTTPRegistry](c, transportcontract.HTTPRegistryKey)
+}
+
 // GetRouter resolves the HTTP router facade from the container.
 //
 // GetRouter 从容器中解析 HTTP 路由门面。
@@ -470,6 +475,11 @@ func MakeHTTP(c runtimecontract.Container) (transportcontract.HTTP, error) {
 	return GetHTTP(c)
 }
 
+// MakeHTTPRegistry is an alias for GetHTTPRegistry.
+func MakeHTTPRegistry(c runtimecontract.Container) (transportcontract.HTTPRegistry, error) {
+	return GetHTTPRegistry(c)
+}
+
 // MakeRouter is an alias for GetRouter.
 //
 // MakeRouter 是 GetRouter 的别名。
@@ -524,6 +534,11 @@ func MustMakeRouter(c runtimecontract.Container) transportcontract.Router {
 // MustMakeHTTP 是 GetHTTPOrPanic 的别名。
 func MustMakeHTTP(c runtimecontract.Container) transportcontract.HTTP {
 	return GetHTTPOrPanic(c)
+}
+
+// MustMakeHTTPRegistry resolves the HTTP service registry or panics.
+func MustMakeHTTPRegistry(c runtimecontract.Container) transportcontract.HTTPRegistry {
+	return MustMakeWith[transportcontract.HTTPRegistry](c, transportcontract.HTTPRegistryKey)
 }
 
 // MustMakeMessagePublisher is an alias for GetMessagePublisherOrPanic.

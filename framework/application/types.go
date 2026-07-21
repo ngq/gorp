@@ -28,6 +28,10 @@ var (
 // HTTPRuntime 是 application 回调使用的启动上下文。
 type HTTPRuntime = bootstrap.HTTPServiceRuntime
 
+// HTTPService and HTTPRegistry expose the process-level HTTP service contracts.
+type HTTPService = transportcontract.HTTP
+type HTTPRegistry = transportcontract.HTTPRegistry
+
 // GRPCRuntime is the startup runtime exposed to application gRPC callbacks.
 //
 // GRPCRuntime 是 application 回调使用的 gRPC 启动上下文。

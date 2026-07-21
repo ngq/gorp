@@ -17,12 +17,23 @@ import (
 // HTTPKey is the container key for the HTTP service capability.
 //
 // HTTPKey 是 HTTP 服务能力的容器键。
-const HTTPKey = "framework.http"
+const (
+	HTTPKey         = "framework.http"
+	HTTPRegistryKey = "framework.http.registry"
+
+	// DefaultHTTPServiceName identifies the implicit service created by the
+	// single-service server.http configuration.
+	DefaultHTTPServiceName = "default"
+)
 
 // HTTP defines the transport-layer HTTP service abstraction.
 //
 // HTTP 定义 transport 层 HTTP 服务抽象。
 type HTTP interface {
+	// Router is embedded so the common routing surface is available directly
+	// from a service: svc.GET(...), svc.Group(...), svc.Use(...).
+	Router
+
 	// Router returns the framework HTTP router facade.
 	//
 	// Router 返回框架 HTTP 路由门面。
@@ -38,6 +49,13 @@ type HTTP interface {
 	// Run 启动 HTTP 流量服务。
 	Run() error
 
+	// Start binds the listening address synchronously and serves in the
+	// background. Binding failures are returned before Start completes.
+	Start(ctx context.Context) error
+
+	// Stop gracefully stops the HTTP service.
+	Stop(ctx context.Context) error
+
 	// Shutdown gracefully stops the HTTP service.
 	//
 	// Shutdown 优雅关闭 HTTP 服务。
@@ -51,6 +69,27 @@ type HTTP interface {
 	// Semantically equivalent to Gin's engine.Use(), distinct from Router.Use() which is group-level.
 	// Global middleware executes after framework governance middleware and before group-level middleware.
 	UseGlobal(middleware ...Middleware)
+}
+
+// HTTPServiceEntry describes one configured HTTP service. Disabled services
+// remain addressable during setup so route registration does not depend on the
+// deployment environment, but they are not started by the host.
+type HTTPServiceEntry struct {
+	Name    string
+	Service HTTP
+	Enabled bool
+}
+
+// HTTPRegistry provides named access to all HTTP service instances owned by
+// one application process and a shared middleware registration surface.
+type HTTPRegistry interface {
+	Get(name string) (HTTP, bool)
+	Default() (HTTP, bool)
+	Names() []string
+	Entries() []HTTPServiceEntry
+	// Use applies shared business middleware to every configured service.
+	// Call it before registering routes so Gin-style middleware inheritance is deterministic.
+	Use(middleware ...Middleware)
 }
 
 // GINEngineProvider is an optional interface that HTTP implementations can satisfy

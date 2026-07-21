@@ -27,6 +27,8 @@ type RPCConfig struct {
 	Address  string `mapstructure:"address"`
 
 	BaseURL string `mapstructure:"base_url"`
+	// HTTPService selects the named HTTP service that hosts inbound HTTP RPC routes.
+	HTTPService string `mapstructure:"http_service"`
 
 	Target    string `mapstructure:"target"`
 	Insecure  bool   `mapstructure:"insecure"`

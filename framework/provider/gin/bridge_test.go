@@ -92,8 +92,8 @@ func TestNativeEngineFromHTTPService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := NewTestEngine()
 	svc := &service{
-		engine: engine,
-		router: newRouter(&engine.RouterGroup),
+		engine:       engine,
+		routeSurface: newRouter(&engine.RouterGroup, engine),
 	}
 
 	extracted, ok := NativeEngine(svc)
@@ -126,8 +126,8 @@ func TestNativeRouterGroupFromHTTPService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := NewTestEngine()
 	svc := &service{
-		engine: engine,
-		router: newRouter(&engine.RouterGroup),
+		engine:       engine,
+		routeSurface: newRouter(&engine.RouterGroup, engine),
 	}
 
 	rg, ok := NativeRouterGroup(svc)
@@ -208,12 +208,18 @@ func (m *mockContainer) ProviderDAG() runtimecontract.ProviderDAG {
 }
 
 // nonGinHTTPService 模拟不实现 GINEngineProvider 的 HTTP 服务。
-type nonGinHTTPService struct{}
+type nonGinRouter interface{ transportcontract.Router }
 
-func (n *nonGinHTTPService) Router() transportcontract.Router   { return nil }
-func (n *nonGinHTTPService) Server() *http.Server               { return nil }
-func (n *nonGinHTTPService) Run() error                         { return nil }
-func (n *nonGinHTTPService) Shutdown(ctx context.Context) error { return nil }
+type nonGinHTTPService struct {
+	nonGinRouter
+}
+
+func (n *nonGinHTTPService) Router() transportcontract.Router                     { return n.nonGinRouter }
+func (n *nonGinHTTPService) Server() *http.Server                                 { return nil }
+func (n *nonGinHTTPService) Run() error                                           { return nil }
+func (n *nonGinHTTPService) Start(ctx context.Context) error                      { return nil }
+func (n *nonGinHTTPService) Stop(ctx context.Context) error                       { return nil }
+func (n *nonGinHTTPService) Shutdown(ctx context.Context) error                   { return nil }
 func (n *nonGinHTTPService) UseGlobal(middleware ...transportcontract.Middleware) {}
 
 // TestRouteLevelMiddleware 验证接口级中间件只对指定路由生效，不影响其他路由。

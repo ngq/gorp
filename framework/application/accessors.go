@@ -33,6 +33,11 @@ func MakeGRPCServerRegistrar(c runtimecontract.Container) (transportcontract.GRP
 	return frameworkcontainer.MakeGRPCServerRegistrar(c)
 }
 
+// MakeHTTPRegistry returns all HTTP services configured for this process.
+func MakeHTTPRegistry(c runtimecontract.Container) (transportcontract.HTTPRegistry, error) {
+	return frameworkcontainer.MakeHTTPRegistry(c)
+}
+
 // MakeDistributedLock returns the distributed lock capability from the container.
 //
 // MakeDistributedLock 获取分布式锁能力。

@@ -9,6 +9,8 @@ package http
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -62,13 +64,9 @@ func (s *Server) Register(service string, handler any) error {
 // 从容器获取 HTTP server，在 "/rpc/{service}" 下注册路由。
 // 不启动 HTTP server 本身（委托给 HTTP provider）。
 func (s *Server) Start(ctx context.Context) error {
-	httpSvc, err := s.c.Make(transportcontract.HTTPKey)
+	httpServer, err := s.resolveHTTPService()
 	if err != nil {
-		return nil
-	}
-	httpServer, ok := httpSvc.(transportcontract.HTTP)
-	if !ok || httpServer == nil {
-		return nil
+		return err
 	}
 	router := httpServer.Router()
 	if router == nil {
@@ -84,6 +82,43 @@ func (s *Server) Start(ctx context.Context) error {
 		return true
 	})
 	return nil
+}
+
+func (s *Server) resolveHTTPService() (transportcontract.HTTP, error) {
+	if s.c == nil {
+		return nil, fmt.Errorf("HTTP RPC server container is nil")
+	}
+	serviceName := ""
+	if s.cfg != nil {
+		serviceName = strings.TrimSpace(s.cfg.HTTPService)
+	}
+	if s.c.IsBind(transportcontract.HTTPRegistryKey) {
+		registryAny, err := s.c.Make(transportcontract.HTTPRegistryKey)
+		if err != nil {
+			return nil, fmt.Errorf("resolve HTTP service registry: %w", err)
+		}
+		registry, ok := registryAny.(transportcontract.HTTPRegistry)
+		if !ok || registry == nil {
+			return nil, fmt.Errorf("HTTP service registry has invalid type")
+		}
+		if serviceName == "" {
+			serviceName = transportcontract.DefaultHTTPServiceName
+		}
+		service, ok := registry.Get(serviceName)
+		if !ok || service == nil {
+			return nil, fmt.Errorf("HTTP RPC service target is not configured: %s", serviceName)
+		}
+		return service, nil
+	}
+	httpSvc, err := s.c.Make(transportcontract.HTTPKey)
+	if err != nil {
+		return nil, fmt.Errorf("resolve default HTTP service: %w", err)
+	}
+	httpServer, ok := httpSvc.(transportcontract.HTTP)
+	if !ok || httpServer == nil {
+		return nil, fmt.Errorf("default HTTP service has invalid type")
+	}
+	return httpServer, nil
 }
 
 // Stop is a no-op for HTTP RPC server.
@@ -105,6 +140,9 @@ func (s *Server) Stop(ctx context.Context) error {
 func (s *Server) Addr() string {
 	if s.addr != "" {
 		return s.addr
+	}
+	if service, err := s.resolveHTTPService(); err == nil && service.Server() != nil && service.Server().Addr != "" {
+		return service.Server().Addr
 	}
 	if s.c.IsBind(datacontract.ConfigKey) {
 		cfgAny, _ := s.c.Make(datacontract.ConfigKey)
