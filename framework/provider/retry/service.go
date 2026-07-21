@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -26,7 +27,7 @@ import (
 // 核心逻辑：带重试执行函数、带抖动计算延迟、分类可重试错误。
 type RetryService struct {
 	cfg *resiliencecontract.RetryConfig
-	rng *rand.Rand
+	mu  sync.RWMutex
 }
 
 // NewRetryService creates a retry service with configuration.
@@ -35,10 +36,10 @@ type RetryService struct {
 // NewRetryService 创建带配置的重试服务。
 // 核心逻辑：初始化随机源用于抖动。
 func NewRetryService(cfg *resiliencecontract.RetryConfig) *RetryService {
-	return &RetryService{
-		cfg: cfg,
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+	if cfg == nil {
+		cfg = &resiliencecontract.RetryConfig{}
 	}
+	return &RetryService{cfg: cfg}
 }
 
 // Do executes function with default retry policy.
@@ -47,7 +48,10 @@ func NewRetryService(cfg *resiliencecontract.RetryConfig) *RetryService {
 // Do 使用默认重试策略执行函数。
 // 核心逻辑：调用 doWithPolicy 并使用默认配置。
 func (r *RetryService) Do(ctx context.Context, fn func() error) error {
-	return r.doWithPolicy(ctx, r.cfg.DefaultPolicy, fn)
+	r.mu.RLock()
+	policy := r.cfg.DefaultPolicy
+	r.mu.RUnlock()
+	return r.doWithPolicy(ctx, policy, fn)
 }
 
 func (r *RetryService) doWithPolicy(ctx context.Context, policy resiliencecontract.RetryPolicy, fn func() error) error {
@@ -59,7 +63,7 @@ func (r *RetryService) doWithPolicy(ctx context.Context, policy resiliencecontra
 		}
 
 		lastErr = err
-		if !r.IsRetryable(err) {
+		if !isRetryableWithPolicy(err, policy) {
 			return err
 		}
 		if attempt == policy.MaxAttempts-1 {
@@ -72,7 +76,7 @@ func (r *RetryService) doWithPolicy(ctx context.Context, policy resiliencecontra
 		default:
 		}
 
-		jitter := r.rng.Float64()
+		jitter := rand.Float64()
 		delay := policy.CalculateDelay(attempt, jitter)
 
 		select {
@@ -108,11 +112,16 @@ func (r *RetryService) DoWithResult(ctx context.Context, fn func() (any, error))
 // IsRetryable 根据策略检查错误是否可重试。
 // 核心逻辑：检查 AppError reason/code、gRPC status、网络错误类型。
 func (r *RetryService) IsRetryable(err error) bool {
+	r.mu.RLock()
+	policy := r.cfg.DefaultPolicy
+	r.mu.RUnlock()
+	return isRetryableWithPolicy(err, policy)
+}
+
+func isRetryableWithPolicy(err error, policy resiliencecontract.RetryPolicy) bool {
 	if err == nil {
 		return false
 	}
-
-	policy := r.cfg.DefaultPolicy
 
 	var appErr resiliencecontract.AppError
 	if errors.As(err, &appErr) {
@@ -195,10 +204,21 @@ func isNetworkError(err error) bool {
 }
 
 func (r *RetryService) GetConfig() *resiliencecontract.RetryConfig {
-	return r.cfg
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	copyCfg := *r.cfg
+	if r.cfg.ResourcePolicies != nil {
+		copyCfg.ResourcePolicies = make(map[string]resiliencecontract.RetryPolicy, len(r.cfg.ResourcePolicies))
+		for key, policy := range r.cfg.ResourcePolicies {
+			copyCfg.ResourcePolicies[key] = policy
+		}
+	}
+	return &copyCfg
 }
 
 func (r *RetryService) SetPolicy(resource string, policy resiliencecontract.RetryPolicy) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.cfg.ResourcePolicies == nil {
 		r.cfg.ResourcePolicies = make(map[string]resiliencecontract.RetryPolicy)
 	}
@@ -206,5 +226,8 @@ func (r *RetryService) SetPolicy(resource string, policy resiliencecontract.Retr
 }
 
 func (r *RetryService) DoForResource(ctx context.Context, resource string, fn func() error) error {
-	return r.doWithPolicy(ctx, r.cfg.GetPolicy(resource), fn)
+	r.mu.RLock()
+	policy := r.cfg.GetPolicy(resource)
+	r.mu.RUnlock()
+	return r.doWithPolicy(ctx, policy, fn)
 }

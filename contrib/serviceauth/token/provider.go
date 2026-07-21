@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -90,8 +89,10 @@ func getServiceAuthConfig(c runtimecontract.Container) (*securitycontract.Servic
 	if secret := configprovider.GetStringAny(cfg, "serviceauth.token.secret", "service_auth.token.secret", "service_auth.token_secret"); secret != "" {
 		authCfg.TokenSecret = secret
 	} else {
-		authCfg.TokenSecret = defaultTokenSecret
-		slog.Error("serviceauth.token: token secret not configured, using default — MUST change in production!")
+		return nil, errors.New("serviceauth.token: token secret is required")
+	}
+	if authCfg.TokenSecret == defaultTokenSecret || authCfg.TokenSecret == "change-me-in-production" || authCfg.TokenSecret == "your-secret-key" {
+		return nil, errors.New("serviceauth.token: token secret uses an unsafe placeholder value")
 	}
 	if issuer := configprovider.GetStringAny(cfg, "serviceauth.token.issuer", "service_auth.token.issuer", "service_auth.token_issuer"); issuer != "" {
 		authCfg.TokenIssuer = issuer

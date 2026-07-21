@@ -36,6 +36,13 @@ func TestRateLimiter_Allow_Basic(t *testing.T) {
 	require.True(t, errors.Is(err, ratelimiter.ErrRateLimited))
 }
 
+func TestRateLimiter_ZeroConfigUsesSafeDefaults(t *testing.T) {
+	limiter := ratelimiter.NewTokenBucketRateLimiter(resiliencecontract.RateLimiterConfig{})
+	for i := 0; i < 10; i++ {
+		require.NoError(t, limiter.Allow(context.Background(), "default-resource"))
+	}
+}
+
 // TestRateLimiter_Allow_DifferentResources 验证不同资源独立限流。
 func TestRateLimiter_Allow_DifferentResources(t *testing.T) {
 	cfg := resiliencecontract.RateLimiterConfig{

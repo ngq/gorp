@@ -10,14 +10,15 @@ import (
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/ngq/gorp/framework/provider/health"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHealthChecker_Check(t *testing.T) {
 	cfg := observabilitycontract.HealthCheckerConfig{
-		ServiceName:        "test-service",
-		Version:            "1.0.0",
-		Timeout:            5 * time.Second,
-		CheckDependencies:  true,
+		ServiceName:       "test-service",
+		Version:           "1.0.0",
+		Timeout:           5 * time.Second,
+		CheckDependencies: true,
 	}
 
 	checker := health.NewHealthChecker(cfg, nil)
@@ -65,10 +66,10 @@ func TestHealthChecker_Check(t *testing.T) {
 
 func TestHealthChecker_CheckWithUnhealthyComponent(t *testing.T) {
 	cfg := observabilitycontract.HealthCheckerConfig{
-		ServiceName:        "test-service",
-		Version:            "1.0.0",
-		Timeout:            5 * time.Second,
-		CheckDependencies:  false,
+		ServiceName:       "test-service",
+		Version:           "1.0.0",
+		Timeout:           5 * time.Second,
+		CheckDependencies: false,
 	}
 
 	checker := health.NewHealthChecker(cfg, nil)
@@ -96,10 +97,10 @@ func TestHealthChecker_CheckWithUnhealthyComponent(t *testing.T) {
 
 func TestHealthChecker_CheckWithUnhealthyDependency(t *testing.T) {
 	cfg := observabilitycontract.HealthCheckerConfig{
-		ServiceName:        "test-service",
-		Version:            "1.0.0",
-		Timeout:            5 * time.Second,
-		CheckDependencies:  true,
+		ServiceName:       "test-service",
+		Version:           "1.0.0",
+		Timeout:           5 * time.Second,
+		CheckDependencies: true,
 	}
 
 	checker := health.NewHealthChecker(cfg, nil)
@@ -194,6 +195,31 @@ func TestHealthChecker_Timeout(t *testing.T) {
 	if report.Checks["slow"].Status != observabilitycontract.HealthStatusUnhealthy {
 		t.Errorf("slow check status = %v, want unhealthy", report.Checks["slow"].Status)
 	}
+}
+
+func TestHealthChecker_TimeoutDoesNotWaitForIgnoringChecker(t *testing.T) {
+	checker := health.NewHealthChecker(observabilitycontract.HealthCheckerConfig{Timeout: 20 * time.Millisecond}, nil)
+	block := make(chan struct{})
+	checker.AddChecker("blocked", func(context.Context) observabilitycontract.HealthCheckResult {
+		<-block
+		return observabilitycontract.HealthCheckResult{Status: observabilitycontract.HealthStatusHealthy}
+	})
+	start := time.Now()
+	report, err := checker.Check(context.Background())
+	require.NoError(t, err)
+	require.Less(t, time.Since(start), 200*time.Millisecond)
+	require.Equal(t, observabilitycontract.HealthStatusUnhealthy, report.Checks["blocked"].Status)
+	close(block)
+}
+
+func TestHealthChecker_RecoversCheckerPanic(t *testing.T) {
+	checker := health.NewHealthChecker(observabilitycontract.HealthCheckerConfig{Timeout: time.Second}, nil)
+	checker.AddChecker("panic", func(context.Context) observabilitycontract.HealthCheckResult {
+		panic("boom")
+	})
+	report, err := checker.Check(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, observabilitycontract.HealthStatusUnhealthy, report.Checks["panic"].Status)
 }
 
 func TestDatabaseHealthChecker(t *testing.T) {
@@ -327,34 +353,34 @@ func TestHealthChecker_ConcurrentChecks(t *testing.T) {
 
 func TestHealthChecker_StatusCalculation(t *testing.T) {
 	tests := []struct {
-		name           string
+		name            string
 		componentStatus observabilitycontract.HealthStatus
-		depStatus      observabilitycontract.HealthStatus
-		wantStatus     observabilitycontract.HealthStatus
+		depStatus       observabilitycontract.HealthStatus
+		wantStatus      observabilitycontract.HealthStatus
 	}{
 		{
-			name:           "all healthy",
+			name:            "all healthy",
 			componentStatus: observabilitycontract.HealthStatusHealthy,
-			depStatus:      observabilitycontract.HealthStatusHealthy,
-			wantStatus:     observabilitycontract.HealthStatusHealthy,
+			depStatus:       observabilitycontract.HealthStatusHealthy,
+			wantStatus:      observabilitycontract.HealthStatusHealthy,
 		},
 		{
-			name:           "component unhealthy",
+			name:            "component unhealthy",
 			componentStatus: observabilitycontract.HealthStatusUnhealthy,
-			depStatus:      observabilitycontract.HealthStatusHealthy,
-			wantStatus:     observabilitycontract.HealthStatusUnhealthy,
+			depStatus:       observabilitycontract.HealthStatusHealthy,
+			wantStatus:      observabilitycontract.HealthStatusUnhealthy,
 		},
 		{
-			name:           "dependency unhealthy",
+			name:            "dependency unhealthy",
 			componentStatus: observabilitycontract.HealthStatusHealthy,
-			depStatus:      observabilitycontract.HealthStatusUnhealthy,
-			wantStatus:     observabilitycontract.HealthStatusDegraded,
+			depStatus:       observabilitycontract.HealthStatusUnhealthy,
+			wantStatus:      observabilitycontract.HealthStatusDegraded,
 		},
 		{
-			name:           "dependency degraded",
+			name:            "dependency degraded",
 			componentStatus: observabilitycontract.HealthStatusHealthy,
-			depStatus:      observabilitycontract.HealthStatusDegraded,
-			wantStatus:     observabilitycontract.HealthStatusDegraded,
+			depStatus:       observabilitycontract.HealthStatusDegraded,
+			wantStatus:      observabilitycontract.HealthStatusDegraded,
 		},
 	}
 

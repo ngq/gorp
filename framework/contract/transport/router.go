@@ -11,6 +11,13 @@ package transport
 
 import "net/http"
 
+// RouteInfo describes one route successfully registered through the contract router.
+type RouteInfo struct {
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	Name   string `json:"name,omitempty"`
+}
+
 // Router defines the HTTP router abstraction.
 //
 // Router 定义 HTTP 路由抽象。
@@ -60,6 +67,16 @@ type Router interface {
 	//
 	// DELETE registers a DELETE route handler with optional interface-level middleware.
 	DELETE(path string, handler Handler, middleware ...Middleware)
+	PATCH(path string, handler Handler, middleware ...Middleware)
+	HEAD(path string, handler Handler, middleware ...Middleware)
+	OPTIONS(path string, handler Handler, middleware ...Middleware)
+	ANY(path string, handler Handler, middleware ...Middleware)
 
 	Mount(path string, handler http.Handler)
+	Static(relativePath, root string)
+	StaticFile(relativePath, filePath string)
+	StaticFS(relativePath string, fs http.FileSystem)
+	NoRoute(handler Handler)
+	NoMethod(handler Handler)
+	Routes() []RouteInfo
 }

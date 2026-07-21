@@ -46,7 +46,7 @@ service_auth:
 {{- if .IsMicroGovernance }}
   mode: token
   token:
-    secret: "change-me-in-production"
+    secret: "env(SERVICE_AUTH_TOKEN_SECRET)"
     issuer: "product-service"
     audience: "internal"
     expiry: 3600
@@ -54,7 +54,7 @@ service_auth:
 {{- else }}
   mode: noop
   token:
-    secret: "change-me-in-production"
+    secret: ""
     issuer: "product-service"
     audience: ""
     expiry: 3600

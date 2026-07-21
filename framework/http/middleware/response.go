@@ -58,6 +58,7 @@ const (
 	CodeTooManyRequests    = 1007
 	CodeConflict           = 1008
 	CodeValidationFailed   = 1009
+	CodeMethodNotAllowed   = 1010
 
 	CodeUserNotFound      = 10001
 	CodeUserAlreadyExists = 10002
@@ -192,6 +193,12 @@ func NotFound(c transportcontract.Context, message string) {
 	c.JSON(http.StatusNotFound, Response{Code: CodeNotFound, Message: message})
 }
 
+// MethodNotAllowed writes a standard method-not-allowed response.
+func MethodNotAllowed(c transportcontract.Context, message string) {
+	writeResponseHeaders(c)
+	c.JSON(http.StatusMethodNotAllowed, Response{Code: CodeMethodNotAllowed, Message: message})
+}
+
 // InternalError writes a standard internal-error response.
 //
 // InternalError 输出标准的内部错误响应。
@@ -293,6 +300,8 @@ func codeToHTTPStatus(code int) int {
 		return http.StatusForbidden
 	case CodeNotFound, CodeUserNotFound, CodeOrderNotFound, CodeProductNotFound:
 		return http.StatusNotFound
+	case CodeMethodNotAllowed:
+		return http.StatusMethodNotAllowed
 	case CodeConflict, CodeUserAlreadyExists, CodeOrderAlreadyPaid:
 		return http.StatusConflict
 	case CodeTooManyRequests:

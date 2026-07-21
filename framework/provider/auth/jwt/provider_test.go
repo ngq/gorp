@@ -217,10 +217,10 @@ func TestJWTService_VerifyRejectsZeroSubjectID(t *testing.T) {
 	}
 }
 
-// TestProviderDefaultFallbackSecret verifies that when no secret is configured, the provider uses the default fallback.
+// TestProviderRejectsMissingSecret verifies that a missing secret fails closed.
 //
-// TestProviderDefaultFallbackSecret 验证未配置 secret 时，provider 使用默认回退 secret。
-func TestProviderDefaultFallbackSecret(t *testing.T) {
+// TestProviderRejectsMissingSecret 验证未配置 secret 时 provider 拒绝创建服务。
+func TestProviderRejectsMissingSecret(t *testing.T) {
 	c := container.New()
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return &stubConfig{values: map[string]string{}}, nil
@@ -230,19 +230,34 @@ func TestProviderDefaultFallbackSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := c.Make(securitycontract.AuthJWTKey)
-	if err != nil {
-		t.Fatal(err)
+	if _, err := c.Make(securitycontract.AuthJWTKey); err == nil {
+		t.Fatal("expected missing JWT secret to fail closed")
 	}
-	svc := v.(securitycontract.JWTService)
-	// 用默认 secret 也能正常签发和校验
+}
+
+func TestJWTService_VerifyRejectsMissingConfiguredIssuer(t *testing.T) {
+	svc := NewJWTService("secret", "expected-issuer", "")
 	claims := svc.NewClaims(1, "user", "u1", nil, 60)
+	claims.Issuer = ""
 	token, err := svc.Sign(claims)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Verify(token); err != nil {
-		t.Fatalf("expected token verify pass with default secret, got err: %v", err)
+	if _, err := svc.Verify(token); err == nil {
+		t.Fatal("expected token without configured issuer to be rejected")
+	}
+}
+
+func TestJWTService_VerifyRejectsMissingConfiguredAudience(t *testing.T) {
+	svc := NewJWTService("secret", "", "expected-audience")
+	claims := svc.NewClaims(1, "user", "u1", nil, 60)
+	claims.Audience = ""
+	token, err := svc.Sign(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Verify(token); err == nil {
+		t.Fatal("expected token without configured audience to be rejected")
 	}
 }
 

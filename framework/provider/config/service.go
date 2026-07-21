@@ -58,6 +58,18 @@ func NewServiceWithSource(source datacontract.ConfigSource) *Service {
 	}
 }
 
+// AttachConfigSource connects a source selected during the second bootstrap
+// phase. The next Reload atomically rebuilds the effective config snapshot.
+func (s *Service) AttachConfigSource(source datacontract.ConfigSource) error {
+	if source == nil {
+		return errors.New("config: source is nil")
+	}
+	s.mu.Lock()
+	s.source = source
+	s.mu.Unlock()
+	return nil
+}
+
 // Env returns the current loaded environment name.
 //
 // Env 返回当前加载的环境名。

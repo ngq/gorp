@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,10 +24,13 @@ import (
 // MemoryOutbox 是内存 Outbox 模式实现。
 // 核心逻辑：存储消息、带重试处理、跟踪状态。
 type MemoryOutbox struct {
-	mu       sync.RWMutex
-	messages map[string]*integrationcontract.OutboxMessage
-	sender   integrationcontract.OutboxSender
-	config   integrationcontract.OutboxConfig
+	mu             sync.RWMutex
+	messages       map[string]*integrationcontract.OutboxMessage
+	sender         integrationcontract.OutboxSender
+	config         integrationcontract.OutboxConfig
+	processMu      sync.Mutex
+	workerRunning  atomic.Bool
+	pendingVersion atomic.Uint64
 }
 
 // NewMemoryOutbox creates a new in-memory outbox.
@@ -59,8 +63,8 @@ func (o *MemoryOutbox) Emit(ctx context.Context, topic string, payload interface
 	o.mu.Lock()
 	o.messages[msg.ID] = msg
 	o.mu.Unlock()
-
-	go o.Process(context.Background())
+	o.pendingVersion.Add(1)
+	o.scheduleProcess()
 
 	return nil
 }
@@ -92,6 +96,9 @@ func (o *MemoryOutbox) EmitSync(ctx context.Context, topic string, payload inter
 // Process 处理待处理消息，带重试逻辑。
 // 核心逻辑：找到待处理/重试中的消息、带重试限制发送、更新状态。
 func (o *MemoryOutbox) Process(ctx context.Context) error {
+	o.processMu.Lock()
+	defer o.processMu.Unlock()
+
 	o.mu.RLock()
 	var pending []*integrationcontract.OutboxMessage
 	for _, msg := range o.messages {
@@ -144,6 +151,22 @@ func (o *MemoryOutbox) Process(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (o *MemoryOutbox) scheduleProcess() {
+	if !o.workerRunning.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		for {
+			version := o.pendingVersion.Load()
+			_ = o.Process(context.Background())
+			o.workerRunning.Store(false)
+			if o.pendingVersion.Load() == version || !o.workerRunning.CompareAndSwap(false, true) {
+				return
+			}
+		}
+	}()
 }
 
 // MemoryOutboxStore is the in-memory outbox storage implementation.

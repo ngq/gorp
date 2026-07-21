@@ -125,11 +125,11 @@ func (s *JWTService) Verify(token string) (*securitycontract.JWTClaims, error) {
 		return nil, errors.New("invalid token")
 	}
 	// 校验 issuer：如果服务配置了 issuer，则 token 的 issuer 必须匹配
-	if s.issuer != "" && claims.Issuer != "" && claims.Issuer != s.issuer {
+	if s.issuer != "" && claims.Issuer != s.issuer {
 		return nil, errors.New("invalid token: issuer mismatch")
 	}
 	// 校验 audience：如果服务配置了 audience，则 token 的 audience 必须匹配
-	if s.audience != "" && claims.Audience != "" && claims.Audience != s.audience {
+	if s.audience != "" && claims.Audience != s.audience {
 		return nil, errors.New("invalid token: audience mismatch")
 	}
 	return &claims, nil

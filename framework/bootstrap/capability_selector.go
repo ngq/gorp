@@ -103,11 +103,11 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 	if c == nil || !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}
-	cfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
+	baseCfg, err := container.MakeWith[datacontract.Config](c, datacontract.ConfigKey)
 	if err != nil {
 		return fmt.Errorf("bootstrap: failed to resolve config for provider selection: %w", err)
 	}
-	cfg = overlayGovernanceConfig(cfg, disabled, enabled, providerOverrides)
+	cfg := overlayGovernanceConfig(baseCfg, disabled, enabled, providerOverrides)
 
 	configSourceProvider := SelectConfigSourceProvider(cfg)
 	if configSourceProvider != nil {
@@ -118,12 +118,19 @@ func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 			if err := c.RegisterProvider(configSourceProvider); err != nil {
 				return err
 			}
-			if cfgSvc, ok := cfg.(datacontract.Config); ok {
-				if err := cfgSvc.Reload(context.Background()); err != nil {
-					return err
-				}
-				cfg = overlayGovernanceConfig(cfgSvc, disabled, enabled, providerOverrides)
+			source, err := container.MakeWith[datacontract.ConfigSource](c, datacontract.ConfigSourceKey)
+			if err != nil {
+				return fmt.Errorf("bootstrap: failed to resolve config source: %w", err)
 			}
+			if attacher, ok := baseCfg.(datacontract.ConfigSourceAttacher); ok {
+				if err := attacher.AttachConfigSource(source); err != nil {
+					return fmt.Errorf("bootstrap: attach config source: %w", err)
+				}
+			}
+			if err := baseCfg.Reload(context.Background()); err != nil {
+				return err
+			}
+			cfg = overlayGovernanceConfig(baseCfg, disabled, enabled, providerOverrides)
 		}
 	}
 

@@ -191,14 +191,18 @@ func (c *Client) Close() error {
 	}
 	c.closed = true
 
+	var closeErrs []error
 	c.connPool.Range(func(key, value any) bool {
 		if conn, ok := value.(*grpc.ClientConn); ok {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				closeErrs = append(closeErrs, err)
+			}
 		}
+		c.connPool.Delete(key)
 		return true
 	})
 
-	return nil
+	return errors.Join(closeErrs...)
 }
 
 // getConn returns a pooled gRPC connection for the given service.
@@ -207,12 +211,25 @@ func (c *Client) Close() error {
 // getConn 返回给定服务的池化 gRPC 连接。
 // 可用时使用服务发现，回退到直接目标地址。
 func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn, discoverycontract.DoneFunc, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, nil, errors.New("rpc: client is closed")
+	}
+	c.mu.Unlock()
+
 	addr, done, err := c.resolveTarget(ctx, service)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// 检查连接池
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return nil, nil, errors.New("rpc: client is closed")
+	}
+
+	// 检查连接池。连接创建也在同一生命周期锁内，避免并发覆盖和 Close 竞态。
 	if cached, ok := c.connPool.Load(addr); ok {
 		conn := cached.(*grpc.ClientConn)
 		if conn.GetState().String() != "SHUTDOWN" {

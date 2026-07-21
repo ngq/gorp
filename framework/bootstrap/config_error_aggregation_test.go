@@ -26,7 +26,6 @@ func TestValidateCriticalConfigAggregatesMultipleErrors(t *testing.T) {
 
 	err := ValidateCriticalConfig(cfg)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "config: app.address is required")
 	require.Contains(t, err.Error(), "config: log.level must be one of [debug info warn error]")
 	require.Contains(t, err.Error(), "config: log.format must be one of [console json]")
 }

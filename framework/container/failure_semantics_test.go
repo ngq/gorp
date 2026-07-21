@@ -75,7 +75,9 @@ func TestContainer_BootProviderRetriesAfterBootFailure(t *testing.T) {
 		booted:  &booted,
 	}
 
-	c.providersByName[p.Name()] = &providerState{p: p, loaded: true}
+	state := &providerState{p: p}
+	state.loaded.Store(true)
+	c.providersByName[p.Name()] = state
 
 	err := c.bootProvider(p.Name())
 	require.EqualError(t, err, "boot failed")

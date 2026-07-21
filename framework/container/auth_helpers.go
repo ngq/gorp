@@ -8,9 +8,24 @@
 package container
 
 import (
+	"fmt"
+
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 )
+
+// MakeJWTService resolves the optional JWT service without panicking.
+func MakeJWTService(c runtimecontract.Container) (securitycontract.JWTService, error) {
+	value, err := c.Make(securitycontract.AuthJWTKey)
+	if err != nil {
+		return nil, err
+	}
+	service, ok := value.(securitycontract.JWTService)
+	if !ok || service == nil {
+		return nil, fmt.Errorf("container: service %q has invalid type %T", securitycontract.AuthJWTKey, value)
+	}
+	return service, nil
+}
 
 // MustMakeJWTService resolves the JWT service and panics on failure.
 //

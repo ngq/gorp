@@ -2,6 +2,7 @@ package gorm
 
 import (
 	"database/sql"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,10 +56,12 @@ var (
 // - 用于监控数据库连接池健康状态，排查连接泄漏等问题；
 // - 建议在应用启动后调用 StartCollection 开始定期收集。
 type DBMetricsCollector struct {
-	sqlDB  *sql.DB
-	driver string
-	stopCh chan struct{}
-	ticker *time.Ticker
+	sqlDB     *sql.DB
+	driver    string
+	stopCh    chan struct{}
+	ticker    *time.Ticker
+	startOnce sync.Once
+	stopOnce  sync.Once
 }
 
 // NewDBMetricsCollector 创建数据库指标收集器。
@@ -77,24 +80,26 @@ func NewDBMetricsCollector(sqlDB *sql.DB, driver string) *DBMetricsCollector {
 // - 更新 Prometheus Gauge 指标；
 // - 返回 stop 函数，调用后停止收集。
 func (c *DBMetricsCollector) StartCollection() func() {
-	c.ticker = time.NewTicker(5 * time.Second)
-	go func() {
-		for {
-			select {
-			case <-c.ticker.C:
-				c.collect()
-			case <-c.stopCh:
-				c.ticker.Stop()
-				return
+	c.startOnce.Do(func() {
+		c.ticker = time.NewTicker(5 * time.Second)
+		go func() {
+			for {
+				select {
+				case <-c.ticker.C:
+					c.collect()
+				case <-c.stopCh:
+					c.ticker.Stop()
+					return
+				}
 			}
-		}
-	}()
+		}()
+	})
 	return c.Stop
 }
 
 // Stop 停止收集指标。
 func (c *DBMetricsCollector) Stop() {
-	close(c.stopCh)
+	c.stopOnce.Do(func() { close(c.stopCh) })
 }
 
 // collect 采集当前连接池状态。

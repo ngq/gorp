@@ -334,3 +334,24 @@ func TestRetryServiceDoForResourceUsesResourcePolicy(t *testing.T) {
 		t.Fatalf("expected 3 attempts from resource policy, got %d", callCount)
 	}
 }
+
+func TestRetryServiceDoForResourceUsesResourceRetryableClassification(t *testing.T) {
+	cfg := &resiliencecontract.RetryConfig{
+		DefaultPolicy: resiliencecontract.RetryPolicy{
+			MaxAttempts:    3,
+			RetryableCodes: []int{503},
+		},
+		ResourcePolicies: map[string]resiliencecontract.RetryPolicy{
+			"no-retry": {MaxAttempts: 3, RetryableCodes: []int{429}},
+		},
+	}
+	svc := NewRetryService(cfg)
+	calls := 0
+	err := svc.DoForResource(context.Background(), "no-retry", func() error {
+		calls++
+		return resiliencecontract.NewError(503, resiliencecontract.ErrorReasonServiceUnavailable, "do not retry")
+	})
+	if err == nil || calls != 1 {
+		t.Fatalf("resource policy must reject retry; calls=%d err=%v", calls, err)
+	}
+}

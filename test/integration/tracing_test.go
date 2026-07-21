@@ -124,7 +124,8 @@ func TestTracingErrorRecording(t *testing.T) {
 
 	t.Logf("error span recorded: error=%s", testErr.GetStatus().Message)
 
-	shutdownCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
 	tracerProvider.Shutdown(shutdownCtx)
 }
 
@@ -187,7 +188,8 @@ func TestTracingNestedSpans(t *testing.T) {
 
 	t.Log("nested spans ended successfully")
 
-	shutdownCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
 	tracerProvider.Shutdown(shutdownCtx)
 }
 

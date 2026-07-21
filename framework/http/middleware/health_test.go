@@ -228,14 +228,21 @@ func (m *mockRouter) GET(path string, handler transportcontract.Handler, middlew
 	m.routes[path] = handler
 }
 
-func (m *mockRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)    {}
-func (m *mockRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)     {}
-func (m *mockRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)  {}
-func (m *mockRouter) PATCH(path string, handler transportcontract.Handler)   {}
-func (m *mockRouter) OPTIONS(path string, handler transportcontract.Handler) {}
-func (m *mockRouter) HEAD(path string, handler transportcontract.Handler)    {}
-func (m *mockRouter) ANY(path string, handler transportcontract.Handler)     {}
-func (m *mockRouter) Use(middleware ...transportcontract.Middleware)         {}
+func (m *mockRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) PATCH(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) OPTIONS(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) HEAD(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) ANY(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (m *mockRouter) Use(middleware ...transportcontract.Middleware) {}
 func (m *mockRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return m
 }
@@ -249,3 +256,6 @@ func (m *mockRouter) HandleFunc(method, path string, handler transportcontract.H
 func (m *mockRouter) Static(relativePath, root string)                 {}
 func (m *mockRouter) StaticFile(relativePath, filepath string)         {}
 func (m *mockRouter) StaticFS(relativePath string, fs http.FileSystem) {}
+func (m *mockRouter) NoRoute(handler transportcontract.Handler)        {}
+func (m *mockRouter) NoMethod(handler transportcontract.Handler)       {}
+func (m *mockRouter) Routes() []transportcontract.RouteInfo            { return nil }

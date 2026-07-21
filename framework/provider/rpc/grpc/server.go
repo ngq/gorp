@@ -47,6 +47,8 @@ type Server struct {
 	mu       sync.Mutex
 	running  bool
 	listener net.Listener
+	initErr  error
+	serveErr chan error
 }
 
 // NewServer creates a new gRPC Server instance with container for middleware resolution.
@@ -75,7 +77,11 @@ func (s *Server) RegisterProto(register func(server *grpc.Server) error) error {
 	if register == nil {
 		return nil
 	}
-	return register(s.Server())
+	server := s.Server()
+	if server == nil {
+		return s.initializationError()
+	}
+	return register(server)
 }
 
 // Start starts the gRPC server on the configured address.
@@ -91,6 +97,10 @@ func (s *Server) Start(ctx context.Context) error {
 		return errors.New("rpc: server already running")
 	}
 
+	if err := s.ensureServerLocked(); err != nil {
+		return err
+	}
+
 	addr := s.cfg.Address
 	if addr == "" {
 		addr = ":9090"
@@ -103,13 +113,18 @@ func (s *Server) Start(ctx context.Context) error {
 	s.listener = lis
 	s.addr = lis.Addr().String()
 
-	if s.server == nil {
-		s.server = s.newGRPCServer()
-	}
-
 	s.running = true
+	s.serveErr = make(chan error, 1)
+	server := s.server
 	go func() {
-		s.server.Serve(lis)
+		err := server.Serve(lis)
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			s.serveErr <- err
+		}
+		close(s.serveErr)
+		s.mu.Lock()
+		s.running = false
+		s.mu.Unlock()
 	}()
 
 	return nil
@@ -153,6 +168,8 @@ func (s *Server) Stop(ctx context.Context) error {
 // Addr 返回服务器的监听地址。
 // 实现 transportcontract.RPCServer.Addr。
 func (s *Server) Addr() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.addr
 }
 
@@ -162,10 +179,35 @@ func (s *Server) Addr() string {
 // Server 返回底层 gRPC 服务器实例。
 // 如果尚未创建则延迟初始化。
 func (s *Server) Server() *grpc.Server {
-	if s.server == nil {
-		s.server = s.newGRPCServer()
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_ = s.ensureServerLocked()
 	return s.server
+}
+
+func (s *Server) initializationError() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.initErr != nil {
+		return s.initErr
+	}
+	return errors.New("rpc: gRPC server initialization failed")
+}
+
+func (s *Server) ensureServerLocked() error {
+	if s.server != nil {
+		return nil
+	}
+	if s.initErr != nil {
+		return s.initErr
+	}
+	server, err := s.newGRPCServer()
+	if err != nil {
+		s.initErr = err
+		return err
+	}
+	s.server = server
+	return nil
 }
 
 // GRPCServer returns the underlying gRPC server (alias for Server).
@@ -184,7 +226,7 @@ func (s *Server) GRPCServer() *grpc.Server {
 // newGRPCServer 从容器解析中间件链构建 gRPC 服务器。
 // interceptor 链顺序与 HTTP middleware 对齐：
 // recovery → logging → timeout → tracing → metadata → serviceauth → metrics
-func (s *Server) newGRPCServer() *grpc.Server {
+func (s *Server) newGRPCServer() (*grpc.Server, error) {
 	opts := []grpc.ServerOption{}
 
 	var unaryInterceptors []grpc.UnaryServerInterceptor
@@ -234,12 +276,16 @@ func (s *Server) newGRPCServer() *grpc.Server {
 	// 6. service auth (服务间认证)
 	// serviceauth - 服务间认证
 	if s.c.IsBind(securitycontract.ServiceAuthKey) {
-		if authAny, err := s.c.Make(securitycontract.ServiceAuthKey); err == nil {
-			if authenticator, ok := authAny.(securitycontract.ServiceAuthenticator); ok {
-				unaryInterceptors = append(unaryInterceptors, serviceAuthUnaryServerInterceptor(authenticator))
-				streamInterceptors = append(streamInterceptors, serviceAuthStreamServerInterceptor(authenticator))
-			}
+		authAny, err := s.c.Make(securitycontract.ServiceAuthKey)
+		if err != nil {
+			return nil, fmt.Errorf("rpc: resolve service authenticator: %w", err)
 		}
+		authenticator, ok := authAny.(securitycontract.ServiceAuthenticator)
+		if !ok || authenticator == nil {
+			return nil, fmt.Errorf("rpc: service authenticator has invalid type %T", authAny)
+		}
+		unaryInterceptors = append(unaryInterceptors, serviceAuthUnaryServerInterceptor(authenticator))
+		streamInterceptors = append(streamInterceptors, serviceAuthStreamServerInterceptor(authenticator))
 	}
 
 	// 7. rate limit (从容器解析)
@@ -293,7 +339,7 @@ func (s *Server) newGRPCServer() *grpc.Server {
 	// 注册反射服务
 	reflection.Register(srv)
 
-	return srv
+	return srv, nil
 }
 
 // rateLimitUnaryServerInterceptor creates a unary server interceptor for rate limiting.

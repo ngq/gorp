@@ -51,6 +51,7 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 		cfg.httpOpts.DisableRedis = h.DisableRedis
 		cfg.httpOpts.DisableGorm = h.DisableGorm
 		cfg.httpOpts.DisableMetrics = h.DisableMetrics
+		cfg.httpOpts.EnablePprof = h.EnablePprof
 		if h.GovernanceMode != "" {
 			cfg.httpOpts.GovernanceMode = string(h.GovernanceMode)
 		}

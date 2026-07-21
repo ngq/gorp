@@ -148,6 +148,9 @@ func (m *Manager) Start(ctx context.Context) error {
 			m.mu.Unlock()
 			return err
 		}
+		// Start succeeded, so the service must participate in rollback even when
+		// the post-start hook fails.
+		started = append(started, entry)
 
 		if entry.Hooks != nil {
 			if err := entry.Hooks.OnStarted(ctx); err != nil {
@@ -159,7 +162,6 @@ func (m *Manager) Start(ctx context.Context) error {
 			}
 		}
 
-		started = append(started, entry)
 	}
 
 	m.mu.Lock()

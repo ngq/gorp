@@ -36,7 +36,7 @@ func TestContribProvidersFollowProviderBoundary(t *testing.T) {
 		{name: "dlock.redis", provider: dlockredis.NewProvider(), deferred: true, providesKey: []string{datacontract.DistributedLockKey}},
 		{name: "serviceauth.token", provider: serviceauthtoken.NewProvider(), deferred: true, providesKey: []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}},
 		{name: "serviceauth.mtls", provider: serviceauthmtls.NewProvider(), deferred: true, providesKey: []string{securitycontract.ServiceAuthKey, securitycontract.ServiceIdentityKey}},
-		{name: "circuitbreaker.sentinel", provider: circuitbreakersentinel.NewProvider(), deferred: true, providesKey: []string{resiliencecontract.CircuitBreakerKey, resiliencecontract.RateLimiterKey}},
+		{name: "circuitbreaker.sentinel", provider: circuitbreakersentinel.NewProvider(), deferred: true, providesKey: []string{resiliencecontract.CircuitBreakerKey}},
 	}
 
 	for _, tt := range tests {

@@ -55,6 +55,7 @@ func (c *testContext) GetHeader(key string) string {
 func (c *testContext) SetHeader(key, value string) {
 	c.gin.Header(key, value)
 }
+func (c *testContext) Cookie(name string) (string, error) { return c.gin.Cookie(name) }
 
 func (c *testContext) Bind(obj any) error {
 	return c.gin.ShouldBind(obj)
@@ -67,6 +68,9 @@ func (c *testContext) BindJSON(obj any) error {
 func (c *testContext) BindQuery(obj any) error {
 	return c.gin.ShouldBindQuery(obj)
 }
+func (c *testContext) BindURI(obj any) error    { return c.gin.ShouldBindUri(obj) }
+func (c *testContext) BindHeader(obj any) error { return c.gin.ShouldBindHeader(obj) }
+func (c *testContext) BindForm(obj any) error   { return c.gin.ShouldBind(obj) }
 
 func (c *testContext) JSON(status int, body any) {
 	c.gin.JSON(status, body)
@@ -91,6 +95,14 @@ func (c *testContext) Redirect(status int, location string) {
 func (c *testContext) Status(code int) {
 	c.gin.Status(code)
 }
+func (c *testContext) File(path string)                       { c.gin.File(path) }
+func (c *testContext) FileAttachment(path, filename string)   { c.gin.FileAttachment(path, filename) }
+func (c *testContext) SetCookie(cookie *http.Cookie)          {}
+func (c *testContext) DeleteCookie(name, path, domain string) {}
+func (c *testContext) Stream(contentType string, write func(transportcontract.StreamWriter) error) error {
+	return nil
+}
+func (c *testContext) SSE(event transportcontract.SSEEvent) error { return nil }
 
 func (c *testContext) RoutePath() string {
 	return c.gin.FullPath()

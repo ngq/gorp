@@ -26,7 +26,7 @@ package jwt
 
 import (
 	"errors"
-	"log/slog"
+	"fmt"
 	"strings"
 
 	datacontract "github.com/ngq/gorp/framework/contract/data"
@@ -101,8 +101,7 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(securitycontract.AuthJWTKey, func(c runtimecontract.Container) (any, error) {
 		cfgAny, err := c.Make(datacontract.ConfigKey)
 		if err != nil {
-			slog.Error("auth.jwt: config service unavailable, using default secret — MUST change in production!")
-			return NewJWTService(defaultJWTSecret, "gorp", ""), nil
+			return nil, fmt.Errorf("auth.jwt: config service unavailable: %w", err)
 		}
 
 		cfg, ok := cfgAny.(datacontract.Config)
@@ -112,13 +111,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 
 		secret := JWTSecretFromConfig(cfg)
 		if secret == "" {
-			secret = defaultJWTSecret
-			slog.Error("auth.jwt: JWT secret not configured, using default secret — MUST change in production!")
-		} else if secret == defaultJWTSecret {
-			slog.Error("auth.jwt: JWT secret is the default value — MUST change in production!")
-		} else if isUnsafeSecret(secret) {
-			slog.Error("auth.jwt: JWT secret appears to be a template placeholder value — MUST change in production! " +
-				"Unsafe values include: change-me-in-production, your-secret-key, secret, jwt-secret")
+			return nil, errors.New("auth.jwt: JWT secret is required")
+		}
+		if isUnsafeSecret(secret) {
+			return nil, errors.New("auth.jwt: JWT secret uses an unsafe placeholder value")
 		}
 
 		issuer := strings.TrimSpace(cfg.GetString("auth.jwt.issuer"))

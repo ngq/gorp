@@ -34,7 +34,7 @@ type AppConfigSchema struct {
 	// Address 是 HTTP 服务监听地址，必填，例如 ":8080" 或 "0.0.0.0:8080"。
 	//
 	// Address is the HTTP listen address, required, e.g. ":8080" or "0.0.0.0:8080".
-	Address string `validate:"required" mapstructure:"address"`
+	Address string `mapstructure:"address"`
 }
 
 // ServerHTTPConfigSchema 对应 YAML 配置中的 server.http 节。
@@ -46,7 +46,7 @@ type ServerHTTPConfigSchema struct {
 	// Addr 是 HTTP 服务监听地址，必填（当 server.http 节存在时）。
 	//
 	// Addr is the HTTP listen address, required when server.http section is present.
-	Addr string `validate:"required" mapstructure:"addr"`
+	Addr string `mapstructure:"addr"`
 }
 
 // LogConfigSchema 对应 YAML 配置中的 log 节。
@@ -81,7 +81,7 @@ type DatabaseConfigSchema struct {
 	//
 	// Driver is the database driver. Valid values: mysql / postgres / pgx.
 	// When DSN is non-empty, Driver is also required.
-	Driver string `validate:"required_with=DSN,oneof=mysql postgres pgx" mapstructure:"driver"`
+	Driver string `validate:"required_with=DSN,oneof=mysql postgres pgx sqlite sqlite3" mapstructure:"driver"`
 
 	// DSN 是数据库连接字符串，当 Driver 非空时必须提供。
 	//
@@ -176,8 +176,6 @@ func ValidateCriticalConfig(cfg datacontract.Config) error {
 	var appCfg AppConfigSchema
 	if err := cfg.Unmarshal("app", &appCfg); err != nil {
 		errs = append(errs, fmt.Sprintf("config: failed to unmarshal app section: %v", err))
-	} else if fieldErrs := configValidator.Struct(appCfg); fieldErrs != nil {
-		errs = append(errs, formatSectionErrors("app", fieldErrs)...)
 	}
 
 	// 2. 校验 server.http 节（条件校验：仅在配置中存在时才校验）
@@ -186,8 +184,6 @@ func ValidateCriticalConfig(cfg datacontract.Config) error {
 		var httpCfg ServerHTTPConfigSchema
 		if err := cfg.Unmarshal("server.http", &httpCfg); err != nil {
 			errs = append(errs, fmt.Sprintf("config: failed to unmarshal server.http section: %v", err))
-		} else if fieldErrs := configValidator.Struct(httpCfg); fieldErrs != nil {
-			errs = append(errs, formatSectionErrors("server.http", fieldErrs)...)
 		}
 	}
 

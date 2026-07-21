@@ -8,6 +8,8 @@
 package grpc
 
 import (
+	"fmt"
+
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -69,7 +71,7 @@ func (p *Provider) DependsOn() []string {
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(transportcontract.GRPCConnFactoryKey, func(c runtimecontract.Container) (any, error) {
 		cfg, _ := getGRPCConfig(c)
-		return newClientFromContainer(c, cfg), nil
+		return newClientFromContainer(c, cfg)
 	}, true)
 
 	c.Bind(transportcontract.RPCClientKey, func(c runtimecontract.Container) (any, error) {
@@ -143,7 +145,7 @@ func getGRPCConfig(c runtimecontract.Container) (*transportcontract.RPCConfig, e
 // newClientFromContainer 通过从容器解析依赖创建 gRPC Client 实例。
 // 依赖包括服务注册、选择器、metadata propagator、服务认证、
 // tracer、熔断器和重试策略。
-func newClientFromContainer(c runtimecontract.Container, cfg *transportcontract.RPCConfig) *Client {
+func newClientFromContainer(c runtimecontract.Container, cfg *transportcontract.RPCConfig) (*Client, error) {
 	var registry transportcontract.ServiceRegistry
 	if c.IsBind(transportcontract.RPCRegistryKey) {
 		regAny, _ := c.Make(transportcontract.RPCRegistryKey)
@@ -164,8 +166,15 @@ func newClientFromContainer(c runtimecontract.Container, cfg *transportcontract.
 
 	var serviceAuth securitycontract.ServiceTokenIssuer
 	if c.IsBind(securitycontract.ServiceAuthKey) {
-		authAny, _ := c.Make(securitycontract.ServiceAuthKey)
-		serviceAuth, _ = authAny.(securitycontract.ServiceTokenIssuer)
+		authAny, err := c.Make(securitycontract.ServiceAuthKey)
+		if err != nil {
+			return nil, fmt.Errorf("rpc: resolve service token issuer: %w", err)
+		}
+		var ok bool
+		serviceAuth, ok = authAny.(securitycontract.ServiceTokenIssuer)
+		if !ok || serviceAuth == nil {
+			return nil, fmt.Errorf("rpc: service token issuer has invalid type %T", authAny)
+		}
 	}
 
 	var tracer observabilitycontract.Tracer
@@ -185,5 +194,5 @@ func newClientFromContainer(c runtimecontract.Container, cfg *transportcontract.
 		retry, _ = retryAny.(resiliencecontract.Retry)
 	}
 
-	return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker, retry)
+	return NewClient(cfg, registry, selector, metadataPropagator, serviceAuth, tracer, circuitBreaker, retry), nil
 }

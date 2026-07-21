@@ -19,13 +19,24 @@ func (r *captureRouter) Group(prefix string, middleware ...Middleware) Router {
 	r.used = append(r.used, middleware...)
 	return r
 }
-func (r *captureRouter) Handle(method, path string, handler Handler, middleware ...Middleware)         {}
-func (r *captureRouter) HandleFunc(method, path string, handlerFunc Handler, middleware ...Middleware) {}
-func (r *captureRouter) GET(path string, handler Handler, middleware ...Middleware)                    {}
-func (r *captureRouter) POST(path string, handler Handler, middleware ...Middleware)                   {}
-func (r *captureRouter) PUT(path string, handler Handler, middleware ...Middleware)                    {}
-func (r *captureRouter) DELETE(path string, handler Handler, middleware ...Middleware)                 {}
-func (r *captureRouter) Mount(path string, handler http.Handler)             {}
+func (r *captureRouter) Handle(method, path string, handler Handler, middleware ...Middleware) {}
+func (r *captureRouter) HandleFunc(method, path string, handlerFunc Handler, middleware ...Middleware) {
+}
+func (r *captureRouter) GET(path string, handler Handler, middleware ...Middleware)     {}
+func (r *captureRouter) POST(path string, handler Handler, middleware ...Middleware)    {}
+func (r *captureRouter) PUT(path string, handler Handler, middleware ...Middleware)     {}
+func (r *captureRouter) DELETE(path string, handler Handler, middleware ...Middleware)  {}
+func (r *captureRouter) PATCH(path string, handler Handler, middleware ...Middleware)   {}
+func (r *captureRouter) HEAD(path string, handler Handler, middleware ...Middleware)    {}
+func (r *captureRouter) OPTIONS(path string, handler Handler, middleware ...Middleware) {}
+func (r *captureRouter) ANY(path string, handler Handler, middleware ...Middleware)     {}
+func (r *captureRouter) Static(relativePath, root string)                               {}
+func (r *captureRouter) StaticFile(relativePath, filePath string)                       {}
+func (r *captureRouter) StaticFS(relativePath string, fs http.FileSystem)               {}
+func (r *captureRouter) NoRoute(handler Handler)                                        {}
+func (r *captureRouter) NoMethod(handler Handler)                                       {}
+func (r *captureRouter) Routes() []RouteInfo                                            { return nil }
+func (r *captureRouter) Mount(path string, handler http.Handler)                        {}
 
 func TestAdaptMiddlewareWrapsNextHandler(t *testing.T) {
 	var calls []string

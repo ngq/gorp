@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -129,6 +130,7 @@ func (c *ginContext) GetHeader(key string) string {
 func (c *ginContext) SetHeader(key, value string) {
 	c.gin.Header(key, value)
 }
+func (c *ginContext) Cookie(name string) (string, error) { return c.gin.Cookie(name) }
 
 // ========== Binding ==========
 
@@ -142,6 +144,18 @@ func (c *ginContext) BindJSON(obj any) error {
 
 func (c *ginContext) BindQuery(obj any) error {
 	return c.gin.ShouldBindQuery(obj)
+}
+
+func (c *ginContext) BindURI(obj any) error {
+	return c.gin.ShouldBindUri(obj)
+}
+
+func (c *ginContext) BindHeader(obj any) error {
+	return c.gin.ShouldBindHeader(obj)
+}
+
+func (c *ginContext) BindForm(obj any) error {
+	return c.gin.ShouldBind(obj)
 }
 
 // ========== Response ==========
@@ -169,6 +183,43 @@ func (c *ginContext) Redirect(status int, location string) {
 func (c *ginContext) Status(code int) {
 	c.gin.Status(code)
 }
+
+func (c *ginContext) File(path string) {
+	c.gin.File(path)
+}
+
+func (c *ginContext) FileAttachment(path, filename string) {
+	c.gin.FileAttachment(path, filename)
+}
+
+func (c *ginContext) SetCookie(cookie *http.Cookie) {
+	if cookie != nil {
+		http.SetCookie(c.gin.Writer, cookie)
+	}
+}
+
+func (c *ginContext) DeleteCookie(name, path, domain string) {
+	http.SetCookie(c.gin.Writer, &http.Cookie{Name: name, Path: path, Domain: domain, MaxAge: -1, Expires: time.Unix(1, 0), HttpOnly: true})
+}
+
+func (c *ginContext) Stream(contentType string, write func(transportcontract.StreamWriter) error) error {
+	if write == nil {
+		return nil
+	}
+	c.gin.Header("Content-Type", contentType)
+	return write(streamWriter{writer: c.gin.Writer})
+}
+
+func (c *ginContext) SSE(event transportcontract.SSEEvent) error {
+	c.gin.SSEvent(event.Event, event.Data)
+	c.gin.Writer.Flush()
+	return nil
+}
+
+type streamWriter struct{ writer gin.ResponseWriter }
+
+func (w streamWriter) Write(data []byte) (int, error) { return w.writer.Write(data) }
+func (w streamWriter) Flush() error                   { w.writer.Flush(); return nil }
 
 // ========== Route info ==========
 

@@ -101,7 +101,7 @@ service_auth:
   enabled: true
   backend: token
   token:
-    secret: change-me-in-production
+    secret: env(SERVICE_AUTH_TOKEN_SECRET)
     issuer: {{.Name}}
     audience: ""
     expiry: 3600
@@ -111,7 +111,7 @@ service_auth:
   enabled: false
   backend: token
   token:
-    secret: change-me-in-production
+    secret: ""
     issuer: {{.Name}}
     audience: ""
     expiry: 3600
@@ -185,7 +185,7 @@ discovery:
 # 业务 JWT 配置（已预留接入位）
 auth:
   jwt:
-    secret: change-me-in-production
+    secret: ""
     issuer: {{.Name}}
     audience: ""
 

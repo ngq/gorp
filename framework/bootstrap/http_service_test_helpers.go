@@ -28,15 +28,33 @@ func (r *recordingRouter) Use(middleware ...transportcontract.Middleware) {}
 func (r *recordingRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return r
 }
-func (r *recordingRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {}
+func (r *recordingRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
 func (r *recordingRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {
 }
 func (r *recordingRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	r.gets = append(r.gets, path)
 }
-func (r *recordingRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)   {}
-func (r *recordingRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)    {}
-func (r *recordingRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {}
+func (r *recordingRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) PATCH(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) HEAD(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) OPTIONS(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) ANY(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (r *recordingRouter) Static(relativePath, root string)                 {}
+func (r *recordingRouter) StaticFile(relativePath, filePath string)         {}
+func (r *recordingRouter) StaticFS(relativePath string, fs http.FileSystem) {}
+func (r *recordingRouter) NoRoute(handler transportcontract.Handler)        {}
+func (r *recordingRouter) NoMethod(handler transportcontract.Handler)       {}
+func (r *recordingRouter) Routes() []transportcontract.RouteInfo            { return nil }
 func (r *recordingRouter) Mount(path string, handler http.Handler) {
 	r.mounted = append(r.mounted, path)
 }
@@ -86,6 +104,7 @@ func (c *testContext) GetHeader(key string) string {
 func (c *testContext) SetHeader(key, value string) {
 	c.gin.Header(key, value)
 }
+func (c *testContext) Cookie(name string) (string, error) { return c.gin.Cookie(name) }
 
 func (c *testContext) Bind(obj any) error {
 	return c.gin.ShouldBind(obj)
@@ -98,6 +117,9 @@ func (c *testContext) BindJSON(obj any) error {
 func (c *testContext) BindQuery(obj any) error {
 	return c.gin.ShouldBindQuery(obj)
 }
+func (c *testContext) BindURI(obj any) error    { return c.gin.ShouldBindUri(obj) }
+func (c *testContext) BindHeader(obj any) error { return c.gin.ShouldBindHeader(obj) }
+func (c *testContext) BindForm(obj any) error   { return c.gin.ShouldBind(obj) }
 
 func (c *testContext) JSON(status int, body any) {
 	c.gin.JSON(status, body)
@@ -122,6 +144,18 @@ func (c *testContext) Redirect(status int, location string) {
 func (c *testContext) Status(code int) {
 	c.gin.Status(code)
 }
+func (c *testContext) File(path string)                     { c.gin.File(path) }
+func (c *testContext) FileAttachment(path, filename string) { c.gin.FileAttachment(path, filename) }
+func (c *testContext) SetCookie(cookie *http.Cookie) {
+	if cookie != nil {
+		http.SetCookie(c.gin.Writer, cookie)
+	}
+}
+func (c *testContext) DeleteCookie(name, path, domain string) {}
+func (c *testContext) Stream(contentType string, write func(transportcontract.StreamWriter) error) error {
+	return nil
+}
+func (c *testContext) SSE(event transportcontract.SSEEvent) error { return nil }
 
 func (c *testContext) RoutePath() string {
 	return c.gin.FullPath()
@@ -246,6 +280,33 @@ func (r *ginTestRouter) PUT(path string, handler transportcontract.Handler, midd
 func (r *ginTestRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	r.Handle(http.MethodDelete, path, handler, middleware...)
 }
+func (r *ginTestRouter) PATCH(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPatch, path, handler, middleware...)
+}
+func (r *ginTestRouter) HEAD(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodHead, path, handler, middleware...)
+}
+func (r *ginTestRouter) OPTIONS(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodOptions, path, handler, middleware...)
+}
+func (r *ginTestRouter) ANY(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.engine.Any(path, func(c *gin.Context) { handler(newTestContext(c)) })
+}
+func (r *ginTestRouter) Static(relativePath, root string) { r.engine.Static(relativePath, root) }
+func (r *ginTestRouter) StaticFile(relativePath, filePath string) {
+	r.engine.StaticFile(relativePath, filePath)
+}
+func (r *ginTestRouter) StaticFS(relativePath string, fs http.FileSystem) {
+	r.engine.StaticFS(relativePath, fs)
+}
+func (r *ginTestRouter) NoRoute(handler transportcontract.Handler) {
+	r.engine.NoRoute(func(c *gin.Context) { handler(newTestContext(c)) })
+}
+func (r *ginTestRouter) NoMethod(handler transportcontract.Handler) {
+	r.engine.HandleMethodNotAllowed = true
+	r.engine.NoMethod(func(c *gin.Context) { handler(newTestContext(c)) })
+}
+func (r *ginTestRouter) Routes() []transportcontract.RouteInfo { return nil }
 
 func (r *ginTestRouter) Mount(path string, handler http.Handler) {
 	h := func(c *gin.Context) {
@@ -325,6 +386,28 @@ func (r *ginGroupTestRouter) PUT(path string, handler transportcontract.Handler,
 func (r *ginGroupTestRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
 	r.Handle(http.MethodDelete, path, handler, middleware...)
 }
+func (r *ginGroupTestRouter) PATCH(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodPatch, path, handler, middleware...)
+}
+func (r *ginGroupTestRouter) HEAD(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodHead, path, handler, middleware...)
+}
+func (r *ginGroupTestRouter) OPTIONS(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.Handle(http.MethodOptions, path, handler, middleware...)
+}
+func (r *ginGroupTestRouter) ANY(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+	r.group.Any(path, func(c *gin.Context) { handler(newTestContext(c)) })
+}
+func (r *ginGroupTestRouter) Static(relativePath, root string) { r.group.Static(relativePath, root) }
+func (r *ginGroupTestRouter) StaticFile(relativePath, filePath string) {
+	r.group.StaticFile(relativePath, filePath)
+}
+func (r *ginGroupTestRouter) StaticFS(relativePath string, fs http.FileSystem) {
+	r.group.StaticFS(relativePath, fs)
+}
+func (r *ginGroupTestRouter) NoRoute(handler transportcontract.Handler)  {}
+func (r *ginGroupTestRouter) NoMethod(handler transportcontract.Handler) {}
+func (r *ginGroupTestRouter) Routes() []transportcontract.RouteInfo      { return nil }
 
 func (r *ginGroupTestRouter) Mount(path string, handler http.Handler) {
 	h := func(c *gin.Context) {

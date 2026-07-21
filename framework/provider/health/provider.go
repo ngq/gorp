@@ -6,6 +6,7 @@ package health
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -52,11 +53,11 @@ func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 // healthChecker 是 HealthChecker 契约的实现。
 // 聚合多个组件和依赖的健康状态，生成统一的健康报告。
 type healthChecker struct {
-	config     observabilitycontract.HealthCheckerConfig
-	container  runtimecontract.Container
-	checkers   map[string]observabilitycontract.ComponentChecker
-	deps       map[string]observabilitycontract.DependencyChecker
-	mu         sync.RWMutex
+	config    observabilitycontract.HealthCheckerConfig
+	container runtimecontract.Container
+	checkers  map[string]observabilitycontract.ComponentChecker
+	deps      map[string]observabilitycontract.DependencyChecker
+	mu        sync.RWMutex
 }
 
 // newHealthChecker 根据配置创建健康检查器。
@@ -96,65 +97,83 @@ func (h *healthChecker) Check(ctx context.Context) (*observabilitycontract.Healt
 
 	now := time.Now()
 	report := &observabilitycontract.HealthReport{
-		Service:    h.config.ServiceName,
-		Version:    h.config.Version,
-		Timestamp:  now,
-		Checks:     make(map[string]observabilitycontract.HealthCheckResult),
+		Service:      h.config.ServiceName,
+		Version:      h.config.Version,
+		Timestamp:    now,
+		Checks:       make(map[string]observabilitycontract.HealthCheckResult),
 		Dependencies: make(map[string]observabilitycontract.DependencyHealth),
 	}
 
 	// 执行组件检查
 	h.mu.RLock()
-	checkers := h.checkers
-	deps := h.deps
+	checkers := make(map[string]observabilitycontract.ComponentChecker, len(h.checkers))
+	for name, checker := range h.checkers {
+		checkers[name] = checker
+	}
+	deps := make(map[string]observabilitycontract.DependencyChecker, len(h.deps))
+	for name, dep := range h.deps {
+		deps[name] = dep
+	}
 	h.mu.RUnlock()
 
 	// 并发执行组件检查
-	var wg sync.WaitGroup
 	results := make(chan observabilitycontract.HealthCheckResult, len(checkers))
 
 	for name, checker := range checkers {
-		wg.Add(1)
 		go func(name string, checker observabilitycontract.ComponentChecker) {
-			defer wg.Done()
-			result := checker(ctx)
+			result := runComponentChecker(ctx, checker)
 			result.Name = name
 			result.Timestamp = now
 			results <- result
 		}(name, checker)
 	}
 
-	wg.Wait()
-	close(results)
-
 	// 收集组件检查结果
-	for result := range results {
-		report.Checks[result.Name] = result
+	for range len(checkers) {
+		select {
+		case result := <-results:
+			report.Checks[result.Name] = result
+		case <-ctx.Done():
+			for name := range checkers {
+				if _, ok := report.Checks[name]; !ok {
+					report.Checks[name] = timeoutComponentResult(name, now, ctx.Err())
+				}
+			}
+			goto componentsDone
+		}
 	}
+
+componentsDone:
 
 	// 执行依赖检查（如果启用）
 	if h.config.CheckDependencies {
-		var depWg sync.WaitGroup
 		depResults := make(chan observabilitycontract.DependencyHealth, len(deps))
 
 		for name, depChecker := range deps {
-			depWg.Add(1)
 			go func(name string, depChecker observabilitycontract.DependencyChecker) {
-				defer depWg.Done()
-				result := depChecker(ctx)
+				result := runDependencyChecker(ctx, depChecker)
 				result.Name = name
 				depResults <- result
 			}(name, depChecker)
 		}
 
-		depWg.Wait()
-		close(depResults)
-
 		// 收集依赖检查结果
-		for result := range depResults {
-			report.Dependencies[result.Name] = result
+		for range len(deps) {
+			select {
+			case result := <-depResults:
+				report.Dependencies[result.Name] = result
+			case <-ctx.Done():
+				for name := range deps {
+					if _, ok := report.Dependencies[name]; !ok {
+						report.Dependencies[name] = timeoutDependencyResult(name, ctx.Err())
+					}
+				}
+				goto dependenciesDone
+			}
 		}
 	}
+
+dependenciesDone:
 
 	// 计算整体健康状态
 	report.Status = h.calculateOverallStatus(report)
@@ -179,11 +198,51 @@ func (h *healthChecker) CheckComponent(ctx context.Context, name string) (*obser
 		defer cancel()
 	}
 
-	result := checker(ctx)
+	resultCh := make(chan observabilitycontract.HealthCheckResult, 1)
+	go func() { resultCh <- runComponentChecker(ctx, checker) }()
+	var result observabilitycontract.HealthCheckResult
+	select {
+	case result = <-resultCh:
+	case <-ctx.Done():
+		result = timeoutComponentResult(name, time.Now(), ctx.Err())
+	}
 	result.Name = name
 	result.Timestamp = time.Now()
 
 	return &result, nil
+}
+
+func runComponentChecker(ctx context.Context, checker observabilitycontract.ComponentChecker) (result observabilitycontract.HealthCheckResult) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = observabilitycontract.HealthCheckResult{
+				Status:  observabilitycontract.HealthStatusUnhealthy,
+				Message: "health check panicked",
+				Error:   fmt.Sprint(recovered),
+			}
+		}
+	}()
+	return checker(ctx)
+}
+
+func runDependencyChecker(ctx context.Context, checker observabilitycontract.DependencyChecker) (result observabilitycontract.DependencyHealth) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = observabilitycontract.DependencyHealth{
+				Status:  observabilitycontract.HealthStatusUnhealthy,
+				Message: "dependency health check panicked: " + fmt.Sprint(recovered),
+			}
+		}
+	}()
+	return checker(ctx)
+}
+
+func timeoutComponentResult(name string, now time.Time, err error) observabilitycontract.HealthCheckResult {
+	return observabilitycontract.HealthCheckResult{Name: name, Status: observabilitycontract.HealthStatusUnhealthy, Message: "health check timed out", Error: err.Error(), Timestamp: now}
+}
+
+func timeoutDependencyResult(name string, err error) observabilitycontract.DependencyHealth {
+	return observabilitycontract.DependencyHealth{Name: name, Status: observabilitycontract.HealthStatusUnhealthy, Message: "dependency health check timed out: " + err.Error()}
 }
 
 // AddChecker 注册组件健康检查器。
@@ -255,9 +314,9 @@ func (h *healthChecker) registerDefaultCheckers() {
 		// Go runtime 基本检查：内存和 goroutine 数量
 		// 如果 goroutine 数量超过阈值，标记为 degraded
 		return observabilitycontract.HealthCheckResult{
-			Status:   observabilitycontract.HealthStatusHealthy,
-			Message:  "Go runtime is healthy",
-			Latency:  time.Since(start),
+			Status:  observabilitycontract.HealthStatusHealthy,
+			Message: "Go runtime is healthy",
+			Latency: time.Since(start),
 		}
 	})
 }

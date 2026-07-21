@@ -9,6 +9,7 @@ package gin
 
 import (
 	"net/http"
+	"reflect"
 
 	"github.com/gin-gonic/gin"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -65,12 +66,17 @@ func adaptMiddleware(middleware transportcontract.Middleware) gin.HandlerFunc {
 			ctx.Next()
 			return
 		}
-		httpCtx := newContext(ctx)
+		// The contract middleware owns continuation of the remaining Gin chain.
+		// Keep that continuation on a private execution cursor so middleware such
+		// as Timeout can invoke next from a worker without racing Gin's outer cursor.
+		worker := cloneContextForContinuation(ctx)
+		ctx.Abort()
+		httpCtx := newContext(worker)
 		next := func(c transportcontract.Context) {
 			if c != nil && c.Request() != nil {
-				ctx.Request = c.Request()
+				worker.Request = c.Request()
 			}
-			ctx.Next()
+			worker.Next()
 		}
 		wrapped := middleware(next)
 		if wrapped == nil {
@@ -80,6 +86,14 @@ func adaptMiddleware(middleware transportcontract.Middleware) gin.HandlerFunc {
 		wrapped(httpCtx)
 		ctx.Request = httpCtx.Request()
 	}
+}
+
+// cloneContextForContinuation snapshots Gin's private middleware cursor. Gin's
+// public Copy intentionally removes the handler chain, so it cannot continue it.
+func cloneContextForContinuation(ctx *gin.Context) *gin.Context {
+	worker := reflect.New(reflect.TypeOf(ctx).Elem()).Interface().(*gin.Context)
+	reflect.ValueOf(worker).Elem().Set(reflect.ValueOf(ctx).Elem())
+	return worker
 }
 
 // adaptHandler adapts a transport handler into a Gin handler.

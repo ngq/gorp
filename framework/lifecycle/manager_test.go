@@ -190,6 +190,24 @@ func TestManager_Start_StopOnFailure(t *testing.T) {
 	}
 }
 
+func TestManager_Start_RollsBackServiceWhenOnStartedFails(t *testing.T) {
+	m := NewManager()
+	svc := &mockHostable{name: "svc"}
+	hooks := &mockLifecycle{onStartedErr: errors.New("post-start failed")}
+	m.Register("svc", svc, hooks, 100)
+
+	err := m.Start(context.Background())
+	if err == nil {
+		t.Fatal("expected OnStarted failure")
+	}
+	if svc.stopCalls != 1 {
+		t.Fatalf("expected started service to be rolled back once, got %d", svc.stopCalls)
+	}
+	if m.State() != StateIdle {
+		t.Fatalf("expected state Idle after rollback, got %v", m.State())
+	}
+}
+
 // TestManager_Lifecycle_Hooks verifies that lifecycle hooks are called in correct order during start and stop.
 //
 // TestManager_Lifecycle_Hooks 验证生命周期钩子在启动和停止时按正确顺序调用。

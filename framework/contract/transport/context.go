@@ -49,6 +49,7 @@ type RequestContext interface {
 	// Headers
 	GetHeader(key string) string
 	SetHeader(key, value string)
+	Cookie(name string) (string, error)
 }
 
 // BindingContext 提供请求绑定能力。
@@ -57,6 +58,9 @@ type BindingContext interface {
 	Bind(obj any) error
 	BindJSON(obj any) error
 	BindQuery(obj any) error
+	BindURI(obj any) error
+	BindHeader(obj any) error
+	BindForm(obj any) error
 }
 
 // ResponseContext 提供响应输出能力。
@@ -68,6 +72,24 @@ type ResponseContext interface {
 	Data(status int, contentType string, body []byte)
 	Redirect(status int, location string)
 	Status(code int)
+	File(path string)
+	FileAttachment(path, filename string)
+	SetCookie(cookie *http.Cookie)
+	DeleteCookie(name, path, domain string)
+	Stream(contentType string, write func(StreamWriter) error) error
+	SSE(event SSEEvent) error
+}
+
+// StreamWriter is the provider-neutral response stream surface.
+type StreamWriter interface {
+	Write(data []byte) (int, error)
+	Flush() error
+}
+
+// SSEEvent is one Server-Sent Event frame.
+type SSEEvent struct {
+	Event string
+	Data  any
 }
 
 // MiddlewareContext 提供中间件控制流能力。

@@ -15,17 +15,15 @@ import (
 // 缺失必填字段测试
 // ---------------------------------------------------------------------------
 
-// TestValidateCriticalConfigFailsWithoutAppAddress 验证缺失 app.address 时报错。
+// TestValidateCriticalConfigAllowsDefaultHTTPAddress 验证地址缺失时允许 provider 使用默认值。
 //
-// TestValidateCriticalConfigFailsWithoutAppAddress verifies error when app.address is missing.
-func TestValidateCriticalConfigFailsWithoutAppAddress(t *testing.T) {
+// TestValidateCriticalConfigAllowsDefaultHTTPAddress verifies address is optional.
+func TestValidateCriticalConfigAllowsDefaultHTTPAddress(t *testing.T) {
 	cfg := newMapConfigStub()
 	cfg.setSection("app", map[string]any{}) // address 为空
 	cfg.setSection("log", map[string]any{"level": "info", "format": "console"})
 
-	err := ValidateCriticalConfig(cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "config: app.address is required")
+	require.NoError(t, ValidateCriticalConfig(cfg))
 }
 
 // TestValidateCriticalConfigFailsWithoutLogLevel 验证缺失 log.level 时报错。
@@ -93,7 +91,6 @@ func TestValidateCriticalConfigFailsWithEmptyConfig(t *testing.T) {
 
 	err := ValidateCriticalConfig(cfg)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "config: app.address is required")
 	require.Contains(t, err.Error(), "config: log.level is required")
 	require.Contains(t, err.Error(), "config: log.format is required")
 }

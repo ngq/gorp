@@ -53,10 +53,10 @@ func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 // tokenBucketRateLimiter 是 RateLimiter 契约的令牌桶实现。
 // 基于 golang.org/x/time/rate.Limiter，支持 Allow、Wait、Reserve 全套接口。
 type tokenBucketRateLimiter struct {
-	limiter   *rate.Limiter
-	mu        sync.Mutex
-	limiters  sync.Map // resource -> *rate.Limiter
-	config    resiliencecontract.RateLimiterConfig
+	limiter  *rate.Limiter
+	mu       sync.Mutex
+	limiters sync.Map // resource -> *rate.Limiter
+	config   resiliencecontract.RateLimiterConfig
 }
 
 // newTokenBucketRateLimiter 根据配置创建令牌桶限流器。
@@ -69,6 +69,11 @@ func newTokenBucketRateLimiter(cfg resiliencecontract.RateLimiterConfig) *tokenB
 	defaultBurst := cfg.DefaultConfig.Burst
 	if defaultBurst <= 0 {
 		defaultBurst = 200
+	}
+	cfg.DefaultConfig.QPS = defaultQPS
+	cfg.DefaultConfig.Burst = defaultBurst
+	if cfg.ResourceConfigs == nil {
+		cfg.ResourceConfigs = make(map[string]resiliencecontract.RateResourceConfig)
 	}
 
 	return &tokenBucketRateLimiter{

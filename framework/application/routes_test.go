@@ -178,13 +178,33 @@ func (testRouter) Use(middleware ...transportcontract.Middleware) {}
 func (testRouter) Group(prefix string, middleware ...transportcontract.Middleware) transportcontract.Router {
 	return testRouter{}
 }
-func (testRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)         {}
-func (testRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {}
-func (testRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                    {}
-func (testRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                   {}
-func (testRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                    {}
-func (testRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware)                 {}
-func (testRouter) Mount(path string, handler http.Handler)                               {}
+func (testRouter) Handle(method, path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) HandleFunc(method, path string, handlerFunc transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) GET(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) POST(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) PUT(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) DELETE(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) PATCH(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) HEAD(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) OPTIONS(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) ANY(path string, handler transportcontract.Handler, middleware ...transportcontract.Middleware) {
+}
+func (testRouter) Static(relativePath, root string)                 {}
+func (testRouter) StaticFile(relativePath, filePath string)         {}
+func (testRouter) StaticFS(relativePath string, fs http.FileSystem) {}
+func (testRouter) NoRoute(handler transportcontract.Handler)        {}
+func (testRouter) NoMethod(handler transportcontract.Handler)       {}
+func (testRouter) Routes() []transportcontract.RouteInfo            { return nil }
+func (testRouter) Mount(path string, handler http.Handler)          {}
 
 type testContainer struct{}
 

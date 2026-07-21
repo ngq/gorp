@@ -8,6 +8,8 @@
 package application
 
 import (
+	"context"
+
 	"github.com/ngq/gorp/framework/bootstrap"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
@@ -15,7 +17,9 @@ import (
 )
 
 var (
-	bootHTTPService    = bootstrap.BootHTTPService
+	bootHTTPService = func(ctx context.Context, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+		return bootstrap.BootHTTPServiceContext(ctx, opts, migrate, setup)
+	}
 	newHTTPRuntimeFunc = bootstrap.NewHTTPServiceRuntime
 )
 
@@ -56,6 +60,7 @@ type HTTPServiceOptions struct {
 	DisableRedis        bool
 	DisableGorm         bool
 	DisableMetrics      bool
+	EnablePprof         bool
 	GovernanceMode      resiliencecontract.GovernanceMode
 	HTTPMode            resiliencecontract.HTTPMode // HTTP 模式维度：contract 或 gin
 	GovernanceDisable   []string

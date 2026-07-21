@@ -51,9 +51,9 @@ type binding struct {
 type providerState struct {
 	p      runtimecontract.ServiceProvider
 	loadMu sync.Mutex
-	loaded bool
+	loaded atomic.Bool
 	bootMu sync.Mutex
-	booted bool
+	booted atomic.Bool
 }
 
 type namedKey struct {
@@ -82,9 +82,12 @@ type Container struct {
 
 	// Destroy lifecycle.
 	// 销毁生命周期。
-	closerMu  sync.Mutex
-	closers   []closerEntry
-	destroyed atomic.Bool
+	closerMu          sync.Mutex
+	closers           []closerEntry
+	destroyed         atomic.Bool
+	lifecycleMu       sync.Mutex
+	lifecycleCond     *sync.Cond
+	activeResolutions int
 }
 
 // New creates a new runtime container and self-binds the container contract.
@@ -97,6 +100,7 @@ func New() *Container {
 		providersByName: map[string]*providerState{},
 		deferredByKey:   map[string]string{},
 	}
+	c.lifecycleCond = sync.NewCond(&c.lifecycleMu)
 	c.Bind(runtimecontract.ContainerKey, func(runtimecontract.Container) (any, error) {
 		return c, nil
 	}, true)
@@ -205,9 +209,10 @@ func (c *Container) RegisterProvider(p runtimecontract.ServiceProvider) error {
 // 如果容器已销毁，返回 ErrContainerDestroyed。
 // 如果检测到循环依赖，返回 CircularDependencyError。
 func (c *Container) Make(key string) (any, error) {
-	if c.destroyed.Load() {
+	if !c.beginResolution() {
 		return nil, runtimecontract.ErrContainerDestroyed
 	}
+	defer c.endResolution()
 
 	if err := c.ensureProviderForKey(key); err != nil {
 		return nil, err
@@ -220,7 +225,11 @@ func (c *Container) Make(key string) (any, error) {
 		return nil, fmt.Errorf("service not bound: %s", key)
 	}
 
-	return c.resolveBinding(b, key)
+	value, err := c.resolveBinding(b, key)
+	if err == nil && c.destroyed.Load() {
+		return nil, runtimecontract.ErrContainerDestroyed
+	}
+	return value, err
 }
 
 // MakeNamed resolves a named service by name and key.
@@ -231,9 +240,10 @@ func (c *Container) Make(key string) (any, error) {
 // 如果容器已销毁，返回 ErrContainerDestroyed。
 // 如果检测到循环依赖，返回 CircularDependencyError。
 func (c *Container) MakeNamed(name, key string) (any, error) {
-	if c.destroyed.Load() {
+	if !c.beginResolution() {
 		return nil, runtimecontract.ErrContainerDestroyed
 	}
+	defer c.endResolution()
 
 	c.mu.RLock()
 	b, ok := c.namedBindings[namedKey{name: name, key: key}]
@@ -242,7 +252,11 @@ func (c *Container) MakeNamed(name, key string) (any, error) {
 		return nil, fmt.Errorf("named service not bound: name=%s, key=%s", name, key)
 	}
 
-	return c.resolveBinding(b, fmt.Sprintf("%s/%s", name, key))
+	value, err := c.resolveBinding(b, fmt.Sprintf("%s/%s", name, key))
+	if err == nil && c.destroyed.Load() {
+		return nil, runtimecontract.ErrContainerDestroyed
+	}
+	return value, err
 }
 
 // MustMake resolves a service by key and panics on failure.
@@ -277,9 +291,19 @@ func (c *Container) MustMakeNamed(name, key string) any {
 // RegisterCloser 注册一个 io.Closer，在 Destroy 时调用。
 // Closer 按注册逆序调用。
 func (c *Container) RegisterCloser(key string, closer io.Closer) {
+	if closer == nil {
+		return
+	}
+	c.lifecycleMu.Lock()
+	if c.destroyed.Load() {
+		c.lifecycleMu.Unlock()
+		_ = closer.Close()
+		return
+	}
 	c.closerMu.Lock()
-	defer c.closerMu.Unlock()
 	c.closers = append(c.closers, closerEntry{key: key, closer: closer})
+	c.closerMu.Unlock()
+	c.lifecycleMu.Unlock()
 }
 
 // Destroy calls all registered closers in reverse order and marks the container as destroyed.
@@ -288,14 +312,20 @@ func (c *Container) RegisterCloser(key string, closer io.Closer) {
 // Destroy 按注册逆序调用所有 Closer，并将容器标记为已销毁。
 // 销毁后 Make/MakeNamed 返回 ErrContainerDestroyed。
 func (c *Container) Destroy() error {
+	c.lifecycleMu.Lock()
 	if !c.destroyed.CompareAndSwap(false, true) {
+		c.lifecycleMu.Unlock()
 		return runtimecontract.ErrContainerDestroyed
+	}
+	for c.activeResolutions > 0 {
+		c.lifecycleCond.Wait()
 	}
 
 	c.closerMu.Lock()
 	closers := c.closers
 	c.closers = nil
 	c.closerMu.Unlock()
+	c.lifecycleMu.Unlock()
 
 	var errs []error
 	// Close in reverse registration order.
@@ -308,6 +338,25 @@ func (c *Container) Destroy() error {
 	return errors.Join(errs...)
 }
 
+func (c *Container) beginResolution() bool {
+	c.lifecycleMu.Lock()
+	defer c.lifecycleMu.Unlock()
+	if c.destroyed.Load() {
+		return false
+	}
+	c.activeResolutions++
+	return true
+}
+
+func (c *Container) endResolution() {
+	c.lifecycleMu.Lock()
+	c.activeResolutions--
+	if c.activeResolutions == 0 {
+		c.lifecycleCond.Broadcast()
+	}
+	c.lifecycleMu.Unlock()
+}
+
 // RegisteredProviders returns information about all registered providers.
 //
 // RegisteredProviders 返回所有已注册 provider 的信息。
@@ -318,8 +367,8 @@ func (c *Container) RegisteredProviders() []runtimecontract.ProviderInfo {
 	for _, st := range c.providersByName {
 		infos = append(infos, runtimecontract.ProviderInfo{
 			Name:    st.p.Name(),
-			Loaded:  st.loaded,
-			Booted:  st.booted,
+			Loaded:  st.loaded.Load(),
+			Booted:  st.booted.Load(),
 			IsDefer: st.p.IsDefer(),
 		})
 	}
@@ -378,7 +427,7 @@ func (c *Container) DebugPrint() string {
 	sort.Strings(pNames)
 	for _, name := range pNames {
 		st := c.providersByName[name]
-		fmt.Fprintf(&buf, "  %s (loaded=%v,booted=%v,defer=%v)\n", name, st.loaded, st.booted, st.p.IsDefer())
+		fmt.Fprintf(&buf, "  %s (loaded=%v,booted=%v,defer=%v)\n", name, st.loaded.Load(), st.booted.Load(), st.p.IsDefer())
 	}
 
 	fmt.Fprintf(&buf, "Deferred Keys (%d):\n", len(c.deferredByKey))
@@ -407,16 +456,86 @@ func (c *Container) DebugPrint() string {
 	return buf.String()
 }
 
-// RegisterProviders registers multiple providers in order.
+// RegisterProviders registers providers in stable dependency order.
 //
 // RegisterProviders 按顺序注册多个 provider。
 func (c *Container) RegisterProviders(providers ...runtimecontract.ServiceProvider) error {
-	for _, p := range providers {
+	ordered, err := orderProviders(providers)
+	if err != nil {
+		return err
+	}
+	for _, p := range ordered {
+		if p == nil {
+			continue
+		}
 		if err := c.RegisterProvider(p); err != nil {
 			return fmt.Errorf("register provider %s: %w", p.Name(), err)
 		}
 	}
 	return nil
+}
+
+func orderProviders(providers []runtimecontract.ServiceProvider) ([]runtimecontract.ServiceProvider, error) {
+	providerByKey := make(map[string]int)
+	for index, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		for _, key := range provider.Provides() {
+			if _, exists := providerByKey[key]; !exists {
+				providerByKey[key] = index
+			}
+		}
+	}
+
+	edges := make([][]int, len(providers))
+	indegree := make([]int, len(providers))
+	seenEdge := make(map[[2]int]struct{})
+	for dependent, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		for _, dependencyKey := range provider.DependsOn() {
+			dependency, ok := providerByKey[dependencyKey]
+			if !ok || dependency == dependent {
+				continue
+			}
+			edge := [2]int{dependency, dependent}
+			if _, exists := seenEdge[edge]; exists {
+				continue
+			}
+			seenEdge[edge] = struct{}{}
+			edges[dependency] = append(edges[dependency], dependent)
+			indegree[dependent]++
+		}
+	}
+
+	ordered := make([]runtimecontract.ServiceProvider, 0, len(providers))
+	processed := make([]bool, len(providers))
+	for len(ordered) < len(providers) {
+		progress := false
+		for index, provider := range providers {
+			if processed[index] || indegree[index] != 0 {
+				continue
+			}
+			processed[index] = true
+			ordered = append(ordered, provider)
+			for _, dependent := range edges[index] {
+				indegree[dependent]--
+			}
+			progress = true
+		}
+		if !progress {
+			var cycle []string
+			for index, provider := range providers {
+				if !processed[index] && provider != nil {
+					cycle = append(cycle, provider.Name())
+				}
+			}
+			return nil, fmt.Errorf("provider dependency cycle: %s", strings.Join(cycle, " -> "))
+		}
+	}
+	return ordered, nil
 }
 
 // resolveBinding resolves a binding with circular dependency detection for singletons.
@@ -594,7 +713,7 @@ func (c *Container) loadProvider(name string) error {
 
 	st.loadMu.Lock()
 	defer st.loadMu.Unlock()
-	if st.loaded {
+	if st.loaded.Load() {
 		return nil
 	}
 
@@ -602,7 +721,7 @@ func (c *Container) loadProvider(name string) error {
 		return err
 	}
 
-	st.loaded = true
+	st.loaded.Store(true)
 	return nil
 }
 
@@ -616,7 +735,7 @@ func (c *Container) bootProvider(name string) error {
 
 	st.bootMu.Lock()
 	defer st.bootMu.Unlock()
-	if st.booted {
+	if st.booted.Load() {
 		return nil
 	}
 
@@ -624,7 +743,7 @@ func (c *Container) bootProvider(name string) error {
 		return err
 	}
 
-	st.booted = true
+	st.booted.Store(true)
 	return nil
 }
 
@@ -678,8 +797,8 @@ func (c *Container) ProviderDAG() runtimecontract.ProviderDAG {
 			Provides:  st.p.Provides(),
 			DependsOn: st.p.DependsOn(),
 			IsDefer:   st.p.IsDefer(),
-			Loaded:    st.loaded,
-			Booted:    st.booted,
+			Loaded:    st.loaded.Load(),
+			Booted:    st.booted.Load(),
 		}
 		nodeMap[name] = node
 		dag.Nodes = append(dag.Nodes, *node)

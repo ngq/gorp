@@ -36,6 +36,7 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -113,8 +114,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 			dialector = mysql.Open(dbc.DSN)
 		case "postgres", "postgresql", "pgsql":
 			dialector = postgres.Open(dbc.DSN)
+		case "sqlite", "sqlite3":
+			dialector = sqlite.Open(dbc.DSN)
 		default:
-			return nil, fmt.Errorf("unsupported db driver: %s (supported: mysql, postgres)", dbc.Driver)
+			return nil, fmt.Errorf("unsupported db driver: %s (supported: mysql, postgres, sqlite)", dbc.Driver)
 		}
 
 		db, err := gorm.Open(dialector, &gorm.Config{Logger: newGormLogger(logger)})

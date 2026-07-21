@@ -57,7 +57,7 @@ func RunContext(ctx context.Context, options ...Option) error {
 		return err
 	}
 	// serviceName 从配置读取，在 bootHTTPService 内部处理
-	if err := bootHTTPService(cfg.httpOpts, cfg.migrate, cfg.setup); err != nil {
+	if err := bootHTTPService(ctx, cfg.httpOpts, cfg.migrate, cfg.setup); err != nil {
 		return errors.Join(ErrHTTPServiceRunFailed, err)
 	}
 	return nil

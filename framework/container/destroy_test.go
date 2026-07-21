@@ -8,7 +8,9 @@ package container
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
@@ -37,6 +39,49 @@ func TestDestroy_ReverseOrder(t *testing.T) {
 	err := c.Destroy()
 	require.NoError(t, err)
 	require.Equal(t, []string{"third", "second", "first"}, order)
+}
+
+func TestDestroyWaitsForActiveResolutionAndClosesLateResource(t *testing.T) {
+	c := New()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	makeDone := make(chan error, 1)
+	destroyDone := make(chan error, 1)
+	var closed atomic.Bool
+
+	c.Bind("svc", func(container runtimecontract.Container) (any, error) {
+		close(started)
+		<-release
+		container.RegisterCloser("svc", &closeFunc{fn: func() error {
+			closed.Store(true)
+			return nil
+		}})
+		return "value", nil
+	}, true)
+
+	go func() {
+		_, err := c.Make("svc")
+		makeDone <- err
+	}()
+	<-started
+	go func() { destroyDone <- c.Destroy() }()
+
+	require.Eventually(t, c.destroyed.Load, time.Second, time.Millisecond)
+	close(release)
+	require.ErrorIs(t, <-makeDone, runtimecontract.ErrContainerDestroyed)
+	require.NoError(t, <-destroyDone)
+	require.True(t, closed.Load(), "resource registered during destroy must be closed")
+}
+
+func TestRegisterCloserAfterDestroyClosesImmediately(t *testing.T) {
+	c := New()
+	require.NoError(t, c.Destroy())
+	var closed atomic.Bool
+	c.RegisterCloser("late", &closeFunc{fn: func() error {
+		closed.Store(true)
+		return nil
+	}})
+	require.True(t, closed.Load())
 }
 
 // TestDestroy_ReturnsPartialErrors verifies that Destroy collects all close errors.

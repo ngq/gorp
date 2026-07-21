@@ -106,6 +106,12 @@ type ConfigSource interface {
 	Close() error
 }
 
+// ConfigSourceAttacher is implemented by config services that support attaching
+// a source selected after the initial local bootstrap phase.
+type ConfigSourceAttacher interface {
+	AttachConfigSource(source ConfigSource) error
+}
+
 // ConfigWatcher defines the change callback contract for watched config keys.
 //
 // ConfigWatcher 定义配置 key 监听后的变更回调契约。

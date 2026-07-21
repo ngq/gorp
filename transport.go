@@ -26,6 +26,9 @@ type Container = runtime.Container
 //
 // Router 是 transport 层 Router 契约的顶层别名。
 type Router = transport.Router
+type RouteInfo = transport.RouteInfo
+type StreamWriter = transport.StreamWriter
+type SSEEvent = transport.SSEEvent
 
 // Context is the top-level alias of the transport context contract.
 //

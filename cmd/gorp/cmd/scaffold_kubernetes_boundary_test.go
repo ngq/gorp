@@ -76,6 +76,22 @@ func TestPublicStartersRenderProjectScopedKubernetesNames(t *testing.T) {
 
 			require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(tt.template), projectDir, data))
 
+			if tt.template == starterTemplateGoLayout {
+				appConfig, err := os.ReadFile(filepath.Join(projectDir, "config", "app.yaml"))
+				require.NoError(t, err)
+				appConfigText := string(appConfig)
+				require.NotContains(t, appConfigText, "change-me-in-production")
+				require.Contains(t, appConfigText, "secret: \"\"")
+			} else {
+				for _, service := range []string{"user", "order", "product"} {
+					appConfig, err := os.ReadFile(filepath.Join(projectDir, "services", service, "config", "app.yaml"))
+					require.NoError(t, err)
+					appConfigText := string(appConfig)
+					require.NotContains(t, appConfigText, "change-me-in-production")
+					require.Contains(t, appConfigText, "secret: \"\"")
+				}
+			}
+
 			var configMapPath, secretPath, deploymentPath, namespacePath string
 			switch tt.template {
 			case starterTemplateGoLayout:
@@ -96,7 +112,12 @@ func TestPublicStartersRenderProjectScopedKubernetesNames(t *testing.T) {
 
 			secret, err := os.ReadFile(secretPath)
 			require.NoError(t, err)
-			require.Contains(t, string(secret), "demo-app-secret")
+			secretText := string(secret)
+			require.Contains(t, secretText, "demo-app-secret")
+			require.Contains(t, secretText, "JWT_SECRET")
+			require.Contains(t, secretText, "SERVICE_AUTH_TOKEN_SECRET")
+			require.NotContains(t, secretText, "SERVICE_AUTH_KEY")
+			require.NotContains(t, secretText, "change-me-in-production")
 
 			deployment, err := os.ReadFile(deploymentPath)
 			require.NoError(t, err)
@@ -150,6 +171,55 @@ func TestPublicStartersRenderProjectScopedKubernetesNames(t *testing.T) {
 				require.Contains(t, devText, "newName: demo-app-order-service")
 				require.Contains(t, devText, "name: your-registry/demo-app-product-service")
 				require.Contains(t, devText, "newName: demo-app-product-service")
+			}
+		})
+	}
+}
+
+func TestMicroGovernanceTemplatesUseEnvironmentBackedServiceAuthSecret(t *testing.T) {
+	require.NoError(t, frameworktesting.ChdirRepoRoot())
+
+	tests := []struct {
+		name     string
+		template string
+	}{
+		{name: "golayout", template: starterTemplateGoLayout},
+		{name: "multi-flat-wire", template: starterTemplateMultiFlatWire},
+		{name: "multi-independent", template: starterTemplateMultiIndependent},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			projectDir := filepath.Join(root, "verify")
+			data := buildScaffoldData(scaffoldInput{
+				Name:            "Demo_App",
+				Module:          "example.com/demo-app",
+				FrameworkModule: "github.com/ngq/gorp",
+				FrameworkPath:   ".",
+				Backend:         "gorm",
+				WithDB:          true,
+				WithSwagger:     true,
+				Governance:      "micro",
+			})
+
+			require.NoError(t, renderTemplateProject(projectTemplateFS, resolveOfflineTemplateRoot(tt.template), projectDir, data))
+
+			if tt.template == starterTemplateGoLayout {
+				appConfig, err := os.ReadFile(filepath.Join(projectDir, "config", "app.yaml"))
+				require.NoError(t, err)
+				appConfigText := string(appConfig)
+				require.NotContains(t, appConfigText, "change-me-in-production")
+				require.Contains(t, appConfigText, "env(SERVICE_AUTH_TOKEN_SECRET)")
+				return
+			}
+
+			for _, service := range []string{"user", "order", "product"} {
+				appConfig, err := os.ReadFile(filepath.Join(projectDir, "services", service, "config", "app.yaml"))
+				require.NoError(t, err)
+				appConfigText := string(appConfig)
+				require.NotContains(t, appConfigText, "change-me-in-production")
+				require.Contains(t, appConfigText, "env(SERVICE_AUTH_TOKEN_SECRET)")
 			}
 		})
 	}

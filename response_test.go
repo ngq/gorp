@@ -174,6 +174,7 @@ func (c *testResponseContext) GetHeader(key string) string {
 func (c *testResponseContext) SetHeader(key, value string) {
 	c.gin.Header(key, value)
 }
+func (c *testResponseContext) Cookie(name string) (string, error) { return c.gin.Cookie(name) }
 
 func (c *testResponseContext) Bind(obj any) error {
 	return c.gin.ShouldBind(obj)
@@ -186,6 +187,9 @@ func (c *testResponseContext) BindJSON(obj any) error {
 func (c *testResponseContext) BindQuery(obj any) error {
 	return c.gin.ShouldBindQuery(obj)
 }
+func (c *testResponseContext) BindURI(obj any) error    { return c.gin.ShouldBindUri(obj) }
+func (c *testResponseContext) BindHeader(obj any) error { return c.gin.ShouldBindHeader(obj) }
+func (c *testResponseContext) BindForm(obj any) error   { return c.gin.ShouldBind(obj) }
 
 func (c *testResponseContext) JSON(status int, body any) {
 	c.captured.status = status
@@ -216,6 +220,14 @@ func (c *testResponseContext) Redirect(status int, location string) {
 func (c *testResponseContext) Status(code int) {
 	c.captured.status = code
 }
+func (c *testResponseContext) File(path string) { c.gin.File(path) }
+func (c *testResponseContext) FileAttachment(path, filename string) {
+	c.gin.FileAttachment(path, filename)
+}
+func (c *testResponseContext) SetCookie(cookie *http.Cookie)                 {}
+func (c *testResponseContext) DeleteCookie(name, path, domain string)        {}
+func (c *testResponseContext) Stream(string, func(StreamWriter) error) error { return nil }
+func (c *testResponseContext) SSE(event SSEEvent) error                      { return nil }
 
 func (c *testResponseContext) RoutePath() string {
 	return c.gin.FullPath()

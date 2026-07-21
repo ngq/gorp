@@ -21,7 +21,7 @@ func TestRunReturnsStableRunFailureError(t *testing.T) {
 	origin := bootHTTPService
 	defer func() { bootHTTPService = origin }()
 	cause := fmt.Errorf("run failed")
-	bootHTTPService = func(opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+	bootHTTPService = func(_ context.Context, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
 		return cause
 	}
 
@@ -41,7 +41,7 @@ func TestStartReturnsStableRunFailureError(t *testing.T) {
 	origin := bootHTTPService
 	defer func() { bootHTTPService = origin }()
 	cause := fmt.Errorf("start failed")
-	bootHTTPService = func(opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+	bootHTTPService = func(_ context.Context, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
 		return cause
 	}
 
@@ -151,7 +151,7 @@ func TestRunContextNilContextUsesBackgroundAndBoots(t *testing.T) {
 	origin := bootHTTPService
 	defer func() { bootHTTPService = origin }()
 	called := false
-	bootHTTPService = func(opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+	bootHTTPService = func(_ context.Context, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
 		called = true
 		return nil
 	}
@@ -172,7 +172,7 @@ func TestRunContextCanceledSkipsBootHTTPService(t *testing.T) {
 	origin := bootHTTPService
 	defer func() { bootHTTPService = origin }()
 	called := false
-	bootHTTPService = func(opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+	bootHTTPService = func(_ context.Context, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
 		called = true
 		return nil
 	}
@@ -185,6 +185,27 @@ func TestRunContextCanceledSkipsBootHTTPService(t *testing.T) {
 	}
 	if called {
 		t.Fatalf("bootHTTPService should not be called when startup context is canceled")
+	}
+}
+
+func TestRunContextPropagatesRuntimeCancellation(t *testing.T) {
+	origin := bootHTTPService
+	defer func() { bootHTTPService = origin }()
+	started := make(chan struct{})
+	bootHTTPService = func(ctx context.Context, _ bootstrap.HTTPServiceOptions, _ func(*bootstrap.HTTPServiceRuntime) error, _ func(*bootstrap.HTTPServiceRuntime) error) error {
+		close(started)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- RunContext(ctx) }()
+	<-started
+	cancel()
+	err := <-done
+	if !errors.Is(err, context.Canceled) || !errors.Is(err, ErrHTTPServiceRunFailed) {
+		t.Fatalf("expected runtime cancellation to propagate, got %v", err)
 	}
 }
 
@@ -220,7 +241,7 @@ func TestRunWithoutHTTPSkipsBootHTTPService(t *testing.T) {
 	origin := bootHTTPService
 	defer func() { bootHTTPService = origin }()
 	called := false
-	bootHTTPService = func(opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
+	bootHTTPService = func(_ context.Context, opts bootstrap.HTTPServiceOptions, migrate func(*bootstrap.HTTPServiceRuntime) error, setup func(*bootstrap.HTTPServiceRuntime) error) error {
 		called = true
 		return nil
 	}

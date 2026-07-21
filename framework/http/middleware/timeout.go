@@ -10,8 +10,14 @@
 package middleware
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"errors"
+	"net"
 	"net/http"
+	"reflect"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +39,22 @@ func Timeout(timeout time.Duration) transportcontract.Middleware {
 
 			ctx, cancel := context.WithTimeout(c.Context(), timeout)
 			defer cancel()
+			if req := c.Request(); req != nil {
+				*req = *req.WithContext(ctx)
+			}
+
+			gc, ok := unwrapGinContext(c)
+			if !ok {
+				// A provider without response-writer isolation must execute
+				// synchronously to avoid concurrent writes.
+				if next != nil {
+					next(c)
+				}
+				return
+			}
+			base := gc.Writer
+			buffered := newTimeoutResponseWriter(base)
+			gc.Writer = buffered
 
 			done := make(chan struct{})
 			go func() {
@@ -44,25 +66,10 @@ func Timeout(timeout time.Duration) transportcontract.Middleware {
 
 			select {
 			case <-done:
+				buffered.commit(base)
 			case <-ctx.Done():
-				// Wait for the handler to finish to avoid race condition
-				// 等待 handler 完成以避免 race condition
-				<-done
-				if gc, ok := unwrapGinContext(c); ok {
-					writeGinResponseHeaders(gc)
-					resp := Response{
-						Code:    CodeServiceUnavailable,
-						Message: "request timeout",
-						Data:    nil,
-					}
-					gc.JSON(http.StatusGatewayTimeout, resp)
-					gc.Abort()
-					return
-				}
-				c.JSON(http.StatusGatewayTimeout, map[string]any{
-					"code":    CodeServiceUnavailable,
-					"message": "request timeout",
-				})
+				buffered.timeout()
+				writeTimeoutResponse(base)
 			}
 		}
 	}
@@ -73,29 +80,31 @@ func Timeout(timeout time.Duration) transportcontract.Middleware {
 // TimeoutMiddleware 是超时中间件的原生 Gin 形态。
 func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if timeout <= 0 {
+			c.Next()
+			return
+		}
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 		defer cancel()
 		c.Request = c.Request.WithContext(ctx)
 
+		base := c.Writer
+		buffered := newTimeoutResponseWriter(base)
+		worker := cloneGinContextForContinuation(c)
+		worker.Writer = buffered
+		c.Abort()
 		done := make(chan struct{})
 		go func() {
-			c.Next()
+			worker.Next()
 			close(done)
 		}()
 
 		select {
 		case <-done:
+			buffered.commit(base)
 		case <-ctx.Done():
-			// Wait for the handler to finish to avoid race condition
-			// 等待 handler 完成以避免 race condition
-			<-done
-			writeGinResponseHeaders(c)
-			resp := Response{
-				Code:    CodeServiceUnavailable,
-				Message: "request timeout",
-				Data:    nil,
-			}
-			c.JSON(http.StatusGatewayTimeout, resp)
+			buffered.timeout()
+			writeTimeoutResponse(base)
 			c.Abort()
 		}
 	}
@@ -106,36 +115,136 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 // TimeoutMiddlewareWithHandler 应用超时控制，并把超时后的输出交给自定义回调处理。
 func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Context)) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if timeout <= 0 {
+			c.Next()
+			return
+		}
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 		defer cancel()
 		c.Request = c.Request.WithContext(ctx)
 
+		base := c.Writer
+		buffered := newTimeoutResponseWriter(base)
+		worker := cloneGinContextForContinuation(c)
+		worker.Writer = buffered
+		c.Abort()
 		done := make(chan struct{})
 		go func() {
-			c.Next()
+			worker.Next()
 			close(done)
 		}()
 
 		select {
 		case <-done:
+			buffered.commit(base)
 		case <-ctx.Done():
-			// Wait for the handler to finish to avoid race condition
-			// 等待 handler 完成以避免 race condition
-			<-done
+			buffered.timeout()
 			if onTimeout != nil {
-				onTimeout(c)
+				timeoutContext := c.Copy()
+				timeoutContext.Writer = base
+				onTimeout(timeoutContext)
 			} else {
-				writeGinResponseHeaders(c)
-				resp := Response{
-					Code:    CodeServiceUnavailable,
-					Message: "request timeout",
-					Data:    nil,
-				}
-				c.JSON(http.StatusGatewayTimeout, resp)
+				writeTimeoutResponse(base)
 			}
 			c.Abort()
 		}
 	}
+}
+
+// cloneGinContextForContinuation preserves Gin's private middleware cursor;
+// gin.Context.Copy cannot be used because it intentionally drops handlers.
+func cloneGinContextForContinuation(ctx *gin.Context) *gin.Context {
+	worker := reflect.New(reflect.TypeOf(ctx).Elem()).Interface().(*gin.Context)
+	reflect.ValueOf(worker).Elem().Set(reflect.ValueOf(ctx).Elem())
+	return worker
+}
+
+type timeoutResponseWriter struct {
+	gin.ResponseWriter
+	mu       sync.Mutex
+	header   http.Header
+	body     bytes.Buffer
+	status   int
+	timedOut bool
+}
+
+func newTimeoutResponseWriter(base gin.ResponseWriter) *timeoutResponseWriter {
+	header := make(http.Header, len(base.Header()))
+	for key, values := range base.Header() {
+		header[key] = append([]string(nil), values...)
+	}
+	return &timeoutResponseWriter{ResponseWriter: base, header: header, status: http.StatusOK}
+}
+
+func (w *timeoutResponseWriter) Header() http.Header { return w.header }
+func (w *timeoutResponseWriter) WriteHeader(code int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.timedOut && w.body.Len() == 0 {
+		w.status = code
+	}
+}
+func (w *timeoutResponseWriter) WriteHeaderNow() {}
+func (w *timeoutResponseWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.timedOut {
+		return len(data), nil
+	}
+	return w.body.Write(data)
+}
+func (w *timeoutResponseWriter) WriteString(value string) (int, error) {
+	return w.Write([]byte(value))
+}
+func (w *timeoutResponseWriter) Status() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.status
+}
+func (w *timeoutResponseWriter) Size() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.body.Len()
+}
+func (w *timeoutResponseWriter) Written() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.body.Len() > 0 || w.status != http.StatusOK
+}
+func (w *timeoutResponseWriter) Flush()                   {}
+func (w *timeoutResponseWriter) Pusher() http.Pusher      { return nil }
+func (w *timeoutResponseWriter) CloseNotify() <-chan bool { return w.ResponseWriter.CloseNotify() }
+func (w *timeoutResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, errors.New("timeout middleware does not support hijacking")
+}
+func (w *timeoutResponseWriter) timeout() {
+	w.mu.Lock()
+	w.timedOut = true
+	w.status = http.StatusGatewayTimeout
+	w.body.Reset()
+	w.mu.Unlock()
+}
+func (w *timeoutResponseWriter) commit(dst gin.ResponseWriter) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.timedOut {
+		return
+	}
+	copyTimeoutHeaders(dst.Header(), w.header)
+	dst.WriteHeader(w.status)
+	_, _ = dst.Write(w.body.Bytes())
+}
+
+func copyTimeoutHeaders(dst, src http.Header) {
+	for key, values := range src {
+		dst[key] = append([]string(nil), values...)
+	}
+}
+
+func writeTimeoutResponse(writer http.ResponseWriter) {
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	writer.WriteHeader(http.StatusGatewayTimeout)
+	_, _ = writer.Write([]byte(`{"code":503,"message":"request timeout","data":null}`))
 }
 
 // RequestTimeout returns the remaining timeout budget of the current request.

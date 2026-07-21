@@ -30,6 +30,7 @@ func TestGRPCFullChain(t *testing.T) {
 		Mode:      "grpc",
 		Address:   getEnvOrDefault("GORP_TEST_GRPC_BACKEND_ADDR", "localhost:50051"),
 		TimeoutMS: 5000,
+		Insecure:  true, // The integration mock backend intentionally uses plaintext.
 	}
 
 	client := grpcprovider.NewClient(cfg, nil, nil, nil, nil, nil, nil, nil)
@@ -70,6 +71,7 @@ func TestGRPCMetadataPropagation(t *testing.T) {
 		Mode:      "grpc",
 		Address:   getEnvOrDefault("GORP_TEST_GRPC_BACKEND_ADDR", "localhost:50051"),
 		TimeoutMS: 5000,
+		Insecure:  true,
 	}
 
 	client := grpcprovider.NewClient(cfg, nil, nil, nil, nil, nil, nil, nil)
@@ -107,6 +109,7 @@ func TestGRPCTimeoutMiddleware(t *testing.T) {
 		Mode:      "grpc",
 		Address:   getEnvOrDefault("GORP_TEST_GRPC_BACKEND_ADDR", "localhost:50051"),
 		TimeoutMS: 50, // Very short timeout
+		Insecure:  true,
 	}
 
 	client := grpcprovider.NewClient(cfg, nil, nil, nil, nil, nil, nil, nil)

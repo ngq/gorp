@@ -181,8 +181,10 @@ require (
 
 require (
 	github.com/lxzan/gws v1.9.1
+	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/ngq/gorp/contrib/registry/etcd v0.1.3
 	github.com/ngq/gorp/contrib/registry/nacos v0.1.3
+	gorm.io/driver/sqlite v1.6.0
 )
 
 require (
@@ -208,8 +210,3 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 )
-
-// genproto 歧义导入修复：go.opencensus.io@v0.22.2（etcd 客户端依赖）
-// 拉取旧版 genproto 单模块 v0.0.0-20190425155659，与新版子模块冲突
-// 用空模块替代，消除 "ambiguous import" 编译错误
-replace google.golang.org/genproto => ./examples/nop-go/deploy/docker/genproto-dummy

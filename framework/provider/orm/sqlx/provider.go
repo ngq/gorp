@@ -38,6 +38,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // closerFunc 将 func() error 适配为 io.Closer 接口
@@ -165,6 +166,8 @@ func normalizeDriver(driver string) (string, error) {
 		return "mysql", nil
 	case "postgres", "postgresql", "pgsql":
 		return "pgx", nil
+	case "sqlite", "sqlite3":
+		return "sqlite3", nil
 	default:
 		return "", fmt.Errorf("unknown db driver: %s", driver)
 	}

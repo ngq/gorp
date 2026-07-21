@@ -44,7 +44,7 @@ type Provider struct{}
 func NewProvider() *Provider { return &Provider{} }
 
 // Name 返回 provider 唯一名称。
-func (p *Provider) Name() string { return "loadshedding.provider" }
+func (p *Provider) Name() string { return "loadshedding.semaphore" }
 
 // IsDefer 标记此 provider 延迟装载。
 func (p *Provider) IsDefer() bool { return true }

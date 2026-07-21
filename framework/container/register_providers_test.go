@@ -16,16 +16,41 @@ type orderedProvider struct {
 	name     string
 	calls    *[]string
 	failBoot error
+	depends  []string
 }
 
 func (p *orderedProvider) Name() string        { return p.name }
 func (p *orderedProvider) IsDefer() bool       { return false }
 func (p *orderedProvider) Provides() []string  { return []string{p.name} }
-func (p *orderedProvider) DependsOn() []string { return nil }
+func (p *orderedProvider) DependsOn() []string { return p.depends }
 func (p *orderedProvider) Register(c runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":register")
 	c.Bind(p.name, func(runtimecontract.Container) (any, error) { return p.name, nil }, true)
 	return nil
+}
+
+func TestRegisterProvidersOrdersDependenciesBeforeDependents(t *testing.T) {
+	c := New()
+	calls := []string{}
+	dependency := &orderedProvider{name: "dependency", calls: &calls}
+	dependent := &orderedProvider{name: "dependent", calls: &calls, depends: []string{"dependency"}}
+
+	require.NoError(t, c.RegisterProviders(dependent, dependency))
+	require.Equal(t, []string{
+		"dependency:register", "dependency:boot",
+		"dependent:register", "dependent:boot",
+	}, calls)
+}
+
+func TestRegisterProvidersRejectsDependencyCycle(t *testing.T) {
+	c := New()
+	calls := []string{}
+	a := &orderedProvider{name: "a", calls: &calls, depends: []string{"b"}}
+	b := &orderedProvider{name: "b", calls: &calls, depends: []string{"a"}}
+
+	err := c.RegisterProviders(a, b)
+	require.ErrorContains(t, err, "provider dependency cycle")
+	require.Empty(t, calls)
 }
 func (p *orderedProvider) Boot(runtimecontract.Container) error {
 	*p.calls = append(*p.calls, p.name+":boot")

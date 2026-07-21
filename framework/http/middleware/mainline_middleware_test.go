@@ -70,7 +70,9 @@ func applyTransportMiddleware(router *gin.Engine, middleware ...transportcontrac
 		})
 		handlers = append(handlers, func(handler transportcontract.Handler) gin.HandlerFunc {
 			return func(c *gin.Context) {
-				handler(newContext(c))
+				worker := cloneGinContextForContinuation(c)
+				c.Abort()
+				handler(newContext(worker))
 			}
 		}(handler))
 	}
@@ -92,7 +94,11 @@ func TestTimeoutUsesUnifiedResponse(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/slow", nil)
 	recorder := httptest.NewRecorder()
+	startedAt := time.Now()
 	router.ServeHTTP(recorder, req)
+	if elapsed := time.Since(startedAt); elapsed >= 40*time.Millisecond {
+		t.Fatalf("timeout response waited for handler: %v", elapsed)
+	}
 
 	if recorder.Code != http.StatusGatewayTimeout {
 		t.Fatalf("expected 504, got %d", recorder.Code)
@@ -104,6 +110,21 @@ func TestTimeoutUsesUnifiedResponse(t *testing.T) {
 	}
 	if resp.Message != "request timeout" {
 		t.Fatalf("unexpected message: %s", resp.Message)
+	}
+}
+
+func TestTimeoutReturnsWhenHandlerIgnoresContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewTestEngine()
+	applyTransportMiddleware(router, Timeout(10*time.Millisecond))
+	release := make(chan struct{})
+	router.GET("/blocked", func(c *gin.Context) { <-release })
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/blocked", nil))
+	close(release)
+	if recorder.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected 504, got %d", recorder.Code)
 	}
 }
 

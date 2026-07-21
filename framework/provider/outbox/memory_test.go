@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -489,6 +490,41 @@ func TestMemoryOutboxEmitAsync(t *testing.T) {
 	// 验证消息被发送
 	if sender.getSent() != 1 {
 		t.Fatalf("expected 1 message sent after async processing, got %d", sender.getSent())
+	}
+}
+
+type blockingSender struct {
+	started chan struct{}
+	release chan struct{}
+	calls   atomic.Int32
+}
+
+func (s *blockingSender) Send(context.Context, *integrationcontract.OutboxMessage) error {
+	if s.calls.Add(1) == 1 {
+		close(s.started)
+	}
+	<-s.release
+	return nil
+}
+
+func TestMemoryOutboxConcurrentProcessDoesNotDuplicateDelivery(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	sender := &blockingSender{started: started, release: release}
+	outbox := NewMemoryOutbox(sender, integrationcontract.OutboxConfig{RetryLimit: 3})
+	outbox.mu.Lock()
+	outbox.messages["one"] = &integrationcontract.OutboxMessage{ID: "one", Status: integrationcontract.OutboxStatusPending}
+	outbox.mu.Unlock()
+
+	done := make(chan struct{}, 2)
+	go func() { _ = outbox.Process(context.Background()); done <- struct{}{} }()
+	<-started
+	go func() { _ = outbox.Process(context.Background()); done <- struct{}{} }()
+	close(release)
+	<-done
+	<-done
+	if got := sender.calls.Load(); got != 1 {
+		t.Fatalf("expected one delivery, got %d", got)
 	}
 }
 
