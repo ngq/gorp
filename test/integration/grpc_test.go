@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -119,22 +120,21 @@ func TestGRPCTimeoutMiddleware(t *testing.T) {
 	resp := &pb.HelloResponse{}
 
 	err := client.Call(ctx, "test-service", "/gorp.test.TestService/SayHello", req, resp)
-	// Expect timeout error
-	// 期望超时错误
+	// Expect timeout error — previously this only logged, so a broken timeout
+	// middleware would still pass. Now the test must actually fail.
+	// 期望超时错误——此前仅打日志，timeout 中间件失效也检不出；现在必须断言。
 	if err == nil {
-		t.Log("WARNING: expected timeout error but call succeeded")
-	} else {
-		t.Logf("expected timeout error: %v", err)
+		t.Fatal("expected timeout error from timeout middleware, but call succeeded")
 	}
+	t.Logf("expected timeout error: %v", err)
 }
 
 // getEnvOrDefault gets environment variable or returns default value.
 //
 // getEnvOrDefault 获取环境变量或返回默认值。
 func getEnvOrDefault(key, defaultVal string) string {
-	// In real implementation, use os.Getenv
-	// 实际实现中使用 os.Getenv
-	// For test environment, return default
-	// 测试环境返回默认值
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return defaultVal
 }

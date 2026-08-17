@@ -32,14 +32,18 @@ type cleanupFunc func()
 // NewTestContainer builds a container configured for tests:
 // - APP_ENV=testing
 // - miniredis
+// Restores env vars and working directory on cleanup to avoid cross-test pollution.
 func NewTestContainer(t *testing.T) (runtimecontract.Container, cleanupFunc) {
 	require.NoError(t, ChdirRepoRoot())
 
-	// Set test env
+	// Set test env, restoring old values on cleanup so t.Parallel() tests
+	// don't observe polluted APP_ENV / REDIS_ADDR.
+	prevEnv := os.Getenv("APP_ENV")
 	_ = os.Setenv("APP_ENV", "testing")
 
 	// miniredis
 	mr := miniredis.RunT(t)
+	prevRedis := os.Getenv("REDIS_ADDR")
 	_ = os.Setenv("REDIS_ADDR", mr.Addr())
 
 	c := container.New()
@@ -75,5 +79,16 @@ func NewTestContainer(t *testing.T) (runtimecontract.Container, cleanupFunc) {
 
 	return c, func() {
 		mr.Close()
+		restoreEnv("APP_ENV", prevEnv)
+		restoreEnv("REDIS_ADDR", prevRedis)
 	}
+}
+
+// restoreEnv 恢复环境变量到调用前的值（之前为空则删除）。
+func restoreEnv(key, prev string) {
+	if prev == "" {
+		_ = os.Unsetenv(key)
+		return
+	}
+	_ = os.Setenv(key, prev)
 }

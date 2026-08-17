@@ -73,10 +73,15 @@ func UploadDir(client *ssh.Client, localDir, remoteDir string) error {
 		if err != nil {
 			return fmt.Errorf("create remote %s: %w", remotePath, err)
 		}
-		defer dst.Close()
 
+		// SFTP 文件带写缓冲：最后一次 flush 的错误只在 Close 时暴露。
+		// defer 丢弃该错误会让网络中断/磁盘满时远端文件不完整却"上传成功"。
 		if _, err := io.Copy(dst, src); err != nil {
+			_ = dst.Close()
 			return err
+		}
+		if err := dst.Close(); err != nil {
+			return fmt.Errorf("close remote %s: %w", remotePath, err)
 		}
 		return nil
 	})

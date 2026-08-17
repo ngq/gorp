@@ -92,15 +92,17 @@ func TestKafkaPublishSubscribe(t *testing.T) {
 	msgCh := make(chan string, len(testMessages))
 	errCh := make(chan error, 1)
 
+	var unsub integrationcontract.UnsubscribeFunc
 	go func() {
-		unsub, err := subscriber.Subscribe(ctx, topic, func(ctx context.Context, msg *integrationcontract.Message) error {
+		u, err := subscriber.Subscribe(ctx, topic, func(ctx context.Context, msg *integrationcontract.Message) error {
 			msgCh <- string(msg.Body)
 			return nil
 		})
 		if err != nil {
 			errCh <- err
+			return
 		}
-		defer unsub()
+		unsub = u
 	}()
 
 	// Collect messages with timeout
@@ -122,6 +124,11 @@ func TestKafkaPublishSubscribe(t *testing.T) {
 	}
 
 done:
+	// 取消订阅并清理；订阅句柄在收集期之后才释放，避免"订阅即取消"。
+	cancel()
+	if unsub != nil {
+		_ = unsub()
+	}
 	// 7. Verify received messages
 	// 验证接收的消息
 	if receivedCount == 0 {

@@ -8,8 +8,6 @@ package main
 import (
 	"context"
 
-	"google.golang.org/grpc/metadata"
-
 	pb "github.com/ngq/gorp/test/integration/pb"
 )
 
@@ -43,16 +41,32 @@ func (s *RecordingServer) VerifyTracingPropagation(expectedTraceID string) bool 
 }
 
 // VerifyMetadataPropagation verifies that metadata was propagated correctly.
+// Checks against the metadata recorded on actual calls (the previous version
+// verified an empty metadata.MD{}, which always returned false for any
+// non-empty expectedKeys and was useless).
 //
 // VerifyMetadataPropagation 验证 metadata 正确传播。
+// 基于实际调用记录中的 metadata 校验（旧版对空 metadata.MD{} 校验，
+// expectedKeys 非空时恒 false，完全失效）。
 func (s *RecordingServer) VerifyMetadataPropagation(expectedKeys []string) bool {
-	md := extractMetadataMap(metadata.MD{})
-	for _, key := range expectedKeys {
-		if _, ok := md[key]; !ok {
-			return false
+	calls := s.GetCalls()
+	if len(calls) == 0 {
+		return false
+	}
+	// 任意一次调用包含全部 expected key 即视为传播成功。
+	for _, call := range calls {
+		all := true
+		for _, key := range expectedKeys {
+			if _, ok := call.Metadata[key]; !ok {
+				all = false
+				break
+			}
+		}
+		if all {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 // ClearCalls clears all recorded calls.
