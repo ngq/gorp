@@ -18,6 +18,11 @@ import (
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
+// maxRetainedTerminalMessages 是终态（sent/failed）消息的保留上限。
+// 超过后按进入终态的顺序逐出最旧的消息，防止内存实现在长期运行中
+// 无界增长。需要完整历史时请使用持久化存储实现。
+const maxRetainedTerminalMessages = 1000
+
 // MemoryOutbox is the in-memory outbox pattern implementation.
 // Core logic: Store messages, process with retry, track status.
 //
@@ -26,6 +31,7 @@ import (
 type MemoryOutbox struct {
 	mu             sync.RWMutex
 	messages       map[string]*integrationcontract.OutboxMessage
+	terminalOrder  []string // 进入终态的消息 ID，按顺序，用于限量逐出
 	sender         integrationcontract.OutboxSender
 	config         integrationcontract.OutboxConfig
 	processMu      sync.Mutex
@@ -121,6 +127,7 @@ func (o *MemoryOutbox) Process(ctx context.Context) error {
 			o.mu.Lock()
 			if m, ok := o.messages[msg.ID]; ok {
 				m.Status = integrationcontract.OutboxStatusFailed
+				o.retainTerminalLocked(msg.ID)
 			}
 			o.mu.Unlock()
 			continue
@@ -133,6 +140,7 @@ func (o *MemoryOutbox) Process(ctx context.Context) error {
 				m.Error = err.Error()
 				if m.RetryCount >= o.config.RetryLimit {
 					m.Status = integrationcontract.OutboxStatusFailed
+					o.retainTerminalLocked(msg.ID)
 				} else {
 					m.Status = integrationcontract.OutboxStatusRetrying
 				}
@@ -146,11 +154,26 @@ func (o *MemoryOutbox) Process(ctx context.Context) error {
 		if m, ok := o.messages[msg.ID]; ok {
 			m.Status = integrationcontract.OutboxStatusSent
 			m.SentAt = &now
+			o.retainTerminalLocked(msg.ID)
 		}
 		o.mu.Unlock()
 	}
 
 	return nil
+}
+
+// retainTerminalLocked 记录进入终态的消息并逐出超限的最旧终态消息。
+// 调用方必须持有 o.mu。
+func (o *MemoryOutbox) retainTerminalLocked(id string) {
+	o.terminalOrder = append(o.terminalOrder, id)
+	if len(o.terminalOrder) <= maxRetainedTerminalMessages {
+		return
+	}
+	evictCount := len(o.terminalOrder) - maxRetainedTerminalMessages
+	for _, oldID := range o.terminalOrder[:evictCount] {
+		delete(o.messages, oldID)
+	}
+	o.terminalOrder = append(o.terminalOrder[:0], o.terminalOrder[evictCount:]...)
 }
 
 func (o *MemoryOutbox) scheduleProcess() {
@@ -175,8 +198,9 @@ func (o *MemoryOutbox) scheduleProcess() {
 // MemoryOutboxStore 是内存 Outbox 存储实现。
 // 核心逻辑：存储消息、提供待处理查询、标记状态。
 type MemoryOutboxStore struct {
-	mu       sync.RWMutex
-	messages map[string]*integrationcontract.OutboxMessage
+	mu            sync.RWMutex
+	messages      map[string]*integrationcontract.OutboxMessage
+	terminalOrder []string // 终态消息 ID，按顺序，用于限量逐出
 }
 
 func NewMemoryOutboxStore() *MemoryOutboxStore {
@@ -215,6 +239,7 @@ func (s *MemoryOutboxStore) MarkSent(ctx context.Context, id string) error {
 		now := time.Now()
 		msg.Status = integrationcontract.OutboxStatusSent
 		msg.SentAt = &now
+		s.retainTerminalLocked(id)
 	}
 	return nil
 }
@@ -224,7 +249,24 @@ func (s *MemoryOutboxStore) MarkFailed(ctx context.Context, id string, err error
 	defer s.mu.Unlock()
 	if msg, ok := s.messages[id]; ok {
 		msg.Status = integrationcontract.OutboxStatusFailed
-		msg.Error = err.Error()
+		if err != nil {
+			msg.Error = err.Error()
+		}
+		s.retainTerminalLocked(id)
 	}
 	return nil
+}
+
+// retainTerminalLocked 记录进入终态的消息并逐出超限的最旧终态消息。
+// 调用方必须持有 s.mu。
+func (s *MemoryOutboxStore) retainTerminalLocked(id string) {
+	s.terminalOrder = append(s.terminalOrder, id)
+	if len(s.terminalOrder) <= maxRetainedTerminalMessages {
+		return
+	}
+	evictCount := len(s.terminalOrder) - maxRetainedTerminalMessages
+	for _, oldID := range s.terminalOrder[:evictCount] {
+		delete(s.messages, oldID)
+	}
+	s.terminalOrder = append(s.terminalOrder[:0], s.terminalOrder[evictCount:]...)
 }

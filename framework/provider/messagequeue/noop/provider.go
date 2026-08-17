@@ -55,7 +55,7 @@ func (p *Provider) DependsOn() []string { return nil }
 // Register 将空消息队列组件绑定到容器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(integrationcontract.MessageQueueKey, func(c runtimecontract.Container) (any, error) {
-		return &noopQueue{}, nil
+		return NewNoopQueue(), nil
 	}, true)
 
 	c.Bind(integrationcontract.MessagePublisherKey, func(c runtimecontract.Container) (any, error) {
@@ -82,32 +82,36 @@ func (p *Provider) Boot(c runtimecontract.Container) error {
 var ErrNoopQueue = errors.New("messagequeue: noop mode, message queue not available in monolith")
 
 // noopQueue implements MessageQueue with no-op behavior.
-// publisher and subscriber are cached as singletons for consistent behavior.
+// publisher and subscriber are created eagerly by NewNoopQueue; the queue is a
+// container singleton, so lazy check-then-write init would race under
+// concurrent Publisher/Subscriber calls.
 //
 // noopQueue 使用空行为实现 MessageQueue 接口。
-// publisher 和 subscriber 缓存为单例以保持行为一致。
+// publisher 和 subscriber 由 NewNoopQueue 预先创建；该队列是容器 singleton，
+// 懒初始化的 check-then-write 在并发调用 Publisher/Subscriber 时存在 data race。
 type noopQueue struct {
 	publisher  integrationcontract.MessagePublisher
 	subscriber integrationcontract.MessageSubscriber
 }
 
-// Publisher returns a no-op publisher (cached singleton).
+// NewNoopQueue creates a fully initialized no-op queue.
 //
-// Publisher 返回空发布者（缓存单例）。
+// NewNoopQueue 创建完成初始化的空消息队列。
+func NewNoopQueue() *noopQueue {
+	return &noopQueue{publisher: &noopPublisher{}, subscriber: &noopSubscriber{}}
+}
+
+// Publisher returns a no-op publisher (initialized at construction).
+//
+// Publisher 返回空发布者（构造时初始化）。
 func (q *noopQueue) Publisher() integrationcontract.MessagePublisher {
-	if q.publisher == nil {
-		q.publisher = &noopPublisher{}
-	}
 	return q.publisher
 }
 
-// Subscriber returns a no-op subscriber (cached singleton).
+// Subscriber returns a no-op subscriber (initialized at construction).
 //
-// Subscriber 返回空订阅者（缓存单例）。
+// Subscriber 返回空订阅者（构造时初始化）。
 func (q *noopQueue) Subscriber() integrationcontract.MessageSubscriber {
-	if q.subscriber == nil {
-		q.subscriber = &noopSubscriber{}
-	}
 	return q.subscriber
 }
 

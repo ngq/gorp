@@ -9,6 +9,7 @@ import (
 	"context"
 	"runtime"
 
+	"github.com/ngq/gorp/framework/bootstrap"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -40,6 +41,15 @@ type Provider struct {
 // NewProvider 使用默认配置创建新的 WebSocket provider。
 func NewProvider() *Provider {
 	return NewProviderWithConfig(nil)
+}
+
+// init 将 gws 后端自注册到 bootstrap 的能力工厂表。选择 init 注册而非在
+// bootstrap 中直接 import：不使用 WebSocket 的应用不应被强制依赖 gws 模块
+// （未 import 本包时 capability selector 回退 noop 后端）。
+func init() {
+	bootstrap.RegisterWebSocketProviderFactory("gws", func() runtimecontract.ServiceProvider {
+		return NewProvider()
+	})
 }
 
 // NewProviderWithConfig creates a new WebSocket provider with custom config.

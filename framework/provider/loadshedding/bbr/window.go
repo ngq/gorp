@@ -45,7 +45,14 @@ type bucket struct {
 // - bucketCount：桶数量（如 100）
 //
 // 每个桶的时间窗口 = windowSize / bucketCount
+// 非正数入参回退默认值，否则 Record 中的除法会除零 panic。
 func newSlidingWindow(windowSize time.Duration, bucketCount int) *slidingWindow {
+	if windowSize <= 0 {
+		windowSize = 10 * time.Second
+	}
+	if bucketCount <= 0 {
+		bucketCount = 100
+	}
 	bucketSize := windowSize / time.Duration(bucketCount)
 
 	buckets := make([]*bucket, bucketCount)
@@ -64,8 +71,9 @@ func newSlidingWindow(windowSize time.Duration, bucketCount int) *slidingWindow 
 	}
 }
 
-// Record 记录一次请求的响应时间。
-func (w *slidingWindow) Record(resource string, rt time.Duration) {
+// Record 记录一次请求的响应时间。窗口按资源维度独立实例化（见
+// LoadShedder.windowFor），因此这里无需 resource 参数。
+func (w *slidingWindow) Record(rt time.Duration) {
 	w.mu.Lock()
 
 	// 检查是否需要前进到下一个桶
@@ -83,10 +91,10 @@ func (w *slidingWindow) Record(resource string, rt time.Duration) {
 		w.lastTime = now
 	}
 
+	// currentIdx 必须在锁内读取：它与上面并发 Record 的推进逻辑共享。
+	currentBucket := w.buckets[w.currentIdx]
 	w.mu.Unlock()
 
-	// 在当前桶中记录统计
-	currentBucket := w.buckets[w.currentIdx]
 	currentBucket.record(rt)
 }
 

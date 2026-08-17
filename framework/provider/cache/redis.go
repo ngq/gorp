@@ -69,20 +69,24 @@ func (c *redisCache) MGet(ctx context.Context, keys ...string) (map[string]strin
 	return c.r.MGet(ctx, keys...)
 }
 
-// MSet writes multiple key-value pairs using Redis MSET command.
+// MSet writes multiple key-value pairs.
 //
-// MSet 使用 Redis MSET 命令批量写入多个键值对。
+// When ttl > 0 each key is written with SET key value ttl: the TTL is part of
+// the same command, so a mid-batch failure or crash can never leave a written
+// key without an expiry (MSET followed by per-key EXPIRE had exactly that
+// window). When ttl <= 0 a single MSET is used.
+//
+// MSet 批量写入多个键值对。
+// ttl > 0 时逐 key 使用 SET key value ttl：TTL 与写入同命令，批次中途
+// 失败或进程崩溃都不会留下无过期时间的脏 key（MSET 后逐个 EXPIRE 的
+// 写法正是存在该窗口）。ttl <= 0 时使用单条 MSET。
 func (c *redisCache) MSet(ctx context.Context, kvs map[string]string, ttl time.Duration) error {
-	if err := c.r.MSet(ctx, kvs); err != nil {
-		return err
+	if ttl <= 0 {
+		return c.r.MSet(ctx, kvs)
 	}
-	// Set TTL for each key if specified.
-	// 为每个 key 设置 TTL（如果指定）。
-	if ttl > 0 {
-		for key := range kvs {
-			if err := c.r.Expire(ctx, key, ttl); err != nil {
-				return err
-			}
+	for key, value := range kvs {
+		if err := c.r.Set(ctx, key, value, ttl); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -130,19 +134,22 @@ func (c *redisBinaryCache) MGet(ctx context.Context, keys ...string) (map[string
 	return out, nil
 }
 
+// MSet writes multiple binary key-value pairs. See redisCache.MSet for why
+// per-key SET with TTL replaces MSET + EXPIRE when ttl > 0.
+//
+// MSet 批量写入多个二进制键值对。ttl > 0 时改用逐 key SET 的原因
+// 见 redisCache.MSet。
 func (c *redisBinaryCache) MSet(ctx context.Context, kvs map[string][]byte, ttl time.Duration) error {
-	strKvs := make(map[string]string, len(kvs))
-	for k, v := range kvs {
-		strKvs[k] = string(v)
+	if ttl <= 0 {
+		strKvs := make(map[string]string, len(kvs))
+		for k, v := range kvs {
+			strKvs[k] = string(v)
+		}
+		return c.r.MSet(ctx, strKvs)
 	}
-	if err := c.r.MSet(ctx, strKvs); err != nil {
-		return err
-	}
-	if ttl > 0 {
-		for key := range kvs {
-			if err := c.r.Expire(ctx, key, ttl); err != nil {
-				return err
-			}
+	for key, value := range kvs {
+		if err := c.r.Set(ctx, key, string(value), ttl); err != nil {
+			return err
 		}
 	}
 	return nil

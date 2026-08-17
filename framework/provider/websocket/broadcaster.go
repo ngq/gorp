@@ -90,6 +90,8 @@ func (b *broadcasterAdapter) BroadcastStringExcept(message string, excludeConn t
 	}
 	excludeSocket := adapter.socket
 	broadcaster := gws.NewBroadcaster(gws.OpcodeText, []byte(message))
+	// Close 归还 gws 内部缓冲池；Except 版本漏掉 Close 会让池完全失效。
+	defer broadcaster.Close()
 
 	total := len(b.server.conns) - 1
 	var errs []error
@@ -124,6 +126,8 @@ func (b *broadcasterAdapter) BroadcastBinaryExcept(data []byte, excludeConn tran
 	}
 	excludeSocket := adapter.socket
 	broadcaster := gws.NewBroadcaster(gws.OpcodeBinary, data)
+	// Close 归还 gws 内部缓冲池；Except 版本漏掉 Close 会让池完全失效。
+	defer broadcaster.Close()
 
 	total := len(b.server.conns) - 1
 	var errs []error

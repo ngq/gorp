@@ -184,10 +184,15 @@ func (s *ClusterServer) broadcastToRoomLocal(roomID string, msg ClusterMessage) 
 	members := value.(*sync.Map)
 	members.Range(func(key, value any) bool {
 		conn := key.(transportcontract.WebSocketConn)
+		var err error
 		if msg.IsBinary {
-			conn.WriteBinary(msg.Binary)
+			err = conn.WriteBinary(msg.Binary)
 		} else {
-			conn.WriteString(msg.Message)
+			err = conn.WriteString(msg.Message)
+		}
+		if err != nil {
+			// 写失败的连接大概率已断开：从 room 移除，避免反复向死连接写。
+			members.Delete(conn)
 		}
 		return true
 	})
@@ -260,7 +265,10 @@ func (s *ClusterServer) startHeartbeat() {
 //
 // Upgrade 将 HTTP 连接升级为 WebSocket 并在集群中跟踪。
 func (s *ClusterServer) Upgrade(w http.ResponseWriter, r *http.Request, handler transportcontract.WebSocketHandler) (transportcontract.WebSocketConn, error) {
-	conn, err := s.Server.Upgrade(w, r, handler)
+	// 包装用户 handler：连接关闭时把连接从所有 room 移除并递减集群计数，
+	// 否则 room 只进不出（内存泄漏 + 持续向死连接写消息），全局计数虚高。
+	wrapped := &clusterConnHandler{inner: handler, cluster: s}
+	conn, err := s.Server.Upgrade(w, r, wrapped)
 	if err != nil {
 		return nil, err
 	}
@@ -273,10 +281,65 @@ func (s *ClusterServer) Upgrade(w http.ResponseWriter, r *http.Request, handler 
 			countKeyPrefix = "gorp:ws:count"
 		}
 		key := fmt.Sprintf("%s:node:%s", countKeyPrefix, s.nodeID)
-		s.redis.Incr(context.Background(), key)
+		// Incr 后立即设置 TTL：节点在第一次心跳 SET 之前崩溃时，
+		// 该 key 不会永不过期变成幽灵节点。
+		ctx := context.Background()
+		s.redis.Incr(ctx, key)
+		s.redis.Expire(ctx, key, time.Duration(s.heartbeatInterval()*3)*time.Second)
 	}
 
 	return conn, nil
+}
+
+// clusterConnHandler 包装用户 handler，在连接关闭时执行集群侧清理。
+type clusterConnHandler struct {
+	inner   transportcontract.WebSocketHandler
+	cluster *ClusterServer
+}
+
+func (h *clusterConnHandler) OnOpen(conn transportcontract.WebSocketConn) {
+	h.inner.OnOpen(conn)
+}
+
+func (h *clusterConnHandler) OnClose(conn transportcontract.WebSocketConn, err error) {
+	h.cluster.removeConnFromRooms(conn)
+	h.cluster.decrementGlobalCount()
+	h.inner.OnClose(conn, err)
+}
+
+func (h *clusterConnHandler) OnMessage(conn transportcontract.WebSocketConn, messageType int, data []byte) {
+	h.inner.OnMessage(conn, messageType, data)
+}
+
+// removeConnFromRooms 把连接从所有 room 移除。
+func (s *ClusterServer) removeConnFromRooms(conn transportcontract.WebSocketConn) {
+	s.rooms.Range(func(roomID, value any) bool {
+		if members, ok := value.(*sync.Map); ok {
+			members.Delete(conn)
+		}
+		return true
+	})
+}
+
+// decrementGlobalCount 递减本节点的全局连接计数（仅启用时）。
+func (s *ClusterServer) decrementGlobalCount() {
+	if !s.config.Enabled || !s.config.EnableGlobalCount || s.redis == nil {
+		return
+	}
+	countKeyPrefix := s.config.CountKeyPrefix
+	if countKeyPrefix == "" {
+		countKeyPrefix = "gorp:ws:count"
+	}
+	key := fmt.Sprintf("%s:node:%s", countKeyPrefix, s.nodeID)
+	s.redis.Decr(context.Background(), key)
+}
+
+// heartbeatInterval 返回有效的心跳间隔秒数。
+func (s *ClusterServer) heartbeatInterval() int {
+	if s.config.HeartbeatInterval > 0 {
+		return s.config.HeartbeatInterval
+	}
+	return 30
 }
 
 // JoinRoom adds a connection to a room.

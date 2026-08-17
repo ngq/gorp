@@ -23,11 +23,11 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestNewLoadShedder(t *testing.T) {
 	t.Run("default config", func(t *testing.T) {
-		ls := NewLoadShedder(nil)
-		require.NotNil(t, ls)
-		require.NotNil(t, ls.cfg)
-		require.NotNil(t, ls.cpuMonitor)
-		require.NotNil(t, ls.window)
+			ls := NewLoadShedder(nil)
+			require.NotNil(t, ls)
+			require.NotNil(t, ls.cfg)
+			require.NotNil(t, ls.cpuMonitor)
+			require.NotNil(t, ls.windowFor("test"))
 	})
 
 	t.Run("custom config", func(t *testing.T) {
@@ -113,17 +113,17 @@ func TestSlidingWindow(t *testing.T) {
 
 	t.Run("record and max pass", func(t *testing.T) {
 		// 记录一些请求
-		w.Record("test", 10*time.Millisecond)
-		w.Record("test", 20*time.Millisecond)
-		w.Record("test", 15*time.Millisecond)
+		w.Record(10 * time.Millisecond)
+		w.Record(20 * time.Millisecond)
+		w.Record(15 * time.Millisecond)
 
 		maxPass := w.MaxPass()
 		require.Greater(t, maxPass, int64(0))
 	})
 
 	t.Run("min rt", func(t *testing.T) {
-		w.Record("test", 5*time.Millisecond)
-		w.Record("test", 50*time.Millisecond)
+		w.Record(5 * time.Millisecond)
+		w.Record(50 * time.Millisecond)
 
 		minRT := w.MinRT()
 		require.Greater(t, minRT, time.Duration(0))
@@ -170,12 +170,12 @@ func TestCalculateMaxInFlight(t *testing.T) {
 	ctx := context.Background()
 	for i := 0; i < 10; i++ {
 		ls.Allow(ctx, "test")
-		ls.window.Record("test", 10*time.Millisecond)
+		ls.windowFor("test").Record(10 * time.Millisecond)
 		ls.Done(ctx, "test", nil)
 	}
 
 	// 计算 maxInFlight
-	maxInFlight := ls.calculateMaxInFlight()
+	maxInFlight := ls.calculateMaxInFlight("test")
 	require.Greater(t, maxInFlight, int64(0))
 }
 

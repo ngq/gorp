@@ -118,5 +118,12 @@ func getRetryConfig(c runtimecontract.Container) (*resiliencecontract.RetryConfi
 		retryCfg.DefaultPolicy.Multiplier = cfg.GetFloat("retry.default_policy.multiplier")
 	}
 
+	// retry.enabled=false 时把策略退化为单次执行，让配置开关真正生效。
+	// 不在 RetryService 内判断：直接构造 RetryConfig 的调用方未显式设置
+	// Enabled（零值 false），会被误判为关闭。
+	if !retryCfg.Enabled {
+		retryCfg.DefaultPolicy.MaxAttempts = 1
+	}
+
 	return retryCfg, nil
 }

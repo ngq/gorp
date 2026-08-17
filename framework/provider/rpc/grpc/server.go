@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -43,7 +44,6 @@ type Server struct {
 	c        runtimecontract.Container
 	server   *grpc.Server
 	addr     string
-	services sync.Map
 	mu       sync.Mutex
 	running  bool
 	listener net.Listener
@@ -58,14 +58,18 @@ func NewServer(cfg *transportcontract.RPCConfig, c runtimecontract.Container) *S
 	return &Server{cfg: cfg, c: c}
 }
 
-// Register stores a service handler for later registration.
-// Implements transportcontract.RPCServer.Register.
+// Register is not supported by the gRPC backend and returns an explicit
+// error. gRPC services must be registered through RegisterProto with a
+// protobuf-generated registration function; a generic any handler cannot be
+// mounted onto a grpc.Server. Returning nil here used to silently discard
+// the handler while the caller believed registration succeeded.
 //
-// Register 存储服务 handler 供后续注册。
-// 实现 transportcontract.RPCServer.Register。
+// Register 不被 gRPC 后端支持，返回显式错误。
+// gRPC 服务必须通过 RegisterProto 使用 protobuf 生成的注册函数注册；
+// 泛型 any handler 无法挂载到 grpc.Server。此前返回 nil 会静默丢弃
+// handler，调用方却以为注册成功。
 func (s *Server) Register(service string, handler any) error {
-	s.services.Store(service, handler)
-	return nil
+	return fmt.Errorf("rpc: gRPC backend does not support Register(%q); use RegisterProto with a protobuf-generated registration function instead", service)
 }
 
 // RegisterProto registers a gRPC service using a registration function.
@@ -116,10 +120,21 @@ func (s *Server) Start(ctx context.Context) error {
 	s.running = true
 	s.serveErr = make(chan error, 1)
 	server := s.server
+	logger := s.resolveLogger()
 	go func() {
 		err := server.Serve(lis)
 		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			s.serveErr <- err
+			// Serve 意外退出时必须有可观测信号：记录日志并向 ServeError
+			// 的订阅者投递，否则进程看似健康而 gRPC 服务已死。
+			if logger != nil {
+				logger.Error("grpc server Serve exited", observabilitycontract.Field{Key: "error", Value: err.Error()})
+			} else {
+				log.Printf("[gorp] grpc server Serve exited: %v", err)
+			}
+			select {
+			case s.serveErr <- err:
+			default:
+			}
 		}
 		close(s.serveErr)
 		s.mu.Lock()
@@ -128,6 +143,27 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+// ServeError 返回一个 channel：Serve 意外退出（非主动 Stop）时会向其
+// 投递一个错误后关闭。供 lifecycle/守护逻辑探测"gRPC 服务静默死亡"。
+func (s *Server) ServeError() <-chan error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.serveErr
+}
+
+// resolveLogger 尽力从容器解析 logger；容器不可用或未绑定时返回 nil。
+func (s *Server) resolveLogger() observabilitycontract.Logger {
+	if s.c == nil {
+		return nil
+	}
+	v, err := s.c.Make(observabilitycontract.LogKey)
+	if err != nil {
+		return nil
+	}
+	l, _ := v.(observabilitycontract.Logger)
+	return l
 }
 
 // Stop gracefully stops the gRPC server.
@@ -159,6 +195,11 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 
 	s.running = false
+	// 置空已停止的 server 实例：已 GracefulStop/Stop 的 grpc.Server 不能
+	// 再次 Serve（立即返回 ErrServerStopped），复用它会让下一次 Start
+	// "假成功"，新 listener 泄漏且无人服务。
+	s.server = nil
+	s.initErr = nil
 	return nil
 }
 

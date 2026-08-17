@@ -26,12 +26,17 @@
 package runtime
 
 import (
-	"os"
+	"errors"
+	"fmt"
 
 	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
+
+// ErrMigratorUnsupported 表示当前后端（ent）不提供迁移器。
+// 用哨兵错误而非 os.ErrInvalid，让调用方可用 errors.Is 精确区分根因。
+var ErrMigratorUnsupported = errors.New(`orm.runtime: migrator is not supported for backend "ent"`)
 
 // Provider registers ORM backend abstraction and unified runtime services.
 //
@@ -78,22 +83,24 @@ func (p *Provider) DependsOn() []string { return []string{datacontract.ConfigKey
 // Register 根据后端配置将多个工厂绑定到容器。
 // 核心逻辑：从配置确定后端，然后绑定相应的实现。
 func (p *Provider) Register(c runtimecontract.Container) error {
-	// Bind ORMBackendKey: resolve backend name from config, default to "gorm".
+	// Bind ORMBackendKey: resolve backend name from config.
+	// 配置异常时 fail-fast：静默回退 gorm 会让用户配置的 sqlx/ent 后端
+	// 悄悄失效，错误在很远的地方以类型断言失败的形式爆发。
 	//
-	// 绑定 ORMBackendKey：从配置解析后端名称，默认为 "gorm"。
+	// 绑定 ORMBackendKey：从配置解析后端名称。
 	c.Bind(datacontract.ORMBackendKey, func(c runtimecontract.Container) (any, error) {
 		cfgAny, err := c.Make(datacontract.ConfigKey)
 		if err != nil {
-			return string(datacontract.RuntimeBackendGorm), nil
+			return nil, fmt.Errorf("orm: resolve backend: make config: %w", err)
 		}
 		cfg, ok := cfgAny.(datacontract.Config)
 		if !ok {
-			return string(datacontract.RuntimeBackendGorm), nil
+			return nil, fmt.Errorf("orm: resolve backend: config service has invalid type %T", cfgAny)
 		}
 
 		var dbc datacontract.DBConfig
 		if err := cfg.Unmarshal("database", &dbc); err != nil {
-			return string(datacontract.RuntimeBackendGorm), nil
+			return nil, fmt.Errorf("orm: resolve backend: unmarshal database config: %w", err)
 		}
 		return string(datacontract.NormalizeBackendName(dbc.Backend)), nil
 	}, true)
@@ -124,7 +131,7 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(datacontract.MigratorKey, func(c runtimecontract.Container) (any, error) {
 		backend, err := container.MakeWith[string](c, datacontract.ORMBackendKey)
 		if err == nil && datacontract.NormalizeBackendName(backend) == datacontract.RuntimeBackendEnt {
-			return nil, os.ErrInvalid
+			return nil, ErrMigratorUnsupported
 		}
 		return c.Make(datacontract.GormKey)
 	}, true)

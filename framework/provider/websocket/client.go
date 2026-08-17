@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/lxzan/gws"
@@ -28,7 +29,9 @@ type Client struct {
 // connWrapper 包装 gws.Conn 以实现 WebSocketConn。
 type connWrapper struct {
 	socket *gws.Conn
-	ctx    context.Context
+	// ctx 用 atomic 指针存取：SetContext 可能在用户 goroutine 调用，
+	// Context 在读循环回调 goroutine 调用，裸字段读写构成 data race。
+	ctx atomic.Value // context.Context
 }
 
 // NewClient creates a new WebSocket client connection.
@@ -156,8 +159,8 @@ func (c *connWrapper) Close(code int, reason string) error {
 //
 // Context 返回连接上下文。
 func (c *connWrapper) Context() context.Context {
-	if c.ctx != nil {
-		return c.ctx
+	if ctx, ok := c.ctx.Load().(context.Context); ok && ctx != nil {
+		return ctx
 	}
 	return context.Background()
 }
@@ -166,7 +169,7 @@ func (c *connWrapper) Context() context.Context {
 //
 // SetContext 设置连接上下文。
 func (c *connWrapper) SetContext(ctx context.Context) {
-	c.ctx = ctx
+	c.ctx.Store(ctx)
 }
 
 // RemoteAddr returns the remote address.

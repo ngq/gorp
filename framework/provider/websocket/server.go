@@ -122,7 +122,10 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request, handler transpo
 	}
 
 	s.mu.Lock()
-	s.conns[socket] = r.Context()
+	// 存独立 context：r.Context() 在 HTTP handler 返回后即被取消，
+	// 业务基于连接 ctx 派生的 goroutine/超时会立即失效。业务可通过
+	// SetContext 注入带值的 context（如 user_id）。
+	s.conns[socket] = context.Background()
 	s.lastActivity[socket] = time.Now()
 	s.mu.Unlock()
 
@@ -234,7 +237,13 @@ func (s *Server) updateActivity(socket *gws.Conn) {
 // healthCheck 定期检查过期连接并关闭它们。
 // 当配置了 ReadTimeout 时以 goroutine 方式运行。
 func (s *Server) healthCheck() {
-	ticker := time.NewTicker(s.config.ReadTimeout / 2)
+	// ticker 周期设下限：ReadTimeout 极小值（如 1ns）会让 NewTicker(0)
+	// panic 或高频空转。
+	interval := s.config.ReadTimeout / 2
+	if interval < 100*time.Millisecond {
+		interval = 100 * time.Millisecond
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

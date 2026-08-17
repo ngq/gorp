@@ -62,6 +62,11 @@ type DBMetricsCollector struct {
 	ticker    *time.Ticker
 	startOnce sync.Once
 	stopOnce  sync.Once
+	// 上次采集的累计值。sql.DBStats 的 Wait* 是进程级单调累计，
+	// Counter 只能加增量，整体 Add 会指数式虚增。
+	// 仅在 collect 的单一 goroutine 中访问，无需加锁。
+	lastWaitCount    int64
+	lastWaitDuration time.Duration
 }
 
 // NewDBMetricsCollector 创建数据库指标收集器。
@@ -109,8 +114,22 @@ func (c *DBMetricsCollector) collect() {
 	dbConnectionsOpen.WithLabelValues(c.driver).Set(float64(stats.OpenConnections))
 	dbConnectionsInUse.WithLabelValues(c.driver).Set(float64(stats.InUse))
 	dbConnectionsIdle.WithLabelValues(c.driver).Set(float64(stats.Idle))
-	dbConnectionsWaitTotal.WithLabelValues(c.driver).Add(float64(stats.WaitCount))
-	dbConnectionsWaitDuration.WithLabelValues(c.driver).Add(stats.WaitDuration.Seconds())
+
+	// Wait* 是累计值：只把自上次采集以来的增量计入 Counter。
+	waitCountDelta := stats.WaitCount - c.lastWaitCount
+	if waitCountDelta < 0 {
+		// 计数回退（理论上不发生），按全量处理避免漏计。
+		waitCountDelta = stats.WaitCount
+	}
+	waitDurationDelta := stats.WaitDuration - c.lastWaitDuration
+	if waitDurationDelta < 0 {
+		waitDurationDelta = stats.WaitDuration
+	}
+	c.lastWaitCount = stats.WaitCount
+	c.lastWaitDuration = stats.WaitDuration
+
+	dbConnectionsWaitTotal.WithLabelValues(c.driver).Add(float64(waitCountDelta))
+	dbConnectionsWaitDuration.WithLabelValues(c.driver).Add(waitDurationDelta.Seconds())
 }
 
 // GormQueryCallback 为 GORM 添加查询耗时回调。

@@ -37,7 +37,10 @@ type RetryService struct {
 // 核心逻辑：初始化随机源用于抖动。
 func NewRetryService(cfg *resiliencecontract.RetryConfig) *RetryService {
 	if cfg == nil {
-		cfg = &resiliencecontract.RetryConfig{}
+		cfg = &resiliencecontract.RetryConfig{
+			Enabled:       true,
+			DefaultPolicy: resiliencecontract.DefaultRetryPolicy(),
+		}
 	}
 	return &RetryService{cfg: cfg}
 }
@@ -55,6 +58,11 @@ func (r *RetryService) Do(ctx context.Context, fn func() error) error {
 }
 
 func (r *RetryService) doWithPolicy(ctx context.Context, policy resiliencecontract.RetryPolicy, fn func() error) error {
+	if policy.MaxAttempts < 1 {
+		// A non-positive attempt count must still execute the operation once
+		// instead of silently skipping it and reporting success.
+		policy.MaxAttempts = 1
+	}
 	var lastErr error
 	for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
 		err := fn()
@@ -140,6 +148,9 @@ func isRetryableWithPolicy(err error, policy resiliencecontract.RetryPolicy) boo
 				return true
 			}
 		}
+		// A classified business error that misses the policy is deterministic:
+		// do not fall through to the string-heuristic network checks below.
+		return false
 	}
 
 	grpcStatus, ok := status.FromError(err)
@@ -156,11 +167,14 @@ func isRetryableWithPolicy(err error, policy resiliencecontract.RetryPolicy) boo
 		return false
 	}
 
-	if isNetworkError(err) {
-		return true
-	}
+	// Context errors are never retryable, and must be checked before
+	// isNetworkError: context.DeadlineExceeded implements net.Error and would
+	// otherwise be misclassified as a retryable timeout.
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return false
+	}
+	if isNetworkError(err) {
+		return true
 	}
 	return false
 }
@@ -184,18 +198,18 @@ func isNetworkError(err error) bool {
 		}
 	}
 
-	errMsg := err.Error()
+	errMsg := strings.ToLower(err.Error())
 	retryableMessages := []string{
 		"connection refused",
 		"connection reset",
 		"broken pipe",
 		"timeout",
-		"EOF",
+		"eof",
 		"temporary failure",
 	}
 
 	for _, msg := range retryableMessages {
-		if strings.Contains(strings.ToLower(errMsg), msg) {
+		if strings.Contains(errMsg, msg) {
 			return true
 		}
 	}

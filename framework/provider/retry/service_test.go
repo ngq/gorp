@@ -249,6 +249,21 @@ func TestRetryService_IsRetryable(t *testing.T) {
 			err:       errors.New("some error"),
 			retryable: false,
 		},
+		{
+			name:      "connection refused",
+			err:       errors.New("dial tcp: connection refused"),
+			retryable: true,
+		},
+		{
+			name:      "io EOF",
+			err:       errors.New("read: unexpected EOF"),
+			retryable: true,
+		},
+		{
+			name:      "connection reset",
+			err:       errors.New("read tcp: connection reset by peer"),
+			retryable: true,
+		},
 	}
 
 	for _, tt := range tests {

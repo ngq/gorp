@@ -44,7 +44,7 @@ var ErrLoadShedded = resiliencecontract.ServiceUnavailable("server is busy: bbr 
 type LoadShedder struct {
 	cfg        *Config
 	cpuMonitor *cpuMonitor
-	window     *slidingWindow
+	windows    sync.Map // resource -> *slidingWindow，按资源隔离统计
 	stats      sync.Map // resource -> *resourceStats
 }
 
@@ -53,9 +53,6 @@ type resourceStats struct {
 	mu          sync.Mutex
 	inFlight    int64     // 当前正在处理的请求数
 	droppedTime time.Time // 最近一次拒绝的时间（用于冷却判断）
-	passCount   int64     // 通过请求数累计
-	rtSum       int64     // 响应时间累计（纳秒）
-	rtCount     int64     // 响应时间采样次数
 }
 
 // Config 是 BBR 策略的配置参数。
@@ -88,8 +85,14 @@ func NewLoadShedder(cfg *Config) *LoadShedder {
 	return &LoadShedder{
 		cfg:        cfg,
 		cpuMonitor: newCPUMonitor(cfg.CPUThreshold),
-		window:     newSlidingWindow(cfg.WindowSize, cfg.BucketCount),
 	}
+}
+
+// Close 停止后台 CPU 采样 goroutine。使用完（容器销毁）时必须调用，
+// 否则采样 goroutine 泄漏。
+func (b *LoadShedder) Close() error {
+	b.cpuMonitor.Stop()
+	return nil
 }
 
 // Allow 判断是否允许请求通过。
@@ -120,7 +123,7 @@ func (b *LoadShedder) Allow(ctx context.Context, resource string) error {
 	}
 
 	// 计算最大允许的 inflight
-	maxInFlight := b.calculateMaxInFlight()
+	maxInFlight := b.calculateMaxInFlight(resource)
 
 	// 判断是否超过上限
 	if stats.inFlight < maxInFlight {
@@ -150,23 +153,19 @@ func (b *LoadShedder) Done(ctx context.Context, resource string, err error) {
 
 	stats.mu.Lock()
 	stats.inFlight--
-	if rt > 0 {
-		stats.rtSum += int64(rt)
-		stats.rtCount++
-	}
-	stats.passCount++
 	stats.mu.Unlock()
 
-	// 更新滑动窗口统计
-	b.window.Record(resource, rt)
+	// 更新该资源独立的滑动窗口统计
+	b.windowFor(resource).Record(rt)
 }
 
 // calculateMaxInFlight 计算当前最大允许的 inflight 数。
 //
 // 公式：maxInFlight = maxPASS * minRT * bucketPerSecond / 1000
-func (b *LoadShedder) calculateMaxInFlight() int64 {
-	maxPASS := b.window.MaxPass()
-	minRT := b.window.MinRT()
+func (b *LoadShedder) calculateMaxInFlight(resource string) int64 {
+	w := b.windowFor(resource)
+	maxPASS := w.MaxPass()
+	minRT := w.MinRT()
 
 	// minRT 太小（< 1ms）说明系统极快，不需要限流
 	if minRT < b.cfg.MinRTThreshold {
@@ -195,6 +194,17 @@ func (b *LoadShedder) getOrCreateStats(resource string) *resourceStats {
 	stats := &resourceStats{}
 	actual, _ := b.stats.LoadOrStore(resource, stats)
 	return actual.(*resourceStats)
+}
+
+// windowFor 获取或创建资源独立的滑动窗口。
+// 每个资源单独开窗：快速资源与慢速资源共享窗口时，快速资源的极小
+// minRT 会严重低估慢资源的 maxInFlight，导致慢资源被过度丢弃。
+func (b *LoadShedder) windowFor(resource string) *slidingWindow {
+	if v, ok := b.windows.Load(resource); ok {
+		return v.(*slidingWindow)
+	}
+	actual, _ := b.windows.LoadOrStore(resource, newSlidingWindow(b.cfg.WindowSize, b.cfg.BucketCount))
+	return actual.(*slidingWindow)
 }
 
 // --- Context Key ---

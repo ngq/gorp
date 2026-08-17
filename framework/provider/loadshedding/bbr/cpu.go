@@ -15,13 +15,18 @@ import (
 // - decay：衰减系数，越大越平滑
 // - 采样间隔：500ms
 // - 衰减系数：0.95
+//
+// 采样来源：Linux 上读取 /proc/stat 获取真实系统 CPU 使用率（见
+// cpu_proc.go）；其他平台退化为 goroutine 数代理指标（见 cpu_fallback.go），
+// 代理路径不做任何 STW 级别的系统调用。
 
 // cpuMonitor 监控系统 CPU 使用率。
 type cpuMonitor struct {
-	threshold   float64        // CPU 阈值（0.0-1.0）
-	ema         atomic.Value   // 存储 float64，EMA 平滑后的 CPU 使用率
-	overloaded_ atomic.Bool     // 当前是否过载
-	stopCh      chan struct{}  // 停止信号
+	threshold   float64       // CPU 阈值（0.0-1.0）
+	ema         atomic.Value  // 存储 float64，EMA 平滑后的 CPU 使用率
+	overloaded_ atomic.Bool   // 当前是否过载
+	stopCh      chan struct{} // 停止信号
+	stopOnce    sync.Once
 	wg          sync.WaitGroup
 }
 
@@ -48,9 +53,9 @@ func newCPUMonitor(threshold float64) *cpuMonitor {
 	return m
 }
 
-// Stop 停止 CPU 监控。
+// Stop 停止 CPU 监控。幂等，可安全多次调用。
 func (m *cpuMonitor) Stop() {
-	close(m.stopCh)
+	m.stopOnce.Do(func() { close(m.stopCh) })
 	m.wg.Wait()
 }
 
@@ -63,7 +68,7 @@ func (m *cpuMonitor) run() {
 	defer ticker.Stop()
 
 	// 获取初始采样
-	lastSample := m.sampleCPU()
+	lastSample, lastOK := m.sampleCPU()
 
 	for {
 		select {
@@ -71,11 +76,11 @@ func (m *cpuMonitor) run() {
 			return
 		case <-ticker.C:
 			// 获取新采样
-			currentSample := m.sampleCPU()
+			currentSample, currentOK := m.sampleCPU()
 
 			// 计算 CPU 使用率
-			usage := m.calculateUsage(lastSample, currentSample)
-			lastSample = currentSample
+			usage := m.calculateUsage(lastSample, currentSample, lastOK && currentOK)
+			lastSample, lastOK = currentSample, currentOK
 
 			// EMA 平滑
 			oldEMA := m.ema.Load().(float64)
@@ -88,52 +93,42 @@ func (m *cpuMonitor) run() {
 	}
 }
 
-// sampleCPU 采样当前 CPU 使用情况。
-//
-// 使用 runtime.ReadMemStats 和自定义计算获取 CPU 使用率。
-// 注意：Go 没有直接获取 CPU 使用率的 API，这里使用进程时间近似计算。
-func (m *cpuMonitor) sampleCPU() cpuSample {
-	// 使用进程 CPU 时间
-	var rusage runtime.MemStats
-	runtime.ReadMemStats(&rusage)
-
-	// 使用 goroutine 数量和 GC CPU 占用作为代理指标
-	// 这是一个近似方法，不是精确的 CPU 使用率
-	//
-	// 更精确的方法需要读取 /proc/stat（Linux）或调用系统 API
-	// 这里采用简化方案：基于 GC CPU 占用和 goroutine 数量估算
-
-	return cpuSample{
-		user:   rusage.PauseTotalNs, // GC 暂停时间作为 user 时间代理
-		system: 0,
-		idle:   0,
-		total:  rusage.PauseTotalNs,
-	}
+// sampleCPU 采样当前系统 CPU 使用情况。
+// 第二个返回值表示采样是否来自真实系统计数器；false 时调用方应使用代理指标。
+func (m *cpuMonitor) sampleCPU() (cpuSample, bool) {
+	return sampleSystemCPU()
 }
 
 // calculateUsage 计算两次采样之间的 CPU 使用率。
-func (m *cpuMonitor) calculateUsage(last, current cpuSample) float64 {
-	// 简化实现：基于 GC 暂停时间占比估算
-	// 实际生产环境建议使用 gopsutil 等库获取精确 CPU 使用率
-	//
-	// 这里使用一个启发式方法：
-	// - 监控 GC 频率和暂停时间
-	// - 如果 GC 暂停时间增长过快，说明内存压力大，间接反映 CPU 压力
+// real 为 true 时基于系统计数器计算：usage = 1 - Δidle/Δtotal。
+// real 为 false 时（非 Linux 平台回退）使用 goroutine 数代理指标。
+func (m *cpuMonitor) calculateUsage(last, current cpuSample, real bool) float64 {
+	if real {
+		dTotal := current.total - last.total
+		if dTotal == 0 {
+			return 0
+		}
+		dIdle := current.idle - last.idle
+		usage := 1 - float64(dIdle)/float64(dTotal)
+		if usage < 0 {
+			usage = 0
+		}
+		if usage > 1 {
+			usage = 1
+		}
+		return usage
+	}
 
-	// 使用 goroutine 数量作为负载指标
-	// 当 goroutine 数量过多时，调度开销增加，视为 CPU 过载
+	// 回退代理：goroutine 数 / (GOMAXPROCS * 100)。
+	// 这不是 CPU 使用率——只是调度压力的粗略代理，仅在无法读取
+	// 系统计数器的平台上避免 BBR 完全失效。
 	goroutineCount := runtime.NumGoroutine()
 	maxProcs := runtime.GOMAXPROCS(0)
-
-	// 如果 goroutine 数量超过 GOMAXPROCS 的 100 倍，认为 CPU 可能过载
-	// 这是一个启发式阈值
 	threshold := float64(maxProcs * 100)
 	usage := float64(goroutineCount) / threshold
-
 	if usage > 1.0 {
 		usage = 1.0
 	}
-
 	return usage
 }
 
@@ -146,30 +141,3 @@ func (m *cpuMonitor) overloaded() bool {
 func (m *cpuMonitor) cpuUsage() float64 {
 	return m.ema.Load().(float64)
 }
-
-// --- 更精确的 CPU 监控实现（可选）---
-//
-// 如果需要更精确的 CPU 监控，可以使用以下方法：
-// 1. Linux: 读取 /proc/stat 或 /proc/[pid]/stat
-// 2. 跨平台: 使用 github.com/shirou/gopsutil/v3/cpu
-//
-// 当前实现使用 goroutine 数量作为代理指标，适用于大多数场景。
-// 如果需要更精确的监控，可以在编译时通过 build tag 选择不同实现。
-
-// cpuMonitorPrecise 是更精确的 CPU 监控实现（使用 gopsutil）。
-// 当前未启用，仅作为参考。
-type cpuMonitorPrecise struct {
-	threshold float64
-	ema       atomic.Value
-	stopCh    chan struct{}
-	wg        sync.WaitGroup
-	// cpu.Percent 需要 time.Duration 参数
-	// 这里不实际使用，仅作为文档说明
-}
-
-// 注意：如果需要使用 gopsutil，需要添加依赖：
-// import "github.com/shirou/gopsutil/v3/cpu"
-//
-// 然后在 run() 中使用：
-// percent, _ := cpu.Percent(500*time.Millisecond, false)
-// usage := percent[0] / 100.0

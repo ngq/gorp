@@ -63,56 +63,140 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 // Boot 此 Provider 无启动逻辑。
 func (p *Provider) Boot(runtimecontract.Container) error { return nil }
 
-// noopLock implements datacontract.DistributedLock using local sync.Mutex.
-// 注意：locks 中的 mutex 在 Unlock 后会从 sync.Map 中删除，避免内存膨胀。
-// 但在高并发场景下，频繁创建/删除 mutex 可能影响性能，可考虑保留。
+// noopLock implements datacontract.DistributedLock using per-key local locks.
+// Entries are kept in the map for the process lifetime: deleting them on
+// unlock (the previous behavior) allowed two goroutines to hold "the lock"
+// simultaneously and let one goroutine cascade-release another's lock. Key
+// cardinality is bounded by the application's lock keys, so retention is
+// the safe trade-off.
 //
-// noopLock 使用本地 sync.Mutex 实现 datacontract.DistributedLock 接口。
+// noopLock 使用按 key 的本地锁实现 datacontract.DistributedLock 接口。
 type noopLock struct {
-	locks sync.Map // locks stores per-key mutexes.
-	//
-	// locks 存储每个键的互斥锁。
+	locks sync.Map // locks stores per-key *lockEntry, retained forever.
 }
 
-// Lock acquires a local mutex lock.
+// lockEntry is a local mutex that also honors context cancellation while
+// blocked, which sync.Mutex cannot do.
 //
-// Lock 获取本地互斥锁。
+// lockEntry 是支持阻塞期间响应 ctx 取消的本地互斥锁。
+type lockEntry struct {
+	mu      sync.Mutex
+	locked  bool
+	waiters []chan struct{}
+}
+
+// Lock acquires the entry, blocking until available, the context is done, or
+// ownership is handed over by a previous holder.
+func (e *lockEntry) Lock(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	e.mu.Lock()
+	if !e.locked {
+		e.locked = true
+		e.mu.Unlock()
+		return nil
+	}
+	ch := make(chan struct{})
+	e.waiters = append(e.waiters, ch)
+	e.mu.Unlock()
+
+	select {
+	case <-ch:
+		return nil
+	case <-ctx.Done():
+		// If the hand-over already happened we own the lock and must give it
+		// back; otherwise just leave the waiter queue.
+		select {
+		case <-ch:
+			e.Unlock()
+		default:
+			e.removeWaiter(ch)
+		}
+		return ctx.Err()
+	}
+}
+
+func (e *lockEntry) removeWaiter(ch chan struct{}) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, w := range e.waiters {
+		if w == ch {
+			e.waiters = append(e.waiters[:i], e.waiters[i+1:]...)
+			return
+		}
+	}
+}
+
+// TryLock acquires the entry without blocking.
+func (e *lockEntry) TryLock() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.locked {
+		return false
+	}
+	e.locked = true
+	return true
+}
+
+// Unlock releases the entry, handing ownership to the longest-waiting waiter
+// when one exists (the entry stays locked across the hand-over).
+func (e *lockEntry) Unlock() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !e.locked {
+		return
+	}
+	if len(e.waiters) > 0 {
+		ch := e.waiters[0]
+		e.waiters = e.waiters[1:]
+		close(ch)
+		return
+	}
+	e.locked = false
+}
+
+// IsLocked reports whether the entry is currently held.
+func (e *lockEntry) IsLocked() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.locked
+}
+
+// Lock acquires a local mutex lock, honoring ctx cancellation while blocked.
+// TTL is ignored: this is a single-process stand-in for a real distributed lock.
+//
+// Lock 获取本地互斥锁，阻塞期间响应 ctx 取消。TTL 不生效：
+// 这是真实分布式锁的单进程替身。
 func (l *noopLock) Lock(ctx context.Context, key string, ttl time.Duration) error {
 	_ = ttl
-	lock := l.getOrCreateLock(key)
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	lock.Lock()
-	return nil
+	return l.getOrCreateLock(key).Lock(ctx)
 }
 
 // TryLock attempts to acquire lock, returns immediately if locked by others.
-// 使用 sync.Mutex.TryLock 避免 goroutine 泄漏。
 //
 // TryLock 尝试获取锁，如果已被锁定则立即返回。
 func (l *noopLock) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 	_ = ttl
-	lock := l.getOrCreateLock(key)
-
-	if lock.TryLock() {
-		return true, nil
+	if err := ctx.Err(); err != nil {
+		return false, err
 	}
-	return false, nil
+	return l.getOrCreateLock(key).TryLock(), nil
 }
 
-// Unlock releases the local mutex lock and removes it from the map to prevent memory bloat.
-// Note: This may cause performance overhead in high-concurrency scenarios due to frequent mutex creation/deletion.
+// Unlock releases the local mutex lock. The map entry is intentionally kept:
+// deleting it would let a concurrent Lock create a second live lock for the
+// same key and break mutual exclusion.
 //
-// Unlock 释放本地互斥锁并从 map 中删除，防止内存膨胀。
-// 注意：高并发场景下频繁创建/删除 mutex 可能影响性能。
+// Unlock 释放本地互斥锁。map 条目有意保留：删除它会让并发的 Lock
+// 为同一 key 创建第二个活跃锁，破坏互斥性。
 func (l *noopLock) Unlock(ctx context.Context, key string) error {
 	_ = ctx
-	if lock, ok := l.locks.Load(key); ok {
-		l.locks.Delete(key) // 删除锁记录，防止内存膨胀
-		lock.(*sync.Mutex).Unlock()
+	if entry, ok := l.locks.Load(key); ok {
+		entry.(*lockEntry).Unlock()
 	}
 	return nil
 }
@@ -128,18 +212,16 @@ func (l *noopLock) Renew(ctx context.Context, key string, ttl time.Duration) err
 }
 
 // IsLocked checks if the key is currently locked.
-// 使用 sync.Mutex.TryLock 避免 goroutine 泄漏。
 //
 // IsLocked 检查键是否当前被锁定。
 func (l *noopLock) IsLocked(ctx context.Context, key string) (bool, error) {
-	lock := l.getOrCreateLock(key)
-
-	// TryLock 成功说明之前未被锁定，立即释放
-	if lock.TryLock() {
-		lock.Unlock()
-		return false, nil
+	if err := ctx.Err(); err != nil {
+		return false, err
 	}
-	return true, nil
+	if entry, ok := l.locks.Load(key); ok {
+		return entry.(*lockEntry).IsLocked(), nil
+	}
+	return false, nil
 }
 
 // WithLock acquires lock, executes function, then releases lock.
@@ -153,15 +235,17 @@ func (l *noopLock) WithLock(ctx context.Context, key string, ttl time.Duration, 
 	return fn()
 }
 
-// getOrCreateLock gets or creates a mutex for the given key.
+// getOrCreateLock gets or creates the lock entry for the given key.
+// LoadOrStore is mandatory: separate Load+Store lets two concurrent callers
+// end up with different entries and both "hold" the lock.
 //
-// getOrCreateLock 获取或创建给定键的互斥锁。
-func (l *noopLock) getOrCreateLock(key string) *sync.Mutex {
-	if lock, ok := l.locks.Load(key); ok {
-		return lock.(*sync.Mutex)
+// getOrCreateLock 获取或创建给定键的锁条目。
+// 必须用 LoadOrStore：分离的 Load+Store 会让两个并发调用者
+// 拿到不同条目并同时"持有"锁。
+func (l *noopLock) getOrCreateLock(key string) *lockEntry {
+	if entry, ok := l.locks.Load(key); ok {
+		return entry.(*lockEntry)
 	}
-
-	lock := &sync.Mutex{}
-	l.locks.Store(key, lock)
-	return lock
+	actual, _ := l.locks.LoadOrStore(key, &lockEntry{})
+	return actual.(*lockEntry)
 }

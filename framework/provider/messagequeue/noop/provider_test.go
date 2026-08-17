@@ -20,7 +20,7 @@ import (
 //
 // TestNoopQueue 验证消息队列的空操作实现。
 func TestNoopQueue(t *testing.T) {
-	queue := &noopQueue{}
+	queue := NewNoopQueue()
 
 	publisher := queue.Publisher()
 	assert.NotNil(t, publisher)

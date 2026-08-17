@@ -28,7 +28,8 @@ type memoryStore struct {
 	m map[string]memItem // m stores cache items.
 	//
 	// m 存储缓存项。
-	stopCh chan struct{} // stopCh signals the cleanup goroutine to stop.
+	stopCh    chan struct{} // stopCh signals the cleanup goroutine to stop.
+	closeOnce sync.Once     // closeOnce makes Close idempotent.
 	//
 	// stopCh 通知清理 goroutine 停止。
 }
@@ -59,16 +60,11 @@ func newMemoryStore() *memoryStore {
 	return s
 }
 
-// Close stops the cleanup goroutine. Implements io.Closer.
+// Close stops the cleanup goroutine. Idempotent via sync.Once.
 //
-// Close 停止清理 goroutine。实现 io.Closer。
+// Close 停止清理 goroutine。sync.Once 保证幂等。
 func (s *memoryStore) Close() error {
-	select {
-	case <-s.stopCh:
-		// Already closed.
-	default:
-		close(s.stopCh)
-	}
+	s.closeOnce.Do(func() { close(s.stopCh) })
 	return nil
 }
 
@@ -220,9 +216,10 @@ func (s *memoryStore) MSet(ctx context.Context, kvs map[string]string, ttl time.
 //
 // memoryBinaryStore 使用内存 map 实现二进制安全缓存，支持 TTL 过期。
 type memoryBinaryStore struct {
-	mu     sync.RWMutex
-	m      map[string]memBinaryItem
-	stopCh chan struct{}
+	mu        sync.RWMutex
+	m         map[string]memBinaryItem
+	stopCh    chan struct{}
+	closeOnce sync.Once
 }
 
 type memBinaryItem struct {
@@ -240,11 +237,7 @@ func newMemoryBinaryStore() *memoryBinaryStore {
 }
 
 func (s *memoryBinaryStore) Close() error {
-	select {
-	case <-s.stopCh:
-	default:
-		close(s.stopCh)
-	}
+	s.closeOnce.Do(func() { close(s.stopCh) })
 	return nil
 }
 

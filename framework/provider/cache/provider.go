@@ -101,7 +101,10 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		var d cacheDriver
 		switch strings.ToLower(driver) {
 		case "memory", "mem", "inmemory":
-			d = newMemoryStore()
+			store := newMemoryStore()
+			// 接线 closer：否则 cleanup goroutine 在容器销毁后仍常驻运行。
+			c.RegisterCloser("cache.memory", store)
+			d = store
 		case "redis":
 			r, err := container.MakeWith[datacontract.Redis](c, datacontract.RedisKey)
 			if err != nil {
@@ -274,7 +277,10 @@ func (p *BinaryCacheProvider) Register(c runtimecontract.Container) error {
 
 		switch strings.ToLower(driver) {
 		case "memory", "mem", "inmemory":
-			return newMemoryBinaryStore(), nil
+			store := newMemoryBinaryStore()
+			// 接线 closer：否则 cleanup goroutine 在容器销毁后仍常驻运行。
+			c.RegisterCloser("cache.memory.binary", store)
+			return store, nil
 		case "redis":
 			r, err := container.MakeWith[datacontract.Redis](c, datacontract.RedisKey)
 			if err != nil {

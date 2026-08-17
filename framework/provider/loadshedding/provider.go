@@ -77,7 +77,9 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		switch cfg.Strategy {
 		case "bbr":
 			bbrCfg := loadBBRConfigFromContainer(c)
-			return bbr.NewLoadShedder(bbrCfg), nil
+			shedder := bbr.NewLoadShedder(bbrCfg)
+			c.RegisterCloser("loadshedding.bbr", shedder)
+			return shedder, nil
 		default:
 			// 默认使用信号量实现
 			return newSemaphoreLoadShedder(cfg), nil
@@ -280,7 +282,7 @@ func loadBBRConfigFromContainer(c runtimecontract.Container) *bbr.Config {
 		cfg.CPUThreshold = v
 	}
 	if v := getter.GetString("load_shedding.bbr.window_size"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
 			cfg.WindowSize = d
 		}
 	}

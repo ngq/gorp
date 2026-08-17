@@ -9,7 +9,6 @@ package redis
 
 import (
 	"context"
-	"net"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,12 +29,6 @@ var (
 		Help:    "Redis command latency in seconds.",
 		Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 	}, []string{"command", "status"})
-
-	// redisConnectionsOpen Redis 连接数
-	redisConnectionsOpen = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "gorp_redis_connections_open",
-		Help: "The number of Redis connections.",
-	}, []string{"addr"})
 )
 
 // RedisMetricsHook 为 Redis 客户端添加指标收集 hook。
@@ -52,15 +45,12 @@ func NewRedisMetricsHook() *RedisMetricsHook {
 	return &RedisMetricsHook{}
 }
 
-// DialHook 实现 redis.Hook 接口，在连接建立时记录指标。
+// DialHook 实现 redis.Hook 接口，透传连接建立。
+// go-redis 的 Hook 没有连接关闭回调，在 Dial 成功时 Inc 的 Gauge 无人 Dec，
+// 只增不减与真实连接数脱节——曾因此误报连接泄漏告警，故不再在此统计连接数；
+// 需要连接池指标时请从 client.PoolStats() 采集。
 func (h *RedisMetricsHook) DialHook(next redis.DialHook) redis.DialHook {
-	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		conn, err := next(ctx, network, addr)
-		if err == nil {
-			redisConnectionsOpen.WithLabelValues(addr).Inc()
-		}
-		return conn, err
-	}
+	return next
 }
 
 // ProcessHook 实现 redis.Hook 接口，在命令执行前后记录指标。
