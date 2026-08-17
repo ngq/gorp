@@ -26,7 +26,6 @@ import (
 	metadatanoop "github.com/ngq/gorp/framework/provider/metadata/noop"
 	retryprovider "github.com/ngq/gorp/framework/provider/retry"
 	retrynoop "github.com/ngq/gorp/framework/provider/retry/noop"
-	rpcgrpc "github.com/ngq/gorp/framework/provider/rpc/grpc"
 	rpchttp "github.com/ngq/gorp/framework/provider/rpc/http"
 	rpcnoop "github.com/ngq/gorp/framework/provider/rpc/noop"
 	selectornoop "github.com/ngq/gorp/framework/provider/selector/noop"
@@ -177,7 +176,9 @@ var (
 	}
 	rpcProviderFactories = providerFactoryRegistry{
 		"http": func() runtimecontract.ServiceProvider { return rpchttp.NewProvider() },
-		"grpc": func() runtimecontract.ServiceProvider { return rpcgrpc.NewProvider() },
+		// "grpc" 由 framework/provider/rpc/grpc 通过 init 自注册：
+		// 只有真正 import 该包的应用才链接 grpc-go（纯 HTTP 单机应用因此
+		// 无需背负 ~10MB 的 grpc 依赖），未 import 时按 fail-fast 报错。
 		"noop": func() runtimecontract.ServiceProvider { return rpcnoop.NewProvider() },
 		"":     func() runtimecontract.ServiceProvider { return rpcnoop.NewProvider() },
 	}

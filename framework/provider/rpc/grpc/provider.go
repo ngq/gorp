@@ -10,6 +10,7 @@ package grpc
 import (
 	"fmt"
 
+	"github.com/ngq/gorp/framework/bootstrap"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	discoverycontract "github.com/ngq/gorp/framework/contract/discovery"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -24,6 +25,16 @@ import (
 //
 // Provider 是 gRPC RPC provider，注册客户端和服务端能力。
 type Provider struct{}
+
+// init 把 "grpc" 后端自注册到 bootstrap 的能力工厂表。选择 init 注册而非在
+// bootstrap 中直接 import：纯 HTTP 单机应用（monolith）默认 RPC=noop，
+// 不应被强制背负 ~10MB 的 grpc-go 依赖；只有显式 import 本包（proto-first
+// 应用、微服务 RPC）才链接 grpc。
+func init() {
+	bootstrap.RegisterRPCProviderFactory("grpc", func() runtimecontract.ServiceProvider {
+		return NewProvider()
+	})
+}
 
 // NewProvider creates a new gRPC provider instance.
 //
