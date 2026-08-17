@@ -116,6 +116,38 @@ func (q *Queue) Close() error {
 	return nil
 }
 
+// getConn 返回当前可用连接；若底层连接已关闭（broker 重启/网络断线），
+// 则重新拨号并替换。amqp091-go 不自动重连，不在这里重连的话，
+// 断线后订阅循环会永远报 "channel/connection is not open"，消费静默死亡。
+func (q *Queue) getConn() (*amqp.Connection, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.closed {
+		return nil, errors.New("messagequeue.rabbitmq: queue closed")
+	}
+	if q.conn != nil && !q.conn.IsClosed() {
+		return q.conn, nil
+	}
+	conn, err := amqp.Dial(q.cfg.RabbitMQURL)
+	if err != nil {
+		return nil, fmt.Errorf("messagequeue.rabbitmq: reconnect failed: %w", err)
+	}
+	// 重新声明 exchange（broker 重启后 exchange 可能已不存在）。
+	if q.cfg.RabbitMQExchange != "" {
+		ch, chErr := conn.Channel()
+		if chErr == nil {
+			_ = ch.ExchangeDeclare(
+				q.cfg.RabbitMQExchange,
+				q.cfg.RabbitMQExchangeType,
+				true, false, false, false, nil,
+			)
+			_ = ch.Close()
+		}
+	}
+	q.conn = conn
+	return conn, nil
+}
+
 // getChannel creates a new AMQP channel for short-lived operations.
 // The caller MUST close the channel after use (typically via defer).
 // This avoids the channel leak that occurs when channels are stored
@@ -125,14 +157,12 @@ func (q *Queue) Close() error {
 // 调用方必须在使用后关闭 channel（通常通过 defer）。
 // 这避免了将 channel 存入列表但从不关闭导致的泄漏。
 func (q *Queue) getChannel() (*amqp.Channel, error) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	if q.closed {
-		return nil, errors.New("messagequeue.rabbitmq: queue closed")
+	conn, err := q.getConn()
+	if err != nil {
+		return nil, err
 	}
 
-	ch, err := q.conn.Channel()
+	ch, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
 	}

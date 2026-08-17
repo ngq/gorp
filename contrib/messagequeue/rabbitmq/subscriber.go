@@ -120,7 +120,11 @@ func (s *rabbitSubscriber) SubscribeWithGroup(ctx context.Context, topic string,
 // runSubscription 建立一次完整的订阅（channel + queue + bind + consume），
 // 直到 context 取消或投递 channel 关闭（连接断开）。
 func (s *rabbitSubscriber) runSubscription(ctx context.Context, topic string, queueName string, anonymous bool, handler integrationcontract.MessageHandler) error {
-	ch, err := s.queue.conn.Channel()
+	conn, err := s.queue.getConn()
+	if err != nil {
+		return err
+	}
+	ch, err := conn.Channel()
 	if err != nil {
 		return fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
 	}
@@ -203,13 +207,18 @@ func (s *rabbitSubscriber) runSubscription(ctx context.Context, topic string, qu
 // 实现 integrationcontract.MessageSubscriber.Consume。
 func (s *rabbitSubscriber) Consume(ctx context.Context, queue string, handler integrationcontract.MessageHandler) error {
 	s.queue.mu.Lock()
-	defer s.queue.mu.Unlock()
-
-	if s.queue.closed {
+	closed := s.queue.closed
+	s.queue.mu.Unlock()
+	if closed {
 		return errors.New("messagequeue.rabbitmq: queue closed")
 	}
 
-	ch, err := s.queue.conn.Channel()
+	// 用 getConn：断线后 Consume 也能在重连后的连接上继续。
+	conn, err := s.queue.getConn()
+	if err != nil {
+		return err
+	}
+	ch, err := conn.Channel()
 	if err != nil {
 		return fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
 	}

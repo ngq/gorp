@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -36,9 +37,13 @@ func baseURL(cfg *ServiceCombConfig) string {
 }
 
 // microserviceID 通过 serviceName/appId 查找 microserviceID，找不到则创建。
+// 注意：ServiceCenter 的 find 查询对 serviceName 的过滤不可靠（实测会返回
+// 同 appId 下的无关服务），因此必须在客户端侧按 name/appId 精确匹配，
+// 否则会拿到错误服务的 serviceId，注册实例时返回 "Micro-service does not exist"。
 func (c *httpServiceCombClient) microserviceID(ctx context.Context, cfg *ServiceCombConfig, name string) (string, error) {
 	// 1. 按 name 查询已存在的 microservice
-	findURL := fmt.Sprintf("%s/microservices?appId=%s&serviceName=%s", baseURL(cfg), cfg.AppID, name)
+	findURL := fmt.Sprintf("%s/microservices?appId=%s&serviceName=%s",
+		baseURL(cfg), url.QueryEscape(cfg.AppID), url.QueryEscape(name))
 	findReq, err := http.NewRequestWithContext(ctx, http.MethodGet, findURL, nil)
 	if err != nil {
 		return "", err
@@ -47,18 +52,8 @@ func (c *httpServiceCombClient) microserviceID(ctx context.Context, cfg *Service
 	if err != nil {
 		return "", fmt.Errorf("registry.servicecomb: find microservice: %w", err)
 	}
-	defer findResp.Body.Close()
-
-	var findBody struct {
-		Services []struct {
-			ServiceID string `json:"serviceId"`
-		} `json:"services"`
-	}
-	if findResp.StatusCode == http.StatusOK {
-		_ = json.NewDecoder(findResp.Body).Decode(&findBody)
-		if len(findBody.Services) > 0 && findBody.Services[0].ServiceID != "" {
-			return findBody.Services[0].ServiceID, nil
-		}
+	if serviceID, ok := c.matchMicroservice(findResp, cfg.AppID, name); ok {
+		return serviceID, nil
 	}
 
 	// 2. 创建 microservice
@@ -94,25 +89,38 @@ func (c *httpServiceCombClient) microserviceID(ctx context.Context, cfg *Service
 		}
 	}
 
-	// 3. 并发创建冲突时（已有同名服务）再查一次
+	// 3. 并发创建冲突时（已有同名服务）再查一次，同样做客户端侧匹配。
 	findReq2, _ := http.NewRequestWithContext(ctx, http.MethodGet, findURL, nil)
 	findResp2, err := c.httpClient.Do(findReq2)
 	if err != nil {
 		return "", fmt.Errorf("registry.servicecomb: re-find microservice: %w", err)
 	}
-	defer findResp2.Body.Close()
-	var findBody2 struct {
-		Services []struct {
-			ServiceID string `json:"serviceId"`
-		} `json:"services"`
-	}
-	if findResp2.StatusCode == http.StatusOK {
-		_ = json.NewDecoder(findResp2.Body).Decode(&findBody2)
-		if len(findBody2.Services) > 0 && findBody2.Services[0].ServiceID != "" {
-			return findBody2.Services[0].ServiceID, nil
-		}
+	if serviceID, ok := c.matchMicroservice(findResp2, cfg.AppID, name); ok {
+		return serviceID, nil
 	}
 	return "", fmt.Errorf("registry.servicecomb: cannot resolve microservice id for %q (register status %d)", name, createResp.StatusCode)
+}
+
+// matchMicroservice 从 find 响应中按 appId+serviceName 精确匹配 microservice。
+func (c *httpServiceCombClient) matchMicroservice(resp *http.Response, appID, name string) (string, bool) {
+	defer resp.Body.Close()
+	var body struct {
+		Services []struct {
+			ServiceID  string `json:"serviceId"`
+			ServiceName string `json:"serviceName"`
+			AppID      string `json:"appId"`
+		} `json:"services"`
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	for _, svc := range body.Services {
+		if svc.ServiceID != "" && svc.ServiceName == name && svc.AppID == appID {
+			return svc.ServiceID, true
+		}
+	}
+	return "", false
 }
 
 func (c *httpServiceCombClient) Register(ctx context.Context, cfg *ServiceCombConfig, name, addr string, meta map[string]string) error {
@@ -138,7 +146,11 @@ func (c *httpServiceCombClient) Register(ctx context.Context, cfg *ServiceCombCo
 			"status":     "UP",
 			"properties": fullMeta,
 			"healthCheck": map[string]any{
-				"mode": "push",
+				// ServiceCenter 对 push 模式强制要求 interval/times 合法
+				// （interval >= 1），缺省会以 400 拒绝注册。
+				"mode":     "push",
+				"interval": heartbeatIntervalSeconds(cfg),
+				"times":    3,
 			},
 		},
 	}
@@ -155,7 +167,8 @@ func (c *httpServiceCombClient) Register(ctx context.Context, cfg *ServiceCombCo
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("registry.servicecomb: register instance failed with status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("registry.servicecomb: register instance failed with status %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }
@@ -165,8 +178,13 @@ func (c *httpServiceCombClient) Deregister(ctx context.Context, cfg *ServiceComb
 	if err != nil {
 		return err
 	}
-	// ServiceCenter 支持按 endpoints 删除实例。
-	url := fmt.Sprintf("%s/microservices/%s/instances?endpoint=rest%%3A%%2F%%2F%s", baseURL(cfg), serviceID, addr)
+	// ServiceCenter 只能按 instanceId 删除实例（DELETE by endpoint 查询参数
+	// 会返回 405）。先查 endpoint 对应的 instanceId，再删除。
+	instanceID, err := c.findInstanceID(ctx, cfg, serviceID, addr)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/microservices/%s/instances/%s", baseURL(cfg), serviceID, instanceID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -180,32 +198,72 @@ func (c *httpServiceCombClient) Deregister(ctx context.Context, cfg *ServiceComb
 		return ErrServiceNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("registry.servicecomb: deregister instance failed with status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("registry.servicecomb: deregister instance failed with status %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }
 
+// findInstanceID 按 endpoint 查找实例的 instanceId。
+func (c *httpServiceCombClient) findInstanceID(ctx context.Context, cfg *ServiceCombConfig, serviceID, addr string) (string, error) {
+	instances, err := c.discoverInstances(ctx, cfg, serviceID)
+	if err != nil {
+		return "", err
+	}
+	want := "rest://" + addr
+	for _, inst := range instances {
+		for _, ep := range inst.endpoints {
+			if ep == want {
+				if inst.instanceID == "" {
+					return "", fmt.Errorf("registry.servicecomb: instance %s has empty instanceId", addr)
+				}
+				return inst.instanceID, nil
+			}
+		}
+	}
+	return "", ErrServiceNotFound
+}
+
+// Heartbeat 真正续租 ServiceCenter 的实例 lease。
+// push 模式下 ServiceCenter 按 healthCheck.interval×times 判定租约过期：
+// 仅做 GET 探活不续租，实例会变成"已过期但仍在列表"的僵尸节点
+// （DELETE 报不存在、GET 仍列出，直到被 GC）。
 func (c *httpServiceCombClient) Heartbeat(ctx context.Context, cfg *ServiceCombConfig, name, addr string) error {
 	serviceID, err := c.microserviceID(ctx, cfg, name)
 	if err != nil {
 		return err
 	}
-	// 心跳模式为 push 时无需显式调用（实例 status 由 pull 模式探测），
-	// 这里做一次轻量探活，避免返回 nil 造成"心跳成功"的错觉。
-	url := fmt.Sprintf("%s/microservices/%s/instances?endpoint=rest%%3A%%2F%%2F%s", baseURL(cfg), serviceID, addr)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	instanceID, err := c.findInstanceID(ctx, cfg, serviceID, addr)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/microservices/%s/instances/%s/heartbeat", baseURL(cfg), serviceID, instanceID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
 	if err != nil {
 		return err
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("registry.servicecomb: heartbeat probe: %w", err)
+		return fmt.Errorf("registry.servicecomb: heartbeat: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrServiceNotFound
 	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("registry.servicecomb: heartbeat failed with status %d: %s", resp.StatusCode, string(body))
+	}
 	return nil
+}
+
+// serviceCombInstance 是 ServiceCenter 实例的原始响应结构。
+type serviceCombInstance struct {
+	instanceID string
+	serviceID  string
+	endpoints  []string
+	status     string
+	properties map[string]string
 }
 
 func (c *httpServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombConfig, name string) ([]transportcontract.ServiceInstance, error) {
@@ -217,6 +275,33 @@ func (c *httpServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombCo
 		}
 		return nil, err
 	}
+	instances, err := c.discoverInstances(ctx, cfg, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]transportcontract.ServiceInstance, 0, len(instances))
+	for _, inst := range instances {
+		addr := instanceAddrFromEndpoints(inst.endpoints)
+		if addr == "" {
+			continue
+		}
+		result = append(result, transportcontract.ServiceInstance{
+			ID:       inst.instanceID,
+			Name:     name,
+			Address:  addr,
+			Metadata: inst.properties,
+			Healthy:  strings.EqualFold(inst.status, "UP"),
+		})
+	}
+	if len(result) == 0 {
+		return nil, ErrServiceNotFound
+	}
+	sortServiceInstances(result)
+	return result, nil
+}
+
+// discoverInstances 拉取某个 microservice 的全部实例原始数据。
+func (c *httpServiceCombClient) discoverInstances(ctx context.Context, cfg *ServiceCombConfig, serviceID string) ([]serviceCombInstance, error) {
 	url := fmt.Sprintf("%s/microservices/%s/instances", baseURL(cfg), serviceID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -248,25 +333,26 @@ func (c *httpServiceCombClient) Discover(ctx context.Context, cfg *ServiceCombCo
 		return nil, fmt.Errorf("registry.servicecomb: decode discover response: %w", err)
 	}
 
-	result := make([]transportcontract.ServiceInstance, 0, len(body.Instances))
+	out := make([]serviceCombInstance, 0, len(body.Instances))
 	for _, inst := range body.Instances {
-		addr := instanceAddrFromEndpoints(inst.Endpoints)
-		if addr == "" {
-			continue
-		}
-		result = append(result, transportcontract.ServiceInstance{
-			ID:       inst.InstanceID,
-			Name:     name,
-			Address:  addr,
-			Metadata: inst.Properties,
-			Healthy:  strings.EqualFold(inst.Status, "UP"),
+		out = append(out, serviceCombInstance{
+			instanceID: inst.InstanceID,
+			serviceID:  inst.ServiceID,
+			endpoints:  inst.Endpoints,
+			status:     inst.Status,
+			properties: inst.Properties,
 		})
 	}
-	if len(result) == 0 {
-		return nil, ErrServiceNotFound
+	return out, nil
+}
+
+// heartbeatIntervalSeconds 返回健康检查间隔秒数（>=1）。
+func heartbeatIntervalSeconds(cfg *ServiceCombConfig) int {
+	sec := int(cfg.HeartbeatInterval.Seconds())
+	if sec < 1 {
+		sec = 30
 	}
-	sortServiceInstances(result)
-	return result, nil
+	return sec
 }
 
 // instanceAddrFromEndpoints 从 ServiceCenter endpoints（如 "rest://1.2.3.4:8080"）

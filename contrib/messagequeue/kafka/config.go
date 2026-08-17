@@ -32,7 +32,12 @@ func buildSaramaConfig(cfg *integrationcontract.MessageQueueConfig) *sarama.Conf
 	// Producer configuration
 	saramaCfg.Producer.RequiredAcks = parseRequiredAcks(cfg.KafkaRequiredACKs)
 	saramaCfg.Producer.Partitioner = parsePartitioner(cfg.KafkaPartitioner)
+	// MaxMessageBytes 必须 > 0，否则 sarama 校验失败、连 client 都创建不了。
+	// 零值（未配置）回退到 sarama 默认 1MB。
 	saramaCfg.Producer.MaxMessageBytes = cfg.KafkaMaxMessageBytes
+	if saramaCfg.Producer.MaxMessageBytes <= 0 {
+		saramaCfg.Producer.MaxMessageBytes = 1000000
+	}
 	saramaCfg.Producer.Flush.Frequency = cfg.KafkaFlushFrequency
 	saramaCfg.Producer.Compression = parseCompression(cfg.KafkaCompression)
 	saramaCfg.Producer.Return.Successes = true // Required for SyncProducer
