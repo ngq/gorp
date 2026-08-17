@@ -39,13 +39,15 @@ func main() {
 	// 先清空可能的残留
 	_ = client.Del(ctx, queueName, deadLetter)
 
-	// Consume 走 Redis list（BLPop），而 Publish 走 Pub/Sub——这里直接用
-	// RPush 投递一条毒丸消息到 list，验证 Consume 路径的毒丸→死信。
-	if err := client.RPush(ctx, queueName, "poison-message").Err(); err != nil {
-		fmt.Printf("FAIL push poison message: %v\n", err)
+	// Consume 走 Redis list（BLPop），正确配对的生产方法是 Send（RPush），
+	// 而非 Publish（Pub/Sub 广播，不持久）。用 Send 投递毒丸消息验证
+	// Consume 路径的毒丸→死信。
+	pub := queue.Publisher()
+	if err := pub.Send(ctx, queueName, []byte("poison-message")); err != nil {
+		fmt.Printf("FAIL send poison message: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("OK pushed poison message to list queue")
+	fmt.Println("OK sent poison message via Send (work queue path)")
 
 	// 消费：handler 永远失败。
 	var attempts int64

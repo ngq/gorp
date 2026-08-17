@@ -17,6 +17,8 @@ type redisPublisher struct {
 }
 
 // Publish sends a message to a topic using Redis Pub/Sub.
+// 注意：这是广播语义——消息不持久、无重放，消费者不在线即丢失。
+// 需要持久可靠投递（at-least-once、竞争消费）请用 Send + Consume。
 func (p *redisPublisher) Publish(ctx context.Context, topic string, message []byte, options ...integrationcontract.PublishOption) error {
 	startTime := time.Now()
 	cfg := &integrationcontract.PublishConfig{}
@@ -70,7 +72,8 @@ func (p *redisPublisher) PublishWithPriority(ctx context.Context, topic string, 
 	return p.queue.client.LPush(ctx, queueName, message).Err()
 }
 
-// Send sends a message to a queue using Redis list (RPUSH).
+// Send sends a message to a durable work queue using Redis list (RPUSH).
+// 与 Consume(BLPop) 配对：持久、at-least-once，失败带重试重入队。
 func (p *redisPublisher) Send(ctx context.Context, queue string, message []byte, options ...integrationcontract.PublishOption) error {
 	cfg := &integrationcontract.PublishConfig{}
 	for _, opt := range options {

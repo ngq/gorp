@@ -30,18 +30,47 @@ type MessageQueue interface {
 }
 
 // MessagePublisher defines the outbound message publishing contract.
+// It exposes two distinct messaging models:
 //
-// MessagePublisher 定义出站消息发布契约。
+//   - Broadcast: Publish + Subscribe. Fire-and-forget; messages are NOT
+//     durable/replayable. On Redis this maps to Pub/Sub; on Kafka/RabbitMQ it
+//     maps to a durable topic/exchange — semantics differ per backend.
+//
+//   - Work queue: Send + Consume. Durable, at-least-once, competing consumers;
+//     failed messages are requeued with retry. This is the canonical reliable
+//     model and behaves identically across all backends.
+//
+// MessagePublisher 定义出站消息发布契约，暴露两种不同的消息模型：
+//
+//   - 广播：Publish + Subscribe。fire-and-forget，不持久、不可重放。
+//     Redis 映射为 Pub/Sub，Kafka/RabbitMQ 映射为持久 topic/exchange——
+//     各后端语义不同，跨后端迁移时需注意。
+//
+//   - 工作队列：Send + Consume。持久、at-least-once、竞争消费；
+//     失败消息带重试重入队。这是规范可靠模型，各后端行为一致。
 type MessagePublisher interface {
+	// Publish 广播一条消息到 topic（与 Subscribe 配对）。
+	// 注意：Redis 下是 Pub/Sub 广播，不持久、不可重放；
+	// 需要持久可靠投递请用 Send。
 	Publish(ctx context.Context, topic string, message []byte, options ...PublishOption) error
 	PublishWithDelay(ctx context.Context, topic string, message []byte, delay time.Duration) error
 	PublishWithPriority(ctx context.Context, topic string, message []byte, priority int) error
+	// Send 投递一条消息到持久工作队列（与 Consume 配对）。
+	// 这是框架的规范可靠投递路径：at-least-once，失败带重试重入队。
 	Send(ctx context.Context, queue string, message []byte, options ...PublishOption) error
 }
 
 // MessageSubscriber defines the inbound message consumption contract.
+// Mirrors the two producer models:
 //
-// MessageSubscriber 定义入站消息消费契约。
+//   - Subscribe/SubscribeWithGroup pairs with Publish (broadcast; Redis 为
+//     Pub/Sub 不持久)。
+//   - Consume pairs with Send (persistent work queue; Redis 为 BLPop list)。
+//
+// MessageSubscriber 定义入站消息消费契约，与两种生产模型配对：
+//
+//   - Subscribe/SubscribeWithGroup 与 Publish 配对（广播；Redis 为 Pub/Sub 不持久）。
+//   - Consume 与 Send 配对（持久工作队列；Redis 为 BLPop list）。
 type MessageSubscriber interface {
 	Subscribe(ctx context.Context, topic string, handler MessageHandler) (UnsubscribeFunc, error)
 	SubscribeWithGroup(ctx context.Context, topic string, group string, handler MessageHandler) (UnsubscribeFunc, error)
