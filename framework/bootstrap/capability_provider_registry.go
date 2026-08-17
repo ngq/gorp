@@ -9,6 +9,8 @@ package bootstrap
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	circuitbreakernoop "github.com/ngq/gorp/framework/provider/circuitbreaker/noop"
@@ -224,20 +226,59 @@ var (
 	}
 )
 
+// providerFromMap 按 key 选择 provider factory。
+//
+// 日志与失败策略（按用户决策）：
+// - 未配置（key 为空）或显式默认（key == fallback）：用默认后端，静默。
+// - 显式配置了后端且可用：打印实际生效的后端（便于启动时确认配置）。
+// - 配置了后端但不可用（拼错 / provider 未 blank import）：**fail-fast**，
+//   注册时返回明确错误使启动失败，绝不静默降级。
 func providerFromMap(factories map[string]providerFactory, key string, fallback string) runtimecontract.ServiceProvider {
+	key = strings.TrimSpace(key)
 	if factory, ok := factories[key]; ok {
+		// 显式配置了后端且可用：打印实际生效的后端。
+		if key != "" && key != fallback {
+			fmt.Printf("[gorp] capability backend: %q\n", key)
+		}
 		return factory()
 	}
-	// Fall back to the default mapping when the requested backend is absent.
-	// 当请求后端不存在时，回退到默认映射。
-	if factory, ok := factories[fallback]; ok {
-		return factory()
+	// 未配置或显式默认：用默认后端，静默。
+	if key == "" || key == fallback {
+		if factory, ok := factories[fallback]; ok {
+			return factory()
+		}
+		return nil
 	}
-	// When neither the requested key nor the fallback exists, return a noop-like
-	// indicator. Log a warning so users can trace configuration typos.
-	// 当请求 key 和 fallback 都不存在时，记录警告帮助用户排查配置拼写错误。
-	fmt.Printf("[gorp:warn] providerFromMap: unknown backend %q (fallback %q also absent); check config for typos\n", key, fallback)
-	return nil
+	// 配置了后端但不可用：fail-fast，不静默降级到 noop。
+	return &failingProvider{requested: key, available: factoryKeys(factories)}
+}
+
+// failingProvider 表示配置了未知/未注册的后端。Register 返回明确错误，
+// 使启动失败，避免"配置了 sentinel/etcd 却悄悄跑在 noop 上"的静默失效。
+type failingProvider struct {
+	requested string
+	available []string
+}
+
+func (p *failingProvider) Name() string { return "capability.invalid" }
+func (p *failingProvider) Register(c runtimecontract.Container) error {
+	return fmt.Errorf("capability backend %q is not registered; check the config value or blank-import the provider package (available: %s)", p.requested, strings.Join(p.available, ", "))
+}
+func (p *failingProvider) Boot(runtimecontract.Container) error { return nil }
+func (p *failingProvider) IsDefer() bool                       { return false }
+func (p *failingProvider) Provides() []string                  { return nil }
+func (p *failingProvider) DependsOn() []string                 { return nil }
+
+// factoryKeys 返回工厂 map 中已注册的后端名（排序，用于错误提示）。
+func factoryKeys(factories map[string]providerFactory) []string {
+	keys := make([]string, 0, len(factories))
+	for k := range factories {
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // defaultTracingProvider returns the default tracing provider used by bootstrap fallbacks.

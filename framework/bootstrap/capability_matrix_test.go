@@ -14,7 +14,6 @@ import (
 	"github.com/ngq/gorp/framework"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
-	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,6 +31,12 @@ func (s *matrixReloadingConfigStub) Reload(ctx context.Context) error {
 	return nil
 }
 
+// TestRegisterSelectedMicroserviceProviders_ProductionMainlineMatrix verifies that a
+// production-mainline config referencing contrib backends without registering them
+// fail-fasts (per capability decision: unknown backend → run failure, not silent noop).
+//
+// TestRegisterSelectedMicroserviceProviders_ProductionMainlineMatrix 验证生产主线配置
+// 引用了 contrib 后端但未注册时按 fail-fast 决策失败（未知后端→启动失败，而非静默 noop）。
 func TestRegisterSelectedMicroserviceProviders_ProductionMainlineMatrix(t *testing.T) {
 	app := framework.NewApplication()
 	c := app.Container()
@@ -52,13 +57,12 @@ func TestRegisterSelectedMicroserviceProviders_ProductionMainlineMatrix(t *testi
 		return cfg, nil
 	}, true)
 
-	require.NoError(t, RegisterSelectedMicroserviceProviders(c))
-	// etcd 是 contrib 组件，未注册时不会触发 reload
-	// 因为 configsource.local 是本地配置源，不需要 reload
+	// 生产主线引用了 etcd/redis/sentinel/token 等 contrib 后端，但测试二进制未
+	// 注册这些 contrib —— 按 fail-fast 决策应返回错误，而不是静默降级 noop。
+	err := RegisterSelectedMicroserviceProviders(c)
+	require.Error(t, err, "expected fail-fast for unregistered contrib backends in production mainline")
+	require.Contains(t, err.Error(), "not registered")
+
+	// 由于配置源 etcd 未注册，reload 不应被触发（reload 依赖 configsource 注册成功）。
 	require.False(t, cfg.reloadCalled)
-	// contrib 组件未注册，这些 key 不会被绑定（因为 provider 是 noop）
-	// noop provider 通常不绑定实际能力
-	require.True(t, c.IsBind(transportcontract.RPCRegistryKey))
-	// tracing、serviceauth、messagequeue、dlock、circuitbreaker 都是 contrib 组件
-	// 未注册时是 noop，不会绑定实际能力
 }

@@ -30,11 +30,14 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 	app := framework.NewApplication()
 	c := app.Container()
 	// 配置启用了 tracing，但代码侧显式关闭了 tracing
+	// service_auth/circuit_breaker 显式 noop，避免 micro 默认 contrib 未注册触发 fail-fast
 	cfg := &selectorConfigStub{values: map[string]any{
 		"governance.mode":      "micro",
 		"tracing.enabled":      true,
 		"tracing.backend":      "otel",
 		"service_auth.enabled": true,
+		"service_auth.backend": "noop",
+		"circuit_breaker.backend": "noop",
 	}}
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
@@ -56,7 +59,7 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 		}
 	}
 
-	// serviceauth 没有被代码关闭，但 contrib 未注册，所以是 noop
+	// serviceauth 没有被代码关闭，显式 noop，绑定 ServiceAuthKey
 	assertBoundKey(t, c, securitycontract.ServiceAuthKey)
 }
 
@@ -65,10 +68,13 @@ func TestCodeProviderOverrideWinsOverConfigProviderOverrideForSameKey(t *testing
 	app := framework.NewApplication()
 	c := app.Container()
 	// 配置中 governance.providers.serviceauth 设为 mtls
+	// tracing/circuit_breaker 显式 noop，避免 micro 默认 contrib 未注册触发 fail-fast
 	cfg := &selectorConfigStub{values: map[string]any{
 		"governance.mode":                  "micro",
 		"governance.providers.serviceauth": "mtls",
 		"service_auth.enabled":             true,
+		"tracing.backend":                  "noop",
+		"circuit_breaker.backend":          "noop",
 	}}
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
@@ -101,11 +107,9 @@ func TestOverridePriorityChainForSingleFeature(t *testing.T) {
 	}
 
 	// 级别3：模式默认值 —— microservice 模式下 tracing 默认为 otel
-	// 但 contrib 未注册，回退到 noop
+	// contrib 未注册 → fail-fast（不再是静默回退 noop）
 	modeCfg := &selectorConfigStub{values: map[string]any{"governance.mode": "micro"}}
-	if got := SelectTracingProviderWithMode(modeCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.noop" {
-		t.Fatalf("priority 3 (mode default): expected tracing.noop (otel not registered), got %s", got)
-	}
+	assertFailingProvider(t, SelectTracingProviderWithMode(modeCfg, resiliencecontract.GovernanceModeMicro))
 
 	// 级别2：配置显式覆盖 —— 配置中 governance.providers.tracing = noop 优先于模式默认
 	configOverrideCfg := &selectorConfigStub{values: map[string]any{
@@ -117,9 +121,7 @@ func TestOverridePriorityChainForSingleFeature(t *testing.T) {
 	}
 
 	// 级别1：代码显式覆盖 —— 通过 overlay 注入的代码覆盖优先于配置
-	// 但 contrib 未注册，即使指定 otel 也回退到 noop
+	// 指定 otel 但未注册 → fail-fast
 	overlayCfg := overlayGovernanceConfig(configOverrideCfg, nil, nil, map[string]string{"tracing": "otel"})
-	if got := SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicro).Name(); got != "tracing.noop" {
-		t.Fatalf("priority 1 (code override): expected tracing.noop (otel not registered), got %s", got)
-	}
+	assertFailingProvider(t, SelectTracingProviderWithMode(overlayCfg, resiliencecontract.GovernanceModeMicro))
 }

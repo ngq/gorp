@@ -6,13 +6,15 @@
 // - 验证 RegisterSelectedMicroserviceProviders 的重载、传播与降级行为。
 // - 验证 governance override 链路的优先级顺序。
 //
-// 注意：contrib 组件现在是独立模块，这些测试验证框架选择逻辑，
-// 当 contrib provider 未注册时，会回退到 noop。
+// 注意：contrib 组件现在是独立模块。按 fail-fast 决策：显式配置（含
+// enabled 推断出的默认后端）但 provider 未注册时，选择器返回 failingProvider
+// 使启动失败；只有未配置时才回退 noop/local。
 package bootstrap
 
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/ngq/gorp/framework"
@@ -39,6 +41,50 @@ func (s *reloadingConfigStub) Reload(ctx context.Context) error {
 	return nil
 }
 
+// testRemoteConfigSourceProvider 是一个测试用远程配置源 provider。
+// 注册到 "consul" factory，使 reload 测试能在不引入真实 contrib 的情况下
+// 走"非 local/noop → reload"路径。
+type testRemoteConfigSourceProvider struct{}
+
+func (p *testRemoteConfigSourceProvider) Name() string    { return "configsource.testremote" }
+func (p *testRemoteConfigSourceProvider) IsDefer() bool   { return false }
+func (p *testRemoteConfigSourceProvider) Provides() []string {
+	return []string{datacontract.ConfigSourceKey}
+}
+func (p *testRemoteConfigSourceProvider) DependsOn() []string { return nil }
+func (p *testRemoteConfigSourceProvider) Boot(runtimecontract.Container) error {
+	return nil
+}
+func (p *testRemoteConfigSourceProvider) Register(c runtimecontract.Container) error {
+	c.Bind(datacontract.ConfigSourceKey, func(runtimecontract.Container) (any, error) {
+		return &testConfigSource{}, nil
+	}, true)
+	return nil
+}
+
+type testConfigSource struct{}
+
+func (s *testConfigSource) Load(ctx context.Context) (map[string]any, error) {
+	return map[string]any{}, nil
+}
+func (s *testConfigSource) Get(ctx context.Context, key string) (any, error) {
+	return nil, nil
+}
+func (s *testConfigSource) Set(ctx context.Context, key string, value any) error {
+	return nil
+}
+func (s *testConfigSource) Watch(ctx context.Context, key string) (datacontract.ConfigWatcher, error) {
+	return nil, nil
+}
+func (s *testConfigSource) Close() error { return nil }
+
+// registerTestConsulConfigSource 把测试 config source 注册到 "consul" 后端。
+func registerTestConsulConfigSource() {
+	RegisterConfigSourceProviderFactory("consul", func() runtimecontract.ServiceProvider {
+		return &testRemoteConfigSourceProvider{}
+	})
+}
+
 // =============================================================================
 // RegisterSelectedMicroserviceProviders 注册与重载行为
 // =============================================================================
@@ -52,6 +98,9 @@ func TestRegisterSelectedMicroserviceProviders_SkipsWithoutConfigBinding(t *test
 }
 
 func TestRegisterSelectedMicroserviceProviders_ReloadsRemoteConfigSourceBeforeSelectingOthers(t *testing.T) {
+	// 注册测试用 "consul" 配置源，使 reload 路径生效。
+	registerTestConsulConfigSource()
+
 	app := framework.NewApplication()
 	c := app.Container()
 	cfg := &reloadingConfigStub{
@@ -59,11 +108,13 @@ func TestRegisterSelectedMicroserviceProviders_ReloadsRemoteConfigSourceBeforeSe
 			"configsource.backend": "consul",
 		}},
 		valuesAfterReload: map[string]any{
-			"discovery.backend":        "consul",
-			"tracing.enabled":          true,
-			"service_auth.enabled":     true,
-			"message_queue.enabled":    true,
-			"distributed_lock.enabled": true,
+			// 其余能力显式 noop，聚焦验证"远程配置源触发 reload"
+			"discovery.backend":        "noop",
+			"tracing.backend":         "noop",
+			"service_auth.backend":    "noop",
+			"message_queue.backend":   "noop",
+			"distributed_lock.backend": "noop",
+			"circuit_breaker.backend": "noop",
 		},
 	}
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
@@ -73,16 +124,13 @@ func TestRegisterSelectedMicroserviceProviders_ReloadsRemoteConfigSourceBeforeSe
 	if err := RegisterSelectedMicroserviceProviders(c); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	// consul 是 contrib 组件，未注册时不会触发 reload
-	// 因为会回退到 configsource.local
-	if cfg.reloadCalled {
-		t.Fatalf("expected no reload (consul not registered), but reload was called")
+	// consul 配置源已注册，应触发 reload
+	if !cfg.reloadCalled {
+		t.Fatalf("expected reload for remote config source, but reload was NOT called")
 	}
 
 	// RPCRegistry 是 framework 内建能力
 	assertBoundKey(t, c, transportcontract.RPCRegistryKey)
-	// tracing、serviceauth、messagequeue、dlock 都是 contrib 组件
-	// 未注册时是 noop，不会绑定实际能力
 }
 
 func TestRegisterSelectedMicroserviceProviders_DoesNotReloadLocalOrNoopConfigSource(t *testing.T) {
@@ -105,6 +153,9 @@ func TestRegisterSelectedMicroserviceProviders_DoesNotReloadLocalOrNoopConfigSou
 }
 
 func TestRegisterSelectedMicroserviceProviders_PropagatesReloadError(t *testing.T) {
+	// 注册测试用 "consul" 配置源，使 reload 错误能够被触发并传播。
+	registerTestConsulConfigSource()
+
 	app := framework.NewApplication()
 	c := app.Container()
 	cfg := &reloadingConfigStub{
@@ -116,11 +167,12 @@ func TestRegisterSelectedMicroserviceProviders_PropagatesReloadError(t *testing.
 	}, true)
 
 	err := RegisterSelectedMicroserviceProviders(c)
-	// consul 是 contrib 组件，未注册时会回退到 local
-	// local 不需要 reload，所以不会触发 reload 错误
-	// 因此这里期望 nil error
-	if err != nil {
-		t.Fatalf("expected nil error (consul not registered, fallback to local), got %v", err)
+	// 远程配置源 reload 失败应传播错误
+	if err == nil {
+		t.Fatal("expected reload error to propagate, got nil")
+	}
+	if !strings.Contains(err.Error(), "reload failed") {
+		t.Fatalf("expected reload failed in error, got %v", err)
 	}
 }
 

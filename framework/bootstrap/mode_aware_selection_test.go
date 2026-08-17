@@ -31,22 +31,16 @@ func TestModeAwareSelectionsPromoteMicroserviceDefaults(t *testing.T) {
 	if got := SelectSelectorProvider(cfg).Name(); got != "selector.p2c" {
 		t.Fatalf("expected selector.p2c provider implementation, got %s", got)
 	}
-	// otel 是 contrib 组件，未注册时回退到 noop
-	if got := SelectTracingProvider(cfg).Name(); got != "tracing.noop" {
-		t.Fatalf("expected tracing.noop (otel not registered), got %s", got)
-	}
+	// otel 是 contrib 组件，micro 模式默认但未注册 → fail-fast
+	assertFailingProvider(t, SelectTracingProvider(cfg))
 	// metadata.default 是 framework 内建 provider
 	if got := SelectMetadataProvider(cfg).Name(); got != "metadata.default" {
 		t.Fatalf("expected metadata.default, got %s", got)
 	}
-	// token 是 contrib 组件，未注册时回退到 noop
-	if got := SelectServiceAuthProvider(cfg).Name(); got != "serviceauth.noop" {
-		t.Fatalf("expected serviceauth.noop (token not registered), got %s", got)
-	}
-	// sentinel 是 contrib 组件，未注册时回退到 noop
-	if got := SelectCircuitBreakerProvider(cfg).Name(); got != "circuitbreaker.noop" {
-		t.Fatalf("expected circuitbreaker.noop (sentinel not registered), got %s", got)
-	}
+	// token 是 contrib 组件，micro 模式默认但未注册 → fail-fast
+	assertFailingProvider(t, SelectServiceAuthProvider(cfg))
+	// sentinel 是 contrib 组件，micro 模式默认但未注册 → fail-fast
+	assertFailingProvider(t, SelectCircuitBreakerProvider(cfg))
 	// semaphore 是 framework 内建 provider
 	if got := SelectLoadSheddingProvider(cfg).Name(); got != "loadshedding.semaphore" {
 		t.Fatalf("expected loadshedding.semaphore, got %s", got)
@@ -154,35 +148,48 @@ func TestSelectedMicroserviceProvidersPromoteMicroserviceDefaults(t *testing.T) 
 	providers := SelectedMicroserviceProviders(cfg)
 	// 13 providers: discovery, selector, rpc, tracing, metadata, serviceauth,
 	// circuitbreaker, loadshedding, retry, dtm, mq, dlock, websocket
+	// 注意：micro 模式默认引用 contrib 后端（etcd/otel/token/sentinel），
+	// 未注册时为 failingProvider——fail-fast 决策，而非静默 noop。
 	if len(providers) != 13 {
 		t.Fatalf("expected 13 selected providers, got %d", len(providers))
 	}
+	// discovery 不在 micro 特性集，默认仍是 noop
 	assertProviderName(t, providers[0], "discovery.noop")
 	assertProviderName(t, providers[1], "selector.p2c")
 	assertProviderName(t, providers[2], "rpc.noop")
-	// contrib 组件未注册，回退到 noop
-	assertProviderName(t, providers[3], "tracing.noop")
+	assertFailingProvider(t, providers[3]) // tracing → otel 未注册
 	assertProviderName(t, providers[4], "metadata.default")
-	assertProviderName(t, providers[5], "serviceauth.noop")
-	assertProviderName(t, providers[6], "circuitbreaker.noop")
+	assertFailingProvider(t, providers[5]) // serviceauth → token 未注册
+	assertFailingProvider(t, providers[6]) // circuitbreaker → sentinel 未注册
 	assertProviderName(t, providers[7], "loadshedding.semaphore")
 }
 
 func TestRegisterSelectedMicroserviceProvidersWithModeOverrideWinsOverConfig(t *testing.T) {
+	// 强制 micro 模式会引用 contrib 默认后端（未注册时 fail-fast）。
+	// 这里把 contrib 能力显式 noop，聚焦验证"mode override 生效"本身。
 	app := framework.NewApplication()
 	c := app.Container()
-	cfg := &selectorConfigStub{values: map[string]any{"governance.mode": "mono"}}
+	cfg := &selectorConfigStub{values: map[string]any{
+		"governance.mode": "mono",
+		// 显式 noop，避免 micro 默认（etcd/otel/token/sentinel）未注册触发 fail-fast
+		"discovery.backend":        "noop",
+		"tracing.backend":         "noop",
+		"service_auth.backend":    "noop",
+		"circuit_breaker.backend": "noop",
+		"message_queue.backend":   "noop",
+		"distributed_lock.backend": "noop",
+		"websocket.backend":       "noop",
+		"dtm.backend":             "noop",
+	}}
 	c.Bind(datacontract.ConfigKey, func(runtimecontract.Container) (any, error) {
 		return cfg, nil
 	}, true)
 
+	// modeOverride=micro 应覆盖配置的 mono——但因 contrib 未注册且未显式
+	// noop 的能力会 fail-fast；此处全部显式 noop，注册应成功。
 	if err := RegisterSelectedMicroserviceProvidersWithMode(c, "micro"); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-
-	// contrib 组件未注册，这些 key 不会被绑定（因为 provider 是 noop）
-	// noop provider 通常不绑定实际能力
-	// 所以我们只验证调用成功，不验证 key 绑定
 }
 
 func assertProviderName(t *testing.T, provider runtime.ServiceProvider, expected string) {
