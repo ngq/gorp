@@ -13,7 +13,12 @@ import (
 )
 
 // LoggerFromContainer tries to get framework logger.
+// A nil container yields a nil logger: callers such as SafeGo's recover path
+// must never panic while handling another panic.
 func LoggerFromContainer(c runtimecontract.Container) observabilitycontract.Logger {
+	if c == nil {
+		return nil
+	}
 	v, err := c.Make(observabilitycontract.LogKey)
 	if err != nil {
 		return nil

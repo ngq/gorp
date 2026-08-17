@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -51,6 +52,13 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 			)
 			defer span.End()
 
+			// 把带 span 的 ctx 回写进请求，后续中间件、handler 及其发起的
+			// RPC/DB 调用才能挂到这个 server span 上；不回写则链路在 HTTP
+			// 入口即断裂（所有子 span 拿不到父）。
+			if gc, ok := unwrapGinContext(c); ok && gc.Request != nil {
+				gc.Request = gc.Request.WithContext(ctx)
+			}
+
 			if traceID := span.SpanContext().TraceID; traceID != "" {
 				c.Set("trace_id", traceID)
 			}
@@ -84,6 +92,23 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 
 type httpHeaderCarrier struct {
 	header http.Header
+}
+
+// unwrapGinContext extracts the raw gin.Context from a transport Context,
+// mirroring metadata middleware's helper.
+func unwrapGinContext(c transportcontract.Context) (*gin.Context, bool) {
+	type ginContextProvider interface {
+		GinContext() *gin.Context
+	}
+	provider, ok := c.(ginContextProvider)
+	if !ok {
+		return nil, false
+	}
+	gc := provider.GinContext()
+	if gc == nil {
+		return nil, false
+	}
+	return gc, true
 }
 
 func (c *httpHeaderCarrier) Get(key string) string {

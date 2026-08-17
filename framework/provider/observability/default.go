@@ -9,6 +9,8 @@ package observability
 
 import (
 	"context"
+	"sort"
+	"sync"
 	"time"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -61,50 +63,72 @@ func NewPrometheusMetrics() *PrometheusMetrics {
 	return &PrometheusMetrics{}
 }
 
+// collector 缓存：同一 name 重复调用 promauto.New*Vec 会向默认注册表重复
+// 注册并 panic，必须按 name 复用已创建的 collector。
+var (
+	counterVecs   sync.Map // name -> *prometheus.CounterVec
+	gaugeVecs     sync.Map // name -> *prometheus.GaugeVec
+	histogramVecs sync.Map // name -> *prometheus.HistogramVec
+)
+
 func (m *PrometheusMetrics) Counter(name string, labels map[string]string, delta float64) {
-	counter := promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: name,
-		Help: name,
-	}, labelKeys(labels))
-	counter.WithLabelValues(labelValues(labels)...).Add(delta)
+	keys, values := labelKeysAndValues(labels)
+	counter, ok := counterVecs.Load(name)
+	if !ok {
+		counter = promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: name,
+			Help: name,
+		}, keys)
+		counter, _ = counterVecs.LoadOrStore(name, counter)
+	}
+	counter.(*prometheus.CounterVec).WithLabelValues(values...).Add(delta)
 }
 
 func (m *PrometheusMetrics) Gauge(name string, labels map[string]string, value float64) {
-	gauge := promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: name,
-		Help: name,
-	}, labelKeys(labels))
-	gauge.WithLabelValues(labelValues(labels)...).Set(value)
+	keys, values := labelKeysAndValues(labels)
+	gauge, ok := gaugeVecs.Load(name)
+	if !ok {
+		gauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name: name,
+			Help: name,
+		}, keys)
+		gauge, _ = gaugeVecs.LoadOrStore(name, gauge)
+	}
+	gauge.(*prometheus.GaugeVec).WithLabelValues(values...).Set(value)
 }
 
 func (m *PrometheusMetrics) Histogram(name string, labels map[string]string, value float64) {
-	histogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    name,
-		Help:    name,
-		Buckets: prometheus.DefBuckets,
-	}, labelKeys(labels))
-	histogram.WithLabelValues(labelValues(labels)...).Observe(value)
+	keys, values := labelKeysAndValues(labels)
+	histogram, ok := histogramVecs.Load(name)
+	if !ok {
+		histogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    name,
+			Help:    name,
+			Buckets: prometheus.DefBuckets,
+		}, keys)
+		histogram, _ = histogramVecs.LoadOrStore(name, histogram)
+	}
+	histogram.(*prometheus.HistogramVec).WithLabelValues(values...).Observe(value)
 }
 
 func (m *PrometheusMetrics) Timing(name string, labels map[string]string, duration time.Duration) {
 	m.Histogram(name+"_seconds", labels, duration.Seconds())
 }
 
-func labelKeys(labels map[string]string) []string {
+// labelKeysAndValues 在单次确定序（按 key 排序）中同时产出 keys 与 values。
+// 旧实现 labelKeys/labelValues 各自遍历 map，Go map 顺序随机，
+// 两次结果不一致时标签值会张冠李戴（如 path=200, status="/a"）。
+func labelKeysAndValues(labels map[string]string) ([]string, []string) {
 	keys := make([]string, 0, len(labels))
 	for k := range labels {
 		keys = append(keys, k)
 	}
-	return keys
-}
-
-func labelValues(labels map[string]string) []string {
-	keys := labelKeys(labels)
+	sort.Strings(keys)
 	values := make([]string, len(keys))
 	for i, k := range keys {
 		values[i] = labels[k]
 	}
-	return values
+	return keys, values
 }
 
 type NoopTracer struct{}

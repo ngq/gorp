@@ -269,9 +269,11 @@ func (h *healthChecker) AddDependency(name string, dep observabilitycontract.Dep
 // 规则：
 // - 任一组件 unhealthy → 整体 unhealthy
 // - 任一依赖 unhealthy → 整体 degraded（除非有组件 unhealthy）
+// - 任一组件或依赖 degraded → 整体 degraded
 // - 全部 healthy → 整体 healthy
 func (h *healthChecker) calculateOverallStatus(report *observabilitycontract.HealthReport) observabilitycontract.HealthStatus {
 	hasUnhealthyComponent := false
+	hasDegradedComponent := false
 	hasUnhealthyDep := false
 	hasDegradedDep := false
 
@@ -279,6 +281,9 @@ func (h *healthChecker) calculateOverallStatus(report *observabilitycontract.Hea
 	for _, result := range report.Checks {
 		if result.Status == observabilitycontract.HealthStatusUnhealthy {
 			hasUnhealthyComponent = true
+		}
+		if result.Status == observabilitycontract.HealthStatusDegraded {
+			hasDegradedComponent = true
 		}
 	}
 
@@ -295,6 +300,11 @@ func (h *healthChecker) calculateOverallStatus(report *observabilitycontract.Hea
 	// 计算整体状态
 	if hasUnhealthyComponent {
 		return observabilitycontract.HealthStatusUnhealthy
+	}
+	// 组件 degraded 同样要拉低整体状态：按整体状态摘流量的 LB/编排器
+	// 否则看不到降级的组件。
+	if hasDegradedComponent {
+		return observabilitycontract.HealthStatusDegraded
 	}
 	if hasUnhealthyDep {
 		return observabilitycontract.HealthStatusDegraded

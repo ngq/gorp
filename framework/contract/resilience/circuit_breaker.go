@@ -53,4 +53,7 @@ type ResourceConfig struct {
 	Timeout               time.Duration
 	RetryTimeoutMs        int64
 	Interval              time.Duration
+	// Strategy 是可选的按资源熔断策略："error_ratio"（默认）、
+	// "error_count"、"slow_request_ratio"。空值回退默认策略。
+	Strategy string
 }

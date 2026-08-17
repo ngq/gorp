@@ -10,6 +10,7 @@ package goroutine
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/debug"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -25,14 +26,24 @@ func SafeGo(ctx context.Context, c runtimecontract.Container, fn func(context.Co
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				l := LoggerFromContainer(c)
-				if l != nil {
-					l.Error("panic in goroutine", observabilitycontract.Field{Key: "recover", Value: r}, observabilitycontract.Field{Key: "stack", Value: string(debug.Stack())})
-				}
+				logRecoveredPanic(c, r)
 			}
 		}()
 		fn(ctx)
 	}()
+}
+
+// logRecoveredPanic reports a recovered panic. It guards itself with a recover
+// so the recovery path can never crash the process, and falls back to stderr
+// when no logger is available.
+func logRecoveredPanic(c runtimecontract.Container, r any) {
+	defer func() { _ = recover() }()
+	l := LoggerFromContainer(c)
+	if l == nil {
+		fmt.Fprintf(os.Stderr, "panic in goroutine (no logger): %v\n%s\n", r, debug.Stack())
+		return
+	}
+	l.Error("panic in goroutine", observabilitycontract.Field{Key: "recover", Value: r}, observabilitycontract.Field{Key: "stack", Value: string(debug.Stack())})
 }
 
 // SafeGoAndWait runs multiple functions concurrently.

@@ -83,16 +83,17 @@ func (s *Service) Env() string { return s.env }
 // 顺序：本地文件 + 配置源 + 环境变量。
 // 核心逻辑：规范化环境名、加载基础文件、合并环境覆盖、应用环境变量。
 func (s *Service) Load(env string) error {
-	s.mu.Lock()
-	s.env = NormalizeEnv(env)
+	env = NormalizeEnv(env)
 
 	root := projectRoot()
 	v := viper.New()
-	if err := LoadLocalConfigToViper(v, s.env, root); err != nil {
+	if err := LoadLocalConfigToViper(v, env, root); err != nil {
 		return err
 	}
 
-	// 若配置源存在，则用配置源结果覆盖本地配置。
+	// Remote source I/O stays outside the write lock (mirrors Reload) so a slow
+	// or unreachable config center cannot stall every reader; the lock only
+	// guards the final state swap, and error paths return with it released.
 	if s.source != nil {
 		remoteCfg, err := s.source.Load(context.Background())
 		if err != nil {
@@ -103,6 +104,8 @@ func (s *Service) Load(env string) error {
 		}
 	}
 
+	s.mu.Lock()
+	s.env = env
 	s.v = v
 	s.mu.Unlock()
 	return nil
@@ -407,13 +410,17 @@ type localConfigWatcher struct {
 
 func newLocalConfigWatcher(parent context.Context, service *Service, key string, interval time.Duration) datacontract.ConfigWatcher {
 	ctx, cancel := context.WithCancel(parent)
+	// 在 service 读锁下取 env：与并发 Load/Reload 的写入构成 data race。
+	service.mu.RLock()
+	env := service.env
+	service.mu.RUnlock()
 	w := &localConfigWatcher{
 		ctx:       ctx,
 		cancel:    cancel,
 		service:   service,
 		interval:  interval,
 		callbacks: make(map[string][]func(value any)),
-		lastState: collectLocalConfigState(service.env),
+		lastState: collectLocalConfigState(env),
 	}
 	if strings.TrimSpace(key) != "" {
 		w.callbacks[key] = nil
@@ -482,16 +489,27 @@ func (w *localConfigWatcher) checkAndReload() {
 		return
 	}
 
+	// 快照后到锁外触发回调：回调内再调用 OnChange（写锁）时，
+	// 持读锁调用会构成 RWMutex 重入死锁。
+	type pendingCallback struct {
+		callback func(value any)
+		value    any
+	}
+	pending := make([]pendingCallback, 0)
 	w.mu.RLock()
-	defer w.mu.RUnlock()
 	for _, key := range keys {
 		value := w.service.Get(key)
 		if reflect.DeepEqual(previous[key], value) {
 			continue
 		}
 		for _, callback := range w.callbacks[key] {
-			callback(value)
+			pending = append(pending, pendingCallback{callback: callback, value: value})
 		}
+	}
+	w.mu.RUnlock()
+
+	for _, pc := range pending {
+		pc.callback(pc.value)
 	}
 }
 

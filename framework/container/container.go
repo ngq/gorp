@@ -834,11 +834,9 @@ func (c *Container) ProviderDAG() runtimecontract.ProviderDAG {
 				// key 由延迟 provider 承诺提供。
 				edge.To = c.deferredByKey[depKey]
 			}
-			if edge.To != "" || edge.To == "" {
-				// Always add edge to show dependency, even if external.
-				// 始终添加边以显示依赖关系，即使是外部依赖。
-				dag.Edges = append(dag.Edges, edge)
-			}
+			// Always add edge to show dependency, even if external.
+			// 始终添加边以显示依赖关系，即使是外部依赖。
+			dag.Edges = append(dag.Edges, edge)
 		}
 	}
 
@@ -896,19 +894,8 @@ func (c *Container) ProviderDAG() runtimecontract.ProviderDAG {
 
 	// Compute load order using topological sort (Kahn's algorithm).
 	// 使用拓扑排序（Kahn 算法）计算加载顺序。
-	inDegree := make(map[string]int)
-	for name := range nodeMap {
-		inDegree[name] = 0
-	}
-	for _, edge := range dag.Edges {
-		if edge.To != "" {
-			inDegree[edge.To]++ // edge.To is depended by edge.From
-		}
-	}
-
-	// Reverse: edge.From depends on edge.To, so edge.To should be loaded first.
-	// Actually we need to reverse the direction for load order.
-	// 实际上需要反转方向来计算加载顺序。
+	// edge.From depends on edge.To, so edge.To should be loaded first.
+	// edge.From 依赖 edge.To，因此 edge.To 应先加载。
 	adj := make(map[string][]string) // provider -> providers that depend on it
 	for name := range nodeMap {
 		adj[name] = nil
@@ -919,9 +906,9 @@ func (c *Container) ProviderDAG() runtimecontract.ProviderDAG {
 		}
 	}
 
-	// Recompute in-degree: count how many providers each provider depends on.
-	// 重新计算入度：统计每个 provider 依赖多少个其他 provider。
-	inDegree = make(map[string]int)
+	// Compute in-degree: count how many providers each provider depends on.
+	// 计算入度：统计每个 provider 依赖多少个其他 provider。
+	inDegree := make(map[string]int)
 	for name := range nodeMap {
 		inDegree[name] = 0
 	}

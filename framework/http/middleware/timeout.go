@@ -244,7 +244,7 @@ func copyTimeoutHeaders(dst, src http.Header) {
 func writeTimeoutResponse(writer http.ResponseWriter) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.WriteHeader(http.StatusGatewayTimeout)
-	_, _ = writer.Write([]byte(`{"code":503,"message":"request timeout","data":null}`))
+	_, _ = writer.Write([]byte(`{"code":1006,"message":"request timeout","data":null}`))
 }
 
 // RequestTimeout returns the remaining timeout budget of the current request.

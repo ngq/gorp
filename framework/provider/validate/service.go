@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/go-playground/locales/en"
 	"github.com/go-playground/locales/zh"
@@ -28,6 +29,9 @@ import (
 //
 // ValidatorService 使用 go-playground/validator 实现 datacontract.Validator 接口。
 type ValidatorService struct {
+	mu sync.RWMutex // mu 保护 trans/cfg：SetLocale 与并发 Validate 存在 data race，
+	//
+	// mu guards trans/cfg against data races between SetLocale and concurrent Validate.
 	validate *validator.Validate // validate is the underlying validator.
 	//
 	// validate 底层验证器。
@@ -159,8 +163,10 @@ func (s *ValidatorService) SetLocale(locale string) error {
 		return fmt.Errorf("validate: locale %s not supported", locale)
 	}
 
+	s.mu.Lock()
 	s.trans = trans
 	s.cfg.Locale = locale
+	s.mu.Unlock()
 	return nil
 }
 
@@ -183,12 +189,17 @@ func (s *ValidatorService) TranslateError(err error) error {
 		return resiliencecontract.BadRequest(resiliencecontract.ErrorReasonBadRequest, err.Error())
 	}
 
+	s.mu.RLock()
+	translateEnabled := s.cfg.TranslateErrors
+	trans := s.trans
+	s.mu.RUnlock()
+
 	// If TranslateErrors is false, return raw English errors without translation.
 	// This saves ~1.6 µs per validation failure (translation + JSON overhead).
 	//
 	// 如果 TranslateErrors 为 false，返回原始英文错误不做翻译。
 	// 这样每次验证失败可节省约 1.6 µs（翻译 + JSON 开销）。
-	if !s.cfg.TranslateErrors {
+	if !translateEnabled {
 		msgs := make([]string, len(validationErrors))
 		for i, fe := range validationErrors {
 			msgs[i] = fe.Error() // Raw English error: "Key: 'User.Email' Error:Field validation for 'Email' failed on the 'email' tag"
@@ -206,7 +217,7 @@ func (s *ValidatorService) TranslateError(err error) error {
 		details = append(details, datacontract.ValidationError{
 			Field:   fe.Field(),
 			Tag:     fe.Tag(),
-			Message: fe.Translate(s.trans),
+			Message: fe.Translate(trans),
 			Value:   fe.Value(),
 		})
 	}

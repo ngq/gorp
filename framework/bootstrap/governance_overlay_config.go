@@ -48,22 +48,20 @@ func (c *governanceOverlayConfig) Get(key string) any {
 	// 使用显式逻辑流处理 overlay key（无隐式 fallthrough）。
 	// 比 switch fallthrough 更清晰，新增 key 时不易出错。
 
-	// governance.disable: return overlay value if non-empty, otherwise fallback to base.
+	// governance.disable / governance.enable: union of overlay and base lists.
+	// Merging (not replacing) keeps registration behavior consistent with the
+	// governance summary, which also unions both layers — replacing base here
+	// made the summary report a capability as disabled while its provider was
+	// still registered.
+	//
+	// governance.disable / governance.enable：overlay 与 base 取并集。
+	// 用合并而非替换，使注册行为与治理摘要（同为并集语义）一致——
+	// 此前替换会让摘要报告某能力已禁用，实际容器中仍注册了 provider。
 	if key == "governance.disable" {
-		if len(c.governanceDisable) > 0 {
-			return append([]string(nil), c.governanceDisable...)
-		}
-		// Empty overlay, fall through to base config.
-		// overlay 为空，fallback 到基础配置。
+		return mergeOverlayListWithBase(c.base, key, c.governanceDisable)
 	}
-
-	// governance.enable: return overlay value if non-empty, otherwise fallback to base.
 	if key == "governance.enable" {
-		if len(c.governanceEnable) > 0 {
-			return append([]string(nil), c.governanceEnable...)
-		}
-		// Empty overlay, fall through to base config.
-		// overlay 为空，fallback 到基础配置。
+		return mergeOverlayListWithBase(c.base, key, c.governanceEnable)
 	}
 
 	// governance.providers.*: check overlay map first.
@@ -76,6 +74,42 @@ func (c *governanceOverlayConfig) Get(key string) any {
 		return nil
 	}
 	return c.base.Get(key)
+}
+
+// mergeOverlayListWithBase 返回 overlay 列表与 base 配置同 key 列表的并集
+// （overlay 在前，去重）。
+func mergeOverlayListWithBase(base datacontract.Config, key string, overlay []string) []string {
+	merged := make([]string, 0, len(overlay))
+	seen := make(map[string]struct{}, len(overlay))
+	for _, v := range overlay {
+		if _, dup := seen[v]; dup {
+			continue
+		}
+		seen[v] = struct{}{}
+		merged = append(merged, v)
+	}
+	if base == nil {
+		return merged
+	}
+	switch values := base.Get(key).(type) {
+	case []string:
+		for _, v := range values {
+			if _, dup := seen[v]; !dup {
+				seen[v] = struct{}{}
+				merged = append(merged, v)
+			}
+		}
+	case []any:
+		for _, raw := range values {
+			if v, ok := raw.(string); ok {
+				if _, dup := seen[v]; !dup {
+					seen[v] = struct{}{}
+					merged = append(merged, v)
+				}
+			}
+		}
+	}
+	return merged
 }
 
 func (c *governanceOverlayConfig) GetString(key string) string {

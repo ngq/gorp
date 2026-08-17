@@ -239,6 +239,11 @@ func (l *TokenBucketLimiter) Allow(_ string) bool {
 	return false
 }
 
+// maxLimiterTrackedKeys 是限流器 key map 的清扫阈值。
+// 以 IP 为 key 时，攻击者可用海量伪造 IP 使无清扫的 map 无限膨胀
+// （DoS 放大）；超过阈值后触发一次过期 key 清扫以约束内存上界。
+const maxLimiterTrackedKeys = 100000
+
 // SlidingWindowLimiter is an in-memory sliding-window limiter.
 //
 // SlidingWindowLimiter 是一个内存滑动窗口限流器。
@@ -290,7 +295,19 @@ func (l *SlidingWindowLimiter) Allow(key string) bool {
 		return false
 	}
 	record.timestamps = append(record.timestamps, now)
+	if len(l.counts) > maxLimiterTrackedKeys {
+		l.sweepLocked(threshold)
+	}
 	return true
+}
+
+// sweepLocked 删除窗口内已无任何请求的 key。调用方必须持有 l.mu。
+func (l *SlidingWindowLimiter) sweepLocked(threshold time.Time) {
+	for k, rec := range l.counts {
+		if len(rec.timestamps) == 0 || !rec.timestamps[len(rec.timestamps)-1].After(threshold) {
+			delete(l.counts, k)
+		}
+	}
 }
 
 // FixedWindowLimiter is an in-memory fixed-window limiter.
@@ -334,5 +351,18 @@ func (l *FixedWindowLimiter) Allow(key string) bool {
 		return false
 	}
 	l.counts[key]++
+	if len(l.counts) > maxLimiterTrackedKeys {
+		l.sweepLocked(now)
+	}
 	return true
+}
+
+// sweepLocked 删除窗口已过期的 key。调用方必须持有 l.mu。
+func (l *FixedWindowLimiter) sweepLocked(now time.Time) {
+	for k, start := range l.windows {
+		if now.Sub(start) >= l.window {
+			delete(l.windows, k)
+			delete(l.counts, k)
+		}
+	}
 }

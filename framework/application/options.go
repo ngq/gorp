@@ -61,6 +61,9 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 		if len(h.GovernanceDisable) > 0 {
 			cfg.httpOpts.GovernanceDisable = append([]string(nil), h.GovernanceDisable...)
 		}
+		if len(h.GovernanceEnable) > 0 {
+			cfg.httpOpts.GovernanceEnable = append([]string(nil), h.GovernanceEnable...)
+		}
 		if len(h.GovernanceProviders) > 0 {
 			cfg.httpOpts.GovernanceProviders = cloneGovernanceProviders(h.GovernanceProviders)
 		}

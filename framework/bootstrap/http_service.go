@@ -662,6 +662,7 @@ func registerGRPCToHost(c runtimecontract.Container, hostSvc runtimecontract.Hos
 
 	rpcServer, ok := rpcServerAny.(transportcontract.RPCServer)
 	if !ok {
+		logger.Info(fmt.Sprintf("rpc server binding has unexpected type %T, skipping grpc host registration", rpcServerAny))
 		return false
 	}
 
@@ -721,10 +722,14 @@ func runHTTPDirectlyContext(parent context.Context, c runtimecontract.Container,
 	if c.IsBind(transportcontract.GRPCServerRegistrarKey) {
 		if rpcServerAny, rpcErr := c.Make(transportcontract.RPCServerKey); rpcErr == nil {
 			if rs, ok := rpcServerAny.(transportcontract.RPCServer); ok {
-				if startErr := rs.Start(ctx); startErr == nil {
+				if startErr := rs.Start(ctx); startErr != nil {
+					logger.Info(fmt.Sprintf("grpc server start failed (direct mode): %v", startErr))
+				} else {
 					rpcServer = rs
 					logger.Info("starting grpc server (direct mode)")
 				}
+			} else if rpcServerAny != nil {
+				logger.Info(fmt.Sprintf("rpc server binding has unexpected type %T, skipping grpc in direct mode", rpcServerAny))
 			}
 		}
 	}

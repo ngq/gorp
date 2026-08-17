@@ -9,6 +9,7 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -90,13 +91,23 @@ func (b *LocalEventBus) Publish(ctx context.Context, event integrationcontract.E
 
 	var firstErr error
 	for _, handler := range handlers {
-		if err := handler(ctx, event); err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
+		if err := invokeHandler(ctx, event.Name(), handler, event); err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
 	return firstErr
+}
+
+// invokeHandler runs one subscriber. A panicking listener is converted to an
+// error instead of unwinding into the publisher's call stack, so the remaining
+// listeners still run and the publishing request is not taken down.
+func invokeHandler(ctx context.Context, eventName string, handler integrationcontract.EventHandler, event integrationcontract.Event) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("event %s: handler panicked: %v", eventName, r)
+		}
+	}()
+	return handler(ctx, event)
 }
 
 // PublishAsync 异步发布事件。

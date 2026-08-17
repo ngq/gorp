@@ -67,10 +67,15 @@ func ETag() transportcontract.Middleware {
 			if status == 0 {
 				status = http.StatusOK
 			}
+			// Non-2xx and empty-body responses bypass ETag handling, but the
+			// staged status/headers/body must still reach the client instead of
+			// collapsing into an empty 200.
 			if status < 200 || status >= 300 {
+				recorder.FlushTo(gc.Writer)
 				return
 			}
 			if len(recorder.body) == 0 {
+				recorder.FlushTo(gc.Writer)
 				return
 			}
 
@@ -81,6 +86,7 @@ func ETag() transportcontract.Middleware {
 			}
 
 			if matchesIfNoneMatch(req.Header.Get("If-None-Match"), etag) {
+				copyHeaders(gc.Writer.Header(), recorder.header)
 				clearEntityHeaders(gc.Writer.Header())
 				gc.Header("ETag", etag)
 				gc.Status(http.StatusNotModified)

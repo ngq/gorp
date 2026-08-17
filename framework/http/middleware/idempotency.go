@@ -53,6 +53,17 @@ type IdempotencyStore interface {
 	//
 	// Commit 为之前预留的 key 存储最终响应。
 	Commit(key string, response *IdempotencyResponse, ttl time.Duration)
+
+	// Release drops a previously reserved placeholder without storing a
+	// response. The middleware calls it when processing failed or panicked:
+	// keeping the placeholder would make every retry within the TTL window
+	// hit the 409 "being processed" branch, contradicting the "failures may
+	// be retried" contract.
+	//
+	// Release 丢弃之前预留的占位符而不存储响应。中间件在处理失败或 panic 时
+	// 调用：保留占位符会让 TTL 窗口内的所有重试都命中 409"正在处理"分支，
+	// 与"失败可重试"的契约矛盾。
+	Release(key string)
 }
 
 // IdempotencyResponse is the cached response payload used for replay.
@@ -203,6 +214,18 @@ func (s *MemoryIdempotencyStore) Commit(key string, response *IdempotencyRespons
 	})
 }
 
+// Release drops the reserved placeholder for the key. No-op if the entry was
+// already committed or replaced by another reservation.
+//
+// Release 丢弃 key 的预留占位符。条目已提交或已被其他预留替换时为空操作。
+func (s *MemoryIdempotencyStore) Release(key string) {
+	if v, ok := s.data.Load(key); ok {
+		if entry, ok2 := v.(*idempotencyEntry); ok2 && !entry.committed {
+			s.data.CompareAndDelete(key, entry)
+		}
+	}
+}
+
 // cleanup removes expired entries from the in-memory store.
 //
 // cleanup 清理内存存储中已过期的记录。
@@ -271,6 +294,14 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 			return
 		}
 
+		committed := false
+		// panic 也会走 defer：未提交即释放占位符，避免 key 被锁到 TTL。
+		defer func() {
+			if !committed {
+				store.Release(key)
+			}
+		}()
+
 		recorder := &idempotencyResponseWriter{ResponseWriter: c.Writer}
 		c.Writer = recorder
 		c.Next()
@@ -286,6 +317,9 @@ func IdempotencyMiddleware(store IdempotencyStore, ttl time.Duration) gin.Handle
 		// 如果需要缓存所有响应（无论状态码），请实现自定义 IdempotencyStore。
 		if recorder.Status() < 400 {
 			store.Commit(key, captureIdempotencyResponse(c, recorder), ttl)
+			committed = true
+		} else {
+			store.Release(key)
 		}
 	}
 }
@@ -345,6 +379,14 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.Mi
 				return
 			}
 
+			committed := false
+			// panic 也会走 defer：未提交即释放占位符，避免 key 被锁到 TTL。
+			defer func() {
+				if !committed {
+					store.Release(key)
+				}
+			}()
+
 			if gc, ok := unwrapGinContext(c); ok {
 				recorder := &idempotencyResponseWriter{ResponseWriter: gc.Writer}
 				gc.Writer = recorder
@@ -354,6 +396,9 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.Mi
 				gc.Writer = recorder.ResponseWriter
 				if recorder.Status() > 0 && recorder.Status() < 400 {
 					store.Commit(key, captureIdempotencyResponse(gc, recorder), ttl)
+					committed = true
+				} else {
+					store.Release(key)
 				}
 				return
 			}
@@ -363,6 +408,9 @@ func Idempotency(store IdempotencyStore, ttl time.Duration) transportcontract.Mi
 			}
 			if status := c.ResponseStatus(); status > 0 && status < 400 {
 				store.Commit(key, &IdempotencyResponse{StatusCode: status}, ttl)
+				committed = true
+			} else {
+				store.Release(key)
 			}
 		}
 	}

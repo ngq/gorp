@@ -10,8 +10,6 @@
 package middleware
 
 import (
-	"errors"
-	"io"
 	"net/http"
 
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -50,9 +48,9 @@ func BodyLimit(maxBytes int64) transportcontract.Middleware {
 
 			if next != nil {
 				next(c)
-				if errors.Is(req.Context().Err(), io.EOF) {
-					return
-				}
+				// 超限读会在 handler 内以 body 读取错误的形式暴露并由其自行
+				// 响应；这里不再检查（旧代码的 errors.Is(ctx.Err(), io.EOF)
+				// 恒为 false——ctx.Err() 只返回 Canceled/DeadlineExceeded/nil）。
 			}
 		}
 	}

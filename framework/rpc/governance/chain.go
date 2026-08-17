@@ -179,9 +179,14 @@ func MetadataMiddleware(propagator transportcontract.MetadataPropagator) transpo
 			return next
 		}
 		return func(ctx context.Context, service, method string, req, resp any) error {
+			// Copy 后再写入：FromOutgoingContext 返回的 md 与同一请求 ctx 上
+			// 并发发起的其他 RPC 共享，直接修改构成 data race 且注入的 kv
+			// 可能互相覆盖。
 			md, ok := metadata.FromOutgoingContext(ctx)
 			if !ok {
 				md = metadata.New(nil)
+			} else {
+				md = md.Copy()
 			}
 			carrier := NewGRPCMetadataCarrier(md)
 			propagator.Inject(ctx, carrier)
@@ -204,9 +209,12 @@ func ServiceAuthMiddleware(issuer securitycontract.ServiceTokenIssuer) transport
 		return func(ctx context.Context, service, method string, req, resp any) error {
 			token, err := issuer.GenerateToken(ctx, service)
 			if err == nil && token != "" {
+				// Copy 后再写入，原因见 MetadataMiddleware。
 				md, ok := metadata.FromOutgoingContext(ctx)
 				if !ok {
 					md = metadata.New(nil)
+				} else {
+					md = md.Copy()
 				}
 				md.Set("x-service-token", token)
 				ctx = metadata.NewOutgoingContext(ctx, md)
@@ -228,9 +236,12 @@ func TraceIDMiddleware() transportcontract.RPCClientMiddleware {
 		}
 		return func(ctx context.Context, service, method string, req, resp any) error {
 			if traceID, ok := supportcontract.FromTraceIDContext(ctx); ok && traceID != "" {
+				// Copy 后再写入，原因见 MetadataMiddleware。
 				md, ok := metadata.FromOutgoingContext(ctx)
 				if !ok {
 					md = metadata.New(nil)
+				} else {
+					md = md.Copy()
 				}
 				md.Set("x-trace-id", traceID)
 				ctx = metadata.NewOutgoingContext(ctx, md)

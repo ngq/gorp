@@ -20,6 +20,7 @@ package gin
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ngq/gorp/framework/container"
@@ -149,9 +150,14 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 	return nil
 }
 
+// ginModeOnce 保证 gin.SetMode 只生效一次。gin 的 mode 是进程级全局状态，
+// 多 HTTP 服务逐个调用 SetMode 会互相覆盖（最终只留最后创建的服务配置，
+// 并发创建时还存在对全局变量的并发写）。
+var ginModeOnce sync.Once
+
 func newService(c runtimecontract.Container, cfg serverconfig.Service) transportcontract.HTTP {
 	if cfg.Mode != "" {
-		gin.SetMode(cfg.Mode)
+		ginModeOnce.Do(func() { gin.SetMode(cfg.Mode) })
 	}
 	engine := gin.New()
 	engine.ContextWithFallback = true
@@ -160,6 +166,10 @@ func newService(c runtimecontract.Container, cfg serverconfig.Service) transport
 		observabilitycontract.Field{Key: "http_service", Value: cfg.Name},
 		observabilitycontract.Field{Key: "addr", Value: cfg.Addr},
 	)
+	if cfg.Mode != "" && gin.Mode() != cfg.Mode {
+		// 第一个服务的 mode 已全局生效；提示配置冲突，避免排查困难。
+		logger.Info(fmt.Sprintf("gin mode %q requested but %q already active globally (mode is process-wide; first service wins)", cfg.Mode, gin.Mode()))
+	}
 	engine.Use(adaptMiddleware(httpmiddleware.DefaultMiddleware(logger)))
 	attachHTTPTransportMiddleware(engine, c, cfg.Name)
 	router := newRouter(&engine.RouterGroup, engine)

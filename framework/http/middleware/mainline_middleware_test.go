@@ -289,9 +289,12 @@ func TestIdempotencyReplaysHeadersAndJSONBody(t *testing.T) {
 	}
 }
 
-// TestIdempotencyDoesNotCacheFailedResponse verifies that failed responses are not cached for replay.
+// TestIdempotencyDoesNotCacheFailedResponse verifies that failed responses are
+// not cached and the reservation is released, so the client can retry with the
+// same key (Stripe-style: errors are never replayed; the key stays reusable).
 //
-// TestIdempotencyDoesNotCacheFailedResponse 验证失败响应不会被缓存回放。
+// TestIdempotencyDoesNotCacheFailedResponse 验证失败响应不会被缓存且回滚预留，
+// 客户端可用同一 key 重试（Stripe 模式：错误永不回放，key 保持可用）。
 func TestIdempotencyDoesNotCacheFailedResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := NewTestEngine()
@@ -313,16 +316,17 @@ func TestIdempotencyDoesNotCacheFailedResponse(t *testing.T) {
 	recorder2 := httptest.NewRecorder()
 	router.ServeHTTP(recorder2, req2)
 
-	// The second request should get 409 Conflict because the key is reserved
-	// but not committed (failed response). This prevents duplicate execution
-	// of a failed write, which is the safer behavior.
-	// 第二次请求应获得 409 Conflict，因为 key 已预留但未提交（失败响应）。
-	// 这阻止了对失败写操作的重复执行，是更安全的行为。
-	if hits != 1 {
-		t.Fatalf("expected failed response not re-executed, got handler hits %d", hits)
+	// The retry must re-execute the handler (the failed response is not
+	// replayed, and the reservation is released instead of locking the key
+	// with 409 until TTL — locking it would force the client to mint a NEW
+	// key, which bypasses deduplication entirely).
+	// 重试必须重新执行 handler（失败响应不回放，预留被释放而非用 409 锁到
+	// TTL——锁死会迫使客户端换新 key，反而完全绕过去重）。
+	if hits != 2 {
+		t.Fatalf("expected retry to re-execute handler, got handler hits %d", hits)
 	}
-	if recorder2.Code != http.StatusConflict {
-		t.Fatalf("expected 409 for reserved-but-not-committed key, got %d", recorder2.Code)
+	if recorder2.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 re-executed response, got %d", recorder2.Code)
 	}
 }
 

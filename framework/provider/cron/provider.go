@@ -22,9 +22,11 @@ package cron
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	datacontract "github.com/ngq/gorp/framework/contract/data"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 
 	"github.com/robfig/cron/v3"
@@ -72,7 +74,20 @@ func (p *Provider) DependsOn() []string { return nil }
 // Register 将 Cron 服务工厂绑定到容器。
 // 核心逻辑：创建支持秒级表达式的 Service、绑定工厂。
 func (p *Provider) Register(c runtimecontract.Container) error {
-	c.Bind(runtimecontract.CronKey, func(runtimecontract.Container) (any, error) {
+	c.Bind(runtimecontract.CronKey, func(rc runtimecontract.Container) (any, error) {
+		// cron.timezone: 容器镜像默认 UTC，不配置时区会让
+		// "0 0 3 * * *" 在 UTC 3 点而非业务时区 3 点执行。
+		if cfgAny, err := rc.Make(datacontract.ConfigKey); err == nil {
+			if cfg, ok := cfgAny.(datacontract.Config); ok {
+				if tz := strings.TrimSpace(cfg.GetString("cron.timezone")); tz != "" {
+					loc, err := time.LoadLocation(tz)
+					if err != nil {
+						return nil, fmt.Errorf("cron: invalid cron.timezone %q: %w", tz, err)
+					}
+					return NewServiceWithLocation(loc), nil
+				}
+			}
+		}
 		return NewService(), nil
 	}, true)
 	return nil
@@ -110,22 +125,50 @@ type Service struct {
 	specs map[int]string     // specs maps entryID to the original cron spec expression.
 }
 
-// NewService creates a cron service with second-level expression support.
-// Includes automatic panic recovery chain.
+// NewService creates a cron service with second-level expression support,
+// scheduled in the host's local timezone.
 //
-// NewService 创建支持秒级表达式的 Cron 调度器。
-// 包含自动 panic 恢复链。
+// NewService 创建支持秒级表达式的 Cron 调度器，使用宿主机本地时区。
 func NewService() *Service {
+	return NewServiceWithLocation(time.Local)
+}
+
+// NewServiceWithLocation creates a cron service scheduled in the given
+// timezone. Container images default to UTC — pass the business timezone
+// (or configure cron.timezone) so "0 0 3 * * *" fires at 3am business time,
+// not 3am UTC. Specs may still override per-entry with the CRON_TZ= prefix.
+//
+// NewServiceWithLocation 创建在指定时区调度的 Cron 服务。
+// 容器镜像默认 UTC——传入业务时区（或配置 cron.timezone），
+// 否则 "0 0 3 * * *" 会在 UTC 3 点而非业务时区 3 点执行。
+// 表达式仍可用 CRON_TZ= 前缀逐条覆盖时区。
+func NewServiceWithLocation(loc *time.Location) *Service {
+	if loc == nil {
+		loc = time.Local
+	}
 	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	// 注意：不使用 cron.Recover chain——它会在我们的包装函数之前吞掉 panic，
+	// 导致 recordExecution 与指标均不更新。panic 恢复在包装闭包内处理。
 	c := cron.New(
 		cron.WithParser(parser),
-		cron.WithChain(cron.Recover(cron.DefaultLogger)),
+		cron.WithLocation(loc),
 	)
 	return &Service{
 		c:     c,
 		jobs:  make(map[int]*jobRecord),
 		specs: make(map[int]string),
 	}
+}
+
+// runGuarded 执行任务并恢复 panic，保证 panic 也走统一的
+// recordExecution/指标路径（而非被调度器吞掉后状态停留在上次结果）。
+func runGuarded(fn func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("cron job panicked: %v", r)
+		}
+	}()
+	return fn()
 }
 
 // Add registers a cron job without Prometheus metrics labels.
@@ -142,7 +185,7 @@ func (s *Service) Add(spec string, fn func(ctx context.Context) error) (int, err
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		start := time.Now()
-		runErr := fn(ctx)
+		runErr := runGuarded(func() error { return fn(ctx) })
 		took := time.Since(start)
 		s.recordExecution(int(id), runErr, start, took)
 	})
@@ -179,7 +222,7 @@ func (s *Service) AddNamed(name, spec string, fn func(ctx context.Context) error
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
-		runErr := fn(ctx)
+		runErr := runGuarded(func() error { return fn(ctx) })
 		took := time.Since(start)
 
 		status := "success"

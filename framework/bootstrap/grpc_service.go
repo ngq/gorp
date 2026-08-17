@@ -111,9 +111,17 @@ type GRPCServiceRuntime struct {
 // NewGRPCServiceRuntime builds the default gRPC runtime without starting the server.
 //
 // NewGRPCServiceRuntime 构建默认 gRPC runtime，但不启动服务。
-func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (*GRPCServiceRuntime, error) {
+func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (rt *GRPCServiceRuntime, retErr error) {
 	app := framework.NewApplication()
 	c := app.Container()
+
+	// 失败时销毁容器，释放已实例化的 singleton（DB 连接池、Redis 等），
+	// 与 HTTP 主线的清理约定对齐。
+	defer func() {
+		if retErr != nil {
+			c.Destroy()
+		}
+	}()
 
 	// 组装基础 provider 列表（与 HTTP 主线共享 foundation + capability）
 	// Assemble base provider list (shared foundation + capabilities with HTTP mainline)
@@ -135,7 +143,7 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (*GRPCSe
 		return nil, fmt.Errorf("make grpc server registrar: %w", err)
 	}
 
-	rt := &GRPCServiceRuntime{
+	rt = &GRPCServiceRuntime{
 		App:         app,
 		Container:   c,
 		Logger:      container.MustMakeLogger(c),
@@ -179,11 +187,17 @@ func buildGRPCProviders(opts GRPCServiceOptions) []runtimecontract.ServiceProvid
 //
 // BootGRPCService 装配、配置并运行独立的 gRPC 服务。
 // 这是 BootHTTPService 的 gRPC 对称入口，在 gRPC 独立运行时使用。
-func BootGRPCService(serviceName string, opts GRPCServiceOptions, setup func(*GRPCServiceRuntime) error) error {
+func BootGRPCService(serviceName string, opts GRPCServiceOptions, setup func(*GRPCServiceRuntime) error) (retErr error) {
 	rt, err := NewGRPCServiceRuntime(serviceName, opts)
 	if err != nil {
 		return fmt.Errorf("initialize grpc runtime: %w", err)
 	}
+	// setup 失败时同样销毁容器，避免已实例化的资源泄漏。
+	defer func() {
+		if retErr != nil {
+			rt.Container.Destroy()
+		}
+	}()
 
 	rt.Logger.Info(fmt.Sprintf("%s starting (gRPC)", serviceName))
 
@@ -229,18 +243,21 @@ func RunGRPC(c runtimecontract.Container, logger observabilitycontract.Logger) e
 			return fmt.Errorf("register grpc service to host: %w", err)
 		}
 
+		// 信号注册必须先于 Start：启动阶段（迁移、慢服务）收到 SIGINT/SIGTERM
+		// 时也要走优雅关闭，而不是被默认信号行为直接终止。
+		sigs := []os.Signal{os.Interrupt}
+		if runtime.GOOS != "windows" {
+			sigs = append(sigs, syscall.SIGTERM)
+		}
+		sigCtx, stop := signal.NotifyContext(context.Background(), sigs...)
+		defer stop()
+
 		logger.Info("starting grpc server")
 		if err := hostSvc.Start(context.Background()); err != nil {
 			return err
 		}
 
-		sigs := []os.Signal{os.Interrupt}
-		if runtime.GOOS != "windows" {
-			sigs = append(sigs, syscall.SIGTERM)
-		}
-		ctx, stop := signal.NotifyContext(context.Background(), sigs...)
-		defer stop()
-		<-ctx.Done()
+		<-sigCtx.Done()
 
 		logger.Info("shutdown signal received")
 

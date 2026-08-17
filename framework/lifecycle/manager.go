@@ -9,7 +9,10 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
+	"sort"
 	"sync"
+	"time"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -100,6 +103,10 @@ func NewManager() *Manager {
 // - priority 数值小的先启动，后停止。
 // - hooks 可以为 nil，适用于不需要生命周期钩子的服务。
 func (m *Manager) Register(name string, service runtimecontract.Hostable, hooks runtimecontract.Lifecycle, priority int) {
+	if service == nil {
+		// nil 服务在 Start 时必然 panic 且无法回滚，直接拒绝注册。
+		return
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.services = append(m.services, ServiceEntry{
@@ -132,7 +139,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	for _, entry := range sorted {
 		if entry.Hooks != nil {
-			if err := entry.Hooks.OnStarting(ctx); err != nil {
+			if err := runGuarded(func() error { return entry.Hooks.OnStarting(ctx) }); err != nil {
 				_ = m.stopReverse(ctx, started)
 				m.mu.Lock()
 				m.state = StateIdle
@@ -141,7 +148,7 @@ func (m *Manager) Start(ctx context.Context) error {
 			}
 		}
 
-		if err := entry.Service.Start(ctx); err != nil {
+		if err := runGuarded(func() error { return entry.Service.Start(ctx) }); err != nil {
 			_ = m.stopReverse(ctx, started)
 			m.mu.Lock()
 			m.state = StateIdle
@@ -153,7 +160,7 @@ func (m *Manager) Start(ctx context.Context) error {
 		started = append(started, entry)
 
 		if entry.Hooks != nil {
-			if err := entry.Hooks.OnStarted(ctx); err != nil {
+			if err := runGuarded(func() error { return entry.Hooks.OnStarted(ctx) }); err != nil {
 				_ = m.stopReverse(ctx, started)
 				m.mu.Lock()
 				m.state = StateIdle
@@ -179,6 +186,22 @@ func (m *Manager) Start(ctx context.Context) error {
 // - 触发 OnStopping 和 OnStopped 钩子。
 // - 即使某个服务停止失败，也继续停止其他服务。
 func (m *Manager) Stop(ctx context.Context) error {
+	// 等待并发的 Start 完成：若在启动期间调用 Stop 就直接返回，会出现
+	// "服务在运行、host 认为未运行" 的状态分叉，已启动的服务永不停止。
+	for {
+		m.mu.RLock()
+		state := m.state
+		m.mu.RUnlock()
+		if state != StateStarting {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
 	m.mu.Lock()
 	if m.state != StateRunning {
 		m.mu.Unlock()
@@ -194,17 +217,17 @@ func (m *Manager) Stop(ctx context.Context) error {
 		entry := sorted[i]
 
 		if entry.Hooks != nil {
-			if err := entry.Hooks.OnStopping(ctx); err != nil {
+			if err := runGuarded(func() error { return entry.Hooks.OnStopping(ctx) }); err != nil {
 				lastErr = err
 			}
 		}
 
-		if err := entry.Service.Stop(ctx); err != nil {
+		if err := runGuarded(func() error { return entry.Service.Stop(ctx) }); err != nil {
 			lastErr = err
 		}
 
 		if entry.Hooks != nil {
-			if err := entry.Hooks.OnStopped(ctx); err != nil {
+			if err := runGuarded(func() error { return entry.Hooks.OnStopped(ctx) }); err != nil {
 				lastErr = err
 			}
 		}
@@ -214,6 +237,19 @@ func (m *Manager) Stop(ctx context.Context) error {
 	m.state = StateStopped
 	m.mu.Unlock()
 	return lastErr
+}
+
+// runGuarded 执行生命周期回调，把 panic 转为错误。
+// 没有它，某个服务的 Start/Hook panic 会带着 Manager 停留在 StateStarting，
+// 此后所有 Stop 因状态不匹配直接返回 nil——已启动的服务（DB 连接池、
+// HTTP listener、cron）全部无法优雅关闭。
+func runGuarded(fn func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("lifecycle: panic: %v", r)
+		}
+	}()
+	return fn()
 }
 
 // State returns the current lifecycle state.
@@ -260,15 +296,13 @@ func (m *Manager) sortedServices() []ServiceEntry {
 	sorted := make([]ServiceEntry, len(m.services))
 	copy(sorted, m.services)
 
-	// Keep ordering logic local and deterministic so startup/shutdown semantics stay stable.
-	// 把排序逻辑收口在这里，确保启动/停止语义始终稳定可预测。
-	for i := 0; i < len(sorted)-1; i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[i].Priority > sorted[j].Priority {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	// Stable sort by priority keeps registration order for equal priorities,
+	// so Start (ascending) and Stop (descending) see a consistent arrangement.
+	// 按 priority 稳定排序，相同优先级保留注册顺序，
+	// 保证 Start（正序）与 Stop（逆序）看到一致的排列。
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return sorted[i].Priority < sorted[j].Priority
+	})
 	return sorted
 }
 

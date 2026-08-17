@@ -10,6 +10,7 @@ package gin
 import (
 	"net/http"
 	"reflect"
+	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
@@ -72,8 +73,13 @@ func adaptMiddleware(middleware transportcontract.Middleware) gin.HandlerFunc {
 		worker := cloneContextForContinuation(ctx)
 		ctx.Abort()
 		httpCtx := newContext(worker)
+		// next 会把最终 Request 先写入原子槽再启动 worker 链；wrapped 返回后
+		// 异步中间件（如 Timeout）可能仍在 worker goroutine 中执行 next，
+		// 直接读 worker.Request 与该写构成 data race。
+		var nextReq atomic.Pointer[http.Request]
 		next := func(c transportcontract.Context) {
 			if c != nil && c.Request() != nil {
+				nextReq.Store(c.Request())
 				worker.Request = c.Request()
 			}
 			worker.Next()
@@ -84,7 +90,9 @@ func adaptMiddleware(middleware transportcontract.Middleware) gin.HandlerFunc {
 			return
 		}
 		wrapped(httpCtx)
-		ctx.Request = httpCtx.Request()
+		if req := nextReq.Load(); req != nil {
+			ctx.Request = req
+		}
 	}
 }
 
