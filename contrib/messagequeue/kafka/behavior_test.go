@@ -15,7 +15,7 @@ func TestQueueCloseIsIdempotent(t *testing.T) {
 	// Use a minimal mock for idempotent close test
 	q := &Queue{
 		cfg:            &integrationcontract.MessageQueueConfig{Type: "kafka"},
-		consumerGroups: make(map[string]sarama.ConsumerGroup),
+		consumerGroups: make(map[string][]sarama.ConsumerGroup),
 		closed:         false,
 	}
 
@@ -55,7 +55,7 @@ func TestPublisherReturnsErrorWhenNotInitialized(t *testing.T) {
 func TestSubscriberReturnsErrorWhenQueueClosed(t *testing.T) {
 	q := &Queue{
 		cfg:            &integrationcontract.MessageQueueConfig{Type: "kafka"},
-		consumerGroups: make(map[string]sarama.ConsumerGroup),
+		consumerGroups: make(map[string][]sarama.ConsumerGroup),
 		closed:         true,
 	}
 	s := &kafkaSubscriber{queue: q}

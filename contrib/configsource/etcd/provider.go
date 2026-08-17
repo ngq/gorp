@@ -220,9 +220,14 @@ func (w *etcdWatcher) OnChange(key string, callback func(value any)) {
 
 func (w *etcdWatcher) Stop() error {
 	w.cancelMu.Lock()
-	defer w.cancelMu.Unlock()
 	if w.cancel != nil {
 		w.cancel()
+	}
+	w.cancelMu.Unlock()
+	// 从缓存删除：不删的话后续对同一 key 的 Watch 会拿到 watchCh 已关闭的
+	// 僵尸 watcher，OnChange 注册的回调永远不触发。
+	if w.source != nil {
+		w.source.watchers.Delete(strings.TrimPrefix(w.key, w.source.cfg.EtcdPath+"/"))
 	}
 	return nil
 }
@@ -241,10 +246,14 @@ func (w *etcdWatcher) startWatch(ctx context.Context) {
 func (w *etcdWatcher) watchLoop() {
 	for resp := range w.watchCh {
 		for _, ev := range resp.Events {
-			if ev.Type == clientv3.EventTypePut {
+			// Delete 事件也要通知（value 为 nil）：配置删除被静默吞掉会让
+			// 订阅方一直持有已删除的旧值。
+			if ev.Type == clientv3.EventTypePut || ev.Type == clientv3.EventTypeDelete {
 				var value any
-				if err := json.Unmarshal(ev.Kv.Value, &value); err != nil {
-					value = string(ev.Kv.Value)
+				if ev.Type == clientv3.EventTypePut {
+					if err := json.Unmarshal(ev.Kv.Value, &value); err != nil {
+						value = string(ev.Kv.Value)
+					}
 				}
 
 				w.callbacks.Range(func(key, cb any) bool {

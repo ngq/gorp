@@ -128,7 +128,9 @@ type Registry struct {
 }
 
 func NewRegistry(cfg *ServiceCombConfig) (*Registry, error) {
-	return NewRegistryWithClient(cfg, &inMemoryServiceCombClient{})
+	// 默认使用真实的 ServiceCenter HTTP 客户端。此前默认 in-memory 假客户端
+	// 会让生产配置 servicecomb 时注册"成功"但其他服务永远发现不了该实例。
+	return NewRegistryWithClient(cfg, newHTTPServiceCombClient())
 }
 
 func NewRegistryWithClient(cfg *ServiceCombConfig, client serviceCombClient) (*Registry, error) {

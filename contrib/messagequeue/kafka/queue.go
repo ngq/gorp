@@ -22,14 +22,13 @@ import (
 // Queue 使用 IBM/sarama SDK 实现 integrationcontract.MessageQueue。
 // 管理 sarama client、sync producer 和 consumer groups。
 type Queue struct {
-	cfg               *integrationcontract.MessageQueueConfig
-	client            sarama.Client
-	syncProducer      sarama.SyncProducer
-	asyncProducer     sarama.AsyncProducer // optional, for high-throughput scenarios
-	consumerGroups    map[string]sarama.ConsumerGroup
-	consumerGroupRefs map[string]int
-	mu                sync.Mutex
-	closed            bool
+	cfg            *integrationcontract.MessageQueueConfig
+	client         sarama.Client
+	syncProducer   sarama.SyncProducer
+	asyncProducer  sarama.AsyncProducer // optional, for high-throughput scenarios
+	consumerGroups map[string][]sarama.ConsumerGroup
+	mu             sync.Mutex
+	closed         bool
 }
 
 // NewQueue creates a new Kafka Queue instance.
@@ -61,7 +60,7 @@ func NewQueue(cfg *integrationcontract.MessageQueueConfig) (*Queue, error) {
 		cfg:            cfg,
 		client:         client,
 		syncProducer:   syncProducer,
-		consumerGroups: make(map[string]sarama.ConsumerGroup),
+		consumerGroups: make(map[string][]sarama.ConsumerGroup),
 	}, nil
 }
 
@@ -100,10 +99,12 @@ func (q *Queue) Close() error {
 
 	// Close consumer groups first
 	// 先关闭 consumer groups
-	for _, group := range q.consumerGroups {
-		if err := group.Close(); err != nil {
-			slog.Warn("messagequeue.kafka: close consumer group failed", "error", err)
-			errs = append(errs, err)
+	for _, groups := range q.consumerGroups {
+		for _, group := range groups {
+			if err := group.Close(); err != nil {
+				slog.Warn("messagequeue.kafka: close consumer group failed", "error", err)
+				errs = append(errs, err)
+			}
 		}
 	}
 	q.consumerGroups = nil

@@ -79,11 +79,15 @@ func (c *httpEurekaClient) HTTPClient() *http.Client {
 //   - Success: 204 No Content
 func (c *httpEurekaClient) Register(ctx context.Context, cfg *EurekaConfig, name, addr string, meta map[string]string) error {
 	// 构建 Eureka instance payload
+	// instanceId 必须显式带上并与 Heartbeat/Deregister 使用的 ID 一致：
+	// 缺失时服务端会自行生成（基于 hostname），心跳 PUT 永远 404，
+	// 触发 re-register 死循环、实例反复过期重建。
 	payload := map[string]any{
 		"instance": map[string]any{
-			"app":      name,
-			"hostName": cfg.InstanceHost,
-			"ipAddr":   hostFromAddr(addr),
+			"instanceId": instanceID(name, addr),
+			"app":        name,
+			"hostName":   cfg.InstanceHost,
+			"ipAddr":     hostFromAddr(addr),
 			"port": map[string]any{
 				"$":        portFromAddr(addr, cfg.InstancePort),
 				"@enabled": true,
@@ -316,17 +320,47 @@ func (c *httpEurekaClient) Watch(ctx context.Context, cfg *EurekaConfig, name st
 // }
 type eurekaDiscoverResponse struct {
 	Application struct {
-		Instance []struct {
-			InstanceID string            `json:"instanceId"`
-			App        string            `json:"app"`
-			IPAddr     string            `json:"ipAddr"`
-			Status     string            `json:"status"`
-			Metadata   map[string]string `json:"metadata"`
-			Port       struct {
-				Value int `json:"$"`
-			} `json:"port"`
-		} `json:"instance"`
+		// Instance 用自定义解码：Eureka 1.x 在只有一个实例时把
+		// application.instance 序列化为 JSON 对象而非数组（Jackson 默认），
+		// 直接解码进 []struct 会让单实例服务永远无法被发现。
+		Instance eurekaInstances `json:"instance"`
 	} `json:"application"`
+}
+
+// eurekaInstances 兼容对象与数组两种形式的实例字段。
+type eurekaInstances []eurekaInstance
+
+type eurekaInstance struct {
+	InstanceID string            `json:"instanceId"`
+	App        string            `json:"app"`
+	IPAddr     string            `json:"ipAddr"`
+	Status     string            `json:"status"`
+	Metadata   map[string]string `json:"metadata"`
+	Port       struct {
+		Value int `json:"$"`
+	} `json:"port"`
+}
+
+// UnmarshalJSON 同时接受单实例对象与多实例数组。
+func (e *eurekaInstances) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	if trimmed[0] == '[' {
+		var list []eurekaInstance
+		if err := json.Unmarshal(trimmed, &list); err != nil {
+			return err
+		}
+		*e = list
+		return nil
+	}
+	var single eurekaInstance
+	if err := json.Unmarshal(trimmed, &single); err != nil {
+		return err
+	}
+	*e = []eurekaInstance{single}
+	return nil
 }
 
 // sortServiceInstances sorts service instances by ID and address.

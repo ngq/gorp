@@ -150,6 +150,13 @@ func getCircuitBreakerConfig(c runtimecontract.Container) (*resiliencecontract.C
 							}
 						}
 					}
+					// 按资源策略：不读取的话用户配置的 slow_request_ratio /
+					// error_count 会被静默忽略（曾长期是死代码路径）。
+					if v, ok := sub["strategy"]; ok {
+						if s, ok := v.(string); ok {
+							rc.Strategy = s
+						}
+					}
 					cbCfg.ResourceConfigs[name] = rc
 				}
 			}
@@ -218,7 +225,7 @@ func buildCircuitBreakerRule(resource string, current resiliencecontract.Resourc
 
 	return &sentinelcb.Rule{
 		Resource:         resource,
-		Strategy:         sentinelcb.ErrorRatio, // Default strategy; per-resource strategy not yet in ResourceConfig
+		Strategy:         mapSentinelStrategy(current.Strategy),
 		RetryTimeoutMs:   uint32(retryTimeout),
 		MinRequestAmount: uint64(minRequest),
 		StatIntervalMs:   uint32(interval.Milliseconds()),

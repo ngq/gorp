@@ -13,6 +13,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -292,8 +293,15 @@ func (r *Registry) keepAliveLoop(serviceID string, keepAliveCh <-chan *clientv3.
 }
 
 // tryReRegister attempts to re-register a service when keepalive fails.
+// Retries with backoff until the service is re-registered or the registry
+// closes: a single failure would otherwise leave the service permanently
+// missing from etcd (and, worse, the old record kept in `registered` made the
+// idempotency check in Register() short-circuit future attempts).
 //
 // tryReRegister 当 keepalive 失败时尝试重新注册服务。
+// 带退避持续重试直到注册成功或注册中心关闭：单次失败会让服务永久从
+// etcd 消失（且旧记录留在 `registered` 会让 Register() 的幂等检查短路
+// 后续所有恢复尝试）。
 func (r *Registry) tryReRegister(serviceID string, stopCh chan struct{}) {
 	select {
 	case <-stopCh:
@@ -313,28 +321,44 @@ func (r *Registry) tryReRegister(serviceID string, stopCh chan struct{}) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*timeSecond())
-	defer cancel()
-
+	// 先取出注册所需信息并删除旧记录：旧记录携带的是已死亡的 lease，
+	// 重试期间必须避免它被幂等检查命中。
+	name, addr, meta := reg.name, reg.addr, reg.meta
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.closed {
+		r.mu.Unlock()
 		return
 	}
-
-	cached, ok = r.registered.Load(serviceID)
-	if !ok {
-		return
-	}
-	reg = cached.(*registeredService)
-	if reg.stopCh != stopCh {
-		return
-	}
-
-	// 删除旧注册记录，尝试重新注册
 	r.registered.Delete(serviceID)
-	if err := r.registerLocked(ctx, serviceID, reg.name, reg.addr, reg.meta); err != nil {
-		r.registered.Store(serviceID, reg)
+	r.mu.Unlock()
+
+	backoff := time.Second
+	const maxBackoff = 15 * time.Second
+	for {
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
+		if r.isClosed() {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*timeSecond())
+		err := r.registerLocked(ctx, serviceID, name, addr, meta)
+		cancel()
+		if err == nil {
+			return
+		}
+
+		select {
+		case <-stopCh:
+			return
+		case <-time.After(backoff):
+		}
+		if backoff < maxBackoff {
+			backoff *= 2
+		}
 	}
 }
 

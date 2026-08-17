@@ -33,7 +33,6 @@ type Registry struct {
 	registered    map[string]map[string]string  // 已注册实例的 metadata 缓存
 	renewals      map[string]context.CancelFunc // 心跳续租 cancel 函数
 	endpointCache map[string][]transportcontract.ServiceInstance
-	watchCache    map[string]string
 	closeMu       sync.Mutex
 	closed        bool
 	watchCancels  []context.CancelFunc
@@ -64,7 +63,6 @@ func NewRegistryWithClient(cfg *EurekaConfig, client eurekaClient) (*Registry, e
 		registered:    make(map[string]map[string]string),
 		renewals:      make(map[string]context.CancelFunc),
 		endpointCache: make(map[string][]transportcontract.ServiceInstance),
-		watchCache:    make(map[string]string),
 	}, nil
 }
 
@@ -95,7 +93,6 @@ func (r *Registry) Register(ctx context.Context, name, addr string, meta map[str
 	}
 	r.registered[key] = cloneStringMap(meta)
 	delete(r.endpointCache, name)
-	delete(r.watchCache, name)
 	r.startHeartbeatLocked(name, addr)
 	return nil
 }
@@ -127,7 +124,6 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	}
 	delete(r.registered, key)
 	delete(r.endpointCache, name)
-	delete(r.watchCache, name)
 	return nil
 }
 
@@ -190,17 +186,20 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportco
 	ch := make(chan []transportcontract.ServiceInstance, 10)
 	var workers sync.WaitGroup
 
+	// 每个 watcher 独立的快照去重：registry 级共享的 watchCache[name] 会让
+	// 第二个 watcher 的初始 Discover 被第一个 watcher 的快照吞掉，
+	// 后者永远收不到初始列表（路由到空后端）。
+	var lastKey string
+
 	// emit 用于推送实例变更，带去重逻辑
 	emit := func(instances []transportcontract.ServiceInstance) bool {
 		key := snapshotKey(instances)
-
-		r.mu.Lock()
-		last := r.watchCache[name]
-		if last == key {
-			r.mu.Unlock()
+		if key == lastKey {
 			return true
 		}
-		r.watchCache[name] = key
+		lastKey = key
+
+		r.mu.Lock()
 		if len(instances) == 0 {
 			delete(r.endpointCache, name)
 		} else {

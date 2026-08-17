@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -61,22 +62,10 @@ func (s *rabbitSubscriber) Subscribe(ctx context.Context, topic string, handler 
 // 在 RabbitMQ 中，消费者组通过每个消费者唯一队列名实现。
 func (s *rabbitSubscriber) SubscribeWithGroup(ctx context.Context, topic string, group string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
 	s.queue.mu.Lock()
-	defer s.queue.mu.Unlock()
-
-	if s.queue.closed {
+	closed := s.queue.closed
+	s.queue.mu.Unlock()
+	if closed {
 		return nil, errors.New("messagequeue.rabbitmq: queue closed")
-	}
-
-	ch, err := s.queue.conn.Channel()
-	if err != nil {
-		return nil, fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
-	}
-
-	// Set QoS
-	err = ch.Qos(s.queue.cfg.RabbitMQPrefetch, 0, false)
-	if err != nil {
-		ch.Close()
-		return nil, err
 	}
 
 	// Create queue name with group suffix
@@ -87,93 +76,124 @@ func (s *rabbitSubscriber) SubscribeWithGroup(ctx context.Context, topic string,
 		queueName = queueName + "-" + fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 
-	// Declare queue
-	q, err := ch.QueueDeclare(
-		queueName,
-		true,  // durable
-		false, // auto-delete
-		false, // exclusive
-		false, // no-wait
-		nil,   // args
-	)
-	if err != nil {
-		ch.Close()
-		return nil, fmt.Errorf("messagequeue.rabbitmq: declare queue failed: %w", err)
-	}
-
-	// Bind queue to exchange
-	if s.queue.cfg.RabbitMQExchange != "" {
-		err = ch.QueueBind(
-			q.Name,
-			topic, // routing key
-			s.queue.cfg.RabbitMQExchange,
-			false,
-			nil,
-		)
-		if err != nil {
-			ch.Close()
-			return nil, fmt.Errorf("messagequeue.rabbitmq: bind queue failed: %w", err)
-		}
-	}
-
-	// Start consuming
-	s.mu.Lock()
 	subCtx, cancel := context.WithCancel(ctx)
+	s.mu.Lock()
 	if s.cancelMap == nil {
 		s.cancelMap = make(map[string]context.CancelFunc)
 	}
 	s.cancelMap[queueName] = cancel
 	s.mu.Unlock()
 
-	msgs, err := ch.Consume(
-		q.Name,
-		"",    // consumer tag (auto-generated)
-		false, // auto-ack (manual for reliability)
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
-	)
-	if err != nil {
-		cancel()
-		ch.Close()
-		return nil, fmt.Errorf("messagequeue.rabbitmq: consume failed: %w", err)
-	}
-
-	// Handle messages in background
-	wrappedCh := &channelOnce{ch: ch}
+	// 订阅存活循环：channel/连接断开时退避重建，消费不再静默死亡。
 	go func() {
-		defer wrappedCh.Close()
+		backoff := time.Second
+		const maxBackoff = 30 * time.Second
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case msg, ok := <-msgs:
-				if !ok {
-					return
-				}
-				message := &integrationcontract.Message{
-					ID:        msg.MessageId,
-					Topic:     msg.RoutingKey,
-					Body:      msg.Body,
-					Headers:   extractAMQPHeaders(msg.Headers),
-					Timestamp: msg.Timestamp,
-				}
-				if err := handler(subCtx, message); err != nil {
-					// Nack and requeue
-					msg.Nack(false, true)
-				} else {
-					// Ack
-					msg.Ack(false)
-				}
+			default:
+			}
+			err := s.runSubscription(subCtx, topic, queueName, group == "", handler)
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+			slog.Warn("messagequeue.rabbitmq: subscription interrupted, re-establishing",
+				"topic", topic, "queue", queueName, "error", err)
+			select {
+			case <-subCtx.Done():
+				return
+			case <-time.After(backoff):
+			}
+			if backoff < maxBackoff {
+				backoff *= 2
 			}
 		}
 	}()
 
 	return func() error {
 		cancel()
-		return wrappedCh.Close()
+		return nil
 	}, nil
+}
+
+// runSubscription 建立一次完整的订阅（channel + queue + bind + consume），
+// 直到 context 取消或投递 channel 关闭（连接断开）。
+func (s *rabbitSubscriber) runSubscription(ctx context.Context, topic string, queueName string, anonymous bool, handler integrationcontract.MessageHandler) error {
+	ch, err := s.queue.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("messagequeue.rabbitmq: create channel failed: %w", err)
+	}
+	wrappedCh := &channelOnce{ch: ch}
+	defer wrappedCh.Close()
+
+	if err := ch.Qos(s.queue.cfg.RabbitMQPrefetch, 0, false); err != nil {
+		return err
+	}
+
+	// 匿名（无 group）订阅用 exclusive + auto-delete 队列：连接关闭即由
+	// broker 自动删除。此前用 durable 队列且从不 QueueDelete，每次进程
+	// 重启都在 broker 上遗留一个永久孤儿队列（消息黑洞）。
+	durable, autoDelete, exclusive := true, false, false
+	if anonymous {
+		durable, autoDelete, exclusive = false, true, true
+	}
+	q, err := ch.QueueDeclare(
+		queueName,
+		durable,
+		autoDelete,
+		exclusive,
+		false,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("messagequeue.rabbitmq: declare queue failed: %w", err)
+	}
+
+	if s.queue.cfg.RabbitMQExchange != "" {
+		if err := ch.QueueBind(q.Name, topic, s.queue.cfg.RabbitMQExchange, false, nil); err != nil {
+			return fmt.Errorf("messagequeue.rabbitmq: bind queue failed: %w", err)
+		}
+	}
+
+	msgs, err := ch.Consume(
+		q.Name,
+		"",        // consumer tag (auto-generated)
+		false,     // auto-ack (manual for reliability)
+		exclusive, // exclusive consumer for anonymous queues
+		false,     // no-local
+		false,     // no-wait
+		nil,       // args
+	)
+	if err != nil {
+		return fmt.Errorf("messagequeue.rabbitmq: consume failed: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case msg, ok := <-msgs:
+			if !ok {
+				// channel 关闭（连接断开/rebalance）：返回由外层重建订阅。
+				return errors.New("messagequeue.rabbitmq: delivery channel closed")
+			}
+			message := &integrationcontract.Message{
+				ID:        msg.MessageId,
+				Topic:     msg.RoutingKey,
+				Body:      msg.Body,
+				Headers:   extractAMQPHeaders(msg.Headers),
+				Timestamp: msg.Timestamp,
+			}
+			if err := handler(ctx, message); err != nil {
+				// Nack and requeue
+				msg.Nack(false, true)
+			} else {
+				// Ack
+				msg.Ack(false)
+			}
+		}
+	}
 }
 
 // Consume consumes messages from a specific queue.
@@ -216,7 +236,8 @@ func (s *rabbitSubscriber) Consume(ctx context.Context, queue string, handler in
 			return ctx.Err()
 		case msg, ok := <-msgs:
 			if !ok {
-				return nil
+				// channel 关闭不能伪装成功：调用方需要可区分的错误来决定重试。
+				return errors.New("messagequeue.rabbitmq: delivery channel closed during consume")
 			}
 			message := &integrationcontract.Message{
 				ID:        msg.MessageId,

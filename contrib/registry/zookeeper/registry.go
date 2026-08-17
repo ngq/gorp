@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-zookeeper/zk"
+
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
@@ -41,14 +43,20 @@ var ErrAlreadyRegistered = errors.New("registry.zookeeper: instance already regi
 //
 // Registry 使用 Zookeeper SDK 实现 transportcontract.ServiceRegistry。
 // 支持服务注册、发现和监听，带缓存功能。
+// registeredZKInstance 记录一次注册的临时节点路径与完整记录，
+// 供会话过期后重建 ephemeral 节点。
+type registeredZKInstance struct {
+	path   string
+	record serviceRecord
+}
+
 type Registry struct {
 	config  *ZookeeperConfig
 	backend zkBackend
 
 	mu                  sync.RWMutex
 	endpointCache       map[string][]transportcontract.ServiceInstance
-	watchSnapshots      map[string]string
-	registeredInstances map[string]string
+	registeredInstances map[string]registeredZKInstance
 	closeMu             sync.Mutex
 	closed              bool
 	watchCancels        []context.CancelFunc
@@ -79,8 +87,7 @@ func NewRegistryWithBackend(cfg *ZookeeperConfig, backend zkBackend) (*Registry,
 		config:              cfg,
 		backend:             backend,
 		endpointCache:       make(map[string][]transportcontract.ServiceInstance),
-		watchSnapshots:      make(map[string]string),
-		registeredInstances: make(map[string]string),
+		registeredInstances: make(map[string]registeredZKInstance),
 	}, nil
 }
 
@@ -127,10 +134,9 @@ func (r *Registry) Register(ctx context.Context, name, addr string, meta map[str
 		return fmt.Errorf("registry.zookeeper: create ephemeral node failed: %w", err)
 	}
 
-	// 记录已注册实例路径，清理缓存
-	r.registeredInstances[key] = instancePath
+	// 记录已注册实例路径（连同完整记录，供会话过期后重建），清理缓存
+	r.registeredInstances[key] = registeredZKInstance{path: instancePath, record: record}
 	delete(r.endpointCache, name)
-	delete(r.watchSnapshots, name)
 	return nil
 }
 
@@ -148,13 +154,13 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	}
 
 	key := instanceKey(name, addr)
-	instancePath, ok := r.registeredInstances[key]
+	reg, ok := r.registeredInstances[key]
 	if !ok {
 		// 未在本地记录中找到，尝试构造路径删除
-		instancePath = path.Join(r.config.BasePath, name, sanitizeNodeName(addr))
+		reg.path = path.Join(r.config.BasePath, name, sanitizeNodeName(addr))
 	}
 
-	if err := r.backend.Delete(instancePath); err != nil {
+	if err := r.backend.Delete(reg.path); err != nil {
 		if errors.Is(err, errZKNoNode) {
 			return ErrServiceNotFound
 		}
@@ -164,7 +170,6 @@ func (r *Registry) Deregister(ctx context.Context, name, addr string) error {
 	// 清理本地记录和缓存
 	delete(r.registeredInstances, key)
 	delete(r.endpointCache, name)
-	delete(r.watchSnapshots, name)
 	return nil
 }
 
@@ -250,18 +255,18 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportco
 	servicePath := path.Join(r.config.BasePath, name)
 	var workers sync.WaitGroup
 
+	// 每个 watcher 独立的快照去重：registry 级共享的 watchSnapshots[name]
+	// 会让第二个 watcher 启动时的初始 Discover 结果被第一个 watcher 的
+	// 快照"吞掉"，后者永远收不到初始列表（路由到空后端）。
+	var lastSnapshot string
+
 	// emit 函数用于发送实例变更通知，带快照去重逻辑
 	emit := func(instances []transportcontract.ServiceInstance) bool {
 		snapshot := snapshotKey(instances)
-
-		r.mu.Lock()
-		last := r.watchSnapshots[name]
-		if last == snapshot {
-			r.mu.Unlock()
+		if snapshot == lastSnapshot {
 			return true
 		}
-		r.watchSnapshots[name] = snapshot
-		r.mu.Unlock()
+		lastSnapshot = snapshot
 
 		// 发送实例列表到通道
 		select {
@@ -303,6 +308,12 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportco
 			if !isRetryableWatchError(err) {
 				return
 			}
+			// 会话过期后，go-zookeeper 会重连但建立的是新 session，
+			// ephemeral 节点不会被自动重建——不重建则服务从发现列表
+			// 消失且永不恢复。在重试前重建本注册中心持有的临时节点。
+			if isZKSessionExpired(err) {
+				r.recreateEphemeralNodes()
+			}
 			// 重试等待
 			select {
 			case <-watchCtx.Done():
@@ -333,6 +344,29 @@ func (r *Registry) Watch(ctx context.Context, name string) (<-chan []transportco
 	}()
 
 	return ch, nil
+}
+
+// isZKSessionExpired 判断错误是否来自 ZooKeeper 会话过期。
+func isZKSessionExpired(err error) bool {
+	return errors.Is(err, zk.ErrSessionExpired)
+}
+
+// recreateEphemeralNodes 在会话过期后重建本注册中心持有的所有临时节点。
+// 需在 watch 重试前调用，避免服务从发现列表消失后永不恢复。
+func (r *Registry) recreateEphemeralNodes() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return
+	}
+	for key, reg := range r.registeredInstances {
+		payload, err := encodeServiceRecord(reg.record)
+		if err != nil {
+			continue
+		}
+		_ = r.backend.CreateEphemeral(reg.path, payload)
+		_ = key
+	}
 }
 
 // Close releases resources held by the registry.

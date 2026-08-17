@@ -132,8 +132,13 @@ func getTracingConfig(c runtimecontract.Container) (*observabilitycontract.Traci
 	if endpoint := configprovider.GetStringAny(cfg, "tracing.otel.endpoint", "tracing.exporter_endpoint"); endpoint != "" {
 		tracingCfg.ExporterEndpoint = endpoint
 	}
-	if rate := configprovider.GetFloatAny(cfg, "tracing.sampling_rate"); rate > 0 {
-		tracingCfg.SamplingRate = rate
+	// 显式配置 sampling_rate: 0（意图为关闭采样）必须生效：
+	// 先判存在性再读值，不能让 rate > 0 把 0 当"未配置"忽略，
+	// 否则想关采样反而开到默认全量。
+	if _, ok := configprovider.GetAny(cfg, "tracing.sampling_rate"); ok {
+		if rate := configprovider.GetFloatAny(cfg, "tracing.sampling_rate"); rate >= 0 {
+			tracingCfg.SamplingRate = rate
+		}
 	}
 	if timeout := configprovider.GetIntAny(cfg, "tracing.batch_timeout"); timeout > 0 {
 		tracingCfg.BatchTimeout = timeout

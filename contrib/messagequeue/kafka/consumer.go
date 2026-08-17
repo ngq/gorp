@@ -52,26 +52,15 @@ func (s *kafkaSubscriber) Subscribe(ctx context.Context, topic string, handler i
 // 实现 integrationcontract.MessageSubscriber.SubscribeWithGroup。
 func (s *kafkaSubscriber) SubscribeWithGroup(ctx context.Context, topic string, group string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
 	s.queue.mu.Lock()
-	defer s.queue.mu.Unlock()
-	if s.queue.closed {
+	closed := s.queue.closed
+	s.queue.mu.Unlock()
+	if closed {
 		return nil, errors.New("messagequeue.kafka: queue closed")
 	}
 
-	// Check if consumer group already exists
-	// 检查是否已存在 consumer group
-	if existingGroup, ok := s.queue.consumerGroups[group]; ok {
-		// Increment reference count for shared group
-		// 增加共享 group 的引用计数
-		if s.queue.consumerGroupRefs != nil {
-			s.queue.consumerGroupRefs[group]++
-		}
-		// Wrap existing group with new handler
-		// 使用新 handler 包装已存在的 group
-		return s.wrapConsumerGroup(ctx, group, existingGroup, topic, handler)
-	}
-
-	// Create new consumer group
-	// 创建新的 consumer group
+	// 每次订阅创建独立的 ConsumerGroup（同一 group ID 在 broker 侧仍属同组）。
+	// 不能复用实例：sarama 的 Consume 在整个会话期间持有内部锁，
+	// 对同一实例的第二个 Consume 调用会永久阻塞——第二个订阅永远收不到消息。
 	saramaCfg := buildSaramaConfig(s.queue.cfg)
 	saramaCfg.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
 	saramaCfg.Consumer.Offsets.Initial = sarama.OffsetNewest
@@ -81,11 +70,14 @@ func (s *kafkaSubscriber) SubscribeWithGroup(ctx context.Context, topic string, 
 		return nil, fmt.Errorf("messagequeue.kafka: create consumer group failed: %w", err)
 	}
 
-	s.queue.consumerGroups[group] = consumerGroup
-	if s.queue.consumerGroupRefs == nil {
-		s.queue.consumerGroupRefs = make(map[string]int)
+	s.queue.mu.Lock()
+	if s.queue.closed {
+		s.queue.mu.Unlock()
+		_ = consumerGroup.Close()
+		return nil, errors.New("messagequeue.kafka: queue closed")
 	}
-	s.queue.consumerGroupRefs[group] = 1
+	s.queue.consumerGroups[group] = append(s.queue.consumerGroups[group], consumerGroup)
+	s.queue.mu.Unlock()
 
 	return s.wrapConsumerGroup(ctx, group, consumerGroup, topic, handler)
 }
@@ -125,22 +117,20 @@ func (s *kafkaSubscriber) wrapConsumerGroup(ctx context.Context, groupID string,
 
 	return func() error {
 		cancel()
-		// Only close the consumer group if this is the last subscription using it.
-		// Decrement the reference count; close the group only when it reaches zero.
-		// 仅当这是使用该 consumer group 的最后一个订阅时才关闭它。
-		// 减少引用计数；仅在归零时关闭 group。
+		// 只关闭本订阅自己创建的 ConsumerGroup 实例。
 		s.queue.mu.Lock()
-		if s.queue.consumerGroupRefs != nil {
-			s.queue.consumerGroupRefs[groupID]--
-			if s.queue.consumerGroupRefs[groupID] <= 0 {
-				delete(s.queue.consumerGroupRefs, groupID)
-				delete(s.queue.consumerGroups, groupID)
-				s.queue.mu.Unlock()
-				return group.Close()
+		groups := s.queue.consumerGroups[groupID]
+		for i, g := range groups {
+			if g == group {
+				s.queue.consumerGroups[groupID] = append(groups[:i], groups[i+1:]...)
+				break
 			}
 		}
+		if len(s.queue.consumerGroups[groupID]) == 0 {
+			delete(s.queue.consumerGroups, groupID)
+		}
 		s.queue.mu.Unlock()
-		return nil
+		return group.Close()
 	}, nil
 }
 
@@ -167,10 +157,12 @@ func (s *kafkaSubscriber) Consume(ctx context.Context, queue string, handler int
 func (s *kafkaSubscriber) UnsubscribeAll() error {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
-	for _, group := range s.queue.consumerGroups {
-		group.Close()
+	for _, groups := range s.queue.consumerGroups {
+		for _, group := range groups {
+			group.Close()
+		}
 	}
-	s.queue.consumerGroups = make(map[string]sarama.ConsumerGroup)
+	s.queue.consumerGroups = make(map[string][]sarama.ConsumerGroup)
 	return nil
 }
 
@@ -212,7 +204,9 @@ func (s *kafkaSubscriber) NativeSubscriber() any {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		return s.queue.consumerGroups[k]
+		if groups := s.queue.consumerGroups[k]; len(groups) > 0 {
+			return groups[0]
+		}
 	}
 	return nil
 }

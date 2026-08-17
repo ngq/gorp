@@ -131,20 +131,9 @@ func TestSentinelCircuitBreakerAllowMarksOpenOnBlock(t *testing.T) {
 	require.Equal(t, resiliencecontract.CircuitBreakerStateOpen, cb.State(context.Background(), "blocked-resource"))
 }
 
-func TestSentinelRateLimiterReserveWaitAndTimeout(t *testing.T) {
-	rl := NewSentinelRateLimiter(&resiliencecontract.CircuitBreakerConfig{})
-	require.NoError(t, rl.AllowN(context.Background(), "resource", 0))
-
-	res := rl.Reserve(context.Background(), "resource")
-	require.NotNil(t, res)
-	require.True(t, res.OK())
-	require.Zero(t, res.Delay())
-	require.NotPanics(t, func() { res.Cancel(); res.CancelAt(time.Now()) })
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	require.ErrorIs(t, rl.WaitTimeout(ctx, "resource", time.Millisecond), context.Canceled)
-}
+// 注意：曾有 TestSentinelRateLimiterReserveWaitAndTimeout 引用从未实现的
+// NewSentinelRateLimiter API，导致整个测试包无法编译；已移除。
+// 若后续实现 sentinel 限流器，请重新编写对应测试。
 
 func TestInitSentinelLoadsRulesFromConfig(t *testing.T) {
 	original := sentinelInitDefault

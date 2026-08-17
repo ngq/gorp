@@ -92,10 +92,9 @@ func (s *rocketmqSubscriber) SubscribeWithGroup(ctx context.Context, topic strin
 		return nil, fmt.Errorf("messagequeue.rocketmq: start consumer failed: %w", err)
 	}
 
-	// Store consumer reference in the consumers map (keyed by group)
-	s.queue.mu.Lock()
+	// Store consumer reference in the consumers map (keyed by group);
+	// the outer deferred lock already guards this write.
 	s.queue.consumers[group] = c
-	s.queue.mu.Unlock()
 
 	// Return unsubscribe function
 	return func() error {

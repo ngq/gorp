@@ -210,14 +210,19 @@ func (l *Lock) Renew(ctx context.Context, key string, ttl time.Duration) error {
 	if !ok {
 		return errors.New("dlock: lock not held")
 	}
+	// 用毫秒精度（PEXPIRE）并把下限钳到 1ms：秒级截断在 ttl<1s 时
+	// 会算出 0，Redis 对 EXPIRE key 0 的行为是直接删 key——续期变删锁。
+	if ttl < time.Millisecond {
+		ttl = time.Millisecond
+	}
 	script := `
 		if redis.call("get", KEYS[1]) == ARGV[1] then
-			return redis.call("expire", KEYS[1], ARGV[2])
+			return redis.call("pexpire", KEYS[1], ARGV[2])
 		else
 			return 0
 		end
 	`
-	result, err := l.client.Eval(ctx, script, []string{fullKey}, held.(*heldLock).token, int(ttl/time.Second)).Result()
+	result, err := l.client.Eval(ctx, script, []string{fullKey}, held.(*heldLock).token, ttl.Milliseconds()).Result()
 	if err != nil {
 		return fmt.Errorf("dlock: renew failed: %w", err)
 	}

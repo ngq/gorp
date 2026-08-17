@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -203,6 +204,11 @@ func (w *consulWatcher) Stop() error {
 	default:
 		close(w.stopCh)
 	}
+	// 从缓存删除：不删的话后续对同一 key 的 Watch 会拿到已停止的僵尸
+	// watcher，OnChange 注册的回调永远不触发。
+	if w.source != nil {
+		w.source.watchers.Delete(strings.TrimPrefix(w.key, w.source.cfg.ConsulPath))
+	}
 	return nil
 }
 
@@ -269,10 +275,14 @@ func setNestedValue(result map[string]any, key string, value any) {
 		if i == len(keys)-1 {
 			current[k] = value
 		} else {
-			if _, exists := current[k]; !exists {
-				current[k] = make(map[string]any)
+			// A scalar sibling key (e.g. both "app" and "app/name" exist)
+			// must not panic; replace it with a map and keep descending.
+			next, ok := current[k].(map[string]any)
+			if !ok {
+				next = make(map[string]any)
+				current[k] = next
 			}
-			current = current[k].(map[string]any)
+			current = next
 		}
 	}
 }
