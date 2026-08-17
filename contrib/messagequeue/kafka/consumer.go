@@ -193,6 +193,10 @@ func (s *kafkaSubscriber) As(target any) bool {
 // NativeSubscriber implements NativeSubscriberProvider interface.
 // Returns the first consumer group by sorted key name for deterministic behavior.
 //
+// 注意：同一 group 的每次订阅现在是独立 ConsumerGroup 实例（否则同组
+// 第二个订阅会被 sarama 内部锁饿死）。此处返回该 group 的第一个实例；
+// 需要全部实例时请使用 Underlying() 返回的 sarama.Client 自行创建。
+//
 // NativeSubscriber 实现 NativeSubscriberProvider 接口。
 // 按排序后的 key 名返回第一个 consumer group，确保行为确定性。
 func (s *kafkaSubscriber) NativeSubscriber() any {

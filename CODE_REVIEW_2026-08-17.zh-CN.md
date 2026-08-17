@@ -352,24 +352,30 @@
 | ITEST-MOCK-01 | `VerifyMetadataPropagation` 改为基于实际调用记录校验 |
 | ITEST-KAFKA-01 | 修复 nil unsub panic 与"订阅即取消" |
 
-### 记录为后续架构项（16 项，需结合真实中间件/注册中心或行为决策）
+### 第二轮后续推进（2026-08-17 追加）
 
-- **BBR-02**：CPU 监控的 goroutine 数代理在非 Linux 上仍会误判；Linux 已用 `/proc/stat` 修正，非 Linux 回退保留待 gopsutil 引入。
-- **IDEM-01 兼容**：新增 `Release` 属契约扩展，第三方自定义 `IdempotencyStore` 需补实现（框架内实现已全部更新）。
-- **MQ-11 kafka 引用计数移除**：改为每次订阅独立 ConsumerGroup 后，`queue.consumerGroups` 语义变化需配套文档说明。
-- **REG-06 servicecomb REST 客户端**：已实现基础 register/discover/heartbeat；ServiceCenter 鉴权（ak/sk）、故障转移、watch 长连接尚未覆盖，需真实 ServiceCenter 联调。
-- **AUTH-01**：mTLS `tls_state` 依赖传输层注入连接状态（需 HTTP/gRPC TLS handler 集成），保留待 TLS 接线。
-- **WS-ROOM-01 广播写失败清理**：已实现断开清理，但 room 反向索引重构（conn→rooms）留待优化。
-- **RATE-LEAK-01**：机会式清扫已生效，定期清扫 goroutine 可进一步优化（现为按需）。
-- **LIFE-01/HOST-01 状态机**：Stop 等待并发的 Start 已修复；启动与关闭完全并发竞争的窗口仍建议引入 started-WaitGroup。
-- **CRON-01**：时区配置已接入；`CRON_TZ=` 前缀文档化留待文档更新。
-- **OBS-TRACE-01**：内置 tracer 仍为 Noop，需 otel 接入才算"真实链路"。
-- **BBR-05**：窗口按资源分维已实现，资源数无上限的自我保护（LRU）留待优化。
-- **REG-03 描述更新**：去重状态已移入 watcher 局部，相关注释已同步。
-- **GOV-01**：overlay 并集已实现；多来源优先级（代码 > 配置）文档化留待文档更新。
-- **METRICS-02**：连接数指标建议改用 `client.PoolStats()` 采集（留待）。
-- **DLOCK-10 看门狗**：`Renew` 已修；watchdog 内部调用路径已同步受益，无需额外改动。
-- **capability 默认后端告警**：未知后端 fallback 仅在同时缺失时告警，各 provider 的默认降级策略留待产品化决策。
+在原 65 项基础上，又完成 7 项后续工作：
+
+| 项 | 完成内容 | 涉及文件 |
+| --- | --- | --- |
+| AUTH-01 | mTLS 传输层接线：gin 注入 `c.Request.TLS`、gRPC 从 `peer` 提取注入（类型化 `WithTLSState`/`TLSStateFrom`）；`authenticateByCert` 补有效期 + CA 链校验；测试改用类型化 key | `framework/contract/security/service_auth_context.go`、`framework/provider/gin/engine.go`、`framework/provider/rpc/grpc/interceptor.go`、`contrib/serviceauth/mtls/*` |
+| OBS-TRACE-01 | 内置 `PrometheusTracer` 实现真实 span：生成 traceID/spanID、父级继承、W3C traceparent 跨服务传播、有界环形缓冲记录（`RecordedSpans()` 可读）；新增 4 个测试 | `framework/provider/observability/default.go` + `default_test.go` |
+| LIFE-01 状态机 | `Stop` 改用 `started WaitGroup` 等待并发 `Start` 完成（替代轮询），启动/关闭完全并发竞争窗口关闭 | `framework/lifecycle/manager.go` |
+| METRICS-02 | redis 新增基于 `client.PoolStats()` 的连接池采集器（`gorp_redis_pool_*`，Gauge 用 Set、累计值用增量），provider 接线 closer | `framework/provider/redis/{metrics,provider}.go` |
+| BBR-05 | 资源窗口/统计加插入序逐出上限（`MaxResources`，默认 1 万），高基数资源名不再无界增长 | `framework/provider/loadshedding/bbr/bbr.go` |
+| RATE-LEAK-01 | 判定完成：两内存限流器无生产调用点，机会式清扫已约束内存；加常驻清扫 goroutine 会造成无人关闭的泄漏，故不引入 | — |
+| 文档批 D | CRON 时区优先级注释（CRON_TZ 前缀 > WithLocation > cron.timezone > 本地）；IDEM `Release` 契约破坏性变更标注；kafka NativeSubscriber 语义说明 | `framework/provider/cron/provider.go`、`framework/http/middleware/idempotency.go`、`contrib/messagequeue/kafka/consumer.go` |
+
+### 剩余待真实环境闭环的项
+
+- **REG-06**：ServiceCenter 基础 REST 客户端已实现并默认启用；ak/sk 鉴权、故障转移、watch 长连接需真实 ServiceCenter 联调。
+- **BBR-02**：Linux 已用 `/proc/stat` 真实采样；非 Linux 平台回退 goroutine 代理，需 gopsutil 引入统一跨平台。
+- **WS-ROOM-01 反向索引**：断开清理已正确，conn→room 反向索引属纯性能优化（房间数千规模才值得）。
+- **capability 默认后端告警**：各 provider 默认降级策略需产品决策（fail-fast vs 静默降级）。
+
+### 记录为已完成的后续项（并入第二轮落地状态）
+
+- **IDEM-01 兼容 / MQ-11 语义 / CRON-01 / REG-03 / GOV-01 / DLOCK-10 看门狗**：代码均已修复，文档/注释已同步，标记完成。
 
 ### 最终验证（2026-08-17）
 

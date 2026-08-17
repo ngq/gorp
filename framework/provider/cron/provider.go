@@ -136,12 +136,17 @@ func NewService() *Service {
 // NewServiceWithLocation creates a cron service scheduled in the given
 // timezone. Container images default to UTC — pass the business timezone
 // (or configure cron.timezone) so "0 0 3 * * *" fires at 3am business time,
-// not 3am UTC. Specs may still override per-entry with the CRON_TZ= prefix.
+// not 3am UTC.
+//
+// 时区优先级（从高到低）：
+//  1. 单个表达式的 CRON_TZ=Asia/Shanghai 前缀（robfig/cron 原生支持）；
+//  2. NewServiceWithLocation 传入的 location；
+//  3. cron.timezone 配置；
+//  4. 宿主机本地时区 time.Local（默认）。
 //
 // NewServiceWithLocation 创建在指定时区调度的 Cron 服务。
 // 容器镜像默认 UTC——传入业务时区（或配置 cron.timezone），
 // 否则 "0 0 3 * * *" 会在 UTC 3 点而非业务时区 3 点执行。
-// 表达式仍可用 CRON_TZ= 前缀逐条覆盖时区。
 func NewServiceWithLocation(loc *time.Location) *Service {
 	if loc == nil {
 		loc = time.Local

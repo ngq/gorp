@@ -92,9 +92,14 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 		client.AddHook(NewRedisMetricsHook())
 
 		svc := &service{c: client}
+		// 连接池指标采集器：Hook 层无法得到真实的连接数（无成对生命周期
+		// 回调），改用官方 PoolStats() 定期采集。
+		poolCollector := NewRedisPoolCollector(client, rc.Addr)
+		poolCollector.Start()
 		// Register closer to close Redis client on container destroy.
 		// 注册 closer 以在容器销毁时关闭 Redis 客户端。
 		c.RegisterCloser(datacontract.RedisKey, svc)
+		c.RegisterCloser("redis.pool_metrics", poolCollector)
 		return svc, nil
 	}, true)
 	return nil

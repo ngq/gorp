@@ -46,6 +46,10 @@ type LoadShedder struct {
 	cpuMonitor *cpuMonitor
 	windows    sync.Map // resource -> *slidingWindow，按资源隔离统计
 	stats      sync.Map // resource -> *resourceStats
+	// lruMu/lruOrder/lruIndex 约束资源窗口数量上界（见 touch）。
+	lruMu    sync.Mutex
+	lruOrder []string
+	lruIndex map[string]struct{}
 }
 
 // resourceStats 记录单个资源的运行时状态。
@@ -55,6 +59,10 @@ type resourceStats struct {
 	droppedTime time.Time // 最近一次拒绝的时间（用于冷却判断）
 }
 
+// defaultMaxResources 是资源窗口的默认上限。资源名无上限时，
+// 高基数/恶意资源名会让窗口与统计无界增长。
+const defaultMaxResources = 10000
+
 // Config 是 BBR 策略的配置参数。
 type Config struct {
 	Enabled        bool          // 是否启用
@@ -63,6 +71,9 @@ type Config struct {
 	BucketCount    int           // 桶数量，默认 100
 	CoolDown       time.Duration // 冷却时间，默认 1s
 	MinRTThreshold time.Duration // 最小 RT 阈值，低于此值不限流，默认 1ms
+	// MaxResources 是资源窗口/统计的上限，超过后逐出最久未创建的资源。
+	// 0 或负数使用默认值 10000。
+	MaxResources int
 }
 
 // DefaultConfig 返回默认 BBR 配置。
@@ -188,6 +199,7 @@ func (b *LoadShedder) calculateMaxInFlight(resource string) int64 {
 
 // getOrCreateStats 获取或创建资源对应的统计状态。
 func (b *LoadShedder) getOrCreateStats(resource string) *resourceStats {
+	b.touch(resource)
 	if v, ok := b.stats.Load(resource); ok {
 		return v.(*resourceStats)
 	}
@@ -200,11 +212,40 @@ func (b *LoadShedder) getOrCreateStats(resource string) *resourceStats {
 // 每个资源单独开窗：快速资源与慢速资源共享窗口时，快速资源的极小
 // minRT 会严重低估慢资源的 maxInFlight，导致慢资源被过度丢弃。
 func (b *LoadShedder) windowFor(resource string) *slidingWindow {
+	b.touch(resource)
 	if v, ok := b.windows.Load(resource); ok {
 		return v.(*slidingWindow)
 	}
 	actual, _ := b.windows.LoadOrStore(resource, newSlidingWindow(b.cfg.WindowSize, b.cfg.BucketCount))
 	return actual.(*slidingWindow)
+}
+
+// touch 记录资源创建并按插入序逐出超限的资源。
+// 不做每次访问的 LRU 重排（避免 O(n) 成本），只用插入序近似约束上界；
+// 被逐出的热门资源会在下次请求时重建，代价可接受。
+func (b *LoadShedder) touch(resource string) {
+	b.lruMu.Lock()
+	defer b.lruMu.Unlock()
+	if b.lruIndex == nil {
+		b.lruIndex = make(map[string]struct{})
+	}
+	if _, exists := b.lruIndex[resource]; exists {
+		return
+	}
+	b.lruIndex[resource] = struct{}{}
+	b.lruOrder = append(b.lruOrder, resource)
+
+	max := b.cfg.MaxResources
+	if max <= 0 {
+		max = defaultMaxResources
+	}
+	if len(b.lruOrder) > max {
+		evicted := b.lruOrder[0]
+		b.lruOrder = b.lruOrder[1:]
+		delete(b.lruIndex, evicted)
+		b.windows.Delete(evicted)
+		b.stats.Delete(evicted)
+	}
 }
 
 // --- Context Key ---

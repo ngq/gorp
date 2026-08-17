@@ -60,6 +60,10 @@ type IdempotencyStore interface {
 	// hit the 409 "being processed" branch, contradicting the "failures may
 	// be retried" contract.
 	//
+	// 破坏性变更：Release 是本接口新增的契约方法。已有自定义
+	// IdempotencyStore 实现需补充该方法；框架内置 MemoryIdempotencyStore
+	// 已实现。
+	//
 	// Release 丢弃之前预留的占位符而不存储响应。中间件在处理失败或 panic 时
 	// 调用：保留占位符会让 TTL 窗口内的所有重试都命中 409"正在处理"分支，
 	// 与"失败可重试"的契约矛盾。

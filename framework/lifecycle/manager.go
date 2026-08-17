@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 )
@@ -30,6 +29,9 @@ type Manager struct {
 	services []ServiceEntry
 	mu       sync.RWMutex
 	state    State
+	// started 跟踪 Start 是否仍在进行；Stop 在它上面阻塞，
+	// 避免启动与关闭并发时出现状态分叉。
+	started sync.WaitGroup
 }
 
 // ServiceEntry describes one registered service entry.
@@ -132,6 +134,9 @@ func (m *Manager) Start(ctx context.Context) error {
 		return nil
 	}
 	m.state = StateStarting
+	// Start 期间 started.Wait() 在 Stop 中阻塞，直到启动真正结束。
+	m.started.Add(1)
+	defer m.started.Done()
 	m.mu.Unlock()
 
 	sorted := m.sortedServices()
@@ -188,19 +193,8 @@ func (m *Manager) Start(ctx context.Context) error {
 func (m *Manager) Stop(ctx context.Context) error {
 	// 等待并发的 Start 完成：若在启动期间调用 Stop 就直接返回，会出现
 	// "服务在运行、host 认为未运行" 的状态分叉，已启动的服务永不停止。
-	for {
-		m.mu.RLock()
-		state := m.state
-		m.mu.RUnlock()
-		if state != StateStarting {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(10 * time.Millisecond):
-		}
-	}
+	// WaitGroup 阻塞到 Start 的 deferred Done 执行，比轮询状态更严谨。
+	m.started.Wait()
 
 	m.mu.Lock()
 	if m.state != StateRunning {
