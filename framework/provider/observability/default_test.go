@@ -7,6 +7,7 @@ package observability
 import (
 	"context"
 	"testing"
+	"time"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	"github.com/stretchr/testify/assert"
@@ -120,4 +121,121 @@ func (m *mockCarrier) Keys() []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// TestPrometheusTracer_RecordsSpans 验证内置 tracer 生成真实 span 并记录。
+func TestPrometheusTracer_RecordsSpans(t *testing.T) {
+	tr := NewPrometheusTracer()
+	_, span := tr.StartSpan(context.Background(), "GET /orders",
+		WithSpanKindForTest(observabilitycontract.SpanKindServer))
+	span.SetAttributes(map[string]interface{}{"http.method": "GET"})
+	span.SetStatus(observabilitycontract.SpanStatusCodeOk, "")
+	time.Sleep(time.Millisecond) // 保证时长可测量
+	span.End()
+
+	sc := span.SpanContext()
+	if sc.TraceID == "" || len(sc.TraceID) != 32 {
+		t.Fatalf("expected 32-char trace id, got %q", sc.TraceID)
+	}
+	if sc.SpanID == "" || len(sc.SpanID) != 16 {
+		t.Fatalf("expected 16-char span id, got %q", sc.SpanID)
+	}
+	if !span.IsRecording() {
+		t.Fatal("expected recording span")
+	}
+
+	recorded := tr.RecordedSpans()
+	if len(recorded) != 1 {
+		t.Fatalf("expected 1 recorded span, got %d", len(recorded))
+	}
+	if recorded[0].Name != "GET /orders" {
+		t.Fatalf("expected span name GET /orders, got %q", recorded[0].Name)
+	}
+	if recorded[0].Attributes["http.method"] != "GET" {
+		t.Fatalf("expected recorded attribute, got %v", recorded[0].Attributes)
+	}
+	if recorded[0].Duration <= 0 {
+		t.Fatalf("expected positive duration, got %v", recorded[0].Duration)
+	}
+}
+
+// TestPrometheusTracer_ChildInheritsTraceID 验证子 span 继承父 traceID。
+func TestPrometheusTracer_ChildInheritsTraceID(t *testing.T) {
+	tr := NewPrometheusTracer()
+	ctx, parent := tr.StartSpan(context.Background(), "parent")
+	parentCtx := parent.SpanContext()
+
+	_, child := tr.StartSpan(ctx, "child")
+	childCtx := child.SpanContext()
+	if childCtx.TraceID != parentCtx.TraceID {
+		t.Fatalf("expected child trace %s to equal parent trace %s", childCtx.TraceID, parentCtx.TraceID)
+	}
+	if childCtx.SpanID == parentCtx.SpanID {
+		t.Fatal("child span id must differ from parent span id")
+	}
+
+	parent.End()
+	child.End()
+	recorded := tr.RecordedSpans()
+	if len(recorded) != 2 {
+		t.Fatalf("expected 2 recorded spans, got %d", len(recorded))
+	}
+	// 两条 span 都应以 parent 为父（child 的父 span id = parent 的 span id）。
+	var childRec *RecordedSpan
+	for _, r := range recorded {
+		if r.Name == "child" {
+			childRec = r
+		}
+	}
+	if childRec == nil {
+		t.Fatal("child span not recorded")
+	}
+	if childRec.ParentSpanID != parentCtx.SpanID {
+		t.Fatalf("expected child parent %s to equal parent span %s", childRec.ParentSpanID, parentCtx.SpanID)
+	}
+}
+
+// TestPrometheusTracer_InjectExtractTraceParent 验证 W3C traceparent 跨服务传播。
+func TestPrometheusTracer_InjectExtractTraceParent(t *testing.T) {
+	tr := NewPrometheusTracer()
+	_, span := tr.StartSpan(context.Background(), "service-a")
+	sc := span.SpanContext()
+
+	carrier := &mockCarrier{}
+	if err := tr.Inject(span.Context(), carrier); err != nil {
+		t.Fatalf("inject failed: %v", err)
+	}
+	if tp := carrier.data["traceparent"]; tp == "" {
+		t.Fatal("expected traceparent header after inject")
+	}
+
+	// 服务 B 侧 Extract 出远端父 span，其子 span 应继承同一 traceID。
+	ctx, err := tr.Extract(context.Background(), carrier)
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+	_, child := tr.StartSpan(ctx, "service-b")
+	if child.SpanContext().TraceID != sc.TraceID {
+		t.Fatalf("expected propagated trace %s, got %s", sc.TraceID, child.SpanContext().TraceID)
+	}
+	child.End()
+	span.End()
+}
+
+// TestPrometheusTracer_RingBufferBound 验证环形缓冲上限。
+func TestPrometheusTracer_RingBufferBound(t *testing.T) {
+	tr := NewPrometheusTracer()
+	for i := 0; i < maxRecordedSpans+100; i++ {
+		_, s := tr.StartSpan(context.Background(), "span")
+		s.End()
+	}
+	if got := len(tr.RecordedSpans()); got > maxRecordedSpans {
+		t.Fatalf("expected at most %d recorded spans, got %d", maxRecordedSpans, got)
+	}
+}
+
+// WithSpanKindForTest 构造测试用 SpanOption（default.go 的 WithSpanKind 在
+// tracing/middleware 包，这里本地构造避免跨包依赖）。
+func WithSpanKindForTest(kind observabilitycontract.SpanKind) observabilitycontract.SpanOption {
+	return func(cfg *observabilitycontract.SpanConfig) { cfg.Kind = kind }
 }

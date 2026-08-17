@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 
@@ -151,7 +152,7 @@ func NewMTLSAuthenticator(cfg *securitycontract.ServiceAuthConfig) (*MTLSAuthent
 }
 
 func (a *MTLSAuthenticator) Authenticate(ctx context.Context) (*securitycontract.ServiceIdentity, error) {
-	tlsConnState := extractTLSState(ctx)
+	tlsConnState := securitycontract.TLSStateFrom(ctx)
 	if tlsConnState == nil {
 		return nil, errors.New("serviceauth.mtls: no TLS connection found")
 	}
@@ -181,6 +182,24 @@ func (a *MTLSAuthenticator) authenticateByCert(cert *x509.Certificate) (*securit
 	if cert == nil {
 		return nil, errors.New("serviceauth.mtls: nil certificate")
 	}
+	// 基本有效期校验：运输层 TLS 握手已做链校验，这里作为直接调用
+	// AuthenticatePeerCertificate（非 TLS 传输）路径的兜底。
+	now := time.Now()
+	if now.Before(cert.NotBefore) {
+		return nil, fmt.Errorf("serviceauth.mtls: client certificate not valid yet (valid from %s)", cert.NotBefore.Format(time.RFC3339))
+	}
+	if now.After(cert.NotAfter) {
+		return nil, fmt.Errorf("serviceauth.mtls: client certificate expired at %s", cert.NotAfter.Format(time.RFC3339))
+	}
+	// 配置了 CA 池时做链校验（直接调用路径的防御纵深）。
+	if a.certPool != nil {
+		if _, err := cert.Verify(x509.VerifyOptions{
+			Roots:     a.certPool,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}); err != nil {
+			return nil, fmt.Errorf("serviceauth.mtls: client certificate verification failed: %w", err)
+		}
+	}
 	serviceName := cert.Subject.CommonName
 	if serviceName == "" {
 		return nil, errors.New("serviceauth.mtls: certificate missing common name")
@@ -194,8 +213,5 @@ func (a *MTLSAuthenticator) authenticateByCert(cert *x509.Certificate) (*securit
 }
 
 func extractTLSState(ctx context.Context) *tls.ConnectionState {
-	if state, ok := ctx.Value("tls_state").(*tls.ConnectionState); ok {
-		return state
-	}
-	return nil
+	return securitycontract.TLSStateFrom(ctx)
 }

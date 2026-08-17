@@ -31,7 +31,14 @@ import (
 func injectRequestContainer(c runtimecontract.Container) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if c != nil && ctx != nil && ctx.Request != nil {
-			ctx.Request = ctx.Request.WithContext(supportcontract.NewContainerContext(ctx.Request.Context(), c))
+			reqCtx := ctx.Request.Context()
+			reqCtx = supportcontract.NewContainerContext(reqCtx, c)
+			// 注入对端 TLS 连接状态：mTLS 服务认证依赖它读取已验证的客户端证书。
+			// 此前没有任何生产代码注入 tls_state，导致 mTLS 认证路径形同虚设。
+			if tlsState := ctx.Request.TLS; tlsState != nil {
+				reqCtx = securitycontract.WithTLSState(reqCtx, tlsState)
+			}
+			ctx.Request = ctx.Request.WithContext(reqCtx)
 		}
 		ctx.Next()
 	}

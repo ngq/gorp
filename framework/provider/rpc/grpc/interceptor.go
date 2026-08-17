@@ -13,9 +13,23 @@ import (
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
+
+// injectTLSStateToContext 从 gRPC peer 中提取 TLS 连接状态并注入 context，
+// 供 mTLS 服务认证读取已验证的客户端证书。非 TLS 连接时不做任何事。
+func injectTLSStateToContext(ctx context.Context) context.Context {
+	if p, ok := peer.FromContext(ctx); ok {
+		if tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo); ok {
+			state := tlsInfo.State
+			return securitycontract.WithTLSState(ctx, &state)
+		}
+	}
+	return ctx
+}
 
 // serviceAuthWrappedStream wraps a grpc.ServerStream with a custom context.
 // Used to propagate authenticated identity through stream calls.
@@ -79,6 +93,8 @@ func serviceAuthStreamClientInterceptor(auth securitycontract.ServiceTokenIssuer
 // 从入站 metadata 提取服务 token 并认证调用方。
 func serviceAuthUnaryServerInterceptor(auth securitycontract.ServiceAuthenticator) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		// 注入 TLS 连接状态（mTLS 认证需要）
+		ctx = injectTLSStateToContext(ctx)
 		// 从入站 metadata 提取 token
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
@@ -108,6 +124,8 @@ func serviceAuthUnaryServerInterceptor(auth securitycontract.ServiceAuthenticato
 func serviceAuthStreamServerInterceptor(auth securitycontract.ServiceAuthenticator) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := ss.Context()
+		// 注入 TLS 连接状态（mTLS 认证需要）
+		ctx = injectTLSStateToContext(ctx)
 		// 从入站 metadata 提取 token
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {

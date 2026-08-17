@@ -66,12 +66,12 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 
 		var tracer observabilitycontract.Tracer
 		if p.config.TracingEnabled {
-			// 注意：PrometheusTracer 的 StartSpan 仍返回 NoopSpan——内置实现
-			// 只提供 tracer 接口占位，不产生真实 span/传播。要获得真实链路，
+			// 内置 PrometheusTracer 记录本地 span（生成 traceID、父级继承、
+			// traceparent 跨服务传播），但不导出到外部后端。要远端链路存储，
 			// 请注册 contrib/tracing/otel 的 OpenTelemetry tracer。
 			tracer = NewPrometheusTracer()
 			if logger != nil {
-				logger.Warn("observability: tracing enabled, but the built-in tracer records no spans; register contrib/tracing/otel for real traces")
+				logger.Info("observability: tracing enabled with built-in in-memory tracer (no external export); register contrib/tracing/otel for backend export")
 			}
 		} else {
 			tracer = NewNoopTracer()

@@ -31,7 +31,7 @@ func TestMTLSAuthenticator_AuthenticateRejectsMissingPeerCertificate(t *testing.
 	auth, err := NewMTLSAuthenticator(&securitycontract.ServiceAuthConfig{})
 	require.NoError(t, err)
 
-	ctx := context.WithValue(context.Background(), "tls_state", &tls.ConnectionState{})
+	ctx := securitycontract.WithTLSState(context.Background(), &tls.ConnectionState{})
 	_, err = auth.Authenticate(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no client certificate provided")
@@ -149,7 +149,7 @@ func TestMTLSAuthenticator_AuthenticateExtractsIdentityFromTLSPeerCert(t *testin
 	connState := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parsedCert},
 	}
-	ctx := context.WithValue(context.Background(), "tls_state", connState)
+	ctx := securitycontract.WithTLSState(context.Background(), connState)
 
 	identity, err := auth.Authenticate(ctx)
 	require.NoError(t, err)
