@@ -75,7 +75,7 @@ func TestTokenAuthenticator_AuthenticateReadsBearerTokenFromContext(t *testing.T
 	token, err := auth.GenerateToken(context.Background(), "")
 	require.NoError(t, err)
 
-	ctx := context.WithValue(context.Background(), "authorization", "Bearer "+token)
+	ctx := securitycontract.WithAuthorization(context.Background(), "Bearer "+token)
 	identity, err := auth.Authenticate(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "order-service", identity.ServiceName)
@@ -89,10 +89,10 @@ func TestTokenAuthenticator_AuthenticatePeerCertificateRejectsCertificate(t *tes
 }
 
 func TestExtractTokenFromContext(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "authorization", "bearer abc")
+	ctx := securitycontract.WithAuthorization(context.Background(), "bearer abc")
 	require.Equal(t, "abc", extractTokenFromContext(ctx))
 
-	ctx = context.WithValue(context.Background(), "authorization", "raw-token")
+	ctx = securitycontract.WithAuthorization(context.Background(), "raw-token")
 	require.Equal(t, "raw-token", extractTokenFromContext(ctx))
 
 	require.Empty(t, extractTokenFromContext(context.Background()))

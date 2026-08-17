@@ -50,7 +50,13 @@ func (p *Provider) Provides() []string { return []string{integrationcontract.SSH
 // 核心逻辑：创建 Service 实例、绑定到容器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(integrationcontract.SSHKey, func(c runtimecontract.Container) (any, error) {
-		return NewService(c)
+		svc, err := NewService(c)
+		if err != nil {
+			return nil, err
+		}
+		// 接线 closer：容器销毁时关闭全部缓存的 SSH 连接。
+		c.RegisterCloser("ssh", svc)
+		return svc, nil
 	}, true)
 	return nil
 }

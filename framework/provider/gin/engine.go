@@ -8,7 +8,6 @@
 package gin
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
@@ -79,23 +78,22 @@ func attachHTTPTransportMiddleware(engine *gin.Engine, c runtimecontract.Contain
 				return func(c *gin.Context) {
 					ctx := c.Request.Context()
 					if auth := strings.TrimSpace(c.GetHeader("Authorization")); auth != "" {
-						ctx = context.WithValue(ctx, "authorization", auth)
+						ctx = securitycontract.WithAuthorization(ctx, auth)
 					}
 					if token := strings.TrimSpace(c.GetHeader("X-Service-Token")); token != "" {
-						ctx = context.WithValue(ctx, "x-service-token", token)
+						ctx = securitycontract.WithServiceToken(ctx, token)
 					}
 					if authenticator != nil {
-						hasToken := strings.TrimSpace(c.GetHeader("X-Service-Token")) != "" ||
-							strings.TrimSpace(c.GetHeader("Authorization")) != ""
-						if hasToken {
-							identity, err := authenticator.Authenticate(ctx)
-							if err != nil {
-								c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "service authentication failed"})
-								return
-							}
-							if identity != nil {
-								ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
-							}
+						// fail-closed: 认证器绑定后必须通过认证，无凭证由认证器决定拒绝或放行公开端点。
+						// fail-closed: once an authenticator is bound, every request must pass authentication;
+						// missing credentials are rejected (or allowed for public endpoints) by the authenticator itself.
+						identity, err := authenticator.Authenticate(ctx)
+						if err != nil {
+							c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "service authentication failed"})
+							return
+						}
+						if identity != nil {
+							ctx = securitycontract.NewServiceIdentityContext(ctx, identity)
 						}
 					}
 					c.Request = c.Request.WithContext(ctx)

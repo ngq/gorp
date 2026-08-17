@@ -82,7 +82,7 @@ func serviceAuthUnaryServerInterceptor(auth securitycontract.ServiceAuthenticato
 		// 从入站 metadata 提取 token
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
-				ctx = context.WithValue(ctx, "x-service-token", values[0])
+				ctx = securitycontract.WithServiceToken(ctx, values[0])
 			}
 		}
 		// 执行认证
@@ -111,7 +111,7 @@ func serviceAuthStreamServerInterceptor(auth securitycontract.ServiceAuthenticat
 		// 从入站 metadata 提取 token
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
-				ctx = context.WithValue(ctx, "x-service-token", values[0])
+				ctx = securitycontract.WithServiceToken(ctx, values[0])
 			}
 		}
 		// 执行认证
@@ -177,15 +177,18 @@ func timeoutUnaryServerInterceptor(timeout time.Duration) grpc.UnaryServerInterc
 	}
 }
 
-// metricsUnaryServerInterceptor creates a unary server interceptor for Prometheus metrics.
-// Records request count with method label.
+// metricsUnaryServerInterceptor is retained as a no-op placeholder.
+// gRPC request metrics (gorp_grpc_requests_total / gorp_grpc_request_duration_seconds)
+// are already collected by appgrpc.UnaryServerInterceptor registered earlier in the
+// interceptor chain (see server.go), so this interceptor intentionally does nothing
+// to avoid duplicate counter registration and double-counting.
 //
-// metricsUnaryServerInterceptor 创建 Prometheus 指标的一元服务端拦截器。
-// 记录带 method 标签的请求计数。
+// metricsUnaryServerInterceptor 保留为空操作占位。
+// gRPC 请求指标（gorp_grpc_requests_total / gorp_grpc_request_duration_seconds）
+// 已由链路中更早注册的 appgrpc.UnaryServerInterceptor 采集（见 server.go），
+// 此拦截器刻意不做任何事，以避免重复注册指标和重复计数。
 func metricsUnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		// TODO: Integrate with Prometheus metrics when available
-		// 等待 Prometheus metrics 集成后补充
 		return handler(ctx, req)
 	}
 }

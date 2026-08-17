@@ -27,12 +27,20 @@ import (
 )
 
 type hostConfig struct {
-	Host       string `mapstructure:"host"`
-	Port       int    `mapstructure:"port"`
-	Username   string `mapstructure:"username"`
-	Password   string `mapstructure:"password"`
-	KeyPath    string `mapstructure:"key_path"`
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+	// Username/Password are SSH login credentials.
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	KeyPath  string `mapstructure:"key_path"`
+	// KnownHosts is the path to a known_hosts file used to verify the server
+	// host key. When empty, the default ~/.ssh/known_hosts is used; when that
+	// is also missing, dialing fails closed unless InsecureSkipHostKey is set.
 	KnownHosts string `mapstructure:"known_hosts"`
+	// InsecureSkipHostKey disables host key verification. Never enable it in
+	// production: the connection becomes vulnerable to man-in-the-middle
+	// attacks that can steal credentials.
+	InsecureSkipHostKey bool `mapstructure:"insecure_skip_host_key"`
 }
 
 type sshConfig struct {
@@ -50,6 +58,22 @@ type Service struct {
 
 	mu      sync.Mutex
 	clients map[string]*clientHandle
+}
+
+// Close closes all cached SSH connections. Implements io.Closer.
+//
+// Close 关闭所有缓存的 SSH 连接。实现 io.Closer。
+func (s *Service) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var firstErr error
+	for name, cli := range s.clients {
+		if err := cli.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		delete(s.clients, name)
+	}
+	return firstErr
 }
 
 type clientHandle struct {
@@ -79,6 +103,17 @@ func (c *clientHandle) NativeSSHClient() *ssh.Client {
 		return nil
 	}
 	return c.raw
+}
+
+// healthy probes the underlying connection with an SSH keepalive request.
+//
+// healthy 用 SSH keepalive 请求探测底层连接是否存活。
+func (c *clientHandle) healthy() bool {
+	if c == nil || c.raw == nil {
+		return false
+	}
+	_, _, err := c.raw.SendRequest("keepalive@openssh.com", true, nil)
+	return err == nil
 }
 
 type sessionHandle struct {
@@ -129,7 +164,15 @@ func (s *Service) Client(hostName string) (integrationcontract.SSHClient, error)
 	s.mu.Lock()
 	if cli, ok := s.clients[hostName]; ok {
 		s.mu.Unlock()
-		return cli, nil
+		// 缓存命中也做健康探测：底层 TCP 断开（服务器重启、网络中断）后
+		// 旧 client 会持续报错且无法自愈；探测失败即剔除并重新拨号。
+		if cli.healthy() {
+			return cli, nil
+		}
+		s.mu.Lock()
+		delete(s.clients, hostName)
+		s.mu.Unlock()
+		_ = cli.Close()
 	}
 	s.mu.Unlock()
 

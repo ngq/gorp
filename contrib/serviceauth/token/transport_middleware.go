@@ -29,10 +29,10 @@ func ServiceAuthMiddleware(authenticator securitycontract.ServiceAuthenticator) 
 				// Build context for authentication using standard context.Context
 				authCtx := c.Context()
 				if auth != "" {
-					authCtx = context.WithValue(authCtx, "authorization", auth)
+					authCtx = securitycontract.WithAuthorization(authCtx, auth)
 				}
 				if token != "" {
-					authCtx = context.WithValue(authCtx, "x-service-token", token)
+					authCtx = securitycontract.WithServiceToken(authCtx, token)
 				}
 
 				identity, err := authenticator.Authenticate(authCtx)
@@ -78,10 +78,10 @@ func UnaryServerInterceptor(authenticator securitycontract.ServiceAuthenticator)
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("authorization"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
-				ctx = context.WithValue(ctx, "authorization", values[0])
+				ctx = securitycontract.WithAuthorization(ctx, values[0])
 			}
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
-				ctx = context.WithValue(ctx, "x-service-token", values[0])
+				ctx = securitycontract.WithServiceToken(ctx, values[0])
 			}
 		}
 
@@ -105,10 +105,10 @@ func StreamServerInterceptor(authenticator securitycontract.ServiceAuthenticator
 		ctx := ss.Context()
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			if values := md.Get("authorization"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
-				ctx = context.WithValue(ctx, "authorization", values[0])
+				ctx = securitycontract.WithAuthorization(ctx, values[0])
 			}
 			if values := md.Get("x-service-token"); len(values) > 0 && strings.TrimSpace(values[0]) != "" {
-				ctx = context.WithValue(ctx, "x-service-token", values[0])
+				ctx = securitycontract.WithServiceToken(ctx, values[0])
 			}
 		}
 

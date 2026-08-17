@@ -173,7 +173,7 @@ func TestServiceAuthUnaryServerInterceptorInjectsIdentity(t *testing.T) {
 			if !ok || identity == nil || identity.ServiceName != "caller" {
 				t.Fatalf("expected service identity in context, got %+v", identity)
 			}
-			if token, _ := ctx.Value("x-service-token").(string); token != "svc-token" {
+			if token := securitycontract.ServiceTokenFrom(ctx); token != "svc-token" {
 				t.Fatalf("expected service token in context, got %q", token)
 			}
 			return "ok", nil

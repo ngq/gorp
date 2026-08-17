@@ -79,6 +79,18 @@ func (c *testContext) BindQuery(obj any) error {
 	return c.gin.ShouldBindQuery(obj)
 }
 
+func (c *testContext) BindForm(obj any) error {
+	return c.gin.ShouldBind(obj)
+}
+
+func (c *testContext) BindHeader(obj any) error {
+	return c.gin.ShouldBindHeader(obj)
+}
+
+func (c *testContext) BindURI(obj any) error {
+	return c.gin.ShouldBindUri(obj)
+}
+
 func (c *testContext) JSON(status int, body any) {
 	c.gin.JSON(status, body)
 }
@@ -149,6 +161,36 @@ func (c *testContext) FormFile(name string) (multipart.File, *multipart.FileHead
 
 func (c *testContext) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
 	return nil
+}
+
+func (c *testContext) Cookie(name string) (string, error) {
+	return c.gin.Cookie(name)
+}
+
+func (c *testContext) File(path string) {
+	c.gin.File(path)
+}
+
+func (c *testContext) FileAttachment(path, filename string) {
+	c.gin.FileAttachment(path, filename)
+}
+
+func (c *testContext) SetCookie(cookie *http.Cookie) {
+	http.SetCookie(c.gin.Writer, cookie)
+}
+
+func (c *testContext) DeleteCookie(name, path, domain string) {
+	http.SetCookie(c.gin.Writer, &http.Cookie{Name: name, Path: path, Domain: domain, MaxAge: -1})
+}
+
+func (c *testContext) Stream(contentType string, write func(transportcontract.StreamWriter) error) error {
+	// 测试桩不覆盖流式路径。
+	return errors.New("stream not supported by test stub")
+}
+
+func (c *testContext) SSE(event transportcontract.SSEEvent) error {
+	// 测试桩不覆盖 SSE 路径。
+	return errors.New("sse not supported by test stub")
 }
 
 func newTestContext(c *gin.Context) transportcontract.Context {

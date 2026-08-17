@@ -158,18 +158,35 @@ func (a *TokenAuthenticator) GenerateToken(ctx context.Context, targetService st
 
 func (a *TokenAuthenticator) VerifyToken(ctx context.Context, tokenString string) (*securitycontract.ServiceIdentity, error) {
 	_ = ctx
+	// 校验 issuer/audience/exp：GenerateToken 为每个目标服务生成专属
+	// Audience，不校验的话签发给 A 的 token 可原样重放给 B/C（所有服务
+	// 共享同一 HMAC secret 时 aud 是唯一的受众隔离手段）。
+	parserOpts := []jwt.ParserOption{jwt.WithExpirationRequired()}
+	if a.cfg.TokenIssuer != "" {
+		parserOpts = append(parserOpts, jwt.WithIssuer(a.cfg.TokenIssuer))
+	}
+	if a.cfg.TokenAudience != "" {
+		parserOpts = append(parserOpts, jwt.WithAudience(a.cfg.TokenAudience))
+	}
 	token, err := jwt.ParseWithClaims(tokenString, &serviceTokenClaims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(a.cfg.TokenSecret), nil
-	})
+	}, parserOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("serviceauth.token: verify token failed: %w", err)
 	}
 	claims, ok := token.Claims.(*serviceTokenClaims)
 	if !ok || !token.Valid {
 		return nil, errors.New("serviceauth.token: invalid token claims")
+	}
+	// namespace/environment 声明与本地配置比对，阻止跨环境 token 混用。
+	if a.cfg.Namespace != "" && claims.Namespace != "" && claims.Namespace != a.cfg.Namespace {
+		return nil, fmt.Errorf("serviceauth.token: token namespace %q does not match %q", claims.Namespace, a.cfg.Namespace)
+	}
+	if a.cfg.Environment != "" && claims.Environment != "" && claims.Environment != a.cfg.Environment {
+		return nil, fmt.Errorf("serviceauth.token: token environment %q does not match %q", claims.Environment, a.cfg.Environment)
 	}
 	if len(a.cfg.AllowedServices) > 0 {
 		allowed := false
@@ -215,11 +232,12 @@ type serviceTokenClaims struct {
 }
 
 func extractTokenFromContext(ctx context.Context) string {
-	if token, ok := ctx.Value("authorization").(string); ok {
-		if strings.HasPrefix(strings.ToLower(token), "bearer ") {
-			return token[7:]
-		}
-		return token
+	token := securitycontract.AuthorizationFrom(ctx)
+	if token == "" {
+		return ""
 	}
-	return ""
+	if strings.HasPrefix(strings.ToLower(token), "bearer ") {
+		return token[7:]
+	}
+	return token
 }
