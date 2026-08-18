@@ -148,7 +148,7 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (rt *GRP
 		Container:   c,
 		Logger:      container.MustMakeLogger(c),
 		Registrar:   registrar,
-		Server:      registrar.Server(),
+		Server:      grpcServerFromRegistrar(registrar),
 		Config:      container.MustMakeConfig(c),
 		ServiceName: serviceName,
 	}
@@ -397,4 +397,16 @@ func StartGRPCServer(c runtimecontract.Container, logger observabilitycontract.L
 	}
 
 	return rpcServer, nil
+}
+
+// grpcServerFromRegistrar 从契约注册器提取 *grpc.Server。
+// grpc_service.go 是 grpc 专用文件，可安全断言契约返回的 any。
+func grpcServerFromRegistrar(registrar transportcontract.GRPCServerRegistrar) *grpc.Server {
+	if registrar == nil {
+		return nil
+	}
+	if srv, ok := registrar.Server().(*grpc.Server); ok {
+		return srv
+	}
+	return nil
 }

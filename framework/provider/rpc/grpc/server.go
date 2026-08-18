@@ -74,10 +74,11 @@ func (s *Server) Register(service string, handler any) error {
 
 // RegisterProto registers a gRPC service using a registration function.
 // Allows direct registration of protobuf-generated service implementations.
+// register 回调收到的 any 实际为 *grpc.Server（契约 grpc-free，调用方断言）。
 //
 // RegisterProto 使用注册函数注册 gRPC 服务。
 // 允许直接注册 protobuf 生成的服务实现。
-func (s *Server) RegisterProto(register func(server *grpc.Server) error) error {
+func (s *Server) RegisterProto(register func(server any) error) error {
 	if register == nil {
 		return nil
 	}
@@ -216,10 +217,11 @@ func (s *Server) Addr() string {
 
 // Server returns the underlying gRPC server instance.
 // Lazy initializes the server if not already created.
+// 返回 any（实际为 *grpc.Server），满足 grpc-free 契约。
 //
 // Server 返回底层 gRPC 服务器实例。
 // 如果尚未创建则延迟初始化。
-func (s *Server) Server() *grpc.Server {
+func (s *Server) Server() any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_ = s.ensureServerLocked()
@@ -251,13 +253,15 @@ func (s *Server) ensureServerLocked() error {
 	return nil
 }
 
-// GRPCServer returns the underlying gRPC server (alias for Server).
-// Provides explicit gRPC type access for advanced usage.
+// GRPCServer returns the underlying gRPC server with explicit type.
+// Provides typed access for grpc-aware callers (bootstrap/host assembly).
 //
-// GRPGServer 返回底层 gRPC 服务器（Server 的别名）。
-// 提供显式 gRPC 类型访问供高级使用。
+// GRPCServer 返回底层 gRPC 服务器（显式类型），供 grpc 相关装配使用。
 func (s *Server) GRPCServer() *grpc.Server {
-	return s.Server()
+	if v, ok := s.Server().(*grpc.Server); ok {
+		return v
+	}
+	return nil
 }
 
 // newGRPCServer constructs a gRPC server with middleware chain from container.

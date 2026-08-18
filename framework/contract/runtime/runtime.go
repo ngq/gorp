@@ -9,8 +9,6 @@
 // - 保持配置器接口最小化且易于组合。
 package runtime
 
-import "google.golang.org/grpc"
-
 const (
 	HTTPRuntimeConfiguratorKey = "app.runtime.http_configurator"
 	CronRuntimeConfiguratorKey = "app.runtime.cron_configurator"
@@ -41,8 +39,8 @@ type CronRuntimeConfigurator interface {
 //
 // GRPCRuntimeBuilder 定义 gRPC 服务端运行时构建器。
 type GRPCRuntimeBuilder interface {
-	// BuildGRPCServer builds and returns a gRPC server.
+	// BuildGRPCServer builds and returns a gRPC server (*grpc.Server as any).
 	//
-	// BuildGRPCServer 构建并返回一个 gRPC 服务端。
-	BuildGRPCServer() *grpc.Server
+	// BuildGRPCServer 构建并返回一个 gRPC 服务端（*grpc.Server，以 any 形式返回）。
+	BuildGRPCServer() any
 }

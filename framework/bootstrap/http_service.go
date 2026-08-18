@@ -33,7 +33,6 @@ import (
 	gingin "github.com/ngq/gorp/framework/provider/gin"
 	"github.com/ngq/gorp/framework/provider/host"
 	redisProvider "github.com/ngq/gorp/framework/provider/redis"
-	"google.golang.org/grpc"
 
 	"github.com/jmoiron/sqlx"
 	gormpkg "gorm.io/gorm"
@@ -89,14 +88,14 @@ type HTTPServiceRuntime struct {
 	HTTPMode          resiliencecontract.HTTPMode // HTTP 模式维度：contract 或 gin
 	GovernanceSummary GovernanceSummary
 
-	// GRPCServer 是底层 gRPC 服务器实例，仅在微服务模式下可用。
-	// 用户可在 setup 回调中使用此字段注册 proto 服务。
+	// GRPCServer 是底层 gRPC 服务器实例（*grpc.Server，以 any 形式暴露，避免契约依赖 grpc）。
+	// 用户可在 setup 回调中使用此字段注册 proto 服务（用 rpc/grpc.MustGRPCServer 断言）。
 	// 单体模式下此字段为 nil，请使用 GetGRPCServer() 方法安全访问。
 	//
-	// GRPCServer is the underlying gRPC server instance, only available in microservice mode.
+	// GRPCServer is the underlying gRPC server instance (*grpc.Server as any), only available in microservice mode.
 	// Users can use this field to register proto services in the setup callback.
 	// In monolith mode this field is nil, use GetGRPCServer() method for safe access.
-	GRPCServer *grpc.Server
+	GRPCServer any
 
 	// GRPCServerRegistrar 是 gRPC 服务注册器，仅在微服务模式下可用。
 	// 提供 RegisterProto 方法用于注册 proto 生成的服务实现。
@@ -110,10 +109,11 @@ type HTTPServiceRuntime struct {
 
 // GetGRPCServer safely returns the gRPC server instance.
 // Returns error in monolith mode where gRPC is not enabled.
+// 返回值实际为 *grpc.Server，用 rpc/grpc.MustGRPCServer 或类型断言转换。
 //
 // GetGRPCServer 安全返回 gRPC 服务器实例。
 // 在单体模式下（gRPC 未启用）返回错误。
-func (rt *HTTPServiceRuntime) GetGRPCServer() (*grpc.Server, error) {
+func (rt *HTTPServiceRuntime) GetGRPCServer() (any, error) {
 	if rt == nil || rt.GRPCServer == nil {
 		return nil, errors.New("grpc server not available: gRPC is not enabled in current governance mode")
 	}
@@ -134,10 +134,11 @@ func (rt *HTTPServiceRuntime) GetGRPCServerRegistrar() (transportcontract.GRPCSe
 
 // MustGRPCServer returns the gRPC server instance or panics if not available.
 // Use only when gRPC is guaranteed to be enabled (microservice mode).
+// 返回值实际为 *grpc.Server。
 //
 // MustGRPCServer 返回 gRPC 服务器实例，不可用时 panic。
 // 仅在确定 gRPC 已启用（微服务模式）时使用。
-func (rt *HTTPServiceRuntime) MustGRPCServer() *grpc.Server {
+func (rt *HTTPServiceRuntime) MustGRPCServer() any {
 	srv, err := rt.GetGRPCServer()
 	if err != nil {
 		panic(err)

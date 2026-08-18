@@ -7,16 +7,25 @@ package host
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"sync/atomic"
 
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
-	"google.golang.org/grpc"
 )
+
+// grpcServable 是 gRPC server 的最小运行接口。*grpc.Server 满足该接口，
+// 但本包不 import grpc，避免纯 HTTP 应用被强制链接 grpc-go。
+//
+// grpcServable 是 gRPC server 的最小运行接口。
+type grpcServable interface {
+	Serve(lis net.Listener) error
+	GracefulStop()
+	Stop()
+}
 
 // HTTPService wraps transportcontract.HTTP as a Hostable service.
 //
@@ -110,25 +119,20 @@ func (s *CronService) Stop(ctx context.Context) error {
 	}
 }
 
-// GRPCService wraps grpc.Server as a Hostable service.
+// GRPCService wraps a gRPC server (via grpcServable interface) as a Hostable service.
 //
-// GRPCService 封装 grpc.Server 为可托管服务。
+// GRPCService 封装 gRPC server（经 grpcServable 接口）为可托管服务。
 type GRPCService struct {
-	name string // name is the service name.
-	//
-	// name 服务名称。
-	server *grpc.Server // server is the GRPC server.
-	//
-	// server GRPC 服务器。
-	lis net.Listener // lis is the network listener.
-	//
-	// lis 网络监听器。
+	name    string // name 服务名称。
+	server  grpcServable
+	lis     net.Listener
+	stopped atomic.Bool // stopped 记录是否被主动停止，用于区分正常停止与异常
 }
 
 // NewGRPCService creates a new GRPC service adapter.
 //
 // NewGRPCService 创建新的 GRPC 服务适配器。
-func NewGRPCService(name string, server *grpc.Server, lis net.Listener) *GRPCService {
+func NewGRPCService(name string, server grpcServable, lis net.Listener) *GRPCService {
 	return &GRPCService{name: name, server: server, lis: lis}
 }
 
@@ -138,13 +142,12 @@ func NewGRPCService(name string, server *grpc.Server, lis net.Listener) *GRPCSer
 func (s *GRPCService) Name() string { return s.name }
 
 // Start starts the GRPC server in background.
-// 非 grpc.ErrServerStopped 的错误会通过 slog.Error 记录。
+// 主动停止（Stop）后 Serve 返回的错误会被忽略，避免依赖 grpc.ErrServerStopped。
 //
 // Start 在后台启动 GRPC 服务器。
-// 非 grpc.ErrServerStopped 的错误会通过 slog.Error 记录。
 func (s *GRPCService) Start(ctx context.Context) error {
 	go func() {
-		if err := s.server.Serve(s.lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+		if err := s.server.Serve(s.lis); err != nil && !s.stopped.Load() {
 			slog.Error("grpc server error", "error", err)
 		}
 	}()
@@ -152,11 +155,10 @@ func (s *GRPCService) Start(ctx context.Context) error {
 }
 
 // Stop gracefully stops the GRPC server, with fallback to force stop on timeout.
-// Core logic: Call GracefulStop in goroutine, wait for done or context timeout.
 //
 // Stop 优雅关闭 GRPC 服务器，超时时强制关闭。
-// 核心逻辑：在 goroutine 中调用 GracefulStop，等待完成或 context 超时。
 func (s *GRPCService) Stop(ctx context.Context) error {
+	s.stopped.Store(true)
 	done := make(chan struct{})
 	go func() {
 		s.server.GracefulStop()

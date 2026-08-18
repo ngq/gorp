@@ -10,12 +10,10 @@ import (
 	"errors"
 	"math/rand"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
@@ -153,15 +151,16 @@ func isRetryableWithPolicy(err error, policy resiliencecontract.RetryPolicy) boo
 		return false
 	}
 
-	grpcStatus, ok := status.FromError(err)
-	if ok {
-		for _, code := range policy.RetryableGRPCCodes {
-			if grpcStatus.Code().String() == code {
+	// gRPC 错误分类：通过接口方法提取 code 字符串（如 "Unavailable"），
+	// 不引入 grpc 依赖。与 grpc/status.FromError 语义一致——非 gRPC 错误返回 ""。
+	if code := grpcErrorCodeString(err); code != "" {
+		for _, rc := range policy.RetryableGRPCCodes {
+			if code == rc {
 				return true
 			}
 		}
-		switch grpcStatus.Code() {
-		case codes.Unavailable, codes.DeadlineExceeded, codes.ResourceExhausted, codes.Aborted:
+		switch code {
+		case "Unavailable", "DeadlineExceeded", "ResourceExhausted", "Aborted":
 			return true
 		}
 		return false
@@ -244,4 +243,48 @@ func (r *RetryService) DoForResource(ctx context.Context, resource string, fn fu
 	policy := r.cfg.GetPolicy(resource)
 	r.mu.RUnlock()
 	return r.doWithPolicy(ctx, policy, fn)
+}
+
+// grpcErrorCodeString 从错误中提取 gRPC 状态码字符串（如 "Unavailable"）。
+// 用反射访问 GRPCStatus()/Code()/String()，避免引入 google.golang.org/grpc 依赖；
+// 非 gRPC 错误返回 ""。语义对齐 grpc/status.FromError：遍历 unwrap 链。
+// 注：不能用接口断言实现——Go 要求接口方法返回类型与实现完全相同（不可协变），
+// 而 codes.Code 是具体类型，无法用本地接口收窄。
+func grpcErrorCodeString(err error) string {
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if code := grpcCodeViaReflect(e); code != "" {
+			return code
+		}
+	}
+	return ""
+}
+
+// grpcCodeViaReflect 通过反射调用 GRPCStatus().Code().String()。
+func grpcCodeViaReflect(err error) string {
+	v := reflect.ValueOf(err)
+	m := v.MethodByName("GRPCStatus")
+	if !m.IsValid() {
+		return ""
+	}
+	out := m.Call(nil)
+	if len(out) != 1 || !out[0].IsValid() {
+		return ""
+	}
+	codeM := out[0].MethodByName("Code")
+	if !codeM.IsValid() {
+		return ""
+	}
+	codeOut := codeM.Call(nil)
+	if len(codeOut) != 1 || !codeOut[0].IsValid() {
+		return ""
+	}
+	strM := codeOut[0].MethodByName("String")
+	if !strM.IsValid() {
+		return ""
+	}
+	strOut := strM.Call(nil)
+	if len(strOut) != 1 {
+		return ""
+	}
+	return strOut[0].String()
 }

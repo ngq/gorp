@@ -166,10 +166,11 @@ func (c *Client) CallRaw(ctx context.Context, service, method string, data []byt
 
 // Conn returns the underlying gRPC connection for advanced usage.
 // Allows direct access to gRPC client connection for streaming or custom invocations.
+// 返回 any（实际为 *grpc.ClientConn），满足 grpc-free 契约；调用方用类型断言转换。
 //
 // Conn 返回底层 gRPC 连接供高级使用。
 // 允许直接访问 gRPC 客户端连接进行流式调用或自定义调用。
-func (c *Client) Conn(ctx context.Context, service string) (*grpc.ClientConn, error) {
+func (c *Client) Conn(ctx context.Context, service string) (any, error) {
 	conn, _, err := c.getConn(ctx, service)
 	if err != nil {
 		return nil, err
