@@ -33,6 +33,7 @@ func (denyCircuitBreaker) Do(ctx context.Context, resource string, fn func() err
 func (denyCircuitBreaker) State(context.Context, string) resiliencecontract.CircuitBreakerState {
 	return resiliencecontract.CircuitBreakerStateClosed
 }
+func (denyCircuitBreaker) UpdateConfig(resiliencecontract.CircuitBreakerConfig) {}
 
 type denyCircuitBreakerWithAllowError struct{}
 
@@ -50,6 +51,7 @@ func (denyCircuitBreakerWithAllowError) Do(ctx context.Context, resource string,
 func (denyCircuitBreakerWithAllowError) State(context.Context, string) resiliencecontract.CircuitBreakerState {
 	return resiliencecontract.CircuitBreakerStateOpen
 }
+func (denyCircuitBreakerWithAllowError) UpdateConfig(resiliencecontract.CircuitBreakerConfig) {}
 
 // allowCircuitBreaker 允许所有请求通过的熔断器 stub。
 type allowCircuitBreaker struct{}
@@ -66,6 +68,7 @@ func (allowCircuitBreaker) Do(ctx context.Context, resource string, fn func() er
 func (allowCircuitBreaker) State(context.Context, string) resiliencecontract.CircuitBreakerState {
 	return resiliencecontract.CircuitBreakerStateClosed
 }
+func (allowCircuitBreaker) UpdateConfig(resiliencecontract.CircuitBreakerConfig) {}
 
 // =============================================================================
 // Body Limit 与 HTTP Service Governance 预设

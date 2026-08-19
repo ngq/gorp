@@ -140,3 +140,26 @@ func TestMetricsMiddlewareRecordsRequestCount(t *testing.T) {
 		t.Fatalf("expected request counter to increase by 1, got before=%v after=%v", beforeCount, afterCount)
 	}
 }
+
+func TestMetricsMiddlewareHighCardinalityProtection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	labels := map[string]string{
+		"service": "default",
+		"method":  http.MethodGet,
+		"path":    "unmatched",
+		"status":  "404",
+	}
+	beforeCount := counterValue("gorp_http_requests_total", labels)
+
+	router := NewTestEngine()
+	applyTransportMiddleware(router, MetricsMiddleware())
+
+	req := httptest.NewRequest(http.MethodGet, "/random/user/9999999", nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	afterCount := counterValue("gorp_http_requests_total", labels)
+	if afterCount != beforeCount+1 {
+		t.Fatalf("expected request counter for unmatched route to increase by 1, got before=%v after=%v", beforeCount, afterCount)
+	}
+}

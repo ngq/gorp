@@ -116,6 +116,8 @@ func (s *stubCircuitBreaker) State(context.Context, string) resiliencecontract.C
 	return resiliencecontract.CircuitBreakerStateClosed
 }
 
+func (s *stubCircuitBreaker) UpdateConfig(resiliencecontract.CircuitBreakerConfig) {}
+
 // fieldValue extracts a field value by key from observability fields.
 func fieldValue(fields []observabilitycontract.Field, key string) any {
 	for _, field := range fields {

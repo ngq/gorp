@@ -47,8 +47,10 @@ func MetricsMiddleware(serviceNames ...string) transportcontract.Middleware {
 			}
 
 			path := c.RoutePath()
-			if path == "" && c.Request() != nil && c.Request().URL != nil {
-				path = c.Request().URL.Path
+			if path == "" {
+				// 未匹配到路由模板（如 404 或非法路径）时统一收敛为 "unmatched"，
+				// 避免原始 URL 中的动态 ID 导致 Prometheus 标签高基数内存爆炸。
+				path = "unmatched"
 			}
 			status := strconv.Itoa(c.ResponseStatus())
 			if status == "0" {

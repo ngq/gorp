@@ -31,6 +31,7 @@ func (denyContractLimiter) Wait(context.Context, string) error { return errors.N
 func (denyContractLimiter) WaitTimeout(context.Context, string, time.Duration) error {
 	return errors.New("limited")
 }
+func (denyContractLimiter) UpdateConfig(resiliencecontract.RateLimiterConfig) {}
 
 type noopReservation struct{}
 
@@ -53,6 +54,7 @@ func (l *captureLimiter) Reserve(context.Context, string) resiliencecontract.Res
 }
 func (l *captureLimiter) Wait(context.Context, string) error                       { return nil }
 func (l *captureLimiter) WaitTimeout(context.Context, string, time.Duration) error { return nil }
+func (l *captureLimiter) UpdateConfig(resiliencecontract.RateLimiterConfig)         {}
 
 // applyTransportMiddleware mounts transport-level middleware onto a Gin engine for test execution.
 //
