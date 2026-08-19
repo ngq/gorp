@@ -6,3 +6,6 @@ cmd/gorp/gorp
 # Examples (独立 git 仓库)
 examples/
 
+# Handoff & Code Review Docs
+HANDOFF_*.md
+CODE_REVIEW_2026-08*.md
