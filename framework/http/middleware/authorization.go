@@ -138,8 +138,24 @@ func RequireRole(roles ...string) transportcontract.Middleware {
 }
 
 // RequirePermission requires the caller to own at least one of the specified permissions.
+// Permissions are checked against claims.Permissions (NOT claims.Roles).
+//
+// RequirePermission 要求调用方至少拥有一个指定权限。
+// 权限检查基于 claims.Permissions 字段（与 Roles 完全独立）。
 func RequirePermission(perms ...string) transportcontract.Middleware {
-	return RequireAnyRole(perms...)
+	required := normalizeRequiredValues(perms)
+	return Authorize(func(c transportcontract.Context, claims *securitycontract.JWTClaims) error {
+		if len(required) == 0 {
+			return nil
+		}
+		permSet := claimsPermissionSet(claims)
+		for _, perm := range required {
+			if _, ok := permSet[strings.ToLower(perm)]; ok {
+				return nil
+			}
+		}
+		return ErrForbidden("required permission is missing")
+	})
 }
 
 // RequireAnyRole requires the caller to own at least one of the expected roles.
@@ -216,6 +232,24 @@ func claimsRoleSet(claims *securitycontract.JWTClaims) map[string]struct{} {
 			continue
 		}
 		set[strings.ToLower(role)] = struct{}{}
+	}
+	return set
+}
+
+// claimsPermissionSet normalizes permission values into a set for quick membership checks.
+//
+// claimsPermissionSet 把权限列表归一化为集合，便于快速判断是否命中。
+func claimsPermissionSet(claims *securitycontract.JWTClaims) map[string]struct{} {
+	set := make(map[string]struct{})
+	if claims == nil {
+		return set
+	}
+	for _, perm := range claims.Permissions {
+		perm = strings.TrimSpace(perm)
+		if perm == "" {
+			continue
+		}
+		set[strings.ToLower(perm)] = struct{}{}
 	}
 	return set
 }

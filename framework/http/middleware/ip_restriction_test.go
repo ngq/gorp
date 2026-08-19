@@ -29,6 +29,8 @@ func TestIPRestrictionMiddleware_CIDRAndGeoIP(t *testing.T) {
 		middleware.WithBlockIPs("10.0.0.1", "192.168.1.0/24"),
 		middleware.WithAllowCountries("CN"),
 		middleware.WithGeoIPResolver(geoResolver),
+		// 信任 localhost 代理，测试中 httptest 的 RemoteAddr 默认为 192.0.2.1:1234
+		middleware.WithTrustedProxies("192.0.2.0/24"),
 	)))
 
 	engine.GET("/api/resource", func(c *gin.Context) {
@@ -55,4 +57,27 @@ func TestIPRestrictionMiddleware_CIDRAndGeoIP(t *testing.T) {
 	w3 := httptest.NewRecorder()
 	engine.ServeHTTP(w3, req3)
 	require.Equal(t, http.StatusOK, w3.Code)
+}
+
+// TestIPRestrictionMiddleware_SpoofingProtection 验证不受信任的来源伪造 XFF 被正确忽略。
+func TestIPRestrictionMiddleware_SpoofingProtection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := gin.New()
+	engine.Use(ginprovider.AdaptMiddleware(middleware.IPRestrictionMiddleware(
+		middleware.WithAllowIPs("10.10.10.10"),
+		// 不信任默认 httptest 的 RemoteAddr (192.0.2.1)
+		// 默认 TrustedProxies 只有 127.0.0.1 和 ::1
+	)))
+
+	engine.GET("/api/resource", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": "ok"})
+	})
+
+	// 攻击者伪造 XFF 想冒充白名单 IP 10.10.10.10，但来源不受信任 -> 使用 RemoteAddr 判定 -> 403
+	req := httptest.NewRequest(http.MethodGet, "/api/resource", nil)
+	req.Header.Set("X-Forwarded-For", "10.10.10.10")
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+	require.Equal(t, http.StatusForbidden, w.Code)
 }

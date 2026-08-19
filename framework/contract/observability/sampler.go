@@ -3,8 +3,7 @@ package observability
 
 import (
 	"context"
-	"math/rand"
-	"sync"
+	"math/rand/v2"
 	"time"
 )
 
@@ -29,8 +28,6 @@ func DefaultAdaptiveSamplerConfig() AdaptiveSamplerConfig {
 // AdaptiveSampler determines whether a trace should be sampled based on request outcome and latency.
 type AdaptiveSampler struct {
 	config AdaptiveSamplerConfig
-	mu     sync.Mutex
-	rng    *rand.Rand
 }
 
 // NewAdaptiveSampler creates a new AdaptiveSampler instance.
@@ -48,7 +45,6 @@ func NewAdaptiveSampler(cfg ...AdaptiveSamplerConfig) *AdaptiveSampler {
 	}
 	return &AdaptiveSampler{
 		config: c,
-		rng:    rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -64,7 +60,7 @@ func (s *AdaptiveSampler) ShouldSample(ctx context.Context, statusCode int, late
 		return true
 	}
 
-	// 3. Normal Requests -> Baseline Ratio Sampling
+	// 3. Normal Requests -> Baseline Ratio Sampling (lock-free via math/rand/v2)
 	if s.config.BaseRatio <= 0 {
 		return false
 	}
@@ -72,9 +68,6 @@ func (s *AdaptiveSampler) ShouldSample(ctx context.Context, statusCode int, late
 		return true
 	}
 
-	s.mu.Lock()
-	val := s.rng.Float64()
-	s.mu.Unlock()
-
-	return val < s.config.BaseRatio
+	return rand.Float64() < s.config.BaseRatio
 }
+

@@ -16,11 +16,14 @@ type IPRestrictionOptions struct {
 	AllowCountries []string
 	BlockCountries []string
 	GeoIPResolver  func(ip string) string // Resolves IP to Country Code (e.g. "CN")
+	TrustedProxies []string               // CIDRs/IPs of trusted reverse proxies (default: 127.0.0.1, ::1)
 }
 
-// DefaultIPRestrictionOptions returns default configuration.
+// DefaultIPRestrictionOptions returns default configuration with localhost trusted proxy.
 func DefaultIPRestrictionOptions() IPRestrictionOptions {
-	return IPRestrictionOptions{}
+	return IPRestrictionOptions{
+		TrustedProxies: []string{"127.0.0.1", "::1"},
+	}
 }
 
 // IPRestrictionOption configures IPRestrictionOptions.
@@ -54,7 +57,14 @@ func WithGeoIPResolver(resolver func(ip string) string) IPRestrictionOption {
 	}
 }
 
-// IPRestrictionMiddleware provides IP CIDR whitelist/blacklist and Geo-IP region filtering.
+// WithTrustedProxies sets trusted reverse proxy IPs or CIDRs allowed to forward client IPs.
+func WithTrustedProxies(proxies ...string) IPRestrictionOption {
+	return func(o *IPRestrictionOptions) {
+		o.TrustedProxies = append(o.TrustedProxies, proxies...)
+	}
+}
+
+// IPRestrictionMiddleware provides IP CIDR whitelist/blacklist and Geo-IP region filtering with spoofing protection.
 func IPRestrictionMiddleware(opts ...IPRestrictionOption) transportcontract.Middleware {
 	cfg := DefaultIPRestrictionOptions()
 	for _, o := range opts {
@@ -63,10 +73,11 @@ func IPRestrictionMiddleware(opts ...IPRestrictionOption) transportcontract.Midd
 
 	allowNets := parseCIDRNets(cfg.AllowIPs)
 	blockNets := parseCIDRNets(cfg.BlockIPs)
+	trustedNets := parseCIDRNets(cfg.TrustedProxies)
 
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
-			clientIP := resolveClientIP(c)
+			clientIP := resolveClientIP(c, cfg.TrustedProxies, trustedNets)
 
 			// 1. Blacklist CIDR check
 			if matchIPOrCIDR(clientIP, cfg.BlockIPs, blockNets) {
@@ -151,13 +162,35 @@ func matchIPOrCIDR(clientIP string, strList []string, cidrNets []*net.IPNet) boo
 	return false
 }
 
-func resolveClientIP(c transportcontract.Context) string {
+func resolveClientIP(c transportcontract.Context, trustedProxies []string, trustedNets []*net.IPNet) string {
 	req := c.Request()
 	if req == nil {
 		return "127.0.0.1"
 	}
+
+	remoteIP := req.RemoteAddr
+	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		remoteIP = host
+	}
+
+	// If remote IP is NOT a trusted proxy, never trust X-Forwarded-For or X-Real-IP headers (prevents IP spoofing)
+	if !matchIPOrCIDR(remoteIP, trustedProxies, trustedNets) {
+		return remoteIP
+	}
+
+	// Remote IP is trusted proxy: parse X-Forwarded-For or X-Real-IP
 	if xff := req.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
+		// Traverse XFF from right to left to find the first untrusted upstream IP
+		for i := len(parts) - 1; i >= 0; i-- {
+			ip := strings.TrimSpace(parts[i])
+			if net.ParseIP(ip) != nil {
+				if !matchIPOrCIDR(ip, trustedProxies, trustedNets) {
+					return ip
+				}
+			}
+		}
+		// If all IPs in XFF are trusted, return the leftmost client IP
 		if len(parts) > 0 {
 			ip := strings.TrimSpace(parts[0])
 			if net.ParseIP(ip) != nil {
@@ -165,14 +198,12 @@ func resolveClientIP(c transportcontract.Context) string {
 			}
 		}
 	}
+
 	if xri := req.Header.Get("X-Real-IP"); xri != "" {
 		if net.ParseIP(xri) != nil {
 			return xri
 		}
 	}
-	host, _, err := net.SplitHostPort(req.RemoteAddr)
-	if err == nil && net.ParseIP(host) != nil {
-		return host
-	}
-	return req.RemoteAddr
+
+	return remoteIP
 }

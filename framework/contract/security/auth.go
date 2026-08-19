@@ -24,6 +24,7 @@ type JWTClaims struct {
 	SubjectType string
 	SubjectName string
 	Roles       []string
+	Permissions []string // Fine-grained permissions (e.g. "order:create", "user:delete")
 	ExpiresAt   int64
 	IssuedAt    int64
 	Issuer      string
