@@ -22,19 +22,82 @@ import (
 // AuthorizationChecker 用于执行请求级鉴权判断。
 type AuthorizationChecker func(c transportcontract.Context, claims *securitycontract.JWTClaims) error
 
-// Authorize enforces JWT claim presence first, then applies the custom checker.
-//
-// Authorize 先校验 JWT claims 是否存在，再执行自定义鉴权逻辑。
-func Authorize(checker AuthorizationChecker) transportcontract.Middleware {
+// AuthorizeOptions configures authorization middleware options.
+type AuthorizeOptions struct {
+	SuperAdminRoles []string
+	ExcludePaths    []string
+	Checker         AuthorizationChecker
+}
+
+// DefaultAuthorizeOptions returns default production options.
+func DefaultAuthorizeOptions() AuthorizeOptions {
+	return AuthorizeOptions{
+		SuperAdminRoles: []string{"super_admin", "root"},
+		ExcludePaths:    []string{"/ping", "/healthz", "/startupz", "/readyz", "/swagger/*", "/debug/gorp/*", "/login"},
+	}
+}
+
+// AuthorizeOption configures AuthorizeOptions.
+type AuthorizeOption func(*AuthorizeOptions)
+
+// WithSuperAdminRoles configures super admin role exemptions.
+func WithSuperAdminRoles(roles ...string) AuthorizeOption {
+	return func(o *AuthorizeOptions) {
+		o.SuperAdminRoles = append(o.SuperAdminRoles, roles...)
+	}
+}
+
+// WithExcludePaths configures public path exemptions.
+func WithExcludePaths(paths ...string) AuthorizeOption {
+	return func(o *AuthorizeOptions) {
+		o.ExcludePaths = append(o.ExcludePaths, paths...)
+	}
+}
+
+// Authorize enforces JWT claim presence and authorization with public path exclusion & super admin bypass.
+func Authorize(checker AuthorizationChecker, opts ...AuthorizeOption) transportcontract.Middleware {
+	cfg := DefaultAuthorizeOptions()
+	cfg.Checker = checker
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	return func(next transportcontract.Handler) transportcontract.Handler {
 		return func(c transportcontract.Context) {
+			req := c.Request()
+			if req != nil {
+				path := req.URL.Path
+				for _, exp := range cfg.ExcludePaths {
+					if exp == path || (strings.HasSuffix(exp, "*") && strings.HasPrefix(path, strings.TrimSuffix(exp, "*"))) {
+						if next != nil {
+							next(c)
+						}
+						return
+					}
+				}
+			}
+
 			claims, ok := claimsFromContext(c)
 			if !ok {
 				respondUnauthorized(c, "authentication required")
 				return
 			}
-			if checker != nil {
-				if err := checker(c, claims); err != nil {
+
+			// Super Admin Bypass
+			if claims != nil {
+				roleSet := claimsRoleSet(claims)
+				for _, superRole := range cfg.SuperAdminRoles {
+					if _, isSuper := roleSet[strings.ToLower(superRole)]; isSuper {
+						if next != nil {
+							next(c)
+						}
+						return
+					}
+				}
+			}
+
+			if cfg.Checker != nil {
+				if err := cfg.Checker(c, claims); err != nil {
 					respondForbidden(c, err.Error())
 					return
 				}
@@ -47,8 +110,6 @@ func Authorize(checker AuthorizationChecker) transportcontract.Middleware {
 }
 
 // RequireAuthorization requires authenticated JWT claims to exist in the request context.
-//
-// RequireAuthorization 要求请求上下文中必须存在已认证的 JWT claims。
 func RequireAuthorization() transportcontract.Middleware {
 	return Authorize(nil)
 }
@@ -69,6 +130,16 @@ func RequireSubjectType(subjectTypes ...string) transportcontract.Middleware {
 		}
 		return ErrForbidden("subject type is not allowed")
 	})
+}
+
+// RequireRole requires the caller to own at least one of the specified roles (alias for RequireAnyRole).
+func RequireRole(roles ...string) transportcontract.Middleware {
+	return RequireAnyRole(roles...)
+}
+
+// RequirePermission requires the caller to own at least one of the specified permissions.
+func RequirePermission(perms ...string) transportcontract.Middleware {
+	return RequireAnyRole(perms...)
 }
 
 // RequireAnyRole requires the caller to own at least one of the expected roles.
