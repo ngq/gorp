@@ -321,12 +321,6 @@ func (e *Engine) RunContext(parent context.Context, addr ...string) (retErr erro
 	return nil
 }
 
-// UseSecurityGuard enables SQLi/XSS/Path Traversal guard middleware.
-func (e *Engine) UseSecurityGuard(opts ...httpmiddleware.SecurityGuardOption) {
-	if e.ginEngine != nil {
-		e.ginEngine.Use(gingin.AdaptMiddleware(httpmiddleware.SecurityGuardMiddleware(opts...)))
-	}
-}
 
 // UseK8sProbes registers K8s standard three-color probes (/startupz, /readyz, /livez, /healthz).
 func (e *Engine) UseK8sProbes() {
