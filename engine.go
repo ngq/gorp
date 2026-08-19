@@ -331,3 +331,22 @@ func (e *Engine) UseK8sProbes() {
 		e.ginEngine.GET("/healthz", gingin.AdaptHandler(httpmiddleware.HealthCheckHandlerFromContainer(e.Container())))
 	}
 }
+
+// EnableDebugDashboard mounts the /debug/gorp Web Admin Console onto the Gin engine.
+func (e *Engine) EnableDebugDashboard(opts ...httpx.AdminDashboardOption) {
+	if e.ginEngine != nil {
+		httpx.RegisterAdminDashboard(e.ginEngine, e.Container(), "/debug/gorp", opts...)
+	}
+}
+
+// Swagger mounts the embedded Swagger UI and OpenAPI 3 exporter onto the Gin engine.
+func (e *Engine) Swagger(pathPrefix ...string) {
+	if e.ginEngine != nil {
+		prefix := "/swagger"
+		if len(pathPrefix) > 0 && pathPrefix[0] != "" {
+			prefix = pathPrefix[0]
+		}
+		e.ginEngine.GET(prefix+"/*any", httpx.GinSwaggerHandler(prefix))
+	}
+}
+

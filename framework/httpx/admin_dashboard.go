@@ -230,29 +230,102 @@ func DashboardHTML(prefix string) string {
 </html>`, prefix, prefix, prefix)
 }
 
+// AdminDashboardOptions configures security and behavior of the developer console.
+type AdminDashboardOptions struct {
+	AdminToken        string // If specified, requests must provide Authorization: Bearer <token> or ?token=<token>
+	AllowInProduction bool   // If false, /debug/gorp returns 403 Forbidden in release/production mode (default: false)
+}
+
+// DefaultAdminDashboardOptions returns default production-safe options.
+func DefaultAdminDashboardOptions() AdminDashboardOptions {
+	return AdminDashboardOptions{
+		AllowInProduction: false,
+	}
+}
+
+// AdminDashboardOption configures AdminDashboardOptions.
+type AdminDashboardOption func(*AdminDashboardOptions)
+
+// WithAdminToken sets the required bearer or query token to access the debug dashboard.
+func WithAdminToken(token string) AdminDashboardOption {
+	return func(o *AdminDashboardOptions) {
+		o.AdminToken = token
+	}
+}
+
+// WithAllowInProduction explicitly permits access to the dashboard in gin.ReleaseMode.
+func WithAllowInProduction(allow bool) AdminDashboardOption {
+	return func(o *AdminDashboardOptions) {
+		o.AllowInProduction = allow
+	}
+}
+
 // MountDebugDashboard attaches the /debug/gorp developer console and JSON API endpoints to Gin.
 func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container, prefix ...string) {
-	if engine == nil {
-		return
-	}
 	pathPrefix := "/debug/gorp"
 	if len(prefix) > 0 && prefix[0] != "" {
 		pathPrefix = prefix[0]
 	}
+	RegisterAdminDashboard(engine, container, pathPrefix)
+}
+
+// RegisterAdminDashboard mounts the /debug/gorp Web Admin Console and REST endpoints onto a Gin engine.
+func RegisterAdminDashboard(engine *gin.Engine, container runtimecontract.Container, pathPrefix string, opts ...AdminDashboardOption) {
+	if engine == nil {
+		return
+	}
+	if pathPrefix == "" {
+		pathPrefix = "/debug/gorp"
+	}
 	pathPrefix = strings.TrimSuffix(pathPrefix, "/")
 
-	// 1. Dashboard Main HTML
-	engine.GET(pathPrefix, func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(DashboardHTML(pathPrefix)))
+	cfg := DefaultAdminDashboardOptions()
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	group := engine.Group(pathPrefix)
+	group.Use(func(c *gin.Context) {
+		// 1. Production protection check
+		if gin.Mode() == gin.ReleaseMode && !cfg.AllowInProduction && cfg.AdminToken == "" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "access denied: debug dashboard is disabled in production mode",
+			})
+			return
+		}
+
+		// 2. Admin Token verification
+		if cfg.AdminToken != "" {
+			token := c.Query("token")
+			if token == "" {
+				authHeader := c.GetHeader("Authorization")
+				if strings.HasPrefix(authHeader, "Bearer ") {
+					token = strings.TrimPrefix(authHeader, "Bearer ")
+				}
+			}
+			if token != cfg.AdminToken {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "unauthorized: invalid admin token for debug dashboard",
+				})
+				return
+			}
+		}
+		c.Next()
 	})
-	engine.GET(pathPrefix+"/", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(DashboardHTML(pathPrefix)))
+
+	// 1. Main Dashboard Webpage
+	group.GET("", func(c *gin.Context) {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(http.StatusOK, DashboardHTML(pathPrefix))
+	})
+	group.GET("/", func(c *gin.Context) {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(http.StatusOK, DashboardHTML(pathPrefix))
 	})
 
 	// 2. Swagger UI Sub-route
 	swaggerHandler := GinSwaggerHandler("")
-	engine.GET(pathPrefix+"/swagger", func(c *gin.Context) {
-		// Auto-generate OpenAPI 3 spec on the fly for Swagger UI
+	group.GET("/swagger", func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 		if strings.HasSuffix(reqPath, "/spec") || strings.HasSuffix(reqPath, ".json") {
 			specJSON := ExportOpenAPI3JSON(engine, "gorp Service API Spec", "1.0.0")
@@ -261,7 +334,7 @@ func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container
 		}
 		swaggerHandler(c)
 	})
-	engine.GET(pathPrefix+"/swagger/*any", func(c *gin.Context) {
+	group.GET("/swagger/*any", func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 		if strings.HasSuffix(reqPath, "/spec") || strings.HasSuffix(reqPath, ".json") {
 			specJSON := ExportOpenAPI3JSON(engine, "gorp Service API Spec", "1.0.0")
@@ -272,7 +345,7 @@ func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container
 	})
 
 	// 3. API - Container DAG Topology
-	engine.GET(pathPrefix+"/api/container", func(c *gin.Context) {
+	group.GET("/api/container", func(c *gin.Context) {
 		if container == nil {
 			c.JSON(http.StatusOK, []any{})
 			return
@@ -282,7 +355,7 @@ func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container
 	})
 
 	// 4. API - Routes
-	engine.GET(pathPrefix+"/api/routes", func(c *gin.Context) {
+	group.GET("/api/routes", func(c *gin.Context) {
 		routes := engine.Routes()
 		res := make([]map[string]string, 0, len(routes))
 		for _, r := range routes {
@@ -299,7 +372,7 @@ func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container
 	})
 
 	// 5. API - Config (With Secret Masking)
-	engine.GET(pathPrefix+"/api/config", func(c *gin.Context) {
+	group.GET("/api/config", func(c *gin.Context) {
 		if container == nil || !container.IsBind(datacontract.ConfigKey) {
 			c.JSON(http.StatusOK, map[string]any{"status": "no config provider bound"})
 			return
@@ -323,7 +396,7 @@ func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container
 	})
 
 	// 6. API - Metrics
-	engine.GET(pathPrefix+"/api/metrics", func(c *gin.Context) {
+	group.GET("/api/metrics", func(c *gin.Context) {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
 
@@ -338,7 +411,7 @@ func MountDebugDashboard(engine *gin.Engine, container runtimecontract.Container
 	})
 
 	// 7. API - Auto-Exported OpenAPI Spec JSON
-	engine.GET(pathPrefix+"/openapi.json", func(c *gin.Context) {
+	group.GET("/openapi.json", func(c *gin.Context) {
 		specJSON := ExportOpenAPI3JSON(engine, "gorp Auto-Exported API Spec", "1.0.0")
 		c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(specJSON))
 	})

@@ -406,3 +406,57 @@ func TestLocalEventBus_CloudEventTracePropagation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "trace-7777", capturedTraceID)
 }
+
+// TestLocalEventBus_ContextCancelation 验证重试过程中 Context 取消时立即中断，不发生无谓阻塞。
+func TestLocalEventBus_ContextCancelation(t *testing.T) {
+	bus := NewLocalEventBus(
+		WithMaxRetries(5),
+		WithBackoff(100*time.Millisecond, 1*time.Second),
+	)
+	defer bus.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	bus.Subscribe("cancel.test", func(ctx context.Context, event integrationcontract.Event) error {
+		return errors.New("temporary error")
+	})
+
+	start := time.Now()
+	err := bus.Publish(ctx, NewBaseEvent("cancel.test", nil))
+	duration := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+	// 确认在 20ms 超时后立即退出，没有傻等 100ms+ 的 backoff
+	assert.Less(t, duration, 80*time.Millisecond)
+}
+
+// TestLocalEventBus_AsyncWorkerPool 验证高并发下异步 Worker 协程池的削峰与分发。
+func TestLocalEventBus_AsyncWorkerPool(t *testing.T) {
+	bus := NewLocalEventBus(
+		WithAsyncWorkers(4, 100),
+	)
+	defer bus.Close()
+
+	var processedCount int64
+	var wg sync.WaitGroup
+
+	totalEvents := 50
+	wg.Add(totalEvents)
+
+	bus.Subscribe("pool.test", func(ctx context.Context, event integrationcontract.Event) error {
+		atomic.AddInt64(&processedCount, 1)
+		wg.Done()
+		return nil
+	})
+
+	for i := 0; i < totalEvents; i++ {
+		err := bus.PublishAsync(context.Background(), NewBaseEvent("pool.test", i))
+		assert.NoError(t, err)
+	}
+
+	wg.Wait()
+	assert.Equal(t, int64(totalEvents), atomic.LoadInt64(&processedCount))
+}
+

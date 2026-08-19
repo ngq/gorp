@@ -1,5 +1,5 @@
-// Package outbox provides GORM database-backed OutboxStore implementation for gorp framework.
-package outbox
+// Package gorm provides GORM database-backed OutboxStore implementation for gorp framework.
+package gorm
 
 import (
 	"context"

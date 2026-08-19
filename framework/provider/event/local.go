@@ -48,22 +48,66 @@ func (e *BaseEvent) OccurredAt() time.Time { return e.occurredAt }
 // - 支持同步和异步发布；
 // - 支持一个事件多个处理器（广播模式）；
 // - 适合单体应用内部事件通信，后续可演进为 MQ。
+type asyncJob struct {
+	ctx      context.Context
+	event    integrationcontract.Event
+	handlers []integrationcontract.EventHandler
+}
+
 type LocalEventBus struct {
 	mu          sync.RWMutex
 	subscribers map[string][]integrationcontract.EventHandler
 	options     EventBusOptions
+	asyncQueue  chan asyncJob
+	stopOnce    sync.Once
+	stopChan    chan struct{}
 }
 
-// NewLocalEventBus 创建具备重试与 DLQ 能力的本地事件总线。
+// NewLocalEventBus 创建具备重试、DLQ 与异步 Worker 协程池能力的本地事件总线。
 func NewLocalEventBus(opts ...Option) *LocalEventBus {
 	o := DefaultEventBusOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
-	return &LocalEventBus{
+	b := &LocalEventBus{
 		subscribers: make(map[string][]integrationcontract.EventHandler),
 		options:     o,
+		asyncQueue:  make(chan asyncJob, o.AsyncQueueSize),
+		stopChan:    make(chan struct{}),
 	}
+	b.startWorkers()
+	return b
+}
+
+func (b *LocalEventBus) startWorkers() {
+	workerCount := b.options.AsyncWorkerCount
+	if workerCount <= 0 {
+		workerCount = 8
+	}
+	for i := 0; i < workerCount; i++ {
+		goroutine.SafeGo(context.Background(), nil, func(ctx context.Context) {
+			for {
+				select {
+				case <-b.stopChan:
+					return
+				case job, ok := <-b.asyncQueue:
+					if !ok {
+						return
+					}
+					for _, handler := range job.handlers {
+						_ = b.invokeWithRetry(job.ctx, job.event.Name(), handler, job.event)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Close stops the background async workers and releases resources.
+func (b *LocalEventBus) Close() {
+	b.stopOnce.Do(func() {
+		close(b.stopChan)
+	})
 }
 
 // Subscribe 订阅事件。
@@ -105,7 +149,11 @@ func (b *LocalEventBus) invokeWithRetry(ctx context.Context, eventName string, h
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			time.Sleep(backoff)
+			select {
+			case <-execCtx.Done():
+				return execCtx.Err()
+			case <-time.After(backoff):
+			}
 			backoff *= 2
 			if backoff > b.options.MaxBackoff && b.options.MaxBackoff > 0 {
 				backoff = b.options.MaxBackoff
@@ -151,12 +199,7 @@ func restoreContextFromEvent(ctx context.Context, event integrationcontract.Even
 	return ctx
 }
 
-// PublishAsync 异步发布事件。
-//
-// 中文说明：
-// - 立即返回，事件在后台 goroutine 中处理；
-// - 使用 goroutine.SafeGo 包装，确保 panic 不会导致程序崩溃；
-// - 适合不需要等待处理完成的场景。
+// PublishAsync 异步发布事件（通过定长 Worker 协程池削峰处理）。
 func (b *LocalEventBus) PublishAsync(ctx context.Context, event integrationcontract.Event) error {
 	b.mu.RLock()
 	handlers := b.subscribers[event.Name()]
@@ -166,14 +209,27 @@ func (b *LocalEventBus) PublishAsync(ctx context.Context, event integrationcontr
 		return nil
 	}
 
-	// 在后台 goroutine 中执行处理器（带有重试与 DLQ 保护）
-	goroutine.SafeGo(ctx, nil, func(ctx context.Context) {
-		for _, handler := range handlers {
-			_ = b.invokeWithRetry(ctx, event.Name(), handler, event)
-		}
-	})
+	handlersCopy := make([]integrationcontract.EventHandler, len(handlers))
+	copy(handlersCopy, handlers)
 
-	return nil
+	job := asyncJob{
+		ctx:      ctx,
+		event:    event,
+		handlers: handlersCopy,
+	}
+
+	select {
+	case b.asyncQueue <- job:
+		return nil
+	default:
+		// 当队列满时，降级使用受限的 SafeGo 协程处理，防止主流程死锁
+		goroutine.SafeGo(ctx, nil, func(ctx context.Context) {
+			for _, handler := range handlersCopy {
+				_ = b.invokeWithRetry(ctx, event.Name(), handler, event)
+			}
+		})
+		return nil
+	}
 }
 
 // Unsubscribe 取消订阅事件。

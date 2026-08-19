@@ -1,11 +1,11 @@
-package outbox_test
+package gorm_test
 
 import (
 	"context"
 	"testing"
 
+	gormoutbox "github.com/ngq/gorp/contrib/outbox/gorm"
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
-	outboxprovider "github.com/ngq/gorp/framework/provider/outbox"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -15,7 +15,7 @@ func TestGormOutboxStore_Lifecycle(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 
-	store := outboxprovider.NewGormOutboxStore(db)
+	store := gormoutbox.NewGormOutboxStore(db)
 	err = store.AutoMigrate()
 	require.NoError(t, err)
 

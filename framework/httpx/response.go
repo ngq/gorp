@@ -1,22 +1,20 @@
-// Package httpx provides HTTP utilities for gorp framework.
-// This file exposes the standard HTTP response protocol and error types.
-// Business handlers use these types to build consistent HTTP responses.
-//
-// httpx 包提供 gorp 框架的 HTTP 工具。
-// 本文件暴露标准 HTTP 响应协议和错误类型。
-// 业务 handler 使用这些类型构建一致的 HTTP 响应。
+// Package httpx provides HTTP response helpers and error mappings for gorp framework.
 package httpx
 
 import (
 	"errors"
 	"net/http"
 
-	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
 
+// JSONResponder represents any context capable of rendering a JSON response,
+// seamlessly supporting both *gin.Context and transportcontract.Context.
+type JSONResponder interface {
+	JSON(code int, obj any)
+}
+
 // Response is the standard HTTP response envelope used by the framework.
-//
-// Response 是框架使用的标准 HTTP 响应包裹结构。
 type Response struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -24,8 +22,6 @@ type Response struct {
 }
 
 // PaginatedData is the standard pagination payload shape.
-//
-// PaginatedData 是标准的分页载荷结构。
 type PaginatedData struct {
 	Items    any   `json:"items"`
 	Total    int64 `json:"total"`
@@ -34,27 +30,22 @@ type PaginatedData struct {
 }
 
 // CodeSuccess is the success response code.
-//
-// CodeSuccess 是成功响应码。
 const CodeSuccess = 0
 
-// 业务错误码常量，与 HTTP 状态码对应但独立编码。
-// Business error code constants, mapped to HTTP status codes but independently encoded.
+// Business error code constants.
 const (
-	CodeBadRequest         = 1001 // 请求参数错误
-	CodeUnauthorized       = 1002 // 未认证
-	CodeForbidden          = 1003 // 无权限
-	CodeNotFound           = 1004 // 资源不存在
-	CodeInternalError      = 1005 // 内部错误
-	CodeServiceUnavailable = 1006 // 服务不可用
-	CodeTooManyRequests    = 1007 // 限流
-	CodeConflict           = 1008 // 冲突
-	CodeValidationFailed   = 1009 // 校验失败
+	CodeBadRequest         = 400
+	CodeUnauthorized       = 401
+	CodeForbidden          = 403
+	CodeNotFound           = 404
+	CodeInternalError      = 500
+	CodeServiceUnavailable = 503
+	CodeTooManyRequests    = 429
+	CodeConflict           = 409
+	CodeValidationFailed   = 422
 )
 
 // BusinessError describes an error carrying business code and message semantics.
-//
-// BusinessError 描述带有业务错误码与消息语义的错误。
 type BusinessError interface {
 	error
 	Code() int
@@ -62,16 +53,12 @@ type BusinessError interface {
 }
 
 // BizError is the default business error implementation.
-//
-// BizError 是默认的业务错误实现。
 type BizError struct {
 	code    int
 	message string
 }
 
 // NewBizError creates a new business error with the given code and message.
-//
-// NewBizError 使用给定错误码和消息创建业务错误。
 func NewBizError(code int, message string) *BizError {
 	return &BizError{code: code, message: message}
 }
@@ -81,54 +68,50 @@ func (e *BizError) Code() int       { return e.code }
 func (e *BizError) Message() string { return e.message }
 
 // Success writes a standard success response.
-//
-// Success 输出标准成功响应。
-func Success(c transportcontract.Context, data any) {
+func Success(c JSONResponder, data any) {
 	c.JSON(http.StatusOK, Response{Code: CodeSuccess, Message: "success", Data: data})
 }
 
+// OK is an alias for Success.
+func OK(c JSONResponder, data any) {
+	Success(c, data)
+}
+
 // SuccessWithMessage writes a success response with a custom message.
-//
-// SuccessWithMessage 输出带自定义消息的成功响应。
-func SuccessWithMessage(c transportcontract.Context, message string, data any) {
+func SuccessWithMessage(c JSONResponder, message string, data any) {
 	c.JSON(http.StatusOK, Response{Code: CodeSuccess, Message: message, Data: data})
 }
 
 // SuccessWithStatus writes a success response with a custom HTTP status.
-//
-// SuccessWithStatus 输出带自定义 HTTP 状态码的成功响应。
-func SuccessWithStatus(c transportcontract.Context, status int, data any) {
+func SuccessWithStatus(c JSONResponder, status int, data any) {
 	c.JSON(status, Response{Code: CodeSuccess, Message: "success", Data: data})
 }
 
-// Error writes an error response.
-//
-// Error 输出错误响应。
-func Error(c transportcontract.Context, err error) {
+// Error writes an error response, automatically resolving AppError and BizError.
+func Error(c JSONResponder, err error) {
 	code, message := parseError(err)
 	c.JSON(codeToHTTPStatus(code), Response{Code: code, Message: message})
 }
 
+// Fail is an alias for Error.
+func Fail(c JSONResponder, err error) {
+	Error(c, err)
+}
+
 // ErrorWithData writes an error response and attaches extra response data.
-//
-// ErrorWithData 输出错误响应，并附带额外数据。
-func ErrorWithData(c transportcontract.Context, err error, data any) {
+func ErrorWithData(c JSONResponder, err error, data any) {
 	code, message := parseError(err)
 	c.JSON(codeToHTTPStatus(code), Response{Code: code, Message: message, Data: data})
 }
 
 // ErrorWithStatus writes an error response using a caller-provided HTTP status.
-//
-// ErrorWithStatus 使用调用方指定的 HTTP 状态码输出错误响应。
-func ErrorWithStatus(c transportcontract.Context, status int, err error) {
+func ErrorWithStatus(c JSONResponder, status int, err error) {
 	code, message := parseError(err)
 	c.JSON(status, Response{Code: code, Message: message})
 }
 
 // SuccessPaginated writes a standard paginated success response.
-//
-// SuccessPaginated 输出标准的分页成功响应。
-func SuccessPaginated(c transportcontract.Context, items any, total int64, page, pageSize int) {
+func SuccessPaginated(c JSONResponder, items any, total int64, page, pageSize int) {
 	Success(c, PaginatedData{
 		Items:    items,
 		Total:    total,
@@ -137,48 +120,31 @@ func SuccessPaginated(c transportcontract.Context, items any, total int64, page,
 	})
 }
 
-// BadRequest writes a 400 Bad Request response with a business error code and message.
-//
-// BadRequest 输出 400 Bad Request 响应，附带业务错误码和消息。
-func BadRequest(c transportcontract.Context, message string) {
+// BadRequest writes a 400 Bad Request response with a message.
+func BadRequest(c JSONResponder, message string) {
 	c.JSON(http.StatusBadRequest, Response{Code: CodeBadRequest, Message: message})
 }
 
-// Unauthorized writes a 401 Unauthorized response with a business error code and message.
-//
-// Unauthorized 输出 401 Unauthorized 响应，附带业务错误码和消息。
-func Unauthorized(c transportcontract.Context, message string) {
+// Unauthorized writes a 401 Unauthorized response with a message.
+func Unauthorized(c JSONResponder, message string) {
 	c.JSON(http.StatusUnauthorized, Response{Code: CodeUnauthorized, Message: message})
 }
 
-// Forbidden writes a 403 Forbidden response with a business error code and message.
-//
-// Forbidden 输出 403 Forbidden 响应，附带业务错误码和消息。
-func Forbidden(c transportcontract.Context, message string) {
+// Forbidden writes a 403 Forbidden response with a message.
+func Forbidden(c JSONResponder, message string) {
 	c.JSON(http.StatusForbidden, Response{Code: CodeForbidden, Message: message})
 }
 
-// NotFound writes a 404 Not Found response with a business error code and message.
-//
-// NotFound 输出 404 Not Found 响应，附带业务错误码和消息。
-func NotFound(c transportcontract.Context, message string) {
+// NotFound writes a 404 Not Found response with a message.
+func NotFound(c JSONResponder, message string) {
 	c.JSON(http.StatusNotFound, Response{Code: CodeNotFound, Message: message})
 }
 
-// InternalError writes a 500 Internal Server Error response with a business error code and message.
-//
-// InternalError 输出 500 Internal Server Error 响应，附带业务错误码和消息。
-func InternalError(c transportcontract.Context, message string) {
+// InternalError writes a 500 Internal Server Error response with a message.
+func InternalError(c JSONResponder, message string) {
 	c.JSON(http.StatusInternalServerError, Response{Code: CodeInternalError, Message: message})
 }
 
-// parseError extracts code and message from an error.
-// If the error implements BusinessError, use its code and message.
-// Otherwise, return CodeSuccess for nil error or hide internal error details.
-//
-// parseError 从错误中提取错误码和消息。
-// 如果错误实现了 BusinessError，使用其错误码和消息。
-// 否则，nil 错误返回成功码，其他错误隐藏内部细节。
 func parseError(err error) (int, string) {
 	if err == nil {
 		return CodeSuccess, "success"
@@ -187,33 +153,22 @@ func parseError(err error) (int, string) {
 	if errors.As(err, &bizErr) {
 		return bizErr.Code(), bizErr.Message()
 	}
-	// 非 BusinessError 不暴露内部错误细节，返回通用消息
-	return CodeSuccess + 1, "internal server error"
+	var appErr resiliencecontract.AppError
+	if errors.As(err, &appErr) {
+		if st := appErr.GetStatus(); st != nil {
+			return int(st.Code), st.Message
+		}
+	}
+	return CodeInternalError, err.Error()
 }
 
-// codeToHTTPStatus maps business error codes to HTTP status codes.
-// Returns the appropriate HTTP status based on business error code semantics.
-//
-// codeToHTTPStatus 将业务错误码映射到 HTTP 状态码。
-// 根据业务错误码语义返回对应的 HTTP 状态码。
 func codeToHTTPStatus(code int) int {
-	switch {
-	case code == CodeSuccess:
+	if code >= 100 && code < 600 {
+		return code
+	}
+	switch code {
+	case CodeSuccess:
 		return http.StatusOK
-	case code == CodeBadRequest, code == CodeValidationFailed:
-		return http.StatusBadRequest
-	case code == CodeUnauthorized:
-		return http.StatusUnauthorized
-	case code == CodeForbidden:
-		return http.StatusForbidden
-	case code == CodeNotFound:
-		return http.StatusNotFound
-	case code == CodeConflict:
-		return http.StatusConflict
-	case code == CodeTooManyRequests:
-		return http.StatusTooManyRequests
-	case code == CodeServiceUnavailable:
-		return http.StatusServiceUnavailable
 	default:
 		if code >= 10000 {
 			return http.StatusOK

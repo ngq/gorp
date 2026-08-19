@@ -13,20 +13,24 @@ type DLQHandler func(ctx context.Context, event integrationcontract.Event, err e
 
 // EventBusOptions configures the EventBus behavior including exponential retries and DLQ.
 type EventBusOptions struct {
-	MaxRetries     int           // Maximum retry attempts (default: 3)
-	InitialBackoff time.Duration // Initial retry delay (default: 50ms)
-	MaxBackoff     time.Duration // Maximum retry delay (default: 1s)
-	EnableDLQ      bool          // Enable Dead-Letter Queue routing (default: true)
-	DLQHandler     DLQHandler    // Custom DLQ handler
+	MaxRetries       int           // Maximum retry attempts (default: 3)
+	InitialBackoff   time.Duration // Initial retry delay (default: 50ms)
+	MaxBackoff       time.Duration // Maximum retry delay (default: 1s)
+	EnableDLQ        bool          // Enable Dead-Letter Queue routing (default: true)
+	DLQHandler       DLQHandler    // Custom DLQ handler
+	AsyncWorkerCount int           // Number of background workers for PublishAsync (default: 8)
+	AsyncQueueSize   int           // Buffer size for async event queue (default: 1024)
 }
 
 // DefaultEventBusOptions returns sensible defaults for production.
 func DefaultEventBusOptions() EventBusOptions {
 	return EventBusOptions{
-		MaxRetries:     3,
-		InitialBackoff: 50 * time.Millisecond,
-		MaxBackoff:     1 * time.Second,
-		EnableDLQ:      true,
+		MaxRetries:       3,
+		InitialBackoff:   50 * time.Millisecond,
+		MaxBackoff:       1 * time.Second,
+		EnableDLQ:        true,
+		AsyncWorkerCount: 8,
+		AsyncQueueSize:   1024,
 	}
 }
 
@@ -55,3 +59,16 @@ func WithDLQHandler(handler DLQHandler) Option {
 		o.DLQHandler = handler
 	}
 }
+
+// WithAsyncWorkers configures the worker pool and queue size for asynchronous event publishing.
+func WithAsyncWorkers(workerCount, queueSize int) Option {
+	return func(o *EventBusOptions) {
+		if workerCount > 0 {
+			o.AsyncWorkerCount = workerCount
+		}
+		if queueSize > 0 {
+			o.AsyncQueueSize = queueSize
+		}
+	}
+}
+

@@ -24,6 +24,7 @@ type GradientConfig struct {
 	QueueSize     float64       // Headroom queue size added to gradient calculation (default: 4.0)
 	Smoothing     float64       // Exponential smoothing factor alpha (0.0 to 1.0, default: 0.2)
 	RttWindowSize time.Duration // Sliding window size for minRTT tracking (default: 30s)
+	SampleRate    int64         // Sample 1 out of N requests for RTT limit updates (default: 1)
 }
 
 // DefaultGradientConfig returns sensible defaults.
@@ -35,18 +36,20 @@ func DefaultGradientConfig() GradientConfig {
 		QueueSize:     4.0,
 		Smoothing:     0.2,
 		RttWindowSize: 30 * time.Second,
+		SampleRate:    1,
 	}
 }
 
 // GradientLoadShedder implements Little's Law Gradient Adaptive Concurrency Limiting.
 type GradientLoadShedder struct {
-	mu           sync.RWMutex
-	config       GradientConfig
-	inFlight     atomic.Int64
-	currentLimit float64
-	minRtt       time.Duration
-	currentRtt   time.Duration
-	lastRttReset time.Time
+	mu            sync.RWMutex
+	config        GradientConfig
+	inFlight      atomic.Int64
+	sampleCounter atomic.Int64
+	currentLimit  float64
+	minRtt        time.Duration
+	currentRtt    time.Duration
+	lastRttReset  time.Time
 }
 
 // NewGradientLoadShedder creates a new GradientLoadShedder instance.
@@ -67,6 +70,9 @@ func NewGradientLoadShedder(cfg ...GradientConfig) *GradientLoadShedder {
 		}
 		if cfg[0].RttWindowSize > 0 {
 			c.RttWindowSize = cfg[0].RttWindowSize
+		}
+		if cfg[0].SampleRate > 0 {
+			c.SampleRate = cfg[0].SampleRate
 		}
 	}
 	return &GradientLoadShedder{
@@ -103,7 +109,10 @@ func (g *GradientLoadShedder) Done(ctx context.Context, resource string, err err
 	if ctx != nil {
 		if start, ok := ctx.Value(startTimeKey{}).(time.Time); ok {
 			rtt := time.Since(start)
-			g.RecordSample(rtt)
+			sampleRate := g.config.SampleRate
+			if sampleRate <= 1 || g.sampleCounter.Add(1)%sampleRate == 0 || (g.currentRtt > 0 && rtt > g.currentRtt*2) {
+				g.RecordSample(rtt)
+			}
 		}
 	}
 }
