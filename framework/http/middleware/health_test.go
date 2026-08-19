@@ -259,3 +259,31 @@ func (m *mockRouter) StaticFS(relativePath string, fs http.FileSystem) {}
 func (m *mockRouter) NoRoute(handler transportcontract.Handler)        {}
 func (m *mockRouter) NoMethod(handler transportcontract.Handler)       {}
 func (m *mockRouter) Routes() []transportcontract.RouteInfo            { return nil }
+
+// TestStartupHandler_Probes 验证 /startupz 在未完成阶段返回 503，完成后返回 200。
+func TestStartupHandler_Probes(t *testing.T) {
+	started := false
+	isStarted := func() bool { return started }
+
+	router := NewTestEngine()
+	router.GET("/startupz", func(c *gin.Context) {
+		StartupHandler(isStarted)(newContext(c))
+	})
+
+	// 1. 未完成启动阶段，返回 503
+	req1 := httptest.NewRequest(http.MethodGet, "/startupz", nil)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503 while starting up, got %d", w1.Code)
+	}
+
+	// 2. 标记启动完成，返回 200
+	started = true
+	req2 := httptest.NewRequest(http.MethodGet, "/startupz", nil)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Errorf("expected 200 after startup complete, got %d", w2.Code)
+	}
+}

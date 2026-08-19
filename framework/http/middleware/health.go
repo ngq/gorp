@@ -183,13 +183,31 @@ func ReadinessHandlerFromContainer(container runtimecontract.Container) transpor
 	}
 }
 
+// StartupHandler 创建启动检查 HTTP handler。
+// 用于 Kubernetes startup probe，只有预热/Migration 完成后才返回 200，否则返回 503。
+func StartupHandler(isStarted func() bool) transportcontract.Handler {
+	return func(c transportcontract.Context) {
+		started := true
+		if isStarted != nil {
+			started = isStarted()
+		}
+		if started {
+			c.JSON(http.StatusOK, map[string]any{
+				"started": true,
+				"message": "service startup complete",
+			})
+			return
+		}
+		c.JSON(http.StatusServiceUnavailable, map[string]any{
+			"started": false,
+			"message": "service is warming up / starting",
+		})
+	}
+}
+
 // LivenessHandler 创建存活检查 HTTP handler。
 // 用于 Kubernetes liveness probe，检查服务是否存活。
 // 如果服务能响应，就认为存活。
-//
-// 使用方式：
-//
-//	router.GET("/livez", middleware.LivenessHandler())
 func LivenessHandler() transportcontract.Handler {
 	return func(c transportcontract.Context) {
 		c.JSON(http.StatusOK, map[string]any{
@@ -199,12 +217,8 @@ func LivenessHandler() transportcontract.Handler {
 	}
 }
 
-// RegisterHealthEndpoints 注册所有健康检查端点。
-// 包括 /healthz、/readyz 和 /livez。
-//
-// 使用方式：
-//
-//	middleware.RegisterHealthEndpoints(router, container)
+// RegisterHealthEndpoints 注册所有 K8s 标准健康检查端点。
+// 包括 /startupz、/readyz、/livez 和 /healthz。
 func RegisterHealthEndpoints(router transportcontract.Router, container runtimecontract.Container) {
 	if router == nil {
 		return
@@ -215,6 +229,18 @@ func RegisterHealthEndpoints(router transportcontract.Router, container runtimec
 
 	// 注册就绪检查端点
 	router.GET("/readyz", ReadinessHandlerFromContainer(container))
+
+	// 注册启动检查端点
+	router.GET("/startupz", StartupHandler(func() bool {
+		if container != nil && container.IsBind(observabilitycontract.StartupTrackerKey) {
+			if stAny, err := container.Make(observabilitycontract.StartupTrackerKey); err == nil {
+				if st, ok := stAny.(observabilitycontract.StartupState); ok {
+					return st.IsStarted()
+				}
+			}
+		}
+		return true
+	}))
 
 	// 注册存活检查端点
 	router.GET("/livez", LivenessHandler())

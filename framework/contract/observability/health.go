@@ -17,7 +17,16 @@ import (
 // HealthCheckerKey is the container key for the health checker capability.
 //
 // HealthCheckerKey 是健康检查能力的容器键。
-const HealthCheckerKey = "framework.health.checker"
+const (
+	HealthCheckerKey  = "framework.health.checker"
+	StartupTrackerKey = "framework.health.startup"
+)
+
+// StartupState tracks application startup completeness for K8s startup probes.
+type StartupState interface {
+	MarkStarted()
+	IsStarted() bool
+}
 
 // HealthStatus represents the health status of a component or service.
 //

@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	frameworktesting "github.com/ngq/gorp/framework/testing"
@@ -92,6 +93,6 @@ func TestReleaseProjectHandlerTemplatesUseRootApplicationHelpers(t *testing.T) {
 		require.NotContains(t, text, "framework/provider/gin", path)
 		require.NotContains(t, text, "ginprovider.", path)
 		require.Contains(t, text, `gorp "{{.FrameworkModule}}"`, path)
-		require.Contains(t, text, "gorp.Success(", path)
+		require.True(t, strings.Contains(text, "gorp.Success(") || strings.Contains(text, "httpx.Success("), path)
 	}
 }

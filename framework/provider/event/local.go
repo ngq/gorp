@@ -51,21 +51,22 @@ func (e *BaseEvent) OccurredAt() time.Time { return e.occurredAt }
 type LocalEventBus struct {
 	mu          sync.RWMutex
 	subscribers map[string][]integrationcontract.EventHandler
+	options     EventBusOptions
 }
 
-// NewLocalEventBus 创建本地事件总线。
-func NewLocalEventBus() *LocalEventBus {
+// NewLocalEventBus 创建具备重试与 DLQ 能力的本地事件总线。
+func NewLocalEventBus(opts ...Option) *LocalEventBus {
+	o := DefaultEventBusOptions()
+	for _, opt := range opts {
+		opt(&o)
+	}
 	return &LocalEventBus{
 		subscribers: make(map[string][]integrationcontract.EventHandler),
+		options:     o,
 	}
 }
 
 // Subscribe 订阅事件。
-//
-// 中文说明：
-// - 注册事件处理器；
-// - 同一事件可以有多个处理器，按注册顺序执行；
-// - 处理器执行失败不会影响其他处理器的执行。
 func (b *LocalEventBus) Subscribe(eventName string, handler integrationcontract.EventHandler) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -73,13 +74,7 @@ func (b *LocalEventBus) Subscribe(eventName string, handler integrationcontract.
 	b.subscribers[eventName] = append(b.subscribers[eventName], handler)
 }
 
-// Publish 同步发布事件。
-//
-// 中文说明：
-// - 阻塞直到所有处理器执行完毕；
-// - 处理器按注册顺序依次执行；
-// - 如果某个处理器失败，记录错误但继续执行其他处理器；
-// - 返回第一个遇到的错误。
+// Publish 同步发布事件（带有指数退避重试与死信队列 DLQ 路由）。
 func (b *LocalEventBus) Publish(ctx context.Context, event integrationcontract.Event) error {
 	b.mu.RLock()
 	handlers := b.subscribers[event.Name()]
@@ -91,23 +86,69 @@ func (b *LocalEventBus) Publish(ctx context.Context, event integrationcontract.E
 
 	var firstErr error
 	for _, handler := range handlers {
-		if err := invokeHandler(ctx, event.Name(), handler, event); err != nil && firstErr == nil {
+		if err := b.invokeWithRetry(ctx, event.Name(), handler, event); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
 	return firstErr
 }
 
-// invokeHandler runs one subscriber. A panicking listener is converted to an
-// error instead of unwinding into the publisher's call stack, so the remaining
-// listeners still run and the publishing request is not taken down.
-func invokeHandler(ctx context.Context, eventName string, handler integrationcontract.EventHandler, event integrationcontract.Event) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("event %s: handler panicked: %v", eventName, r)
+// invokeWithRetry 包含了 CloudEvent Context 恢复、指数退避重试与死信队列路由。
+func (b *LocalEventBus) invokeWithRetry(ctx context.Context, eventName string, handler integrationcontract.EventHandler, event integrationcontract.Event) (err error) {
+	execCtx := restoreContextFromEvent(ctx, event)
+
+	backoff := b.options.InitialBackoff
+	maxRetries := b.options.MaxRetries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > b.options.MaxBackoff && b.options.MaxBackoff > 0 {
+				backoff = b.options.MaxBackoff
+			}
 		}
-	}()
-	return handler(ctx, event)
+
+		err = func() (handlerErr error) {
+			defer func() {
+				if r := recover(); r != nil {
+					handlerErr = fmt.Errorf("event %s: handler panicked: %v", eventName, r)
+				}
+			}()
+			return handler(execCtx, event)
+		}()
+
+		if err == nil {
+			return nil // 处理成功，退出重试
+		}
+	}
+
+	// 达到最大重试次数仍失败，触发死信队列 (DLQ) 处理
+	if b.options.EnableDLQ && b.options.DLQHandler != nil {
+		b.options.DLQHandler(execCtx, event, err)
+	}
+
+	return err
+}
+
+func restoreContextFromEvent(ctx context.Context, event integrationcontract.Event) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// 如果是 CloudEvent 类型，自动提取 Extensions 中的 Trace 信息并注入 Context
+	if ce, ok := event.(interface{ ExtensionsMap() map[string]any }); ok {
+		ext := ce.ExtensionsMap()
+		if traceID, ok := ext["trace_id"].(string); ok && traceID != "" {
+			ctx = context.WithValue(ctx, "trace_id", traceID)
+		}
+		if reqID, ok := ext["request_id"].(string); ok && reqID != "" {
+			ctx = context.WithValue(ctx, "request_id", reqID)
+		}
+	}
+	return ctx
 }
 
 // PublishAsync 异步发布事件。
@@ -125,10 +166,10 @@ func (b *LocalEventBus) PublishAsync(ctx context.Context, event integrationcontr
 		return nil
 	}
 
-	// 在后台 goroutine 中执行处理器
+	// 在后台 goroutine 中执行处理器（带有重试与 DLQ 保护）
 	goroutine.SafeGo(ctx, nil, func(ctx context.Context) {
 		for _, handler := range handlers {
-			_ = handler(ctx, event)
+			_ = b.invokeWithRetry(ctx, event.Name(), handler, event)
 		}
 	})
 

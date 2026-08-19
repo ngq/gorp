@@ -359,3 +359,50 @@ func TestLocalEventBus_MultipleEventsSameHandler(t *testing.T) {
 	bus.Publish(context.Background(), NewBaseEvent("user.updated", nil))
 	assert.Equal(t, int32(2), atomic.LoadInt32(&callCount))
 }
+
+// TestLocalEventBus_RetryAndDLQ 验证处理失败时的指数退避重试与死信队列转投。
+func TestLocalEventBus_RetryAndDLQ(t *testing.T) {
+	var attempts int32
+	var dlqHandled bool
+
+	dlqFunc := func(ctx context.Context, event integrationcontract.Event, err error) {
+		dlqHandled = true
+	}
+
+	bus := NewLocalEventBus(
+		WithMaxRetries(2),
+		WithBackoff(1*time.Millisecond, 10*time.Millisecond),
+		WithDLQHandler(dlqFunc),
+	)
+
+	bus.Subscribe("order.failed", func(ctx context.Context, event integrationcontract.Event) error {
+		atomic.AddInt32(&attempts, 1)
+		return errors.New("db error")
+	})
+
+	err := bus.Publish(context.Background(), NewBaseEvent("order.failed", nil))
+	assert.Error(t, err)
+	// 初始 1 次 + 2 次重试 = 3 次尝试
+	assert.Equal(t, int32(3), atomic.LoadInt32(&attempts))
+	assert.True(t, dlqHandled)
+}
+
+// TestLocalEventBus_CloudEventTracePropagation 验证 CloudEvent 跨线程/事件总线发布时的 TraceID 贯穿与恢复。
+func TestLocalEventBus_CloudEventTracePropagation(t *testing.T) {
+	var capturedTraceID string
+	bus := NewLocalEventBus()
+
+	bus.Subscribe("com.gorp.test", func(ctx context.Context, event integrationcontract.Event) error {
+		if tID, ok := ctx.Value("trace_id").(string); ok {
+			capturedTraceID = tID
+		}
+		return nil
+	})
+
+	pubCtx := context.WithValue(context.Background(), "trace_id", "trace-7777")
+	ce := integrationcontract.NewCloudEvent(pubCtx, "com.gorp.test", "urn:gorp:test", "payload")
+
+	err := bus.Publish(context.Background(), ce)
+	assert.NoError(t, err)
+	assert.Equal(t, "trace-7777", capturedTraceID)
+}

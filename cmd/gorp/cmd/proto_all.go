@@ -12,6 +12,8 @@ import (
 var (
 	// protoAllDir 指定 proto 文件目录。
 	protoAllDir string
+	// protoFile 指定单个 proto 文件（可选）。
+	protoFile string
 )
 
 // protoAllCmd 批量从目录下所有 Proto 文件生成全套代码。
@@ -45,6 +47,7 @@ func init() {
 	protoCmd.AddCommand(protoAllCmd)
 
 	protoAllCmd.Flags().StringVarP(&protoAllDir, "proto-dir", "d", "api/proto", "Proto 文件目录")
+	protoAllCmd.Flags().StringVarP(&protoFile, "proto-file", "f", "", "单个 Proto 文件路径（可选）")
 }
 
 func runProtoAll(cmd *cobra.Command, args []string) error {
@@ -94,6 +97,13 @@ func runProtoAll(cmd *cobra.Command, args []string) error {
 		// Step 3: 生成 client wrapper。
 		if err := genClientWrapper(cmd, protoFile); err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: client wrapper skipped: %v\n", err)
+		}
+
+		// Step 4: 自动联动刷新 OpenAPI specs (docs/openapi.yaml)
+		openapiProtoFile = protoFile
+		openapiOutputFile = filepath.Join("docs", "openapi.yaml")
+		if err := protoOpenapiCmd.RunE(cmd, nil); err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Notice: openapi spec auto-update skipped: %v\n", err)
 		}
 
 		fmt.Fprintf(cmd.OutOrStdout(), "  Done!\n\n")
