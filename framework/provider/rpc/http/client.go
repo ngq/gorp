@@ -173,6 +173,9 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp any
 			if unmarshalErr := json.Unmarshal(respBody, resp); unmarshalErr != nil {
 				return fmt.Errorf("rpc: unmarshal response failed: %w", unmarshalErr)
 			}
+		} else {
+			// 排空响应流以确保底层 HTTP Keep-Alive 连接复用
+			_, _ = io.Copy(io.Discard, httpResp.Body)
 		}
 
 		return nil

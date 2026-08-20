@@ -172,17 +172,18 @@ func (p *rabbitPublisher) Underlying() any {
 	if p == nil || p.queue == nil {
 		return nil
 	}
-	return p.queue.conn
+	return p.queue.Underlying()
 }
 
 // As attempts to cast the underlying connection to the target type.
 //
 // As 尝试将底层连接转换为目标类型。
 func (p *rabbitPublisher) As(target any) bool {
-	if p == nil || p.queue == nil || p.queue.conn == nil {
+	conn := p.Underlying()
+	if conn == nil {
 		return false
 	}
-	return As(p.queue.conn, target)
+	return As(conn, target)
 }
 
 // NativePublisher implements NativePublisherProvider interface.
@@ -193,8 +194,5 @@ func (p *rabbitPublisher) As(target any) bool {
 // 返回底层 *amqp.Connection 用于高级发布操作。
 // 调用方应从该连接创建和关闭自己的 channel。
 func (p *rabbitPublisher) NativePublisher() any {
-	if p == nil || p.queue == nil || p.queue.conn == nil {
-		return nil
-	}
-	return p.queue.conn
+	return p.Underlying()
 }

@@ -27,6 +27,7 @@ type Retry interface {
 	DoForResource(ctx context.Context, resource string, fn func() error) error
 	DoWithResult(ctx context.Context, fn func() (any, error)) (any, error)
 	IsRetryable(err error) bool
+	UpdateConfig(cfg RetryConfig)
 }
 
 // RetryPolicy describes one retry strategy.

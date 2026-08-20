@@ -61,11 +61,8 @@ func (s *rabbitSubscriber) Subscribe(ctx context.Context, topic string, handler 
 // SubscribeWithGroup 使用特定消费者组（队列名后缀）订阅主题。
 // 在 RabbitMQ 中，消费者组通过每个消费者唯一队列名实现。
 func (s *rabbitSubscriber) SubscribeWithGroup(ctx context.Context, topic string, group string, handler integrationcontract.MessageHandler) (integrationcontract.UnsubscribeFunc, error) {
-	s.queue.mu.Lock()
-	closed := s.queue.closed
-	s.queue.mu.Unlock()
-	if closed {
-		return nil, errors.New("messagequeue.rabbitmq: queue closed")
+	if _, err := s.queue.getConn(); err != nil {
+		return nil, err
 	}
 
 	// Create queue name with group suffix
@@ -206,14 +203,6 @@ func (s *rabbitSubscriber) runSubscription(ctx context.Context, topic string, qu
 // Consume 从特定队列消费消息。
 // 实现 integrationcontract.MessageSubscriber.Consume。
 func (s *rabbitSubscriber) Consume(ctx context.Context, queue string, handler integrationcontract.MessageHandler) error {
-	s.queue.mu.Lock()
-	closed := s.queue.closed
-	s.queue.mu.Unlock()
-	if closed {
-		return errors.New("messagequeue.rabbitmq: queue closed")
-	}
-
-	// 用 getConn：断线后 Consume 也能在重连后的连接上继续。
 	conn, err := s.queue.getConn()
 	if err != nil {
 		return err
@@ -286,17 +275,18 @@ func (s *rabbitSubscriber) Underlying() any {
 	if s == nil || s.queue == nil {
 		return nil
 	}
-	return s.queue.conn
+	return s.queue.Underlying()
 }
 
 // As attempts to cast the underlying connection to the target type.
 //
 // As 尝试将底层连接转换为目标类型。
 func (s *rabbitSubscriber) As(target any) bool {
-	if s == nil || s.queue == nil || s.queue.conn == nil {
+	conn := s.Underlying()
+	if conn == nil {
 		return false
 	}
-	return As(s.queue.conn, target)
+	return As(conn, target)
 }
 
 // NativeSubscriber implements NativeSubscriberProvider interface.
@@ -307,10 +297,7 @@ func (s *rabbitSubscriber) As(target any) bool {
 // 返回底层 *amqp.Connection 用于高级订阅操作。
 // 调用方应从该连接创建和关闭自己的 channel。
 func (s *rabbitSubscriber) NativeSubscriber() any {
-	if s == nil || s.queue == nil || s.queue.conn == nil {
-		return nil
-	}
-	return s.queue.conn
+	return s.Underlying()
 }
 
 // extractAMQPHeaders converts amqp.Table to map[string]string.

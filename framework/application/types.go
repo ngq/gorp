@@ -33,9 +33,11 @@ type HTTPService = transportcontract.HTTP
 type HTTPRegistry = transportcontract.HTTPRegistry
 
 // GRPCRuntime is the startup runtime exposed to application gRPC callbacks.
+// For typed runtime in gRPC standalone mode, import "github.com/ngq/gorp/framework/bootstrap/grpc".
 //
 // GRPCRuntime 是 application 回调使用的 gRPC 启动上下文。
-type GRPCRuntime = bootstrap.GRPCServiceRuntime
+// gRPC 独立启动模式下的类型化运行时请引入 "github.com/ngq/gorp/framework/bootstrap/grpc"。
+type GRPCRuntime = any
 
 // ServiceProvider reuses the provider declaration from the runtime contract.
 //

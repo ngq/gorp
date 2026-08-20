@@ -2,6 +2,7 @@
 package bbr
 
 import (
+	"math"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -22,12 +23,20 @@ import (
 
 // cpuMonitor 监控系统 CPU 使用率。
 type cpuMonitor struct {
-	threshold   float64       // CPU 阈值（0.0-1.0）
-	ema         atomic.Value  // 存储 float64，EMA 平滑后的 CPU 使用率
-	overloaded_ atomic.Bool   // 当前是否过载
-	stopCh      chan struct{} // 停止信号
-	stopOnce    sync.Once
-	wg          sync.WaitGroup
+	thresholdBits atomic.Uint64 // 存储 math.Float64bits(threshold)，支持并发无锁热更新
+	ema           atomic.Value  // 存储 float64，EMA 平滑后的 CPU 使用率
+	overloaded_   atomic.Bool   // 当前是否过载
+	stopCh        chan struct{} // 停止信号
+	stopOnce      sync.Once
+	wg            sync.WaitGroup
+}
+
+func (m *cpuMonitor) getThreshold() float64 {
+	return math.Float64frombits(m.thresholdBits.Load())
+}
+
+func (m *cpuMonitor) setThreshold(t float64) {
+	m.thresholdBits.Store(math.Float64bits(t))
 }
 
 // cpuSample 表示一次 CPU 采样结果。
@@ -41,9 +50,9 @@ type cpuSample struct {
 // newCPUMonitor 创建 CPU 监控器并启动后台采样线程。
 func newCPUMonitor(threshold float64) *cpuMonitor {
 	m := &cpuMonitor{
-		threshold: threshold,
-		stopCh:    make(chan struct{}),
+		stopCh: make(chan struct{}),
 	}
+	m.setThreshold(threshold)
 	m.ema.Store(float64(0))
 
 	// 启动后台采样线程
@@ -88,7 +97,7 @@ func (m *cpuMonitor) run() {
 			m.ema.Store(newEMA)
 
 			// 更新过载状态
-			m.overloaded_.Store(newEMA >= m.threshold)
+			m.overloaded_.Store(newEMA >= m.getThreshold())
 		}
 	}
 }

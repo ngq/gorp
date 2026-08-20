@@ -245,6 +245,13 @@ func (r *RetryService) DoForResource(ctx context.Context, resource string, fn fu
 	return r.doWithPolicy(ctx, policy, fn)
 }
 
+// UpdateConfig 动态更新重试配置。
+func (r *RetryService) UpdateConfig(cfg resiliencecontract.RetryConfig) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cfg = &cfg
+}
+
 // grpcErrorCodeString 从错误中提取 gRPC 状态码字符串（如 "Unavailable"）。
 // 用反射访问 GRPCStatus()/Code()/String()，避免引入 google.golang.org/grpc 依赖；
 // 非 gRPC 错误返回 ""。语义对齐 grpc/status.FromError：遍历 unwrap 链。

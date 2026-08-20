@@ -36,6 +36,7 @@ func (cb *testCircuitBreaker) Do(ctx context.Context, resource string, fn func()
 func (cb *testCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
 	return resiliencecontract.CircuitBreakerStateClosed
 }
+func (cb *testCircuitBreaker) UpdateConfig(cfg resiliencecontract.CircuitBreakerConfig) {}
 
 type testServiceTokenIssuer struct{}
 

@@ -44,7 +44,7 @@ func TestCodeDisableOverridesConfigEnableForSameFeature(t *testing.T) {
 	}, true)
 
 	// 代码侧显式关闭 tracing（模拟 WithGovernanceDisabled("tracing")）
-	if err := registerSelectedMicroserviceProvidersWithOptions(c, "micro", []string{"tracing"}, nil, nil); err != nil {
+	if err := RegisterSelectedMicroserviceProvidersWithOptions(c, "micro", []string{"tracing"}, nil, nil); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
@@ -81,7 +81,7 @@ func TestCodeProviderOverrideWinsOverConfigProviderOverrideForSameKey(t *testing
 	}, true)
 
 	// 代码侧 WithGovernanceProvider("serviceauth", "noop") 覆盖配置的 mtls
-	if err := registerSelectedMicroserviceProvidersWithOptions(c, "micro", nil, nil, map[string]string{"serviceauth": "noop"}); err != nil {
+	if err := RegisterSelectedMicroserviceProvidersWithOptions(c, "micro", nil, nil, map[string]string{"serviceauth": "noop"}); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 

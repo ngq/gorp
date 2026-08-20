@@ -21,8 +21,8 @@ import (
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	appgrpc "github.com/ngq/gorp/framework/provider/grpc"
-	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
-	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
+	metadatamwgrpc "github.com/ngq/gorp/framework/provider/metadata/middleware/grpc"
+	tracingmwgrpc "github.com/ngq/gorp/framework/provider/tracing/middleware/grpc"
 	rpcgovernance "github.com/ngq/gorp/framework/rpc/governance"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -256,12 +256,12 @@ func (c *Client) getConn(ctx context.Context, service string) (*grpc.ClientConn,
 
 	// metadata propagation interceptor
 	if c.metadataPropagator != nil {
-		unaryInterceptors = append(unaryInterceptors, metadatamw.UnaryClientInterceptor(c.metadataPropagator))
-		streamInterceptors = append(streamInterceptors, metadatamw.StreamClientInterceptor(c.metadataPropagator))
+		unaryInterceptors = append(unaryInterceptors, metadatamwgrpc.UnaryClientInterceptor(c.metadataPropagator))
+		streamInterceptors = append(streamInterceptors, metadatamwgrpc.StreamClientInterceptor(c.metadataPropagator))
 	}
 	// tracing interceptor
 	if c.tracer != nil {
-		unaryInterceptors = append(unaryInterceptors, tracingmw.UnaryClientInterceptor(c.tracer, serviceName))
+		unaryInterceptors = append(unaryInterceptors, tracingmwgrpc.UnaryClientInterceptor(c.tracer, serviceName))
 	}
 	// service auth interceptor
 	if c.serviceAuth != nil {

@@ -87,6 +87,10 @@ func (s *Service) Load(env string) error {
 
 	root := projectRoot()
 	v := viper.New()
+	v.SetDefault("app.name", "gorp-app")
+	v.SetDefault("app.address", ":8080")
+	v.SetDefault("log.level", "info")
+	v.SetDefault("log.format", "console")
 	if err := LoadLocalConfigToViper(v, env, root); err != nil {
 		return err
 	}

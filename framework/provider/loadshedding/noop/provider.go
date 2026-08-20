@@ -64,3 +64,6 @@ func (ls *noopLoadShedder) Allow(ctx context.Context, resource string) error {
 
 // Done 空操作（不释放任何资源）。
 func (ls *noopLoadShedder) Done(ctx context.Context, resource string, err error) {}
+
+// UpdateConfig 动态更新过载保护配置（noop 实现无需存储）。
+func (ls *noopLoadShedder) UpdateConfig(cfg resiliencecontract.LoadSheddingConfig) {}

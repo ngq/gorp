@@ -23,6 +23,7 @@ func (s *retryStub) DoWithResult(_ context.Context, fn func() (any, error)) (any
 	return fn()
 }
 func (s *retryStub) IsRetryable(err error) bool { return err != nil }
+func (s *retryStub) UpdateConfig(_ resiliencecontract.RetryConfig) {}
 
 // containerStub 是最小化的容器桩，仅支持按 RetryKey 返回重试服务实例。
 // 其他 Make 调用返回 ErrDefaultContainerNotSet，确保测试不会意外命中其他绑定。

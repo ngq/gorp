@@ -114,6 +114,11 @@ func newSemaphoreLoadShedder(cfg resiliencecontract.LoadSheddingConfig) *semapho
 	}
 }
 
+// NewLoadShedderFromConfig 根据配置创建 LoadShedder 实例。
+func NewLoadShedderFromConfig(cfg resiliencecontract.LoadSheddingConfig) resiliencecontract.LoadShedder {
+	return newSemaphoreLoadShedder(cfg)
+}
+
 // Allow 尝试获取一个并发槽位。如果当前并发已满，立即返回过载错误。
 //
 // 中文说明：
@@ -136,6 +141,27 @@ func (s *semaphoreLoadShedder) Allow(ctx context.Context, resource string) error
 func (s *semaphoreLoadShedder) Done(ctx context.Context, resource string, err error) {
 	entry := s.getOrCreateEntry(resource)
 	entry.release()
+}
+
+// UpdateConfig 动态更新过载保护配置，动态刷新默认最大并发与各资源的独立策略。
+func (s *semaphoreLoadShedder) UpdateConfig(cfg resiliencecontract.LoadSheddingConfig) {
+	defaultMaxCon := cfg.MaxConcurrency
+	if defaultMaxCon <= 0 {
+		defaultMaxCon = runtime.GOMAXPROCS(0) * 100
+	}
+	s.defaultMaxCon = defaultMaxCon
+	s.config = cfg
+
+	// 动态更新已有资源对应的信号量条目
+	s.semaphores.Range(func(key, value any) bool {
+		resource := key.(string)
+		maxCon := defaultMaxCon
+		if policy, ok := cfg.ResourcePolicies[resource]; ok && policy.MaxConcurrency > 0 {
+			maxCon = policy.MaxConcurrency
+		}
+		s.semaphores.Store(resource, newSemaphoreEntry(maxCon))
+		return true
+	})
 }
 
 // getOrCreateEntry 获取或创建资源对应的信号量条目。

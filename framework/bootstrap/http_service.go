@@ -41,7 +41,7 @@ import (
 var (
 	buildHTTPProvidersFunc                               = buildHTTPProviders
 	registerSelectedMicroserviceProvidersWithMode        = RegisterSelectedMicroserviceProvidersWithMode
-	registerSelectedMicroserviceProvidersWithOptionsFunc = registerSelectedMicroserviceProvidersWithOptions
+	registerSelectedMicroserviceProvidersWithOptionsFunc = RegisterSelectedMicroserviceProvidersWithOptions
 )
 
 // HTTPServiceOptions describes the bootstrap options for the default HTTP mainline.
@@ -184,12 +184,12 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 		return nil, fmt.Errorf("register selected microservice providers: %w", err)
 	}
 
-	// 从配置读取服务名
-	// Read service name from config
+	// 从配置读取服务名（默认回退为 gorp-app）
+	// Read service name from config (fallback to gorp-app)
 	cfg := container.MustMakeConfig(c)
 	serviceName := cfg.GetString("app.name")
 	if serviceName == "" {
-		return nil, fmt.Errorf("app.name is required in config file")
+		serviceName = "gorp-app"
 	}
 
 	registry, err := container.MakeHTTPRegistry(c)
@@ -202,6 +202,11 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 		router = defaultHTTP.Router()
 	}
 
+	var jwtSvc securitycontract.JWTService
+	if js, err := container.MakeJWTService(c); err == nil {
+		jwtSvc = js
+	}
+
 	rt = &HTTPServiceRuntime{
 		App:          app,
 		Container:    c,
@@ -209,7 +214,7 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 		Router:       router,
 		HTTPRegistry: registry,
 		Config:       cfg,
-		JWT:          container.MustMakeJWTService(c),
+		JWT:          jwtSvc,
 		ServiceName:  serviceName,
 	}
 	frameworklog.SetDefault(rt.Logger)
@@ -244,7 +249,10 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 	rt.Logger.Info(FormatGovernanceSummary(governanceSummary))
 
 	if !opts.DisableGorm {
-		rt.DB = container.MustMakeGorm(c)
+		// 数据库采用配置驱动按需装配：如果配置中未声明 database 或连接失败，保持 rt.DB = nil，避免阻断轻量服务启动
+		if dbSvc, err := container.MakeGormDB(c); err == nil {
+			rt.DB = dbSvc
+		}
 	}
 	if !opts.DisableRedis {
 		// Redis is optional in this mainline, so keep startup tolerant when the capability is absent.
@@ -347,9 +355,9 @@ func BootHTTPServiceContext(ctx context.Context, opts HTTPServiceOptions, migrat
 		return fmt.Errorf("initialize http runtime: %w", err)
 	}
 
-	// 确保 BootHTTPService 返回错误时清理 Container，释放已分配资源（DB、Redis 等）
+	// 确保 BootHTTPService 退出时（无论是正常停机还是中途报错）都清理 Container，释放已分配资源（DB、Redis、Closer 等）
 	defer func() {
-		if retErr != nil && rt != nil && rt.Container != nil {
+		if rt != nil && rt.Container != nil {
 			rt.Container.Destroy()
 		}
 	}()
@@ -669,11 +677,8 @@ func registerGRPCToHost(c runtimecontract.Container, hostSvc runtimecontract.Hos
 
 	// 创建 Hostable 适配器并注册到 host
 	// Create Hostable adapter and register to host
-	grpcHostable, err := newGRPCHostableFromRPCServer(rpcServer)
-	if err != nil {
-		logger.Info("grpc server adapter creation failed, skipping grpc host registration")
-		return false
-	}
+	grpcHostable := host.NewRPCServerHostable("grpc", rpcServer)
+
 
 	if err := hostSvc.RegisterService("grpc", grpcHostable); err != nil {
 		logger.Info(fmt.Sprintf("register grpc service to host failed: %v, skipping", err))

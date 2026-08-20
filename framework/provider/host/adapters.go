@@ -172,3 +172,41 @@ func (s *GRPCService) Stop(ctx context.Context) error {
 		return fmt.Errorf("grpc stop context done: %w", ctx.Err())
 	}
 }
+
+// NewRPCServerHostable adapts a transportcontract.RPCServer to runtimecontract.Hostable.
+//
+// NewRPCServerHostable 将 transportcontract.RPCServer 适配为 runtimecontract.Hostable。
+func NewRPCServerHostable(name string, server transportcontract.RPCServer) runtimecontract.Hostable {
+	return &RPCServerHostable{
+		name:   name,
+		server: server,
+	}
+}
+
+// RPCServerHostable adapts transportcontract.RPCServer to runtimecontract.Hostable.
+//
+// RPCServerHostable 将 transportcontract.RPCServer 适配为 runtimecontract.Hostable。
+type RPCServerHostable struct {
+	name   string
+	server transportcontract.RPCServer
+}
+
+// Name 返回服务名称。
+func (h *RPCServerHostable) Name() string { return h.name }
+
+// Start 启动 RPC 服务器。
+func (h *RPCServerHostable) Start(ctx context.Context) error {
+	if h.server == nil {
+		return nil
+	}
+	return h.server.Start(ctx)
+}
+
+// Stop 优雅停止 RPC 服务器。
+func (h *RPCServerHostable) Stop(ctx context.Context) error {
+	if h.server == nil {
+		return nil
+	}
+	return h.server.Stop(ctx)
+}
+

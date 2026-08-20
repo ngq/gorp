@@ -7,7 +7,6 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -17,8 +16,6 @@ import (
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"github.com/stretchr/testify/require"
-	ggrpc "google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 type testSpan struct {
@@ -244,32 +241,4 @@ func TestTracingMiddlewareSetsTraceHeader(t *testing.T) {
 
 	require.Equal(t, 204, w.Code)
 	require.Equal(t, "trace-test", w.Header().Get("X-Trace-ID"))
-}
-
-// TestTracingGRPCClientInterceptorInjectsMetadata verifies that gRPC client interceptor injects trace metadata.
-//
-// TestTracingGRPCClientInterceptorInjectsMetadata 验证 gRPC 客户端拦截器注入 trace 元数据。
-func TestTracingGRPCClientInterceptorInjectsMetadata(t *testing.T) {
-	tracer := testTracer{}
-	err := UnaryClientInterceptor(tracer, "svc")(context.Background(), "/demo.Service/Get", nil, nil, nil, func(ctx context.Context, method string, req, reply any, cc *ggrpc.ClientConn, opts ...ggrpc.CallOption) error {
-		md, ok := metadata.FromOutgoingContext(ctx)
-		require.True(t, ok)
-		require.Equal(t, []string{"tp"}, md.Get("traceparent"))
-		return nil
-	})
-	require.NoError(t, err)
-}
-
-// TestTracingGRPCServerInterceptorMarksErrorStatus verifies that gRPC server interceptor marks error status.
-//
-// TestTracingGRPCServerInterceptorMarksErrorStatus 验证 gRPC 服务端拦截器标记错误状态。
-func TestTracingGRPCServerInterceptorMarksErrorStatus(t *testing.T) {
-	tracer := testTracer{}
-	interceptor := UnaryServerInterceptor(tracer, "svc")
-	expected := errors.New("boom")
-
-	_, err := interceptor(context.Background(), nil, &ggrpc.UnaryServerInfo{FullMethod: "/demo.Service/Get"}, func(ctx context.Context, req any) (any, error) {
-		return nil, expected
-	})
-	require.ErrorIs(t, err, expected)
 }

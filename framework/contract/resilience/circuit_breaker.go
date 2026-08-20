@@ -16,6 +16,7 @@ type CircuitBreaker interface {
 	RecordFailure(ctx context.Context, resource string, err error)
 	Do(ctx context.Context, resource string, fn func() error) error
 	State(ctx context.Context, resource string) CircuitBreakerState
+	UpdateConfig(cfg CircuitBreakerConfig)
 }
 
 type CircuitBreakerState int

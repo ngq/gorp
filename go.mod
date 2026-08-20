@@ -25,7 +25,6 @@ require (
 	github.com/ngq/gorp/contrib/serviceauth/mtls v0.1.3
 	github.com/ngq/gorp/contrib/serviceauth/token v0.1.3
 	github.com/ngq/gorp/contrib/tracing/otel v0.1.3
-	github.com/pkg/sftp v1.13.10
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.19.0
@@ -36,7 +35,7 @@ require (
 	github.com/subosito/gotenv v1.6.0
 	go.etcd.io/etcd/client/v3 v3.6.10 // indirect
 	go.uber.org/zap v1.27.1
-	golang.org/x/crypto v0.50.0
+	golang.org/x/crypto v0.50.0 // indirect
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -120,7 +119,6 @@ require (
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/kr/fs v0.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

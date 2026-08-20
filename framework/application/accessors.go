@@ -15,8 +15,8 @@ import (
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
-	frameworkgrpc "github.com/ngq/gorp/framework/provider/grpc"
 )
 
 // MakeGRPCConnFactory returns the proto-first gRPC connection factory from the container.
@@ -77,16 +77,47 @@ func FromServiceIdentity(ctx context.Context) (*securitycontract.ServiceIdentity
 	return securitycontract.FromServiceIdentityContext(ctx)
 }
 
-// GetGRPCTraceID reads the trace id from a gRPC context.
+type contextKey string
+
+const (
+	traceIDContextKey   contextKey = "trace_id"
+	requestIDContextKey contextKey = "request_id"
+)
+
+// GetGRPCTraceID reads the trace id from a context.
 //
-// GetGRPCTraceID 从 gRPC context 读取 trace id。
+// GetGRPCTraceID 从 context 读取 trace id。
 func GetGRPCTraceID(ctx context.Context) string {
-	return frameworkgrpc.GetTraceID(ctx)
+	if ctx == nil {
+		return ""
+	}
+	if tid, ok := ctx.Value(traceIDContextKey).(string); ok && tid != "" {
+		return tid
+	}
+	if tid, ok := ctx.Value("trace_id").(string); ok && tid != "" {
+		return tid
+	}
+	if tid, ok := supportcontract.FromTraceIDContext(ctx); ok && tid != "" {
+		return tid
+	}
+	return ""
 }
 
-// GetGRPCRequestID reads the request id from a gRPC context.
+// GetGRPCRequestID reads the request id from a context.
 //
-// GetGRPCRequestID 从 gRPC context 读取 request id。
+// GetGRPCRequestID 从 context 读取 request id。
 func GetGRPCRequestID(ctx context.Context) string {
-	return frameworkgrpc.GetRequestID(ctx)
+	if ctx == nil {
+		return ""
+	}
+	if rid, ok := ctx.Value(requestIDContextKey).(string); ok && rid != "" {
+		return rid
+	}
+	if rid, ok := ctx.Value("request_id").(string); ok && rid != "" {
+		return rid
+	}
+	if rid, ok := supportcontract.FromRequestIDContext(ctx); ok && rid != "" {
+		return rid
+	}
+	return ""
 }

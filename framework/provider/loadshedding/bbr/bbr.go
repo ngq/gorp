@@ -99,6 +99,21 @@ func NewLoadShedder(cfg *Config) *LoadShedder {
 	}
 }
 
+// UpdateConfig 动态更新 BBR 过载保护配置。
+func (ls *LoadShedder) UpdateConfig(cfg resiliencecontract.LoadSheddingConfig) {
+	ls.cfg.Enabled = cfg.Enabled
+}
+
+// UpdateThreshold 动态更新 CPU 阈值。
+func (ls *LoadShedder) UpdateThreshold(threshold float64) {
+	if threshold > 0 {
+		ls.cfg.CPUThreshold = threshold
+		if ls.cpuMonitor != nil {
+			ls.cpuMonitor.setThreshold(threshold)
+		}
+	}
+}
+
 // Close 停止后台 CPU 采样 goroutine。使用完（容器销毁）时必须调用，
 // 否则采样 goroutine 泄漏。
 func (b *LoadShedder) Close() error {

@@ -33,6 +33,16 @@ func SafeGo(ctx context.Context, c runtimecontract.Container, fn func(context.Co
 	}()
 }
 
+// SafeGoDetached 在新的 goroutine 中执行 fn，保留父 context 中的 Trace ID、Span 与 Metadata，
+// 但脱离父 context 的取消信号（避免 HTTP 请求结束后异步任务被自动 canceled）。
+func SafeGoDetached(ctx context.Context, c runtimecontract.Container, fn func(context.Context)) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	asyncCtx := context.WithoutCancel(ctx)
+	SafeGo(asyncCtx, c, fn)
+}
+
 // logRecoveredPanic reports a recovered panic. It guards itself with a recover
 // so the recovery path can never crash the process, and falls back to stderr
 // when no logger is available.

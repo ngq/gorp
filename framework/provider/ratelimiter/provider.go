@@ -128,6 +128,48 @@ func (l *tokenBucketRateLimiter) WaitTimeout(ctx context.Context, resource strin
 	return limiter.Wait(ctx)
 }
 
+// UpdateConfig 动态更新限流器配置，包括默认 QPS/Burst 和各资源的限流参数。
+func (l *tokenBucketRateLimiter) UpdateConfig(cfg resiliencecontract.RateLimiterConfig) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	defaultQPS := cfg.DefaultConfig.QPS
+	if defaultQPS <= 0 {
+		defaultQPS = 100
+	}
+	defaultBurst := cfg.DefaultConfig.Burst
+	if defaultBurst <= 0 {
+		defaultBurst = 200
+	}
+	cfg.DefaultConfig.QPS = defaultQPS
+	cfg.DefaultConfig.Burst = defaultBurst
+	if cfg.ResourceConfigs == nil {
+		cfg.ResourceConfigs = make(map[string]resiliencecontract.RateResourceConfig)
+	}
+
+	l.config = cfg
+	l.limiter.SetLimit(rate.Limit(defaultQPS))
+	l.limiter.SetBurst(defaultBurst)
+
+	// 更新所有已实例化的资源限流器
+	l.limiters.Range(func(key, value any) bool {
+		resource := key.(string)
+
+		qps := defaultQPS
+		burst := defaultBurst
+		if rCfg, ok := cfg.ResourceConfigs[resource]; ok {
+			if rCfg.QPS > 0 {
+				qps = rCfg.QPS
+			}
+			if rCfg.Burst > 0 {
+				burst = rCfg.Burst
+			}
+		}
+		l.limiters.Store(resource, rate.NewLimiter(rate.Limit(qps), burst))
+		return true
+	})
+}
+
 // getOrCreateLimiter 获取或创建资源对应的限流器。
 // 不同资源可以有独立的 QPS 和 Burst 配置。
 func (l *tokenBucketRateLimiter) getOrCreateLimiter(resource string) *rate.Limiter {
@@ -136,6 +178,7 @@ func (l *tokenBucketRateLimiter) getOrCreateLimiter(resource string) *rate.Limit
 		return v.(*rate.Limiter)
 	}
 
+	l.mu.Lock()
 	// 确定该资源的 QPS 和 Burst
 	qps := l.config.DefaultConfig.QPS
 	burst := l.config.DefaultConfig.Burst
@@ -147,6 +190,7 @@ func (l *tokenBucketRateLimiter) getOrCreateLimiter(resource string) *rate.Limit
 			burst = cfg.Burst
 		}
 	}
+	l.mu.Unlock()
 
 	// 慢路径：创建新限流器
 	limiter := rate.NewLimiter(rate.Limit(qps), burst)

@@ -27,6 +27,7 @@ func (r *captureRetry) DoWithResult(ctx context.Context, fn func() (any, error))
 	return fn()
 }
 func (r *captureRetry) IsRetryable(err error) bool { return false }
+func (r *captureRetry) UpdateConfig(resiliencecontract.RetryConfig) {}
 
 // TestDefaultClientPresetOrderStable verifies the outbound RPC governance order remains stable.
 //

@@ -9,7 +9,10 @@
 // - 在不同 provider 之间统一 metadata 的访问、注入和提取语义。
 package transport
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 const (
 	MetadataKey           = "framework.metadata"
@@ -181,6 +184,14 @@ func (m *mapMetadata) Range(f func(key string, values []string) bool) {
 	}
 }
 
+func (m *mapMetadata) Keys() []string {
+	keys := make([]string, 0, len(m.data))
+	for k := range m.data {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func (m *mapMetadata) Clone() Metadata {
 	data := make(map[string][]string, len(m.data))
 	for k, v := range m.data {
@@ -197,7 +208,47 @@ func (m *mapMetadata) ToMap() map[string][]string {
 	return result
 }
 
+var metadataPool = sync.Pool{
+	New: func() any {
+		return &mapMetadata{data: make(map[string][]string, 8)}
+	},
+}
+
+// AcquireMetadata retrieves a clean Metadata instance from the sync pool.
+//
+// AcquireMetadata 从对象池获取干净的 Metadata 实例。
+func AcquireMetadata() Metadata {
+	md := metadataPool.Get().(*mapMetadata)
+	for k := range md.data {
+		delete(md.data, k)
+	}
+	return md
+}
+
+// ReleaseMetadata returns a Metadata instance back to the sync pool for reuse.
+//
+// ReleaseMetadata 将 Metadata 实例放回对象池以供复用。
+func ReleaseMetadata(md Metadata) {
+	if m, ok := md.(*mapMetadata); ok && m != nil {
+		if len(m.data) > 64 {
+			return
+		}
+		metadataPool.Put(m)
+	}
+}
+
 func lowerKey(key string) string {
+	hasUpper := false
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		if c >= 'A' && c <= 'Z' {
+			hasUpper = true
+			break
+		}
+	}
+	if !hasUpper {
+		return key
+	}
 	b := make([]byte, len(key))
 	for i := 0; i < len(key); i++ {
 		c := key[i]

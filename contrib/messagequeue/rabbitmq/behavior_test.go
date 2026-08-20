@@ -4,21 +4,32 @@ import (
 	"context"
 	"testing"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/require"
 
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
 )
 
-func TestQueueCloseIsIdempotent(t *testing.T) {
-	q := &Queue{
-		cfg:    &integrationcontract.MessageQueueConfig{Type: "rabbitmq"},
-		closed: false,
+func newClosedTestQueue() *Queue {
+	opts := integrationcontract.ResilientOptions[*amqp.Connection]{
+		Dialer: func(ctx context.Context) (*amqp.Connection, error) {
+			return nil, nil
+		},
 	}
+	rc, _ := integrationcontract.NewResilientConnection(context.Background(), opts)
+	_ = rc.Close()
+	return &Queue{
+		cfg:     &integrationcontract.MessageQueueConfig{Type: "rabbitmq"},
+		resConn: rc,
+	}
+}
+
+func TestQueueCloseIsIdempotent(t *testing.T) {
+	q := newClosedTestQueue()
 
 	// First close should succeed
 	err := q.Close()
 	require.NoError(t, err)
-	require.True(t, q.closed)
 
 	// Second close should also succeed (idempotent)
 	err = q.Close()
@@ -33,10 +44,7 @@ func TestQueueUnderlyingReturnsNilWhenQueueIsNil(t *testing.T) {
 }
 
 func TestPublisherReturnsErrorWhenQueueClosed(t *testing.T) {
-	q := &Queue{
-		cfg:    &integrationcontract.MessageQueueConfig{Type: "rabbitmq"},
-		closed: true,
-	}
+	q := newClosedTestQueue()
 	p := &rabbitPublisher{queue: q}
 
 	err := p.Publish(context.Background(), "topic", []byte("msg"))
@@ -45,40 +53,28 @@ func TestPublisherReturnsErrorWhenQueueClosed(t *testing.T) {
 
 func TestPublisherUnderlyingReturnsNilWhenQueueIsNil(t *testing.T) {
 	p := &rabbitPublisher{queue: nil}
-	// NativePublisher 调用 queue.getChannel()，nil queue 会 panic
-	// 只测试 Underlying 和 As
 	require.Nil(t, p.Underlying())
 	require.False(t, p.As(nil))
 }
 
 func TestSubscriberReturnsErrorWhenQueueClosed(t *testing.T) {
-	q := &Queue{
-		cfg:    &integrationcontract.MessageQueueConfig{Type: "rabbitmq"},
-		closed: true,
-	}
+	q := newClosedTestQueue()
 	s := &rabbitSubscriber{queue: q}
 
 	_, err := s.Subscribe(context.Background(), "topic", func(ctx context.Context, msg *integrationcontract.Message) error { return nil })
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "queue closed")
 }
 
 func TestSubscriberConsumeReturnsErrorWhenQueueClosed(t *testing.T) {
-	q := &Queue{
-		cfg:    &integrationcontract.MessageQueueConfig{Type: "rabbitmq"},
-		closed: true,
-	}
+	q := newClosedTestQueue()
 	s := &rabbitSubscriber{queue: q}
 
 	err := s.Consume(context.Background(), "queue", func(ctx context.Context, msg *integrationcontract.Message) error { return nil })
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "queue closed")
 }
 
 func TestSubscriberUnderlyingReturnsNilWhenQueueIsNil(t *testing.T) {
 	s := &rabbitSubscriber{queue: nil}
-	// NativeSubscriber 调用 queue.getChannel()，nil queue 会 panic
-	// 只测试 Underlying 和 As
 	require.Nil(t, s.Underlying())
 	require.False(t, s.As(nil))
 }

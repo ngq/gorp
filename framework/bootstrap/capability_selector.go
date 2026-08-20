@@ -96,10 +96,11 @@ func RegisterSelectedMicroserviceProviders(c runtimecontract.Container) error {
 //
 // RegisterSelectedMicroserviceProvidersWithMode 在显式 mode 覆盖下解析并注册微服务 provider。
 func RegisterSelectedMicroserviceProvidersWithMode(c runtimecontract.Container, modeOverride string) error {
-	return registerSelectedMicroserviceProvidersWithOptions(c, modeOverride, nil, nil, nil)
+	return RegisterSelectedMicroserviceProvidersWithOptions(c, modeOverride, nil, nil, nil)
 }
 
-func registerSelectedMicroserviceProvidersWithOptions(c runtimecontract.Container, modeOverride string, disabled []string, enabled []string, providerOverrides map[string]string) error {
+// RegisterSelectedMicroserviceProvidersWithOptions 在显式 mode 覆盖和治理覆盖项下解析并注册微服务 provider。
+func RegisterSelectedMicroserviceProvidersWithOptions(c runtimecontract.Container, modeOverride string, disabled []string, enabled []string, providerOverrides map[string]string) error {
 	if c == nil || !c.IsBind(datacontract.ConfigKey) {
 		return nil
 	}

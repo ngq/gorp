@@ -468,6 +468,20 @@ func MakeHost(c runtimecontract.Container) (runtimecontract.Host, error) {
 	return GetHost(c)
 }
 
+// MakeRPCClient resolves the RPCClient capability from the container.
+//
+// MakeRPCClient 从容器中解析 RPCClient 能力。
+func MakeRPCClient(c runtimecontract.Container) (transportcontract.RPCClient, error) {
+	return MakeWith[transportcontract.RPCClient](c, transportcontract.RPCClientKey)
+}
+
+// MustMakeRPCClient resolves the RPCClient capability or panics.
+//
+// MustMakeRPCClient 从容器中解析 RPCClient 能力，失败时 panic。
+func MustMakeRPCClient(c runtimecontract.Container) transportcontract.RPCClient {
+	return MustMakeWith[transportcontract.RPCClient](c, transportcontract.RPCClientKey)
+}
+
 // MakeHTTP is an alias for GetHTTP.
 //
 // MakeHTTP 是 GetHTTP 的别名。

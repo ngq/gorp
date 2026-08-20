@@ -23,8 +23,8 @@ import (
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	configprovider "github.com/ngq/gorp/framework/provider/config"
 	appgrpc "github.com/ngq/gorp/framework/provider/grpc"
-	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
-	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
+	metadatamwgrpc "github.com/ngq/gorp/framework/provider/metadata/middleware/grpc"
+	tracingmwgrpc "github.com/ngq/gorp/framework/provider/tracing/middleware/grpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
@@ -302,7 +302,7 @@ func (s *Server) newGRPCServer() (*grpc.Server, error) {
 				if serviceName == "" {
 					serviceName = "grpc-service"
 				}
-				unaryInterceptors = append(unaryInterceptors, tracingmw.UnaryServerInterceptor(tracer, serviceName))
+				unaryInterceptors = append(unaryInterceptors, tracingmwgrpc.UnaryServerInterceptor(tracer, serviceName))
 			}
 		}
 	}
@@ -312,8 +312,8 @@ func (s *Server) newGRPCServer() (*grpc.Server, error) {
 	if s.c.IsBind(transportcontract.MetadataPropagatorKey) {
 		if propagatorAny, err := s.c.Make(transportcontract.MetadataPropagatorKey); err == nil {
 			if propagator, ok := propagatorAny.(transportcontract.MetadataPropagator); ok {
-				unaryInterceptors = append(unaryInterceptors, metadatamw.UnaryServerInterceptor(propagator))
-				streamInterceptors = append(streamInterceptors, metadatamw.StreamServerInterceptor(propagator))
+				unaryInterceptors = append(unaryInterceptors, metadatamwgrpc.UnaryServerInterceptor(propagator))
+				streamInterceptors = append(streamInterceptors, metadatamwgrpc.StreamServerInterceptor(propagator))
 			}
 		}
 	}

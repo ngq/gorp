@@ -71,6 +71,9 @@ func (cb *noopCircuitBreaker) State(ctx context.Context, resource string) resili
 	return resiliencecontract.CircuitBreakerStateClosed
 }
 
+// UpdateConfig 动态更新熔断器配置（noop 实现无需存储）。
+func (cb *noopCircuitBreaker) UpdateConfig(cfg resiliencecontract.CircuitBreakerConfig) {}
+
 // noopRateLimiter 是 RateLimiter 的空实现。
 type noopRateLimiter struct{}
 
@@ -98,6 +101,9 @@ func (rl *noopRateLimiter) Wait(ctx context.Context, resource string) error {
 func (rl *noopRateLimiter) WaitTimeout(ctx context.Context, resource string, timeout time.Duration) error {
 	return nil
 }
+
+// UpdateConfig 动态更新限流器配置（noop 实现无需存储）。
+func (rl *noopRateLimiter) UpdateConfig(cfg resiliencecontract.RateLimiterConfig) {}
 
 // noopReservation 是 Reservation 的空实现。
 type noopReservation struct{}

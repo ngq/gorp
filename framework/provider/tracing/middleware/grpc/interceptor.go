@@ -1,17 +1,18 @@
-// Package middleware provides gRPC tracing middleware for gorp framework.
+// Package grpc provides gRPC tracing middleware for gorp framework.
 // Creates spans for each RPC call, extracts/injects trace context.
 // Supports OpenTelemetry integration via Tracer contract.
 //
 // 中间件包提供 gRPC 追踪中间件，用于 gorp 框架。
 // 为每个 RPC 调用创建 Span，提取/注入追踪上下文。
 // 通过 Tracer 契约支持 OpenTelemetry 集成。
-package middleware
+package grpc
 
 import (
 	"context"
 	"strings"
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
+	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -38,8 +39,8 @@ func UnaryServerInterceptor(tracer observabilitycontract.Tracer, serviceName str
 		// 创建 Span
 		spanName := info.FullMethod
 		ctx, span := tracer.StartSpan(ctx, spanName,
-			WithSpanKind(observabilitycontract.SpanKindServer),
-			WithAttributes(map[string]any{
+			tracingmw.WithSpanKind(observabilitycontract.SpanKindServer),
+			tracingmw.WithAttributes(map[string]any{
 				"rpc.system":   "grpc",
 				"rpc.method":   info.FullMethod,
 				"rpc.service":  extractServiceName(info.FullMethod),
@@ -82,8 +83,8 @@ func UnaryClientInterceptor(tracer observabilitycontract.Tracer, serviceName str
 		// 创建 Span
 		spanName := method
 		ctx, span := tracer.StartSpan(ctx, spanName,
-			WithSpanKind(observabilitycontract.SpanKindClient),
-			WithAttributes(map[string]any{
+			tracingmw.WithSpanKind(observabilitycontract.SpanKindClient),
+			tracingmw.WithAttributes(map[string]any{
 				"rpc.system":   "grpc",
 				"rpc.method":   method,
 				"rpc.service":  extractServiceName(method),

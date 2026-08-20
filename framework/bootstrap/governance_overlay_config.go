@@ -20,9 +20,9 @@ type governanceOverlayConfig struct {
 	governanceProviders map[string]string
 }
 
-// overlayGovernanceConfig 在基础配置之上叠加代码级治理覆盖（关闭项、开启项、provider 覆盖项）。
+// OverlayGovernanceConfig 在基础配置之上叠加代码级治理覆盖（关闭项、开启项、provider 覆盖项）。
 // 将代码驱动和配置驱动的治理覆盖统一到同一个生效视图上。
-func overlayGovernanceConfig(base datacontract.Config, disabled []string, enabled []string, providers map[string]string) datacontract.Config {
+func OverlayGovernanceConfig(base datacontract.Config, disabled []string, enabled []string, providers map[string]string) datacontract.Config {
 	if len(disabled) == 0 && len(enabled) == 0 && len(providers) == 0 {
 		return base
 	}
@@ -32,6 +32,10 @@ func overlayGovernanceConfig(base datacontract.Config, disabled []string, enable
 		governanceEnable:    append([]string(nil), enabled...),
 		governanceProviders: cloneGovernanceProviderMap(providers),
 	}
+}
+
+func overlayGovernanceConfig(base datacontract.Config, disabled []string, enabled []string, providers map[string]string) datacontract.Config {
+	return OverlayGovernanceConfig(base, disabled, enabled, providers)
 }
 
 func (c *governanceOverlayConfig) Env() string {

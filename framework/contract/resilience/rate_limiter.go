@@ -16,6 +16,7 @@ type RateLimiter interface {
 	Reserve(ctx context.Context, resource string) Reservation
 	Wait(ctx context.Context, resource string) error
 	WaitTimeout(ctx context.Context, resource string, timeout time.Duration) error
+	UpdateConfig(cfg RateLimiterConfig)
 }
 
 type Reservation interface {

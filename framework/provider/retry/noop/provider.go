@@ -100,3 +100,6 @@ func (r *noopRetry) DoWithResult(ctx context.Context, fn func() (any, error)) (a
 func (r *noopRetry) IsRetryable(err error) bool {
 	return false
 }
+
+// UpdateConfig 动态更新重试配置（noop 实现无需存储）。
+func (r *noopRetry) UpdateConfig(cfg resiliencecontract.RetryConfig) {}

@@ -170,7 +170,10 @@ func initSentinel(cfg *resiliencecontract.CircuitBreakerConfig) error {
 	if err := sentinelInitDefault(); err != nil {
 		return err
 	}
+	return applySentinelRules(cfg)
+}
 
+func applySentinelRules(cfg *resiliencecontract.CircuitBreakerConfig) error {
 	isolationRules := make([]*isolation.Rule, 0, len(cfg.ResourceConfigs))
 	breakerRules := make([]*sentinelcb.Rule, 0, len(cfg.ResourceConfigs))
 	for resource, ruleCfg := range cfg.ResourceConfigs {
@@ -352,6 +355,14 @@ func (cb *SentinelCircuitBreaker) markHalfOpenIfRecovered(resource string) {
 
 func (cb *SentinelCircuitBreaker) Underlying() any {
 	return sentinel.GlobalSlotChain()
+}
+
+// UpdateConfig 动态更新 Sentinel 熔断器配置与规则。
+func (cb *SentinelCircuitBreaker) UpdateConfig(cfg resiliencecontract.CircuitBreakerConfig) {
+	cb.cfg = &cfg
+	if cfg.Enabled {
+		_ = applySentinelRules(&cfg)
+	}
 }
 
 // Close releases resources held by the circuit breaker.

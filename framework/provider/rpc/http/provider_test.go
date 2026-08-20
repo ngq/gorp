@@ -36,6 +36,7 @@ func (cb *testCircuitBreaker) Do(ctx context.Context, resource string, fn func()
 func (cb *testCircuitBreaker) State(ctx context.Context, resource string) resiliencecontract.CircuitBreakerState {
 	return resiliencecontract.CircuitBreakerStateClosed
 }
+func (cb *testCircuitBreaker) UpdateConfig(cfg resiliencecontract.CircuitBreakerConfig) {}
 
 type captureRetry struct {
 	resource string
@@ -56,7 +57,11 @@ func (r *captureRetry) DoWithResult(ctx context.Context, fn func() (any, error))
 	return fn()
 }
 
-func (r *captureRetry) IsRetryable(err error) bool { return false }
+func (r *captureRetry) IsRetryable(err error) bool {
+	return true
+}
+
+func (r *captureRetry) UpdateConfig(cfg resiliencecontract.RetryConfig) {}
 
 type tokenIssuer struct{ token string }
 

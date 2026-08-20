@@ -20,7 +20,6 @@ import (
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
-	"google.golang.org/grpc/metadata"
 )
 
 // Chain composes outbound RPC middleware in declaration order.
@@ -169,28 +168,26 @@ func TracingMiddleware(tracer observabilitycontract.Tracer, serviceName string) 
 }
 
 // MetadataMiddleware propagates metadata from context to the outgoing RPC call.
-// Uses the MetadataPropagator to inject context metadata into the gRPC outgoing context.
+// Uses the MetadataPropagator to inject context metadata into client context.
 //
 // MetadataMiddleware 将 metadata 从 context 传播到出站 RPC 调用。
-// 使用 MetadataPropagator 将 context metadata 注入到 gRPC outgoing context。
+// 使用 MetadataPropagator 将 context metadata 注入到客户端 context。
 func MetadataMiddleware(propagator transportcontract.MetadataPropagator) transportcontract.RPCClientMiddleware {
 	return func(next transportcontract.RPCInvoker) transportcontract.RPCInvoker {
 		if next == nil || propagator == nil {
 			return next
 		}
 		return func(ctx context.Context, service, method string, req, resp any) error {
-			// Copy 后再写入：FromOutgoingContext 返回的 md 与同一请求 ctx 上
-			// 并发发起的其他 RPC 共享，直接修改构成 data race 且注入的 kv
-			// 可能互相覆盖。
-			md, ok := metadata.FromOutgoingContext(ctx)
-			if !ok {
-				md = metadata.New(nil)
+			md, ok := transportcontract.FromClientContext(ctx)
+			if !ok || md == nil {
+				md = transportcontract.NewMetadata()
 			} else {
-				md = md.Copy()
+				md = md.Clone()
 			}
-			carrier := NewGRPCMetadataCarrier(md)
-			propagator.Inject(ctx, carrier)
-			ctx = metadata.NewOutgoingContext(ctx, md)
+			if carrier, ok := md.(transportcontract.MetadataCarrier); ok {
+				propagator.Inject(ctx, carrier)
+			}
+			ctx = transportcontract.NewClientContext(ctx, md)
 			return next(ctx, service, method, req, resp)
 		}
 	}
@@ -209,15 +206,7 @@ func ServiceAuthMiddleware(issuer securitycontract.ServiceTokenIssuer) transport
 		return func(ctx context.Context, service, method string, req, resp any) error {
 			token, err := issuer.GenerateToken(ctx, service)
 			if err == nil && token != "" {
-				// Copy 后再写入，原因见 MetadataMiddleware。
-				md, ok := metadata.FromOutgoingContext(ctx)
-				if !ok {
-					md = metadata.New(nil)
-				} else {
-					md = md.Copy()
-				}
-				md.Set("x-service-token", token)
-				ctx = metadata.NewOutgoingContext(ctx, md)
+				ctx = transportcontract.AppendToClientContext(ctx, "x-service-token", token)
 			}
 			return next(ctx, service, method, req, resp)
 		}
@@ -236,15 +225,7 @@ func TraceIDMiddleware() transportcontract.RPCClientMiddleware {
 		}
 		return func(ctx context.Context, service, method string, req, resp any) error {
 			if traceID, ok := supportcontract.FromTraceIDContext(ctx); ok && traceID != "" {
-				// Copy 后再写入，原因见 MetadataMiddleware。
-				md, ok := metadata.FromOutgoingContext(ctx)
-				if !ok {
-					md = metadata.New(nil)
-				} else {
-					md = md.Copy()
-				}
-				md.Set("x-trace-id", traceID)
-				ctx = metadata.NewOutgoingContext(ctx, md)
+				ctx = transportcontract.AppendToClientContext(ctx, "x-trace-id", traceID)
 			}
 			return next(ctx, service, method, req, resp)
 		}

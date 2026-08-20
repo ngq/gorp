@@ -22,6 +22,7 @@ const LoadShedderKey = "framework.load_shedder"
 type LoadShedder interface {
 	Allow(ctx context.Context, resource string) error
 	Done(ctx context.Context, resource string, err error)
+	UpdateConfig(cfg LoadSheddingConfig)
 }
 
 // LoadSheddingConfig describes runtime overload-protection settings.

@@ -1,11 +1,11 @@
-// Package bootstrap provides framework bootstrap and assembly helpers for gorp.
-// This file assembles and runs the gRPC service alongside the HTTP mainline.
+// Package grpc provides framework bootstrap and assembly helpers for gRPC services in gorp.
+// This file assembles and runs the gRPC service alongside or independent of the HTTP mainline.
 // Builds a reusable runtime carrying container, gRPC server, config, and logger.
 //
-// Bootstrap 包提供 gorp 框架的启动装配辅助能力。
-// 本文件装配并运行与 HTTP 主线并行的 gRPC 服务。
+// 本包提供 gorp 框架的 gRPC 服务启动装配辅助能力。
+// 本文件装配并运行与 HTTP 主线解耦的 gRPC 服务。
 // 构建复用型 runtime 对象，统一承载 container、gRPC server、config、logger 能力。
-package bootstrap
+package grpc
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ngq/gorp/framework"
+	"github.com/ngq/gorp/framework/bootstrap"
 	"github.com/ngq/gorp/framework/container"
 	datacontract "github.com/ngq/gorp/framework/contract/data"
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
@@ -25,6 +26,8 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	frameworklog "github.com/ngq/gorp/framework/log"
+	"github.com/ngq/gorp/framework/provider/host"
+	rpcgrpc "github.com/ngq/gorp/framework/provider/rpc/grpc"
 	"google.golang.org/grpc"
 )
 
@@ -105,7 +108,7 @@ type GRPCServiceRuntime struct {
 	// GovernanceSummary 是治理摘要信息。
 	//
 	// GovernanceSummary 是治理摘要信息。
-	GovernanceSummary GovernanceSummary
+	GovernanceSummary bootstrap.GovernanceSummary
 }
 
 // NewGRPCServiceRuntime builds the default gRPC runtime without starting the server.
@@ -132,7 +135,7 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (rt *GRP
 
 	// 注册治理模式选择出的微服务能力 provider
 	// Register microservice capability providers selected by governance mode
-	if err := registerSelectedMicroserviceProvidersWithOptionsFunc(c, opts.GovernanceMode, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders); err != nil {
+	if err := bootstrap.RegisterSelectedMicroserviceProvidersWithOptions(c, opts.GovernanceMode, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders); err != nil {
 		return nil, fmt.Errorf("register selected microservice providers: %w", err)
 	}
 
@@ -157,15 +160,15 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (rt *GRP
 
 	// 解析治理模式与摘要
 	// Resolve governance mode and summary
-	effectiveConfig := overlayGovernanceConfig(rt.Config, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders)
-	governanceMode := DetectGovernanceMode(effectiveConfig)
+	effectiveConfig := bootstrap.OverlayGovernanceConfig(rt.Config, opts.GovernanceDisable, opts.GovernanceEnable, opts.GovernanceProviders)
+	governanceMode := bootstrap.DetectGovernanceMode(effectiveConfig)
 	if opts.GovernanceMode != "" {
-		governanceMode = NormalizeGovernanceMode(resiliencecontract.GovernanceMode(opts.GovernanceMode))
+		governanceMode = bootstrap.NormalizeGovernanceMode(resiliencecontract.GovernanceMode(opts.GovernanceMode))
 	}
-	governanceSummary := BuildGovernanceSummaryWithModeOverride(effectiveConfig, governanceMode, opts.GovernanceMode)
+	governanceSummary := bootstrap.BuildGovernanceSummaryWithModeOverride(effectiveConfig, governanceMode, opts.GovernanceMode)
 	rt.GovernanceMode = governanceMode
 	rt.GovernanceSummary = governanceSummary
-	rt.Logger.Info(FormatGovernanceSummary(governanceSummary))
+	rt.Logger.Info(bootstrap.FormatGovernanceSummary(governanceSummary))
 
 	return rt, nil
 }
@@ -175,9 +178,10 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (rt *GRP
 // buildGRPCProviders 组装 gRPC 服务主线使用的 provider 列表。
 func buildGRPCProviders(opts GRPCServiceOptions) []runtimecontract.ServiceProvider {
 	providers := make([]runtimecontract.ServiceProvider, 0)
-	providers = append(providers, FoundationProviders()...)
-	providers = append(providers, ORMRuntimeProviders()...)
-	providers = append(providers, DefaultCapabilityProviders()...)
+	providers = append(providers, bootstrap.FoundationProviders()...)
+	providers = append(providers, bootstrap.ORMRuntimeProviders()...)
+	providers = append(providers, bootstrap.DefaultCapabilityProviders()...)
+	providers = append(providers, rpcgrpc.NewProvider())
 	providers = append(providers, opts.ExtraProviders...)
 	return providers
 }
@@ -192,9 +196,9 @@ func BootGRPCService(serviceName string, opts GRPCServiceOptions, setup func(*GR
 	if err != nil {
 		return fmt.Errorf("initialize grpc runtime: %w", err)
 	}
-	// setup 失败时同样销毁容器，避免已实例化的资源泄漏。
+	// 退出时（无论是正常停机还是中途报错）都销毁容器，回收全部 Closer 与资源。
 	defer func() {
-		if retErr != nil {
+		if rt != nil && rt.Container != nil {
 			rt.Container.Destroy()
 		}
 	}()
@@ -235,10 +239,7 @@ func RunGRPC(c runtimecontract.Container, logger observabilitycontract.Logger) e
 	if err == nil {
 		// 通过 host 管理生命周期
 		// Manage lifecycle through host
-		grpcHostable, err := newGRPCHostableFromRPCServer(rpcServer)
-		if err != nil {
-			return fmt.Errorf("create grpc hostable: %w", err)
-		}
+		grpcHostable := host.NewRPCServerHostable("grpc", rpcServer)
 		if err := hostSvc.RegisterService("grpc", grpcHostable); err != nil {
 			return fmt.Errorf("register grpc service to host: %w", err)
 		}
@@ -306,56 +307,6 @@ func runGRPCDirectly(rpcServer transportcontract.RPCServer, logger observability
 
 	logger.Info("grpc server stopped gracefully")
 	return nil
-}
-
-// newGRPCHostableFromRPCServer creates a Hostable adapter from an RPCServer.
-// This bridges the RPCServer contract with the Host's Hostable interface.
-//
-// newGRPCHostableFromRPCServer 从 RPCServer 创建 Hostable 适配器。
-// 将 RPCServer 契约桥接到 Host 的 Hostable 接口。
-func newGRPCHostableFromRPCServer(rpcServer transportcontract.RPCServer) (runtimecontract.Hostable, error) {
-	// 如果 RPCServer 实现了 GRPCServerRegistrar 接口，可以直接获取底层 grpc.Server
-	// If RPCServer also implements GRPCServerRegistrar, we can get the underlying grpc.Server
-	type grpcServerRegistrar interface {
-		Server() *grpc.Server
-		GRPCServer() *grpc.Server
-	}
-
-	registrar, ok := rpcServer.(grpcServerRegistrar)
-	if !ok {
-		return nil, errors.New("rpc server does not expose gRPC server instance")
-	}
-
-	// 启动 gRPC 服务获取监听地址，然后通过 host 管理
-	// Start the gRPC server to get listener, then manage through host
-	grpcServer := registrar.GRPCServer()
-	return &rpcServerHostable{
-		name:   "grpc",
-		server: rpcServer,
-		grpc:   grpcServer,
-	}, nil
-}
-
-// rpcServerHostable adapts transportcontract.RPCServer to runtimecontract.Hostable.
-//
-// rpcServerHostable 将 transportcontract.RPCServer 适配为 runtimecontract.Hostable。
-type rpcServerHostable struct {
-	name   string
-	server transportcontract.RPCServer
-	grpc   *grpc.Server
-}
-
-// Name 返回服务名称。
-func (h *rpcServerHostable) Name() string { return h.name }
-
-// Start 启动 gRPC 服务器。
-func (h *rpcServerHostable) Start(ctx context.Context) error {
-	return h.server.Start(ctx)
-}
-
-// Stop 优雅停止 gRPC 服务器。
-func (h *rpcServerHostable) Stop(ctx context.Context) error {
-	return h.server.Stop(ctx)
 }
 
 // StartGRPCServer starts the gRPC server from the container when the container

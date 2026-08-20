@@ -1,19 +1,18 @@
-// Package middleware provides gRPC metadata propagation middleware.
+// Package grpc provides gRPC metadata propagation middleware.
 // Implements MetadataCarrier interface for gRPC metadata.
 // Supports unary and stream interceptors for both client and server.
 //
 // 中间件包提供 gRPC 元数据传播中间件。
 // 为 gRPC metadata 实现 MetadataCarrier 接口。
 // 支持客户端和服务端的一元和流拦截器。
-package middleware
+package grpc
 
 import (
 	"context"
 
+	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-
-	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
 
 // GRPCCarrier wraps gRPC metadata.MD to implement MetadataCarrier interface.

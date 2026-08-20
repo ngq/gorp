@@ -4,8 +4,8 @@ import (
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 	providergrpc "github.com/ngq/gorp/framework/provider/grpc"
-	metadatamw "github.com/ngq/gorp/framework/provider/metadata/middleware"
-	tracingmw "github.com/ngq/gorp/framework/provider/tracing/middleware"
+	metadatamwgrpc "github.com/ngq/gorp/framework/provider/metadata/middleware/grpc"
+	tracingmwgrpc "github.com/ngq/gorp/framework/provider/tracing/middleware/grpc"
 	"google.golang.org/grpc"
 )
 
@@ -25,10 +25,10 @@ func DefaultUnaryServerInterceptors(opts DefaultServerPresetOptions) []grpc.Unar
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 3)
 	interceptors = append(interceptors, providergrpc.UnaryServerInterceptor())
 	if opts.Tracer != nil {
-		interceptors = append(interceptors, tracingmw.UnaryServerInterceptor(opts.Tracer, opts.ServiceName))
+		interceptors = append(interceptors, tracingmwgrpc.UnaryServerInterceptor(opts.Tracer, opts.ServiceName))
 	}
 	if opts.MetadataPropagator != nil {
-		interceptors = append(interceptors, metadatamw.UnaryServerInterceptor(opts.MetadataPropagator))
+		interceptors = append(interceptors, metadatamwgrpc.UnaryServerInterceptor(opts.MetadataPropagator))
 	}
 	return ChainUnary(interceptors...)
 }
@@ -40,7 +40,7 @@ func DefaultStreamServerInterceptors(opts DefaultServerPresetOptions) []grpc.Str
 	interceptors := make([]grpc.StreamServerInterceptor, 0, 2)
 	interceptors = append(interceptors, providergrpc.StreamServerInterceptor())
 	if opts.MetadataPropagator != nil {
-		interceptors = append(interceptors, metadatamw.StreamServerInterceptor(opts.MetadataPropagator))
+		interceptors = append(interceptors, metadatamwgrpc.StreamServerInterceptor(opts.MetadataPropagator))
 	}
 	return ChainStream(interceptors...)
 }

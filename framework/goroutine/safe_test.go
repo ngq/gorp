@@ -52,3 +52,26 @@ func TestSafeGoAndWait_RecoversPanic(t *testing.T) {
 	)
 	require.Error(t, err)
 }
+
+func TestSafeGoDetached_RetainsValuesWhileSurvivingParentCancel(t *testing.T) {
+	type keyType struct{}
+	parentCtx, cancel := context.WithCancel(context.WithValue(context.Background(), keyType{}, "trace-123"))
+
+	c := container.New()
+	done := make(chan struct{})
+
+	var capturedVal any
+	var capturedErr error
+
+	SafeGoDetached(parentCtx, c, func(ctx context.Context) {
+		defer close(done)
+		// Cancel parent
+		cancel()
+		capturedVal = ctx.Value(keyType{})
+		capturedErr = ctx.Err()
+	})
+
+	<-done
+	require.Equal(t, "trace-123", capturedVal)
+	require.NoError(t, capturedErr) // should be nil because it's detached from parent cancellation
+}
