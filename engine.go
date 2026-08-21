@@ -149,37 +149,6 @@ func (e *Engine) Feature() featurecontract.FeatureManager {
 	return featureprovider.NewService()
 }
 
-// Swagger mounts an interactive Swagger UI endpoint at the specified path prefix (e.g. "/swagger").
-func (e *Engine) Swagger(pathPrefix string, specPath ...string) {
-	if e.ginEngine == nil {
-		return
-	}
-	targetSpec := "docs/openapi.json"
-	if len(specPath) > 0 && specPath[0] != "" {
-		targetSpec = specPath[0]
-	}
-	handler := httpx.GinSwaggerHandler(targetSpec)
-	prefix := strings.TrimSuffix(pathPrefix, "/")
-	e.ginEngine.GET(prefix, handler)
-	e.ginEngine.GET(prefix+"/*any", handler)
-}
-
-// EnableDebugDashboard mounts the /debug/gorp Web Console Dashboard and API endpoints.
-func (e *Engine) EnableDebugDashboard(pathPrefix ...string) {
-	if e.ginEngine == nil {
-		return
-	}
-	prefix := "/debug/gorp"
-	if len(pathPrefix) > 0 && pathPrefix[0] != "" {
-		prefix = pathPrefix[0]
-	}
-	var containerRef runtimecontract.Container
-	if e.runtime != nil {
-		containerRef = e.runtime.Container
-	}
-	httpx.MountDebugDashboard(e.ginEngine, containerRef, prefix)
-}
-
 // OpenAPI returns the auto-exported OpenAPI 3.0 document JSON string.
 func (e *Engine) OpenAPI(title, version string) string {
 	return httpx.ExportOpenAPI3JSON(e.ginEngine, title, version)
@@ -339,14 +308,25 @@ func (e *Engine) EnableDebugDashboard(opts ...httpx.AdminDashboardOption) {
 	}
 }
 
-// Swagger mounts the embedded Swagger UI and OpenAPI 3 exporter onto the Gin engine.
-func (e *Engine) Swagger(pathPrefix ...string) {
-	if e.ginEngine != nil {
-		prefix := "/swagger"
-		if len(pathPrefix) > 0 && pathPrefix[0] != "" {
-			prefix = pathPrefix[0]
-		}
-		e.ginEngine.GET(prefix+"/*any", httpx.GinSwaggerHandler(prefix))
+// Swagger mounts an interactive Swagger UI endpoint onto the Gin engine.
+// Optional arguments:
+//   - pathPrefix: HTTP route prefix (default: "/swagger")
+//   - specPath: Local OpenAPI/Swagger JSON file path (default: "docs/openapi.json")
+func (e *Engine) Swagger(args ...string) {
+	if e.ginEngine == nil {
+		return
 	}
+	prefix := "/swagger"
+	targetSpec := "docs/openapi.json"
+	if len(args) > 0 && args[0] != "" {
+		prefix = args[0]
+	}
+	if len(args) > 1 && args[1] != "" {
+		targetSpec = args[1]
+	}
+	handler := httpx.GinSwaggerHandler(targetSpec)
+	trimmedPrefix := strings.TrimSuffix(prefix, "/")
+	e.ginEngine.GET(trimmedPrefix, handler)
+	e.ginEngine.GET(trimmedPrefix+"/*any", handler)
 }
 

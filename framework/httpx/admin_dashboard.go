@@ -234,12 +234,14 @@ func DashboardHTML(prefix string) string {
 type AdminDashboardOptions struct {
 	AdminToken        string // If specified, requests must provide Authorization: Bearer <token> or ?token=<token>
 	AllowInProduction bool   // If false, /debug/gorp returns 403 Forbidden in release/production mode (default: false)
+	PathPrefix        string // Mount path prefix (default: "/debug/gorp")
 }
 
 // DefaultAdminDashboardOptions returns default production-safe options.
 func DefaultAdminDashboardOptions() AdminDashboardOptions {
 	return AdminDashboardOptions{
 		AllowInProduction: false,
+		PathPrefix:        "/debug/gorp",
 	}
 }
 
@@ -257,6 +259,13 @@ func WithAdminToken(token string) AdminDashboardOption {
 func WithAllowInProduction(allow bool) AdminDashboardOption {
 	return func(o *AdminDashboardOptions) {
 		o.AllowInProduction = allow
+	}
+}
+
+// WithPathPrefix sets a custom mount path prefix for the debug dashboard (default: "/debug/gorp").
+func WithPathPrefix(prefix string) AdminDashboardOption {
+	return func(o *AdminDashboardOptions) {
+		o.PathPrefix = prefix
 	}
 }
 
@@ -283,6 +292,12 @@ func RegisterAdminDashboard(engine *gin.Engine, container runtimecontract.Contai
 	for _, o := range opts {
 		o(&cfg)
 	}
+	if pathPrefix == "" || pathPrefix == "/debug/gorp" {
+		if cfg.PathPrefix != "" {
+			pathPrefix = cfg.PathPrefix
+		}
+	}
+	pathPrefix = strings.TrimSuffix(pathPrefix, "/")
 
 	group := engine.Group(pathPrefix)
 	group.Use(func(c *gin.Context) {
