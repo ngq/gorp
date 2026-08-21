@@ -151,9 +151,12 @@ func (l *tokenBucketRateLimiter) UpdateConfig(cfg resiliencecontract.RateLimiter
 	l.limiter.SetLimit(rate.Limit(defaultQPS))
 	l.limiter.SetBurst(defaultBurst)
 
-	// 更新所有已实例化的资源限流器
+	// 刷新所有已实例化的资源限流器
 	l.limiters.Range(func(key, value any) bool {
-		resource := key.(string)
+		resource, ok := key.(string)
+		if !ok {
+			return true
+		}
 
 		qps := defaultQPS
 		burst := defaultBurst

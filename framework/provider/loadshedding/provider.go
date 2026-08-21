@@ -23,6 +23,7 @@ import (
 	"context"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
@@ -152,14 +153,21 @@ func (s *semaphoreLoadShedder) UpdateConfig(cfg resiliencecontract.LoadSheddingC
 	s.defaultMaxCon = defaultMaxCon
 	s.config = cfg
 
-	// 动态更新已有资源对应的信号量条目
+	// 动态就地更新已有资源对应的信号量条目最大并发（保留在途并发计数）
 	s.semaphores.Range(func(key, value any) bool {
-		resource := key.(string)
+		resource, ok := key.(string)
+		if !ok {
+			return true
+		}
+		entry, ok := value.(*semaphoreEntry)
+		if !ok || entry == nil {
+			return true
+		}
 		maxCon := defaultMaxCon
 		if policy, ok := cfg.ResourcePolicies[resource]; ok && policy.MaxConcurrency > 0 {
 			maxCon = policy.MaxConcurrency
 		}
-		s.semaphores.Store(resource, newSemaphoreEntry(maxCon))
+		entry.maxCon.Store(int64(maxCon))
 		return true
 	})
 }
@@ -186,36 +194,43 @@ func (s *semaphoreLoadShedder) getOrCreateEntry(resource string) *semaphoreEntry
 
 // --- 信号量条目 ---
 
-// semaphoreEntry 封装一个加权信号量和对应的最大并发数。
+// semaphoreEntry 封装基于无锁 CAS 的高并发信号量与动态容量。
 type semaphoreEntry struct {
-	sem    chan struct{} // 用 buffered channel 模拟信号量，比 semaphore.Weighted 更轻量
-	maxCon int
+	current atomic.Int64
+	maxCon  atomic.Int64
 }
 
 // newSemaphoreEntry 创建指定容量的信号量条目。
 func newSemaphoreEntry(maxCon int) *semaphoreEntry {
-	return &semaphoreEntry{
-		sem:    make(chan struct{}, maxCon),
-		maxCon: maxCon,
-	}
+	e := &semaphoreEntry{}
+	e.maxCon.Store(int64(maxCon))
+	return e
 }
 
 // tryAcquire 非阻塞地尝试获取一个并发槽位。
 func (e *semaphoreEntry) tryAcquire() bool {
-	select {
-	case e.sem <- struct{}{}:
-		return true
-	default:
-		return false
+	for {
+		curr := e.current.Load()
+		max := e.maxCon.Load()
+		if max > 0 && curr >= max {
+			return false
+		}
+		if e.current.CompareAndSwap(curr, curr+1) {
+			return true
+		}
 	}
 }
 
 // release 释放一个并发槽位。
 func (e *semaphoreEntry) release() {
-	select {
-	case <-e.sem:
-	default:
-		// 防御性编程：避免在无人持有时 panic
+	for {
+		curr := e.current.Load()
+		if curr <= 0 {
+			return
+		}
+		if e.current.CompareAndSwap(curr, curr-1) {
+			return
+		}
 	}
 }
 

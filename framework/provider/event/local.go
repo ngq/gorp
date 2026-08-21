@@ -212,8 +212,14 @@ func (b *LocalEventBus) PublishAsync(ctx context.Context, event integrationcontr
 	handlersCopy := make([]integrationcontract.EventHandler, len(handlers))
 	copy(handlersCopy, handlers)
 
+	// 异步事件处理保留父 context 的 Trace ID 与 values，但解耦取消信号（避免 HTTP 请求结束提前 canceled 异步消费）
+	asyncCtx := context.Background()
+	if ctx != nil {
+		asyncCtx = context.WithoutCancel(ctx)
+	}
+
 	job := asyncJob{
-		ctx:      ctx,
+		ctx:      asyncCtx,
 		event:    event,
 		handlers: handlersCopy,
 	}
@@ -223,9 +229,9 @@ func (b *LocalEventBus) PublishAsync(ctx context.Context, event integrationcontr
 		return nil
 	default:
 		// 当队列满时，降级使用受限的 SafeGo 协程处理，防止主流程死锁
-		goroutine.SafeGo(ctx, nil, func(ctx context.Context) {
+		goroutine.SafeGo(asyncCtx, nil, func(c context.Context) {
 			for _, handler := range handlersCopy {
-				_ = b.invokeWithRetry(ctx, event.Name(), handler, event)
+				_ = b.invokeWithRetry(c, event.Name(), handler, event)
 			}
 		})
 		return nil

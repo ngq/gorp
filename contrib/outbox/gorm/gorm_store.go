@@ -106,6 +106,9 @@ func (s *GormOutboxStore) GetPending(ctx context.Context, limit int) ([]*integra
 
 // MarkSent marks a message status as sent.
 func (s *GormOutboxStore) MarkSent(ctx context.Context, id string) error {
+	if s.db == nil {
+		return fmt.Errorf("outbox gorm db is nil")
+	}
 	now := time.Now()
 	return s.db.WithContext(ctx).Model(&GormOutboxModel{}).Where("id = ?", id).Updates(map[string]any{
 		"status":  string(integrationcontract.OutboxStatusSent),
@@ -115,6 +118,9 @@ func (s *GormOutboxStore) MarkSent(ctx context.Context, id string) error {
 
 // MarkFailed marks a message status as failed or increments retry count.
 func (s *GormOutboxStore) MarkFailed(ctx context.Context, id string, err error) error {
+	if s.db == nil {
+		return fmt.Errorf("outbox gorm db is nil")
+	}
 	errMsg := ""
 	if err != nil {
 		errMsg = err.Error()
