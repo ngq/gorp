@@ -210,6 +210,9 @@ func ValidateCriticalConfig(cfg datacontract.Config) error {
 			if fieldErrs := configValidator.Struct(dbCfg); fieldErrs != nil {
 				errs = append(errs, formatSectionErrors("database", fieldErrs)...)
 			}
+			if strings.Contains(dbCfg.DSN, "${") || strings.Contains(dbCfg.DSN, "env(") || strings.Contains(dbCfg.DSN, "__MISSING_ENV__") {
+				errs = append(errs, fmt.Sprintf("config: database.dsn contains unresolved environment placeholder: %q", dbCfg.DSN))
+			}
 		}
 	}
 
@@ -233,6 +236,9 @@ func ValidateCriticalConfig(cfg datacontract.Config) error {
 		} else if redisCfg.Addr != "" {
 			if fieldErrs := configValidator.Struct(redisCfg); fieldErrs != nil {
 				errs = append(errs, formatSectionErrors("redis", fieldErrs)...)
+			}
+			if strings.Contains(redisCfg.Addr, "${") || strings.Contains(redisCfg.Addr, "env(") || strings.Contains(redisCfg.Addr, "__MISSING_ENV__") {
+				errs = append(errs, fmt.Sprintf("config: redis.addr contains unresolved environment placeholder: %q", redisCfg.Addr))
 			}
 		}
 	}

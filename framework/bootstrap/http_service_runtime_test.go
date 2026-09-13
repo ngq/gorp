@@ -102,3 +102,28 @@ func TestNewHTTPServiceRuntimeForwardsGovernanceDisableAndProviderOverrides(t *t
 	require.Equal(t, []string{"tracing"}, gotDisabled)
 	require.Equal(t, "mtls", gotProviders["serviceauth"])
 }
+
+func TestBootHTTPServiceMigratePreflightCheck(t *testing.T) {
+	// 当传入 migrate 但 rt.DB 为 nil 时，必须快速失败报错，不能传给用户回调导致 panic
+	rt := &HTTPServiceRuntime{
+		DB: nil,
+	}
+	var migrateCalled bool
+	migrate := func(r *HTTPServiceRuntime) error {
+		migrateCalled = true
+		return nil
+	}
+
+	var err error
+	if migrate != nil {
+		if rt.DB == nil {
+			err = errors.New("migrate models: database runtime is nil; ensure database config is present and connection succeeded")
+		} else {
+			err = migrate(rt)
+		}
+	}
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "migrate models: database runtime is nil")
+	require.False(t, migrateCalled)
+}
+

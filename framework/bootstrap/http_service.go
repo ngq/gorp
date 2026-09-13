@@ -249,16 +249,25 @@ func NewHTTPServiceRuntime(opts HTTPServiceOptions) (rt *HTTPServiceRuntime, ret
 	rt.Logger.Info(FormatGovernanceSummary(governanceSummary))
 
 	if !opts.DisableGorm {
-		// 数据库采用配置驱动按需装配：如果配置中未声明 database 或连接失败，保持 rt.DB = nil，避免阻断轻量服务启动
+		// 数据库装配严格区分“未配置”与“配置但初始化失败”：
+		// 1. 若配置中显式声明了 database（driver 或 dsn 非空），连接失败时立即抛出错误（Fail-Fast），绝不静默吞噬。
+		// 2. 若配置未声明 database 且解析报错（如缺少 driver），则容忍缺失保持 rt.DB = nil，避免阻断无数据库服务。
+		isDBConfigured := (cfg != nil && (cfg.GetString("database.driver") != "" || cfg.GetString("database.dsn") != ""))
 		if dbSvc, err := container.MakeGormDB(c); err == nil {
 			rt.DB = dbSvc
+		} else if isDBConfigured {
+			return nil, fmt.Errorf("bootstrap: database is configured but failed to initialize: %w", err)
 		}
 	}
 	if !opts.DisableRedis {
-		// Redis is optional in this mainline, so keep startup tolerant when the capability is absent.
-		// Redis 在这条主线里是可选能力，因此这里保持"缺失不阻断启动"的语义。
+		// Redis 同样遵循 Fail-Fast 原则：
+		// 1. 若配置显式声明了 redis.addr，连接失败时必须抛出错误。
+		// 2. 若未配置 redis 则容忍缺失保持 rt.Redis = nil。
+		isRedisConfigured := (cfg != nil && cfg.GetString("redis.addr") != "")
 		if redisSvc, err := container.MakeRedis(c); err == nil {
 			rt.Redis = redisSvc
+		} else if isRedisConfigured {
+			return nil, fmt.Errorf("bootstrap: redis is configured but failed to initialize: %w", err)
 		}
 	}
 
@@ -366,6 +375,9 @@ func BootHTTPServiceContext(ctx context.Context, opts HTTPServiceOptions, migrat
 	rt.Logger.Info(fmt.Sprintf("%s starting", serviceName))
 
 	if migrate != nil {
+		if rt.DB == nil {
+			return errors.New("migrate models: database runtime is nil; ensure database config is present and connection succeeded")
+		}
 		if err := migrate(rt); err != nil {
 			return fmt.Errorf("migrate models: %w", err)
 		}

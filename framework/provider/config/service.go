@@ -252,24 +252,44 @@ func indexOf(ss []string, v string) int {
 	return -1
 }
 
-var reEnvPlaceholder = regexp.MustCompile(`env\(([^)]+)\)`) // env(KEY)
+var reEnvSubst = regexp.MustCompile(`\$\{([a-zA-Z0-9_.-]+)(?::-?([^}]*))?\}|env\(([^)]+)\)`)
 
 func readFileWithEnvSubst(path string) ([]byte, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	out := reEnvPlaceholder.ReplaceAllFunc(b, func(m []byte) []byte {
-		key := strings.TrimSpace(string(m[4 : len(m)-1]))
-		val, ok := os.LookupEnv(key)
-		if !ok {
-			// keep a stable, explicit marker so caller gets a meaningful error
-			return []byte("__MISSING_ENV__(" + key + ")")
+	var missingVars []string
+	out := reEnvSubst.ReplaceAllFunc(b, func(m []byte) []byte {
+		sm := reEnvSubst.FindSubmatch(m)
+		var key, defaultVal string
+		var hasDefault bool
+
+		if len(sm) > 1 && sm[1] != nil { // ${VAR...}
+			key = strings.TrimSpace(string(sm[1]))
+			if len(sm) > 2 && sm[2] != nil {
+				defaultVal = string(sm[2])
+				hasDefault = true
+			}
+		} else if len(sm) > 3 && sm[3] != nil { // env(...)
+			key = strings.TrimSpace(string(sm[3]))
 		}
-		return []byte(val)
+
+		val, ok := os.LookupEnv(key)
+		if ok && val != "" {
+			return []byte(val)
+		}
+		if hasDefault {
+			return []byte(defaultVal)
+		}
+		if ok {
+			return []byte("")
+		}
+		missingVars = append(missingVars, key)
+		return m
 	})
-	if bytes.Contains(out, []byte("__MISSING_ENV__(")) {
-		return nil, fmt.Errorf("config env() placeholder has no env var set (file=%s)", path)
+	if len(missingVars) > 0 {
+		return nil, fmt.Errorf("config env() placeholder has no env var set (file=%s, missing=%v)", path, missingVars)
 	}
 	return out, nil
 }

@@ -94,3 +94,23 @@ func TestValidateCriticalConfigFailsWithEmptyConfig(t *testing.T) {
 	require.Contains(t, err.Error(), "config: log.level is required")
 	require.Contains(t, err.Error(), "config: log.format is required")
 }
+
+// TestValidateCriticalConfigFailsWithUnresolvedPlaceholders 验证关键字段包含未解析占位符时报错。
+func TestValidateCriticalConfigFailsWithUnresolvedPlaceholders(t *testing.T) {
+	cfg := newMapConfigStub()
+	cfg.setSection("app", map[string]any{"address": ":8080"})
+	cfg.setSection("log", map[string]any{"level": "info", "format": "console"})
+	cfg.setSection("database", map[string]any{
+		"driver": "mysql",
+		"dsn":    "${MYSQL_DSN:root@tcp(localhost:3306)/test}",
+	})
+	cfg.setSection("redis", map[string]any{
+		"addr": "env(REDIS_ADDR)",
+	})
+
+	err := ValidateCriticalConfig(cfg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "config: database.dsn contains unresolved environment placeholder")
+	require.Contains(t, err.Error(), "config: redis.addr contains unresolved environment placeholder")
+}
+
