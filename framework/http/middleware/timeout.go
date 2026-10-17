@@ -54,18 +54,30 @@ func Timeout(timeout time.Duration) transportcontract.Middleware {
 			}
 			base := gc.Writer
 			buffered := newTimeoutResponseWriter(base)
-			gc.Writer = buffered
+			worker := cloneGinContextForContinuation(gc)
+			worker.Writer = buffered
+			workerCtx := newContext(worker)
 
+			var panicVal any
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
+				defer func() {
+					if r := recover(); r != nil {
+						panicVal = r
+					}
+				}()
 				if next != nil {
-					next(c)
+					next(workerCtx)
 				}
 			}()
 
 			select {
 			case <-done:
+				if panicVal != nil {
+					buffered.timeout()
+					panic(panicVal)
+				}
 				buffered.commit(base)
 			case <-ctx.Done():
 				buffered.timeout()
@@ -93,14 +105,25 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		worker := cloneGinContextForContinuation(c)
 		worker.Writer = buffered
 		c.Abort()
+
+		var panicVal any
 		done := make(chan struct{})
 		go func() {
+			defer close(done)
+			defer func() {
+				if r := recover(); r != nil {
+					panicVal = r
+				}
+			}()
 			worker.Next()
-			close(done)
 		}()
 
 		select {
 		case <-done:
+			if panicVal != nil {
+				buffered.timeout()
+				panic(panicVal)
+			}
 			buffered.commit(base)
 		case <-ctx.Done():
 			buffered.timeout()
@@ -128,14 +151,25 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 		worker := cloneGinContextForContinuation(c)
 		worker.Writer = buffered
 		c.Abort()
+
+		var panicVal any
 		done := make(chan struct{})
 		go func() {
+			defer close(done)
+			defer func() {
+				if r := recover(); r != nil {
+					panicVal = r
+				}
+			}()
 			worker.Next()
-			close(done)
 		}()
 
 		select {
 		case <-done:
+			if panicVal != nil {
+				buffered.timeout()
+				panic(panicVal)
+			}
 			buffered.commit(base)
 		case <-ctx.Done():
 			buffered.timeout()
@@ -153,9 +187,20 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 
 // cloneGinContextForContinuation preserves Gin's private middleware cursor;
 // gin.Context.Copy cannot be used because it intentionally drops handlers.
+// Deep-copies Keys map and clones Request to prevent concurrent data races with sync.Pool reuse.
 func cloneGinContextForContinuation(ctx *gin.Context) *gin.Context {
 	worker := reflect.New(reflect.TypeOf(ctx).Elem()).Interface().(*gin.Context)
 	reflect.ValueOf(worker).Elem().Set(reflect.ValueOf(ctx).Elem())
+	if ctx.Keys != nil {
+		copiedKeys := make(map[any]any, len(ctx.Keys))
+		for k, v := range ctx.Keys {
+			copiedKeys[k] = v
+		}
+		worker.Keys = copiedKeys
+	}
+	if ctx.Request != nil {
+		worker.Request = ctx.Request.Clone(ctx.Request.Context())
+	}
 	return worker
 }
 

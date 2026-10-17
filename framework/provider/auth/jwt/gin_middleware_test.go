@@ -190,6 +190,19 @@ func TestAuthMiddlewareWritesRequestContext(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, int64(7), subjectID)
 
+		// Claims and IDs are also propagated into request context (for downstream Service/Repo)
+		reqClaims, ok := ClaimsFromRequestContext(c.Request.Context())
+		require.True(t, ok)
+		require.Equal(t, int64(7), reqClaims.SubjectID)
+
+		reqSubjectID, ok := SubjectIDFromRequestContext(c.Request.Context())
+		require.True(t, ok)
+		require.Equal(t, int64(7), reqSubjectID)
+
+		reqSubjectType, ok := SubjectTypeFromRequestContext(c.Request.Context())
+		require.True(t, ok)
+		require.Equal(t, "customer", reqSubjectType)
+
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 

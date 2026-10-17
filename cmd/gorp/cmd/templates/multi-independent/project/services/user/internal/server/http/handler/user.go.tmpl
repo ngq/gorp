@@ -129,7 +129,7 @@ func (h *UserHandler) List(c gorp.Context) {
 func (h *UserHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
@@ -145,7 +145,7 @@ func (h *UserHandler) GetByID(c gorp.Context) {
 func (h *UserHandler) Create(c gorp.Context) {
 	var req request.CreateUser
 	if err := c.BindJSON(&req); err != nil {
-		httpx.BadRequest(c, err.Error())
+		httpx.Error(c, httpx.InvalidArgument("", err.Error()))
 		return
 	}
 
@@ -164,7 +164,7 @@ func (h *UserHandler) Create(c gorp.Context) {
 func (h *UserHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 

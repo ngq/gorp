@@ -104,10 +104,12 @@ func (b *LocalEventBus) startWorkers() {
 }
 
 // Close stops the background async workers and releases resources.
-func (b *LocalEventBus) Close() {
+// Implements io.Closer for container lifecycle cleanup.
+func (b *LocalEventBus) Close() error {
 	b.stopOnce.Do(func() {
 		close(b.stopChan)
 	})
+	return nil
 }
 
 // Subscribe 订阅事件。

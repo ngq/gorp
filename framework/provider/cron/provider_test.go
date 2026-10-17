@@ -7,6 +7,7 @@ package cron
 import (
 	"testing"
 
+	"github.com/ngq/gorp/framework/container"
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	"github.com/stretchr/testify/require"
 )
@@ -19,4 +20,20 @@ func TestProviderContract(t *testing.T) {
 	require.Equal(t, "cron", p.Name())
 	require.False(t, p.IsDefer())
 	require.Equal(t, []string{runtimecontract.CronKey}, p.Provides())
+}
+
+// TestCronProvider_RegisterCloserAndDestroy verifies that cron closer is registered and stopped on container destroy.
+func TestCronProvider_RegisterCloserAndDestroy(t *testing.T) {
+	c := container.New()
+	p := NewProvider()
+	require.NoError(t, p.Register(c))
+
+	cronAny, err := c.Make(runtimecontract.CronKey)
+	require.NoError(t, err)
+	cronSvc, ok := cronAny.(runtimecontract.Cron)
+	require.True(t, ok)
+	cronSvc.Start()
+
+	// Destroying container should stop cron without errors
+	require.NoError(t, c.Destroy())
 }

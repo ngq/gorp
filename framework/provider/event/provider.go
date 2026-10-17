@@ -48,7 +48,9 @@ func (p *Provider) Provides() []string { return []string{integrationcontract.Eve
 // 核心逻辑：创建 LocalEventBus、绑定到容器。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(integrationcontract.EventKey, func(c runtimecontract.Container) (interface{}, error) {
-		return NewLocalEventBus(), nil
+		bus := NewLocalEventBus()
+		c.RegisterCloser(string(integrationcontract.EventKey), bus)
+		return bus, nil
 	}, true)
 	return nil
 }

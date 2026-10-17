@@ -215,7 +215,7 @@ func (h *OrderHandler) List(c gorp.Context) {
 func (h *OrderHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
@@ -241,7 +241,7 @@ func (h *OrderHandler) GetByID(c gorp.Context) {
 func (h *OrderHandler) Create(c gorp.Context) {
 	var req request.CreateOrder
 	if err := c.BindJSON(&req); err != nil {
-		httpx.BadRequest(c, err.Error())
+		httpx.Error(c, httpx.InvalidArgument("", err.Error()))
 		return
 	}
 
@@ -273,7 +273,7 @@ func (h *OrderHandler) Create(c gorp.Context) {
 func (h *OrderHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
@@ -288,7 +288,7 @@ func (h *OrderHandler) Delete(c gorp.Context) {
 func (h *OrderHandler) GetOrderUser(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
@@ -312,7 +312,7 @@ func (h *OrderHandler) GetOrderUser(c gorp.Context) {
 func (h *OrderHandler) LockOrderDemo(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 

@@ -38,3 +38,15 @@ func FromRequestIDContext(ctx context.Context) (string, bool) {
 func FromTraceIDContext(ctx context.Context) (string, bool) {
 	return support.FromTraceIDContext(ctx)
 }
+
+// ResolveResourcePath safely searches for a file path across standard runtime locations:
+// 1. Direct path (absolute or relative to current working directory)
+// 2. Relative to APP_BASE_PATH
+// 3. Extra search directories
+// 4. Running executable directory
+// 5. Parent directories of current working directory
+//
+// ResolveResourcePath 安全解析文件路径，跨执行目录、APP_BASE_PATH、候选目录及父级目录智能探测。
+func ResolveResourcePath(filePath string, extraSearchDirs ...string) string {
+	return support.ResolveResourcePath(filePath, extraSearchDirs...)
+}

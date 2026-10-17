@@ -203,6 +203,13 @@ func AuthMiddleware(jwtSvc securitycontract.JWTService, expectedSubjectType stri
 				c.JSON(http.StatusForbidden, map[string]any{"error": "insufficient role"})
 				return
 			}
+			if req := c.Request(); req != nil {
+				reqCtx := req.Context()
+				reqCtx = securitycontract.NewJWTClaimsContext(reqCtx, claims)
+				reqCtx = securitycontract.NewSubjectIDContext(reqCtx, claims.SubjectID)
+				reqCtx = securitycontract.NewSubjectTypeContext(reqCtx, claims.SubjectType)
+				*req = *req.WithContext(reqCtx)
+			}
 			c.Set(securitycontract.ContextJWTClaimsKey, claims)
 			c.Set(ContextSubjectIDKey, claims.SubjectID)
 			c.Set(ContextSubjectTypeKey, claims.SubjectType)

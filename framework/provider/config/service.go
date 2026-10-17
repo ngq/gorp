@@ -313,6 +313,20 @@ func projectRoot() string {
 		// 工作目录被删除或不可访问；回退到 "."。
 		return "."
 	}
+	// If current working directory does not contain config dir, search up to 3 parent directories.
+	if _, err := os.Stat(filepath.Join(wd, "config")); os.IsNotExist(err) {
+		curr := wd
+		for i := 0; i < 3; i++ {
+			parent := filepath.Dir(curr)
+			if parent == curr {
+				break
+			}
+			if _, err := os.Stat(filepath.Join(parent, "config")); err == nil {
+				return parent
+			}
+			curr = parent
+		}
+	}
 	return wd
 }
 

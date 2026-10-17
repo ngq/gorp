@@ -22,6 +22,7 @@ package cron
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -68,13 +69,19 @@ func (p *Provider) Provides() []string { return []string{runtimecontract.CronKey
 // Cron provider 无依赖。
 func (p *Provider) DependsOn() []string { return nil }
 
+// closerFunc 将 func() error 适配为 io.Closer 接口
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }
+
 // Register binds the cron service factory to the container.
-// Core logic: Create Service with second-level parser, bind factory.
+// Core logic: Create Service with second-level parser, bind factory and closer.
 //
 // Register 将 Cron 服务工厂绑定到容器。
-// 核心逻辑：创建支持秒级表达式的 Service、绑定工厂。
+// 核心逻辑：创建支持秒级表达式的 Service、绑定工厂并注册 Closer。
 func (p *Provider) Register(c runtimecontract.Container) error {
 	c.Bind(runtimecontract.CronKey, func(rc runtimecontract.Container) (any, error) {
+		var svc *Service
 		// cron.timezone: 容器镜像默认 UTC，不配置时区会让
 		// "0 0 3 * * *" 在 UTC 3 点而非业务时区 3 点执行。
 		if cfgAny, err := rc.Make(datacontract.ConfigKey); err == nil {
@@ -84,11 +91,26 @@ func (p *Provider) Register(c runtimecontract.Container) error {
 					if err != nil {
 						return nil, fmt.Errorf("cron: invalid cron.timezone %q: %w", tz, err)
 					}
-					return NewServiceWithLocation(loc), nil
+					svc = NewServiceWithLocation(loc)
 				}
 			}
 		}
-		return NewService(), nil
+		if svc == nil {
+			svc = NewService()
+		}
+
+		// 注册 Closer：在容器销毁时优雅停止 Cron 调度器，等待正在运行的任务退出（最多等待 5 秒）
+		c.RegisterCloser(string(runtimecontract.CronKey), closerFunc(func() error {
+			stopCtx := svc.Stop()
+			select {
+			case <-stopCtx.Done():
+				return nil
+			case <-time.After(5 * time.Second):
+				return nil
+			}
+		}))
+
+		return svc, nil
 	}, true)
 	return nil
 }
@@ -192,6 +214,9 @@ func (s *Service) Add(spec string, fn func(ctx context.Context) error) (int, err
 		start := time.Now()
 		runErr := runGuarded(func() error { return fn(ctx) })
 		took := time.Since(start)
+		if runErr != nil {
+			slog.Error("cron job execution failed", "spec", spec, "error", runErr, "took", took)
+		}
 		s.recordExecution(int(id), runErr, start, took)
 	})
 	if err != nil {
@@ -233,6 +258,7 @@ func (s *Service) AddNamed(name, spec string, fn func(ctx context.Context) error
 		status := "success"
 		if runErr != nil {
 			status = "error"
+			slog.Error("cron job execution failed", "job", name, "spec", spec, "error", runErr, "took", took)
 		}
 		duration := took.Seconds()
 		cronJobsTotal.WithLabelValues(name, status).Inc()

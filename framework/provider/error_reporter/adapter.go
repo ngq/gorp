@@ -16,6 +16,7 @@ import (
 
 	observabilitycontract "github.com/ngq/gorp/framework/contract/observability"
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
+	"github.com/ngq/gorp/framework/goroutine"
 )
 
 // LogReporter is the fallback error reporter that logs errors.
@@ -47,8 +48,12 @@ func (r *LogReporter) ReportSync(ctx context.Context, report *resiliencecontract
 		return nil
 	}
 
+	errStr := ""
+	if report.Error != nil {
+		errStr = report.Error.Error()
+	}
 	fields := []observabilitycontract.Field{
-		{Key: "error", Value: report.Error.Error()},
+		{Key: "error", Value: errStr},
 		{Key: "message", Value: report.Message},
 	}
 
@@ -69,12 +74,14 @@ func (r *LogReporter) ReportSync(ctx context.Context, report *resiliencecontract
 }
 
 // ReportAsync reports error asynchronously by spawning goroutine.
-// Core logic: Call ReportSync in background goroutine.
+// Core logic: Call ReportSync in background goroutine with panic protection.
 //
-// ReportAsync 异步上报错误（启动 goroutine）。
+// ReportAsync 异步上报错误（启动 goroutine 并带有 panic 保护）。
 // 核心逻辑：在后台 goroutine 中调用 ReportSync。
 func (r *LogReporter) ReportAsync(ctx context.Context, report *resiliencecontract.ErrorReport) {
-	go r.ReportSync(ctx, report)
+	goroutine.SafeGo(ctx, nil, func(c context.Context) {
+		_ = r.ReportSync(c, report)
+	})
 }
 
 // Flush flushes pending reports (no-op for log reporter).
@@ -120,13 +127,15 @@ func (a *SentryAdapter) ReportSync(ctx context.Context, report *resiliencecontra
 	return errors.New("sentry adapter not fully implemented, please import github.com/getsentry/sentry-go")
 }
 
-// ReportAsync reports error asynchronously to Sentry.
-// Core logic: Call ReportSync in background goroutine.
+// ReportAsync reports error asynchronously to Sentry with panic protection.
+// Core logic: Call ReportSync in background goroutine with SafeGo.
 //
-// ReportAsync 异步上报错误到 Sentry。
+// ReportAsync 异步上报错误到 Sentry（带有 panic 保护）。
 // 核心逻辑：在后台 goroutine 中调用 ReportSync。
 func (a *SentryAdapter) ReportAsync(ctx context.Context, report *resiliencecontract.ErrorReport) {
-	go a.ReportSync(ctx, report)
+	goroutine.SafeGo(ctx, nil, func(c context.Context) {
+		_ = a.ReportSync(c, report)
+	})
 }
 
 // Flush flushes pending reports (no-op for current implementation).

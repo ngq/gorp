@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ngq/gorp/framework/contract/support"
 )
 
 // SwaggerUIHTML returns a lightweight, self-contained HTML string loading Swagger UI CDN.
@@ -25,27 +26,23 @@ func SwaggerUIHTML(specURL, title string) string {
   <style>
     html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
     *, *:before, *:after { box-sizing: inherit; }
-    body { margin:0; background: #fafafa; }
+    body { margin: 0; background: #fafafa; }
   </style>
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" charset="UTF-8"> </script>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
     window.onload = function() {
-      window.ui = SwaggerUIBundle({
+      SwaggerUIBundle({
         url: "%s",
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [
           SwaggerUIBundle.presets.apis,
-          SwaggerUIStandalonePreset
+          SwaggerUIBundle.SwaggerUIStandalonePreset
         ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
-        ],
-        layout: "StandaloneLayout"
+        layout: "BaseLayout"
       });
     };
   </script>
@@ -55,15 +52,18 @@ func SwaggerUIHTML(specURL, title string) string {
 
 // GinSwaggerHandler returns a Gin handler that serves interactive Swagger UI or the spec JSON.
 func GinSwaggerHandler(specPath string) gin.HandlerFunc {
-	if specPath == "" {
-		specPath = filepath.Join("docs", "openapi.json")
-	}
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 		if strings.HasSuffix(reqPath, ".json") || strings.HasSuffix(reqPath, "/spec") {
-			data, err := os.ReadFile(specPath)
+			targetPath := specPath
+			if targetPath == "" {
+				targetPath = support.ResolveResourcePath(filepath.Join("docs", "openapi.json"), "docs")
+			} else {
+				targetPath = support.ResolveResourcePath(targetPath, "docs")
+			}
+			data, err := os.ReadFile(targetPath)
 			if err != nil {
-				fallbackPath := filepath.Join("docs", "swagger.json")
+				fallbackPath := support.ResolveResourcePath(filepath.Join("docs", "swagger.json"), "docs")
 				var fallbackErr error
 				data, fallbackErr = os.ReadFile(fallbackPath)
 				if fallbackErr != nil {

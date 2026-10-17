@@ -51,6 +51,23 @@ func TestLogReporter_ReportSync(t *testing.T) {
 	assert.NotEmpty(t, logger.lastFields)
 }
 
+// TestLogReporter_ReportSync_NilReportError verifies that nil report.Error does not panic.
+func TestLogReporter_ReportSync_NilReportError(t *testing.T) {
+	logger := &mockLogger{}
+	reporter := NewLogReporter(logger)
+
+	report := &resiliencecontract.ErrorReport{
+		Error:   nil,
+		Message: "info message only without error",
+	}
+
+	err := reporter.ReportSync(context.Background(), report)
+	assert.NoError(t, err)
+	assert.Equal(t, "error report", logger.lastMessage)
+	assert.Equal(t, "", logger.lastFields[0].Value) // error field should be empty string
+	assert.Equal(t, "info message only without error", logger.lastFields[1].Value)
+}
+
 // TestLogReporter_ReportSync_NilLogger verifies behavior when logger is nil.
 //
 // TestLogReporter_ReportSync_NilLogger 验证日志记录器为 nil 时的行为。

@@ -139,7 +139,7 @@ func (h *DemoHandler) Delete(c *gin.Context) {
 func (h *DemoHandler) Create(c gorp.Context) {
 	var req request.CreateDemo
 	if err := c.BindJSON(&req); err != nil {
-		httpx.BadRequest(c, err.Error())
+		httpx.Error(c, httpx.InvalidArgument("", err.Error()))
 		return
 	}
 
@@ -156,7 +156,7 @@ func (h *DemoHandler) Create(c gorp.Context) {
 func (h *DemoHandler) GetByID(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
@@ -203,13 +203,13 @@ func (h *DemoHandler) List(c gorp.Context) {
 func (h *DemoHandler) Update(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
 	var req request.UpdateDemo
 	if err := c.BindJSON(&req); err != nil {
-		httpx.BadRequest(c, err.Error())
+		httpx.Error(c, httpx.InvalidArgument("", err.Error()))
 		return
 	}
 
@@ -226,7 +226,7 @@ func (h *DemoHandler) Update(c gorp.Context) {
 func (h *DemoHandler) Delete(c gorp.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		httpx.BadRequest(c, "invalid id")
+		httpx.Error(c, httpx.InvalidArgument("", "invalid id"))
 		return
 	}
 
