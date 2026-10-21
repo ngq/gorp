@@ -11,12 +11,12 @@ all: build
 # 构建 CLI
 .PHONY: build
 build:
-	cd cmd/gorp && go build $(LDFLAGS) -o gorp.exe .
+	go build $(LDFLAGS) -o gorp.exe ./cmd/gorp
 
 # 安装 CLI 到 GOPATH/bin
 .PHONY: install
 install:
-	cd cmd/gorp && go install $(LDFLAGS)
+	go install $(LDFLAGS) ./cmd/gorp
 
 # 运行测试
 .PHONY: test
@@ -50,7 +50,6 @@ fmt:
 .PHONY: tidy
 tidy:
 	go mod tidy
-	cd cmd/gorp && go mod tidy
 
 # 构建 all 子模块
 .PHONY: build-all

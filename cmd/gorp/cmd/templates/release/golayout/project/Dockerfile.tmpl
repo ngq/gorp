@@ -1,39 +1,48 @@
-# 构建阶段
-FROM golang:1.23-alpine AS builder
+# ---------- 构建阶段 ----------
+FROM golang:1.26-alpine AS builder
+
+# 构建参数与代理配置（支持国内镜像源与自定义构建参数）
+ARG GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=${GOPROXY}
 
 WORKDIR /build
 
-# 安装依赖
-RUN apk add --no-cache git ca-certificates
+# 安装基础构建依赖
+RUN apk add --no-cache git ca-certificates tzdata
 
-# 复制依赖文件
+# 依赖缓存层：单模块优先复用 go.mod 与 go.sum
 COPY go.mod go.sum ./
 RUN go mod download
 
-# 复制源代码
+# 复制业务源码
 COPY . .
 
-# 构建
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app ./cmd/app
+# 编译参数：静态编译、路径脱敏、剥离调试信息与符号表
+ARG VERSION=unknown
+ARG COMMIT=unknown
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
+    -o /build/bin/app ./cmd/app
 
-# 运行阶段
-FROM alpine:3.19
+# ---------- 运行阶段 ----------
+FROM alpine:3.21
+
+# 安装证书、时区并创建非 root 运行用户
+RUN apk --no-cache add ca-certificates tzdata \
+    && adduser -D -g '' appuser
+
+ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 
-# 安装 ca-certificates
-RUN apk --no-cache add ca-certificates tzdata
+# 复制配置文件与可执行程序
+COPY --chown=appuser:appuser config/ ./config/
+COPY --chown=appuser:appuser --from=builder /build/bin/app ./app
 
-# 设置时区
-ENV TZ=Asia/Shanghai
+# 确保 appuser 对运行目录有读写权限（兼容 sqlite 默认生成本地 db 文件）
+RUN chown -R appuser:appuser /app
+USER appuser
 
-# 复制配置文件
-COPY config/ ./config/
-
-# 复制二进制文件
-COPY --from=builder /app .
-
-# 暴露端口
 EXPOSE 8080
 
 # 运行（直接启动项目二进制）
