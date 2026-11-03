@@ -1,437 +1,803 @@
 package cmd
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
+	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/mysql"    // mysql 驱动（golang-migrate 按需加载）
-	_ "github.com/golang-migrate/migrate/v4/database/postgres" // postgres 驱动
-	_ "github.com/golang-migrate/migrate/v4/source/file"       // file source（从本地文件系统加载迁移文件）
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/pressly/goose/v3"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+
+	"github.com/ngq/gorp/framework/pkg/migrate"
 )
 
+// migrateFlags 存储 migrate 命令全局标志
+var migrateFlags = struct {
+	dir       string
+	config    string
+	tableName string
+}{
+	dir:       "migrations",
+	config:    "config/app.yaml",
+	tableName: goose.DefaultTablename,
+}
+
 // dbConfig 对应 config/app.yaml 中的 database 配置段。
-//
-// 中文说明：
-// - driver：数据库驱动类型，支持 mysql / postgres；
-// - dsn：数据库连接字符串，格式因驱动不同而异：
-//   - mysql：   "user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true"
-//   - postgres："postgres://user:password@localhost:5432/dbname?sslmode=disable"
 type dbConfig struct {
 	Driver string `yaml:"driver"`
 	DSN    string `yaml:"dsn"`
 }
 
 // appYamlConfig 对应 config/app.yaml 的顶层结构。
-//
-// 中文说明：
-// - 只解析 database 段，其余配置段不做展开；
-// - 如果 database 段不存在或字段为空，migrate 命令会给出明确的错误提示。
 type appYamlConfig struct {
 	Database *dbConfig `yaml:"database"`
 }
 
-// migrateCmd 是数据库版本化迁移的命令组。
-//
-// 中文说明：
-// - 提供数据库迁移的创建、执行、回滚能力；
-// - 子命令：
-//  1. `gorp migrate create <name>`：创建一对 up/down 迁移文件；
-//  2. `gorp migrate up`：执行所有待执行的迁移；
-//  3. `gorp migrate down`：回滚最后一个迁移；
-//
-// - 迁移文件存放在项目根目录的 migrations/ 目录下。
+// migrateCmd 是数据库版本化迁移的根命令。
 var migrateCmd = &cobra.Command{
 	Use:     "migrate",
-	Short:   "数据库版本化迁移",
+	Short:   "数据库版本化迁移（基于 goose）",
 	GroupID: commandGroupAdvanced,
-	Long: `数据库版本化迁移（基于 golang-migrate）。
+	Long: `数据库版本化迁移（基于 pressly/goose/v3）。
+
+提供完整的数据库迁移管理能力，支持单文件 Up/Down 事务包装与 Go 代码迁移。
 
 子命令：
-  gorp migrate create <name>  创建迁移文件（生成 up/down 一对 SQL 文件）
-  gorp migrate up             执行所有待执行的迁移
-  gorp migrate down           回滚最后一个迁移
-
-迁移文件存放在项目根目录的 migrations/ 目录下。
-数据库配置从 config/app.yaml 的 database 段读取。`,
+  gorp migrate status                 查看迁移应用状态
+  gorp migrate create <name> [sql|go] 创建迁移文件（默认生成方言自适应的 SQL 模板）
+  gorp migrate up                     执行所有待执行的迁移
+  gorp migrate up-by-one              仅执行下一个未应用的迁移
+  gorp migrate up-to <version>        迁移到指定版本
+  gorp migrate down                   回滚最后一个迁移
+  gorp migrate down-to <version>      回滚到指定版本
+  gorp migrate redo                   回滚上一个迁移并重新执行（开发调试神器）
+  gorp migrate reset                  回滚所有已应用的迁移
+  gorp migrate version                查看当前数据库版本`,
 }
 
-// migrateCreateCmd 创建一对迁移文件。
-//
-// 中文说明：
-// - 在 migrations/ 目录下生成 <序号>_<名称>.up.sql 和 <序号>_<名称>.down.sql；
-// - 序号自动递增，基于目录中已有文件的最大序号 +1；
-// - 序号格式为 6 位数字（000001, 000002, ...），与 golang-migrate 约定一致。
+// migrateStatusCmd 查看迁移状态
+var migrateStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "查看迁移状态",
+	Long:  "查看所有迁移文件的应用状态及执行时间。",
+	RunE:  runMigrateStatus,
+}
+
+// migrateCreateCmd 创建迁移文件
 var migrateCreateCmd = &cobra.Command{
-	Use:   "create [name]",
+	Use:   "create <name> [sql|go]",
 	Short: "创建迁移文件",
 	Long: `创建迁移文件。
 
-在 migrations/ 目录下生成一对 up/down SQL 文件。
-序号自动递增，例如：
-  migrations/000001_add_users_table.up.sql
-  migrations/000001_add_users_table.down.sql`,
-	Args: cobra.ExactArgs(1),
+默认在 migrations/ 目录下生成基于时间戳命名的单文件迁移脚本：
+  migrations/YYYYMMDDHHMMSS_<name>.sql
+
+同时会根据 config/app.yaml 中配置的数据库驱动（MySQL / PostgreSQL / SQLite）动态匹配方言骨架模板。`,
+	Args: cobra.RangeArgs(1, 2),
 	RunE: runMigrateCreate,
 }
 
-// migrateUpCmd 执行所有待执行的迁移。
-//
-// 中文说明：
-// - 从 config/app.yaml 读取 database.driver 和 database.dsn；
-// - 打开数据库连接并应用 migrations/ 目录下所有未执行的迁移；
-// - 如果没有待执行的迁移，会提示"no new migrations"。
+// migrateUpCmd 执行全量迁移
 var migrateUpCmd = &cobra.Command{
 	Use:   "up",
 	Short: "执行所有待执行的迁移",
-	Long: `执行所有待执行的迁移。
-
-从 config/app.yaml 的 database 段读取数据库配置，
-然后应用 migrations/ 目录下所有未执行的迁移。`,
-	RunE: runMigrateUp,
+	Long:  "从配置文件读取数据库配置，并应用 migrations/ 目录下所有未执行的迁移。",
+	RunE:  runMigrateUp,
 }
 
-// migrateDownCmd 回滚最后一个迁移。
-//
-// 中文说明：
-// - 从 config/app.yaml 读取数据库配置；
-// - 回滚最近一次已执行的迁移（即 -1 步）。
+// migrateUpByOneCmd 单步执行迁移
+var migrateUpByOneCmd = &cobra.Command{
+	Use:   "up-by-one",
+	Short: "仅执行下一个待执行的迁移",
+	Long:  "仅向前应用一个版本的迁移，适合精细化验证。",
+	RunE:  runMigrateUpByOne,
+}
+
+// migrateUpToCmd 迁移到指定版本
+var migrateUpToCmd = &cobra.Command{
+	Use:   "up-to <version>",
+	Short: "迁移到指定版本",
+	Long:  "应用迁移直至达到指定的版本号（支持向前或追平指定版本）。",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runMigrateUpTo,
+}
+
+// migrateDownCmd 回滚最后一个迁移
 var migrateDownCmd = &cobra.Command{
 	Use:   "down",
 	Short: "回滚最后一个迁移",
-	Long: `回滚最后一个迁移。
-
-从 config/app.yaml 的 database 段读取数据库配置，
-然后回滚最近一次已执行的迁移。`,
-	RunE: runMigrateDown,
+	Long:  "回滚最近一次已执行的迁移版本。",
+	RunE:  runMigrateDown,
 }
 
-// reMigrationFile 匹配迁移文件名中的序号部分。
-//
-// 中文说明：
-// - golang-migrate 约定文件名格式为 <序号>_<名称>.up.sql 或 <序号>_<名称>.down.sql；
-// - 序号可以是纯数字（如 000001）或时间戳格式（如 20260101120000）；
-// - 此正则提取序号部分，用于自动递增。
-var reMigrationFile = regexp.MustCompile(`^(\d+)_.*\.sql$`)
-
-// migrationsDir 返回迁移文件的目录路径。
-//
-// 中文说明：
-// - 固定为当前工作目录下的 migrations/；
-// - 如果目录不存在，由调用方决定是否创建。
-func migrationsDir() string {
-	return filepath.Join(".", "migrations")
+// migrateDownToCmd 回滚到指定版本
+var migrateDownToCmd = &cobra.Command{
+	Use:   "down-to <version>",
+	Short: "回滚到指定版本",
+	Long:  "连续回滚迁移直至当前数据库版本降至指定版本。",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runMigrateDownTo,
 }
 
-// nextMigrationVersion 扫描 migrations/ 目录，返回下一个可用的序号。
-//
-// 中文说明：
-// - 读取目录中所有已有迁移文件，提取最大序号；
-// - 最大序号 +1 即为下一个版本号；
-// - 如果目录为空或不存在，返回 1。
-func nextMigrationVersion(dir string) (int, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 1, nil
-		}
-		return 0, err
-	}
-
-	maxVersion := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		matches := reMigrationFile.FindStringSubmatch(entry.Name())
-		if len(matches) < 2 {
-			continue
-		}
-		v, err := strconv.Atoi(matches[1])
-		if err != nil {
-			continue
-		}
-		if v > maxVersion {
-			maxVersion = v
-		}
-	}
-	return maxVersion + 1, nil
+// migrateRedoCmd 重跑上一个迁移
+var migrateRedoCmd = &cobra.Command{
+	Use:   "redo",
+	Short: "回滚上一个迁移并重新执行",
+	Long:  "回滚最近应用的迁移并立即重新执行（Down + Up），非常适合本地反复调试 SQL。",
+	RunE:  runMigrateRedo,
 }
 
-// formatMigrationVersion 将版本号格式化为 6 位字符串。
-//
-// 中文说明：
-// - golang-migrate 约定序号部分为定长数字字符串；
-// - 6 位可以支持到 999999 个迁移，足够大多数项目使用。
-func formatMigrationVersion(v int) string {
-	return fmt.Sprintf("%06d", v)
+// migrateResetCmd 回滚所有迁移
+var migrateResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "回滚所有已执行的迁移",
+	Long:  "回滚所有已应用的迁移至初始状态（警告：这将清空所有表结构，仅限测试/开发使用）。",
+	RunE:  runMigrateReset,
+}
+
+// migrateVersionCmd 查看当前数据库版本
+var migrateVersionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "查看当前数据库版本",
+	Long:  "查询当前数据库版本记录表，输出最新已应用的迁移版本号。",
+	RunE:  runMigrateVersion,
 }
 
 // sanitizeMigrationName 将用户输入的迁移名称转为合法的文件名片段。
-//
-// 中文说明：
-// - 将空格和连续连字符/下划线替换为单个下划线；
-// - 转为小写，避免文件名大小写不一致问题；
-// - 去除首尾的下划线和连字符。
 func sanitizeMigrationName(name string) string {
-	name = strings.ToLower(strings.TrimSpace(name))
-	// 空格和连字符替换为下划线
-	name = strings.ReplaceAll(name, " ", "_")
-	name = strings.ReplaceAll(name, "-", "_")
-	// 去除连续下划线
-	for strings.Contains(name, "__") {
-		name = strings.ReplaceAll(name, "__", "_")
+	name = strings.TrimSpace(name)
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else if r == ' ' || r == '-' || r == '_' || r == '/' || r == '\\' {
+			b.WriteRune('_')
+		}
 	}
-	// 去除首尾下划线
-	name = strings.Trim(name, "_")
-	if name == "" {
-		name = "migration"
+	res := b.String()
+	for strings.Contains(res, "__") {
+		res = strings.ReplaceAll(res, "__", "_")
 	}
-	return name
+	res = strings.Trim(res, "_")
+	if res == "" {
+		return "migration"
+	}
+	return res
 }
 
-// runMigrateCreate 创建一对迁移文件。
-//
-// 中文说明：
-// - 1) 确保 migrations/ 目录存在；
-// - 2) 计算下一个可用序号；
-// - 3) 生成 .up.sql 和 .down.sql 两个空文件；
-// - 4) 输出文件路径，方便用户编辑。
+// commandContext 返回 cmd 的上下文，若未设置或为 nil 则回退到 context.Background()。
+func commandContext(cmd *cobra.Command) context.Context {
+	if cmd != nil && cmd.Context() != nil {
+		return cmd.Context()
+	}
+	return context.Background()
+}
+
+// loadDBConfig 从指定的配置文件路径读取数据库配置。
+func loadDBConfig(configPath string) (*dbConfig, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("配置文件不存在：%s\n请确认当前工作目录是否正确，或通过 --config 指定配置文件", configPath)
+		}
+		return nil, fmt.Errorf("读取配置文件失败：%w", err)
+	}
+
+	var appCfg appYamlConfig
+	if err := yaml.Unmarshal(data, &appCfg); err != nil {
+		return nil, fmt.Errorf("解析配置文件失败：%w", err)
+	}
+
+	if appCfg.Database == nil {
+		return nil, fmt.Errorf("配置文件 %s 中缺少 database 配置段", configPath)
+	}
+
+	driver := strings.TrimSpace(appCfg.Database.Driver)
+	dsn := strings.TrimSpace(appCfg.Database.DSN)
+
+	if driver == "" {
+		return nil, fmt.Errorf("配置文件 %s 中的 database.driver 不能为空（支持：mysql / postgres / sqlite）", configPath)
+	}
+	if dsn == "" {
+		return nil, fmt.Errorf("配置文件 %s 中的 database.dsn 不能为空", configPath)
+	}
+
+	return &dbConfig{
+		Driver: driver,
+		DSN:    dsn,
+	}, nil
+}
+
+// normalizeSQLDriver 将驱动别名转换为标准 database/sql 驱动名称。
+func normalizeSQLDriver(driver string) (string, error) {
+	d := strings.ToLower(strings.TrimSpace(driver))
+	switch d {
+	case "mysql":
+		return "mysql", nil
+	case "postgres", "postgresql", "pgsql", "pgx":
+		return "pgx", nil
+	case "sqlite", "sqlite3":
+		return "sqlite3", nil
+	default:
+		return "", fmt.Errorf("不支持的数据库驱动：%s（支持：mysql / postgres / sqlite）", driver)
+	}
+}
+
+// openDB 创建数据库连接并进行连通性检查。
+func openDB(cfg *dbConfig) (*sql.DB, error) {
+	stdDriver, err := normalizeSQLDriver(cfg.Driver)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open(stdDriver, cfg.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("打开数据库连接失败：%w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("数据库连接检查失败（driver=%s）：%w", cfg.Driver, err)
+	}
+
+	return db, nil
+}
+
+// getProvider 构建隔离的 goose.Provider 实例。
+func getProvider(cfg *dbConfig, db *sql.DB) (*goose.Provider, error) {
+	dir := filepath.Clean(migrateFlags.dir)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("迁移目录不存在：%s\n请先使用 gorp migrate create <name> 创建迁移文件", dir)
+	}
+
+	return migrate.NewProvider(
+		db,
+		cfg.Driver,
+		os.DirFS(dir),
+		".",
+		migrate.WithTableName(migrateFlags.tableName),
+	)
+}
+
+// generateSQLTemplate 根据当前数据库驱动生成自适应方言的 SQL 初始骨架。
+func generateSQLTemplate(driver, tableName string) string {
+	d := strings.ToLower(strings.TrimSpace(driver))
+	cleanTable := sanitizeMigrationName(tableName)
+
+	switch d {
+	case "postgres", "postgresql", "pgsql", "pgx":
+		return fmt.Sprintf(`-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS "%s" (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(64) NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS "%s";
+-- +goose StatementEnd
+`, cleanTable, cleanTable)
+
+	case "sqlite", "sqlite3":
+		return fmt.Sprintf(`-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS "%s" (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS "%s";
+-- +goose StatementEnd
+`, cleanTable, cleanTable)
+
+	default: // MySQL default
+		return fmt.Sprintf(`-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS `+"`%s`"+` (
+    `+"`id`"+` BIGINT NOT NULL AUTO_INCREMENT,
+    `+"`name`"+` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '名称',
+    `+"`created_at`"+` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `+"`updated_at`"+` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`+"`id`"+`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='%s 表';
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS `+"`%s`"+`;
+-- +goose StatementEnd
+`, cleanTable, cleanTable, cleanTable)
+	}
+}
+
+// generateGoTemplate 生成 Go 代码迁移模板
+func generateGoTemplate(version int64, name string) string {
+	return fmt.Sprintf(`package migrations
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	"github.com/pressly/goose/v3"
+)
+
+func init() {
+	goose.AddMigrationContext(up%d, down%d)
+}
+
+func up%d(ctx context.Context, tx *sql.Tx) error {
+	// 在此编写向上迁移的业务/数据库操作逻辑
+	fmt.Println("Applying Go migration %s (%d)...")
+	return nil
+}
+
+func down%d(ctx context.Context, tx *sql.Tx) error {
+	// 在此编写回滚操作逻辑
+	fmt.Println("Rolling back Go migration %s (%d)...")
+	return nil
+}
+`, version, version, version, name, version, version, name, version)
+}
+
+// runMigrateCreate 创建迁移文件。
 func runMigrateCreate(cmd *cobra.Command, args []string) error {
 	name := sanitizeMigrationName(args[0])
-	dir := migrationsDir()
+	format := "sql"
+	if len(args) > 1 {
+		format = strings.ToLower(strings.TrimSpace(args[1]))
+	}
+	if format != "sql" && format != "go" {
+		return fmt.Errorf("不支持的迁移格式：%s（仅支持 sql 或 go）", format)
+	}
 
-	// 确保迁移目录存在
+	dir := filepath.Clean(migrateFlags.dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("创建迁移目录失败：%w", err)
 	}
 
-	// 计算下一个版本号
-	version, err := nextMigrationVersion(dir)
-	if err != nil {
-		return fmt.Errorf("扫描迁移文件失败：%w", err)
+	// 生成 14 位 UTC 时间戳版本号，避免多时区协作冲突
+	timestampStr := time.Now().UTC().Format("20060102150405")
+	versionNum, _ := strconv.ParseInt(timestampStr, 10, 64)
+
+	fileName := fmt.Sprintf("%s_%s.%s", timestampStr, name, format)
+	filePath := filepath.Join(dir, fileName)
+
+	// 探测 driver 用于生成匹配的模板（若配置文件读取失败则使用通用 MySQL/SQL 模板）
+	driver := "mysql"
+	if cfg, err := loadDBConfig(migrateFlags.config); err == nil && cfg != nil {
+		driver = cfg.Driver
 	}
 
-	versionStr := formatMigrationVersion(version)
-	upFile := filepath.Join(dir, fmt.Sprintf("%s_%s.up.sql", versionStr, name))
-	downFile := filepath.Join(dir, fmt.Sprintf("%s_%s.down.sql", versionStr, name))
-
-	// 写入空文件（golang-migrate 要求文件存在且非空，写入占位注释）
-	upContent := fmt.Sprintf("-- +migrate Up\n-- 在此编写向上迁移的 SQL\n")
-	downContent := fmt.Sprintf("-- +migrate Down\n-- 在此编写回滚迁移的 SQL\n")
-
-	if err := os.WriteFile(upFile, []byte(upContent), 0o644); err != nil {
-		return fmt.Errorf("创建迁移文件失败：%w", err)
-	}
-	if err := os.WriteFile(downFile, []byte(downContent), 0o644); err != nil {
-		return fmt.Errorf("创建迁移文件失败：%w", err)
+	var content string
+	if format == "go" {
+		content = generateGoTemplate(versionNum, name)
+	} else {
+		content = generateSQLTemplate(driver, name)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "已创建迁移文件：\n  %s\n  %s\n", upFile, downFile)
+	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("写入迁移文件失败：%w", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "成功创建迁移文件: %s\n", filePath)
 	return nil
 }
 
-// loadDBConfig 从 config/app.yaml 读取数据库配置。
-//
-// 中文说明：
-// - 读取项目根目录下的 config/app.yaml；
-// - 解析 database 段的 driver 和 dsn 字段；
-// - 如果配置文件不存在或 database 段缺失/字段为空，返回明确错误。
-func loadDBConfig() (*dbConfig, error) {
-	configPath := filepath.Join(".", "config", "app.yaml")
-	if !fileExists(configPath) {
-		return nil, fmt.Errorf("未找到配置文件：%s\n请确保在 gorp 项目根目录下运行此命令", configPath)
-	}
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("读取配置文件失败：%w", err)
-	}
-
-	var cfg appYamlConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("解析配置文件失败：%w", err)
-	}
-
-	if cfg.Database == nil {
-		return nil, fmt.Errorf("配置文件 %s 中缺少 database 配置段\n请参考以下格式添加：\n\ndatabase:\n  driver: \"mysql\"\n  dsn: \"user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true\"", configPath)
-	}
-
-	if cfg.Database.Driver == "" {
-		return nil, fmt.Errorf("配置文件中 database.driver 为空\n请指定 driver（支持：mysql / postgres）")
-	}
-
-	if cfg.Database.DSN == "" {
-		return nil, fmt.Errorf("配置文件中 database.dsn 为空\n请指定数据库连接字符串")
-	}
-
-	return cfg.Database, nil
-}
-
-// buildMigrateDSN 根据 driver 类型构建 golang-migrate 所需的 DSN 格式。
-//
-// 中文说明：
-// - golang-migrate 对不同数据库的 DSN 格式有不同要求；
-// - mysql：直接使用 dsn 字符串；
-// - postgres：直接使用 dsn 字符串；
-// - 返回格式为 "<driver>://<dsn>"，供 migrate.New() 使用。
-func buildMigrateDSN(cfg *dbConfig) (string, error) {
-	driver := strings.ToLower(strings.TrimSpace(cfg.Driver))
-	dsn := strings.TrimSpace(cfg.DSN)
-
-	switch driver {
-	case "mysql":
-		// golang-migrate 的 mysql 驱动需要 "mysql://" 前缀
-		return "mysql://" + dsn, nil
-	case "postgres", "postgresql":
-		// golang-migrate 的 postgres 驱动支持 postgres:// 格式
-		// 如果 dsn 已经以 postgres:// 开头则不再添加前缀
-		if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
-			return dsn, nil
-		}
-		return dsn, nil
-	default:
-		return "", fmt.Errorf("不支持的数据库驱动：%s（支持：mysql / postgres）", driver)
-	}
-}
-
-// newMigrateInstance 创建 golang-migrate 实例。
-//
-// 中文说明：
-// - 从配置文件读取数据库连接信息；
-// - 从 migrations/ 目录加载迁移文件源；
-// - 返回可用于 up/down 操作的 migrate.Migrate 实例。
-func newMigrateInstance() (*migrate.Migrate, error) {
-	cfg, err := loadDBConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	dir := migrationsDir()
-	if !dirExists(dir) {
-		return nil, fmt.Errorf("迁移目录不存在：%s\n请先使用 gorp migrate create <name> 创建迁移文件", dir)
-	}
-
-	// 检查迁移目录中是否有文件
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("读取迁移目录失败：%w", err)
-	}
-	sqlFiles := 0
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-			sqlFiles++
-		}
-	}
-	if sqlFiles == 0 {
-		return nil, fmt.Errorf("迁移目录 %s 中没有迁移文件\n请先使用 gorp migrate create <name> 创建迁移文件", dir)
-	}
-
-	dsn, err := buildMigrateDSN(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// 获取迁移文件的绝对路径（golang-migrate 的 file source 需要绝对路径或 file:// 前缀）
-	migrationsAbs, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, fmt.Errorf("获取迁移目录绝对路径失败：%w", err)
-	}
-
-	m, err := migrate.New(
-		"file://"+filepath.ToSlash(migrationsAbs),
-		dsn,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("初始化迁移引擎失败：%w\n请检查数据库配置是否正确（driver=%s, dsn=%s）", err, cfg.Driver, cfg.DSN)
-	}
-
-	return m, nil
-}
-
-// runMigrateUp 执行所有待执行的迁移。
-//
-// 中文说明：
-// - 创建 migrate 实例并调用 Up()；
-// - 如果没有待执行的迁移，输出提示信息；
-// - 其他错误（如连接失败、SQL 语法错误）会原样返回。
-func runMigrateUp(cmd *cobra.Command, args []string) error {
-	m, err := newMigrateInstance()
+// runMigrateStatus 查看迁移状态
+func runMigrateStatus(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
 	if err != nil {
 		return err
 	}
-	defer m.Close()
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoMigrations) {
+			fmt.Fprintln(cmd.OutOrStdout(), "迁移目录下未找到任何迁移文件，请使用 gorp migrate create 创建")
+			return nil
+		}
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 15*time.Second)
+	defer cancel()
+
+	statuses, err := provider.Status(ctx)
+	if err != nil {
+		return fmt.Errorf("获取迁移状态失败：%w", err)
+	}
+
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "VERSION\tSTATUS\tAPPLIED AT\tSOURCE")
+	fmt.Fprintln(w, "-------\t------\t----------\t------")
+
+	for _, s := range statuses {
+		appliedAt := "-"
+		if !s.AppliedAt.IsZero() {
+			appliedAt = s.AppliedAt.Format("2006-01-02 15:04:05")
+		}
+		statusStr := "Pending"
+		if s.State == goose.StateApplied {
+			statusStr = "Applied"
+		}
+		version := int64(0)
+		sourceName := "-"
+		if s.Source != nil {
+			version = s.Source.Version
+			sourceName = filepath.Base(s.Source.Path)
+		}
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", version, statusStr, appliedAt, sourceName)
+	}
+	w.Flush()
+	return nil
+}
+
+// runMigrateUp 执行全量迁移
+func runMigrateUp(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoMigrations) {
+			fmt.Fprintln(cmd.OutOrStdout(), "迁移目录下未找到任何迁移文件，请使用 gorp migrate create 创建")
+			return nil
+		}
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 60*time.Second)
+	defer cancel()
 
 	fmt.Fprintln(cmd.OutOrStdout(), "正在执行迁移...")
-	if err := m.Up(); err != nil {
-		if errors.Is(err, migrate.ErrNoChange) {
+	results, err := provider.Up(ctx)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
 			fmt.Fprintln(cmd.OutOrStdout(), "没有待执行的迁移（已是最新版本）")
 			return nil
 		}
 		return fmt.Errorf("执行迁移失败：%w", err)
 	}
 
+	if len(results) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "没有待执行的迁移（已是最新版本）")
+		return nil
+	}
+
+	for _, res := range results {
+		fmt.Fprintf(cmd.OutOrStdout(), "-> 已应用版本 %d (%s) 耗时: %v\n", res.Source.Version, filepath.Base(res.Source.Path), res.Duration)
+	}
 	fmt.Fprintln(cmd.OutOrStdout(), "迁移执行完成")
 	return nil
 }
 
-// runMigrateDown 回滚最后一个迁移。
-//
-// 中文说明：
-// - 创建 migrate 实例并调用 Steps(-1)；
-// - 回滚最近一次已执行的迁移；
-// - 如果没有可回滚的迁移，输出提示信息。
-func runMigrateDown(cmd *cobra.Command, args []string) error {
-	m, err := newMigrateInstance()
+// runMigrateUpByOne 执行下一个迁移
+func runMigrateUpByOne(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
 	if err != nil {
 		return err
 	}
-	defer m.Close()
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 30*time.Second)
+	defer cancel()
+
+	res, err := provider.UpByOne(ctx)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
+			fmt.Fprintln(cmd.OutOrStdout(), "没有待执行的迁移（已是最新版本）")
+			return nil
+		}
+		if errors.Is(err, goose.ErrNoMigrations) {
+			fmt.Fprintln(cmd.OutOrStdout(), "迁移目录下未找到任何迁移文件，请使用 gorp migrate create 创建")
+			return nil
+		}
+		return fmt.Errorf("执行单步迁移失败：%w", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "-> 已应用版本 %d (%s) 耗时: %v\n", res.Source.Version, filepath.Base(res.Source.Path), res.Duration)
+	return nil
+}
+
+// runMigrateUpTo 迁移到指定版本
+func runMigrateUpTo(cmd *cobra.Command, args []string) error {
+	targetVersion, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil || targetVersion < 0 {
+		return fmt.Errorf("无效的版本号：%q（版本号必须为非负整数）", args[0])
+	}
+
+	cfg, err := loadDBConfig(migrateFlags.config)
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 60*time.Second)
+	defer cancel()
+
+	fmt.Fprintf(cmd.OutOrStdout(), "正在迁移至版本 %d ...\n", targetVersion)
+	results, err := provider.UpTo(ctx, targetVersion)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
+			fmt.Fprintln(cmd.OutOrStdout(), "已达到指定版本或更高版本，无需迁移")
+			return nil
+		}
+		return fmt.Errorf("迁移到指定版本失败：%w", err)
+	}
+
+	if len(results) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "已是指定版本，没有新变更应用")
+		return nil
+	}
+
+	for _, res := range results {
+		fmt.Fprintf(cmd.OutOrStdout(), "-> 已应用版本 %d (%s) 耗时: %v\n", res.Source.Version, filepath.Base(res.Source.Path), res.Duration)
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "迁移执行完成")
+	return nil
+}
+
+// runMigrateDown 回滚最后一个迁移
+func runMigrateDown(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 30*time.Second)
+	defer cancel()
 
 	fmt.Fprintln(cmd.OutOrStdout(), "正在回滚最后一个迁移...")
-	if err := m.Steps(-1); err != nil {
-		if errors.Is(err, migrate.ErrNoChange) {
+	res, err := provider.Down(ctx)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
 			fmt.Fprintln(cmd.OutOrStdout(), "没有可回滚的迁移")
 			return nil
 		}
 		return fmt.Errorf("回滚迁移失败：%w", err)
 	}
 
+	fmt.Fprintf(cmd.OutOrStdout(), "-> 已回滚版本 %d (%s) 耗时: %v\n", res.Source.Version, filepath.Base(res.Source.Path), res.Duration)
 	fmt.Fprintln(cmd.OutOrStdout(), "回滚完成")
 	return nil
 }
 
-// listMigrationFiles 列出 migrations/ 目录中的迁移文件（供未来扩展使用）。
-//
-// 中文说明：
-// - 按文件名排序，返回所有 .sql 文件；
-// - 仅供内部使用，当前未对外暴露为子命令。
-func listMigrationFiles(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
+// runMigrateDownTo 回滚到指定版本
+func runMigrateDownTo(cmd *cobra.Command, args []string) error {
+	targetVersion, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil || targetVersion < 0 {
+		return fmt.Errorf("无效的版本号：%q（版本号必须为非负整数）", args[0])
+	}
+
+	cfg, err := loadDBConfig(migrateFlags.config)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var files []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			files = append(files, entry.Name())
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 60*time.Second)
+	defer cancel()
+
+	fmt.Fprintf(cmd.OutOrStdout(), "正在回滚至版本 %d ...\n", targetVersion)
+	results, err := provider.DownTo(ctx, targetVersion)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
+			fmt.Fprintln(cmd.OutOrStdout(), "已处于目标版本或更低版本，无需回滚")
+			return nil
 		}
+		return fmt.Errorf("回滚到指定版本失败：%w", err)
 	}
-	sort.Strings(files)
-	return files, nil
+
+	for _, res := range results {
+		fmt.Fprintf(cmd.OutOrStdout(), "-> 已回滚版本 %d (%s) 耗时: %v\n", res.Source.Version, filepath.Base(res.Source.Path), res.Duration)
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "回滚完成")
+	return nil
+}
+
+// runMigrateRedo 回滚上一个迁移并重新执行
+func runMigrateRedo(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 60*time.Second)
+	defer cancel()
+
+	fmt.Fprintln(cmd.OutOrStdout(), "正在执行重做（Redo: Down + Up）...")
+
+	// 1. 回滚最后一个版本
+	downRes, err := provider.Down(ctx)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
+			fmt.Fprintln(cmd.OutOrStdout(), "当前没有任何已应用的迁移可供重做")
+			return nil
+		}
+		return fmt.Errorf("Redo 步骤 1 (回滚) 失败：%w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "-> 已回滚版本 %d (%s)\n", downRes.Source.Version, filepath.Base(downRes.Source.Path))
+	// 2. 重新应用该版本
+	upRes, err := provider.UpByOne(ctx)
+	if err != nil {
+		return fmt.Errorf("Redo 步骤 2 (重新应用) 失败：%w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "-> 已重新应用版本 %d (%s)\n", upRes.Source.Version, filepath.Base(upRes.Source.Path))
+
+	fmt.Fprintln(cmd.OutOrStdout(), "Redo 操作完成")
+	return nil
+}
+
+// runMigrateReset 回滚所有迁移
+func runMigrateReset(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	provider, err := getProvider(cfg, db)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 60*time.Second)
+	defer cancel()
+
+	fmt.Fprintln(cmd.OutOrStdout(), "正在回滚所有迁移至初始状态（Reset）...")
+	results, err := provider.DownTo(ctx, 0)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoNextVersion) {
+			fmt.Fprintln(cmd.OutOrStdout(), "当前没有任何已应用的迁移")
+			return nil
+		}
+		return fmt.Errorf("重置迁移失败：%w", err)
+	}
+
+	for _, res := range results {
+		fmt.Fprintf(cmd.OutOrStdout(), "-> 已回滚版本 %d (%s)\n", res.Source.Version, filepath.Base(res.Source.Path))
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "Reset 重置完成")
+	return nil
+}
+
+// runMigrateVersion 查看当前版本
+func runMigrateVersion(cmd *cobra.Command, args []string) error {
+	cfg, err := loadDBConfig(migrateFlags.config)
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(commandContext(cmd), 10*time.Second)
+	defer cancel()
+
+	ver, err := migrate.GetDBVersion(ctx, db, cfg.Driver, migrate.WithTableName(migrateFlags.tableName))
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "当前数据库迁移版本: %d\n", ver)
+	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(migrateCmd)
+
+	// 全局 Persistent Flags
+	migrateCmd.PersistentFlags().StringVarP(&migrateFlags.dir, "dir", "d", "migrations", "迁移文件所在目录")
+	migrateCmd.PersistentFlags().StringVarP(&migrateFlags.config, "config", "c", "config/app.yaml", "应用配置文件路径")
+	migrateCmd.PersistentFlags().StringVar(&migrateFlags.tableName, "table", goose.DefaultTablename, "迁移版本记录表名")
+
+	// 注册子命令
+	migrateCmd.AddCommand(migrateStatusCmd)
 	migrateCmd.AddCommand(migrateCreateCmd)
 	migrateCmd.AddCommand(migrateUpCmd)
+	migrateCmd.AddCommand(migrateUpByOneCmd)
+	migrateCmd.AddCommand(migrateUpToCmd)
 	migrateCmd.AddCommand(migrateDownCmd)
+	migrateCmd.AddCommand(migrateDownToCmd)
+	migrateCmd.AddCommand(migrateRedoCmd)
+	migrateCmd.AddCommand(migrateResetCmd)
+	migrateCmd.AddCommand(migrateVersionCmd)
 }
