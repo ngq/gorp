@@ -25,7 +25,9 @@ var newOfflineFrameworkVersion string
 var newOfflineHTTP string
 var newOfflineLocalDev bool
 
-const defaultFrameworkVersion = "v0.1.2"
+// FEAT-07：默认版本必须包含模板引用的 framework/httpx 包（v0.3.0 引入），
+// v0.1.2 会让生成的工程开箱编译失败。发版时与 CHANGELOG 同步更新。
+const defaultFrameworkVersion = "v0.3.2"
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)
@@ -42,6 +44,9 @@ func runNewEmbedded(cmd *cobra.Command, args []string) error {
 		newOfflineTemplate = intentTemplate
 	}
 	if err := validateStarterTemplate(newOfflineTemplate); err != nil {
+		return err
+	}
+	if err := validateStarterBackend(newOfflineBackend); err != nil {
 		return err
 	}
 	cwd, err := os.Getwd()
@@ -126,7 +131,7 @@ func init() {
 	newCmd.Flags().BoolVar(&newOfflineWithDB, "with-db", true, "include DB sample and CRUD example")
 	newCmd.Flags().BoolVar(&newOfflineWithSwagger, "with-swagger", true, "enable swagger config in generated starter")
 	newCmd.Flags().BoolVar(&newOfflineLocalDev, "local", false, "use local framework path with replace directive for development")
-	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version (e.g., v0.1.0), default "+defaultFrameworkVersion)
+	newCmd.Flags().StringVar(&newOfflineFrameworkVersion, "framework-version", "", "framework version, default "+defaultFrameworkVersion)
 	newCmd.Flags().StringVar(&newOfflineHTTP, "http", "", "HTTP mode: contract (default), gin")
 }
 

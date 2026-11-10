@@ -56,6 +56,9 @@ Important:
 		if err := validateReleaseStarterTemplate(newReleaseTemplate); err != nil {
 			return err
 		}
+		if err := validateStarterBackend(newReleaseBackend); err != nil {
+			return err
+		}
 		if err := validateGitHubRepo(newReleaseRepo); err != nil {
 			return err
 		}

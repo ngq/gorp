@@ -51,11 +51,11 @@ var migrateCmd = &cobra.Command{
 	GroupID: commandGroupAdvanced,
 	Long: `数据库版本化迁移（基于 pressly/goose/v3）。
 
-提供完整的数据库迁移管理能力，支持单文件 Up/Down 事务包装与 Go 代码迁移。
+提供完整的数据库迁移管理能力，当前 CLI 创建 SQL 迁移文件，并支持 Up/Down 操作。
 
 子命令：
   gorp migrate status                 查看迁移应用状态
-  gorp migrate create <name> [sql|go] 创建迁移文件（默认生成方言自适应的 SQL 模板）
+  gorp migrate create <name> [sql] 创建迁移文件（默认生成方言自适应的 SQL 模板）
   gorp migrate up                     执行所有待执行的迁移
   gorp migrate up-by-one              仅执行下一个未应用的迁移
   gorp migrate up-to <version>        迁移到指定版本
@@ -76,7 +76,7 @@ var migrateStatusCmd = &cobra.Command{
 
 // migrateCreateCmd 创建迁移文件
 var migrateCreateCmd = &cobra.Command{
-	Use:   "create <name> [sql|go]",
+	Use:   "create <name> [sql]",
 	Short: "创建迁移文件",
 	Long: `创建迁移文件。
 
@@ -203,8 +203,16 @@ func loadDBConfig(configPath string) (*dbConfig, error) {
 		return nil, fmt.Errorf("配置文件 %s 中缺少 database 配置段", configPath)
 	}
 
-	driver := strings.TrimSpace(appCfg.Database.Driver)
-	dsn := strings.TrimSpace(appCfg.Database.DSN)
+	driver, err := expandConfigEnv(appCfg.Database.Driver)
+	if err != nil {
+		return nil, fmt.Errorf("解析 database.driver 环境变量失败：%w", err)
+	}
+	dsn, err := expandConfigEnv(appCfg.Database.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("解析 database.dsn 环境变量失败：%w", err)
+	}
+	driver = strings.TrimSpace(driver)
+	dsn = strings.TrimSpace(dsn)
 
 	if driver == "" {
 		return nil, fmt.Errorf("配置文件 %s 中的 database.driver 不能为空（支持：mysql / postgres / sqlite）", configPath)
@@ -217,6 +225,21 @@ func loadDBConfig(configPath string) (*dbConfig, error) {
 		Driver: driver,
 		DSN:    dsn,
 	}, nil
+}
+
+func expandConfigEnv(value string) (string, error) {
+	var missing string
+	expanded := os.Expand(value, func(key string) string {
+		if resolved, ok := os.LookupEnv(key); ok {
+			return resolved
+		}
+		missing = key
+		return ""
+	})
+	if missing != "" {
+		return "", fmt.Errorf("环境变量 %s 未设置", missing)
+	}
+	return expanded, nil
 }
 
 // normalizeSQLDriver 将驱动别名转换为标准 database/sql 驱动名称。
@@ -333,36 +356,6 @@ DROP TABLE IF EXISTS `+"`%s`"+`;
 	}
 }
 
-// generateGoTemplate 生成 Go 代码迁移模板
-func generateGoTemplate(version int64, name string) string {
-	return fmt.Sprintf(`package migrations
-
-import (
-	"context"
-	"database/sql"
-	"fmt"
-
-	"github.com/pressly/goose/v3"
-)
-
-func init() {
-	goose.AddMigrationContext(up%d, down%d)
-}
-
-func up%d(ctx context.Context, tx *sql.Tx) error {
-	// 在此编写向上迁移的业务/数据库操作逻辑
-	fmt.Println("Applying Go migration %s (%d)...")
-	return nil
-}
-
-func down%d(ctx context.Context, tx *sql.Tx) error {
-	// 在此编写回滚操作逻辑
-	fmt.Println("Rolling back Go migration %s (%d)...")
-	return nil
-}
-`, version, version, version, name, version, version, name, version)
-}
-
 // runMigrateCreate 创建迁移文件。
 func runMigrateCreate(cmd *cobra.Command, args []string) error {
 	name := sanitizeMigrationName(args[0])
@@ -370,8 +363,8 @@ func runMigrateCreate(cmd *cobra.Command, args []string) error {
 	if len(args) > 1 {
 		format = strings.ToLower(strings.TrimSpace(args[1]))
 	}
-	if format != "sql" && format != "go" {
-		return fmt.Errorf("不支持的迁移格式：%s（仅支持 sql 或 go）", format)
+	if format != "sql" {
+		return fmt.Errorf("不支持的迁移格式：%s（当前仅支持 sql；Go migration 需要在应用中显式注册）", format)
 	}
 
 	dir := filepath.Clean(migrateFlags.dir)
@@ -381,7 +374,6 @@ func runMigrateCreate(cmd *cobra.Command, args []string) error {
 
 	// 生成 14 位 UTC 时间戳版本号，避免多时区协作冲突
 	timestampStr := time.Now().UTC().Format("20060102150405")
-	versionNum, _ := strconv.ParseInt(timestampStr, 10, 64)
 
 	fileName := fmt.Sprintf("%s_%s.%s", timestampStr, name, format)
 	filePath := filepath.Join(dir, fileName)
@@ -392,12 +384,7 @@ func runMigrateCreate(cmd *cobra.Command, args []string) error {
 		driver = cfg.Driver
 	}
 
-	var content string
-	if format == "go" {
-		content = generateGoTemplate(versionNum, name)
-	} else {
-		content = generateSQLTemplate(driver, name)
-	}
+	content := generateSQLTemplate(driver, name)
 
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("写入迁移文件失败：%w", err)

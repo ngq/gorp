@@ -141,6 +141,18 @@ func requireIdent(name, field string) error {
 }
 
 // validateStarterTemplate 校验 starter 模板名称是否合法。
+func validateStarterBackend(name string) error {
+	name = strings.TrimSpace(strings.ToLower(name))
+	switch name {
+	case "", "gorm":
+		return nil
+	case "ent":
+		return fmt.Errorf("starter backend %q is not supported yet; current templates generate GORM code", name)
+	default:
+		return fmt.Errorf("unsupported starter backend: %s (supported: gorm)", name)
+	}
+}
+
 func validateStarterTemplate(name string) error {
 	name = strings.TrimSpace(strings.ToLower(name))
 	switch name {

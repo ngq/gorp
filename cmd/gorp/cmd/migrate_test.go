@@ -29,6 +29,22 @@ func TestSanitizeMigrationName(t *testing.T) {
 	}
 }
 
+func TestLoadDBConfig_ExpandsEnvironment(t *testing.T) {
+	t.Setenv("GORP_TEST_DSN", "file:expanded.db")
+	configFile := filepath.Join(t.TempDir(), "app.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("database:\n  driver: sqlite3\n  dsn: ${GORP_TEST_DSN}\n"), 0o644))
+	cfg, err := loadDBConfig(configFile)
+	require.NoError(t, err)
+	require.Equal(t, "file:expanded.db", cfg.DSN)
+}
+
+func TestLoadDBConfig_RejectsUnsetEnvironment(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "app.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("database:\n  driver: sqlite3\n  dsn: ${GORP_MISSING_DSN}\n"), 0o644))
+	_, err := loadDBConfig(configFile)
+	require.ErrorContains(t, err, "GORP_MISSING_DSN")
+}
+
 func TestGenerateSQLTemplate_Dialects(t *testing.T) {
 	t.Run("MySQL", func(t *testing.T) {
 		tmpl := generateSQLTemplate("mysql", "users")
@@ -58,6 +74,11 @@ func TestGenerateSQLTemplate_Dialects(t *testing.T) {
 		require.Contains(t, tmpl, "-- +goose Down")
 		require.Contains(t, tmpl, `DROP TABLE IF EXISTS "products"`)
 	})
+}
+
+func TestMigrateCreateRejectsGoMigrations(t *testing.T) {
+	err := runMigrateCreate(migrateCreateCmd, []string{"unsupported", "go"})
+	require.ErrorContains(t, err, "当前仅支持 sql")
 }
 
 func TestMigrateCLI_FullLifecycle(t *testing.T) {

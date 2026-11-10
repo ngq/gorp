@@ -28,6 +28,13 @@ func TestRootCommandKeepsToolchainBoundary(t *testing.T) {
 	require.NotContains(t, out, " deploy ")
 }
 
+func TestStarterBackendValidation(t *testing.T) {
+	require.NoError(t, validateStarterBackend("gorm"))
+	require.NoError(t, validateStarterBackend(""))
+	require.ErrorContains(t, validateStarterBackend("ent"), "not supported yet")
+	require.ErrorContains(t, validateStarterBackend("unknown"), "unsupported starter backend")
+}
+
 func TestPublicStarterMatrixMatchesCurrentBoundary(t *testing.T) {
 	allowed := []string{starterTemplateGoLayout, starterTemplateMultiFlatWire, starterTemplateMultiIndependent}
 	for _, name := range allowed {

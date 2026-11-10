@@ -13,6 +13,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/database"
+	"github.com/pressly/goose/v3/lock"
 )
 
 // Option defines a functional option for configuring migration executions.
@@ -70,6 +71,8 @@ func resolveFS(fsys fs.FS, dir string) (fs.FS, error) {
 }
 
 // NewProvider creates a new goose.Provider instance with isolated state.
+// MySQL and PostgreSQL providers use a shared table lock for multi-instance safety;
+// SQLite migrations require single-instance execution.
 func NewProvider(db *sql.DB, driver string, fsys fs.FS, dir string, opts ...Option) (*goose.Provider, error) {
 	dialect, err := ToGooseDialect(driver)
 	if err != nil {
@@ -93,6 +96,21 @@ func NewProvider(db *sql.DB, driver string, fsys fs.FS, dir string, opts ...Opti
 	var providerOpts []goose.ProviderOption
 	if cfg.tableName != "" && cfg.tableName != goose.DefaultTablename {
 		providerOpts = append(providerOpts, goose.WithTableName(cfg.tableName))
+	}
+
+	switch dialect {
+	case goose.DialectPostgres:
+		locker, err := lock.NewPostgresTableLocker()
+		if err != nil {
+			return nil, fmt.Errorf("create PostgreSQL migration locker: %w", err)
+		}
+		providerOpts = append(providerOpts, goose.WithLocker(locker))
+	case goose.DialectMySQL:
+		locker, err := lock.NewMySQLTableLocker()
+		if err != nil {
+			return nil, fmt.Errorf("create MySQL migration locker: %w", err)
+		}
+		providerOpts = append(providerOpts, goose.WithLocker(locker))
 	}
 
 	provider, err := goose.NewProvider(dialect, db, subFS, providerOpts...)
