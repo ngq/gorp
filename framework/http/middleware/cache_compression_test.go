@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,6 +37,58 @@ func TestCacheControlWritesHeader(t *testing.T) {
 // TestETagWritesHeaderAndReturnsNotModifiedOnMatch verifies ETag generation and conditional 304 responses.
 //
 // TestETagWritesHeaderAndReturnsNotModifiedOnMatch 验证 ETag 生成与条件 304 响应。
+func TestETagFlushEnablesStreaming(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewTestEngine()
+	applyTransportMiddleware(router, ETag())
+	flushed := make(chan struct{}, 1)
+	router.GET("/events", func(c *gin.Context) {
+		c.Writer.Write([]byte("first"))
+		c.Writer.Flush()
+		flushed <- struct{}{}
+		c.Writer.Write([]byte("second"))
+	})
+
+	recorder := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/events", nil))
+		close(done)
+	}()
+	select {
+	case <-flushed:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not reach flush")
+	}
+	<-done
+	if recorder.Body.String() != "firstsecond" {
+		t.Fatalf("expected streamed body, got %q", recorder.Body.String())
+	}
+	if recorder.Header().Get("ETag") != "" {
+		t.Fatal("streaming response must not receive an ETag")
+	}
+}
+
+func TestETagOversizedResponseSpillsToWriter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewTestEngine()
+	applyTransportMiddleware(router, ETag())
+	router.GET("/large", func(c *gin.Context) {
+		_, _ = c.Writer.Write(make([]byte, maxETagResponseBytes+1))
+	})
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/large", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", recorder.Code)
+	}
+	if recorder.Body.Len() != maxETagResponseBytes+1 {
+		t.Fatalf("expected full streamed body, got %d bytes", recorder.Body.Len())
+	}
+	if recorder.Header().Get("ETag") != "" {
+		t.Fatal("oversized response must bypass ETag generation")
+	}
+}
+
 func TestETagWritesHeaderAndReturnsNotModifiedOnMatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := NewTestEngine()

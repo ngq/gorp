@@ -190,35 +190,13 @@ func requestClientIP(c transportcontract.Context) string {
 	}
 
 	req := c.Request()
-	remoteAddr := ""
-	if req != nil {
-		remoteAddr = strings.TrimSpace(req.RemoteAddr)
-	}
-
-	// Only trust forwarding headers when the request comes from a trusted proxy.
-	// 仅当请求来自可信代理时才信任转发头。
-	if isFromTrustedProxy(remoteAddr) {
-		if xff := strings.TrimSpace(c.GetHeader("X-Forwarded-For")); xff != "" {
-			parts := strings.Split(xff, ",")
-			if len(parts) > 0 {
-				return strings.TrimSpace(parts[0])
-			}
-		}
-		if xri := strings.TrimSpace(c.GetHeader("X-Real-IP")); xri != "" {
-			return xri
-		}
-	}
-
-	// Fallback: use RemoteAddr directly.
-	// 回退：直接使用 RemoteAddr。
 	if req == nil {
 		return ""
 	}
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err == nil && host != "" {
-		return host
-	}
-	return remoteAddr
+
+	// 统一走 resolveClientIPFromRequest（XFF 从右向左扫描、跳过可信代理）：
+	// 旧实现取 XFF 最左值，可信代理拓扑下可被客户端预置伪造（SEC-01）。
+	return resolveClientIPFromRequest(req, nil, trustedProxies)
 }
 
 // matchesIPRules reports whether the given IP matches any configured rule.

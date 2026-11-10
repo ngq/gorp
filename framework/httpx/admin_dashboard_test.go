@@ -93,11 +93,11 @@ func TestAdminDashboard_TokenAuth(t *testing.T) {
 	engine.ServeHTTP(w1, req1)
 	require.Equal(t, http.StatusUnauthorized, w1.Code)
 
-	// 2. 带有效 Query Token 访问 -> 200
+	// 2. Query Token 已移除（SEC-04：token 会落入访问日志）-> 401
 	w2 := httptest.NewRecorder()
 	req2 := httptest.NewRequest(http.MethodGet, "/debug/gorp/api/metrics?token=my-secret-admin-token", nil)
 	engine.ServeHTTP(w2, req2)
-	require.Equal(t, http.StatusOK, w2.Code)
+	require.Equal(t, http.StatusUnauthorized, w2.Code)
 
 	// 3. 带有效 Bearer Header Token 访问 -> 200
 	w3 := httptest.NewRecorder()

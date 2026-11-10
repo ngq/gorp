@@ -87,7 +87,8 @@ type IdempotencyResponse struct {
 // 使用 sync.Map.LoadOrStore 实现原子 Reserve，消除 TOCTOU 竞态。
 type MemoryIdempotencyStore struct {
 	data   sync.Map
-	stopCh chan struct{} // stopCh 用于通知 cleanup goroutine 退出
+	stopCh    chan struct{} // stopCh 用于通知 cleanup goroutine 退出
+	closeOnce sync.Once     // CORE-06：保证并发 Close 不 double-close panic
 	//
 	// stopCh signals the cleanup goroutine to exit.
 }
@@ -143,7 +144,8 @@ func (w *idempotencyResponseWriter) Status() int {
 // NewMemoryIdempotencyStore 创建一个基于内存的幂等存储。
 func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
 	store := &MemoryIdempotencyStore{
-		stopCh: make(chan struct{}),
+		stopCh:    make(chan struct{}),
+		closeOnce: sync.Once{},
 	}
 	go store.cleanup()
 	return store
@@ -151,13 +153,9 @@ func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
 
 // Close 停止 cleanup goroutine，释放资源。
 // 调用后 store 不应再被使用。
+// CORE-06：sync.Once 保证并发 Close 不 double-close panic。
 func (s *MemoryIdempotencyStore) Close() {
-	select {
-	case <-s.stopCh:
-		// 已关闭
-	default:
-		close(s.stopCh)
-	}
+	s.closeOnce.Do(func() { close(s.stopCh) })
 }
 
 // Reserve atomically reserves a key or returns the cached response.
@@ -185,9 +183,11 @@ func (s *MemoryIdempotencyStore) Reserve(key string, ttl time.Duration) (bool, *
 	// Key already exists. Check if expired.
 	// Key 已存在。检查是否过期。
 	if time.Now().After(entry.expiresAt) {
-		// Entry is expired. Try to replace it with our placeholder.
-		// 条目已过期。尝试用我们的占位符替换。
-		s.data.Delete(key)
+		// Entry is expired. Atomically replace it with our placeholder.
+		// CORE-03：必须用 CompareAndDelete——无条件 Delete 会把并发 Reserve
+		// 刚写入的新占位符也删掉，导致两个请求同时预留（幂等被击穿）。
+		// CAS 失败说明条目已被并发替换，落入下方 committed/未提交分支。
+		s.data.CompareAndDelete(key, entry)
 		// Retry reservation (could lose to another goroutine, so use LoadOrStore again).
 		actual2, loaded2 := s.data.LoadOrStore(key, placeholder)
 		if !loaded2 {

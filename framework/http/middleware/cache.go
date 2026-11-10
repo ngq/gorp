@@ -60,10 +60,29 @@ func ETag() transportcontract.Middleware {
 
 			recorder := newETagResponseWriter(gc.Writer)
 			gc.Writer = recorder
+			// CORE-01：next(c) panic 穿透本帧时，恢复真实 writer 让外层
+			// Recovery 中间件能干净地写 500；否则 Recovery 的 500 会写进
+			// recorder，客户端收到 200 空 body。正常路径在下方显式恢复，
+			// defer 的二次赋值为幂等 no-op。
+			defer func() {
+				gc.Writer = recorder.ResponseWriter
+			}()
 			next(c)
 			gc.Writer = recorder.ResponseWriter
 
+			if recorder.streaming {
+				return
+			}
+			if recorder.overflow {
+				recorder.FlushTo(gc.Writer)
+				return
+			}
+
 			status := recorder.Status()
+			if strings.HasPrefix(strings.ToLower(recorder.header.Get("Content-Type")), "text/event-stream") {
+				recorder.FlushTo(gc.Writer)
+				return
+			}
 			if status == 0 {
 				status = http.StatusOK
 			}
@@ -99,6 +118,8 @@ func ETag() transportcontract.Middleware {
 	}
 }
 
+const maxETagResponseBytes = 10 << 20
+
 type etagResponseWriter struct {
 	gin.ResponseWriter
 	header     http.Header
@@ -106,6 +127,8 @@ type etagResponseWriter struct {
 	statusCode int
 	written    bool
 	size       int
+	streaming  bool
+	overflow   bool
 }
 
 // newETagResponseWriter creates a response recorder used for ETag calculation.
@@ -150,10 +173,36 @@ func (w *etagResponseWriter) WriteHeaderNow() {
 //
 // Write 缓存响应字节，供后续 ETag 处理使用。
 func (w *etagResponseWriter) Write(data []byte) (int, error) {
+	if w.streaming {
+		w.WriteHeaderNow()
+		w.size += len(data)
+		return w.ResponseWriter.Write(data)
+	}
 	w.WriteHeaderNow()
+	if strings.HasPrefix(strings.ToLower(w.header.Get("Content-Type")), "text/event-stream") || len(w.body)+len(data) > maxETagResponseBytes {
+		if err := w.startStreaming(); err != nil {
+			return 0, err
+		}
+		w.overflow = !strings.HasPrefix(strings.ToLower(w.header.Get("Content-Type")), "text/event-stream")
+		w.size += len(data)
+		return w.ResponseWriter.Write(data)
+	}
 	w.body = append(w.body, data...)
 	w.size += len(data)
 	return len(data), nil
+}
+
+func (w *etagResponseWriter) startStreaming() error {
+	copyHeaders(w.ResponseWriter.Header(), w.header)
+	w.ResponseWriter.WriteHeader(w.statusCode)
+	if len(w.body) > 0 {
+		if _, err := w.ResponseWriter.Write(w.body); err != nil {
+			return err
+		}
+	}
+	w.body = nil
+	w.streaming = true
+	return nil
 }
 
 // WriteString buffers response text for later ETag processing.
@@ -184,10 +233,21 @@ func (w *etagResponseWriter) Written() bool {
 	return w.written
 }
 
-// Flush is a no-op because the response is fully buffered.
+// Flush switches to direct writes so streaming responses are not held until completion.
 //
-// Flush 在这里为空操作，因为响应会先被完整缓冲。
-func (w *etagResponseWriter) Flush() {}
+// Flush 切换为直写模式，避免流式响应被缓冲到请求结束。
+func (w *etagResponseWriter) Flush() {
+	if !w.streaming {
+		copyHeaders(w.ResponseWriter.Header(), w.header)
+		w.ResponseWriter.WriteHeader(w.statusCode)
+		if len(w.body) > 0 {
+			_, _ = w.ResponseWriter.Write(w.body)
+			w.body = nil
+		}
+		w.streaming = true
+	}
+	w.ResponseWriter.Flush()
+}
 
 // FlushTo writes the staged response into the destination writer.
 //

@@ -11,7 +11,6 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -175,24 +174,14 @@ func RateLimitMiddleware(limiter RateLimiter, keyFunc func(*gin.Context) string)
 // Otherwise, RemoteAddr is used directly to prevent spoofing.
 //
 // IPKeyFunc 从请求中提取基于客户端 IP 的限流 key。
-// X-Forwarded-For 和 X-Real-IP 头仅在请求来自可信代理时才会被信任
-// （见 ip_filter.go 中的 SetTrustedProxies）。
-// 否则直接使用 RemoteAddr，以防止伪造绕过限流。
+// 统一走 resolveClientIPFromRequest（XFF 从右向左扫描、跳过可信代理）。
+// 不再回退 c.ClientIP()：gin 引擎默认信任所有来源的 XFF，回退它会把
+// 直连伪造路径重新打开（SEC-02）；核心函数在头不可信时直接使用 RemoteAddr。
 func IPKeyFunc(c *gin.Context) string {
-	remoteAddr := c.Request.RemoteAddr
-
-	if isFromTrustedProxy(remoteAddr) {
-		if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-			// Take only the first IP from the comma-separated list
-			parts := strings.SplitN(xff, ",", 2)
-			return strings.TrimSpace(parts[0])
-		}
-		if xri := c.GetHeader("X-Real-IP"); xri != "" {
-			return strings.TrimSpace(xri)
-		}
+	if c.Request == nil {
+		return ""
 	}
-
-	return c.ClientIP()
+	return resolveClientIPFromRequest(c.Request, nil, trustedProxies)
 }
 
 // TokenBucketLimiter is an in-memory token-bucket limiter for lightweight HTTP protection.

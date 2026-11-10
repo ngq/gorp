@@ -29,6 +29,7 @@ import (
 	httpmiddleware "github.com/ngq/gorp/framework/http/middleware"
 	featureprovider "github.com/ngq/gorp/framework/provider/feature"
 	gingin "github.com/ngq/gorp/framework/provider/gin"
+	configprovider "github.com/ngq/gorp/framework/provider/config"
 	gormpkg "gorm.io/gorm"
 )
 
@@ -41,6 +42,10 @@ type Engine struct {
 
 // Default creates a pre-configured gorp Engine with standard middleware,
 // config-driven database/redis bindings, structured logger, and graceful shutdown.
+//
+// 生产环境（app.env=prod）下不再自动挂载 /debug/gorp 治理控制台（SEC-03）：
+// 控制台会暴露全量配置、路由与 OpenAPI 规约，必须显式调用 EnableDebugDashboard
+// 并配置 AdminToken 后才会开启。非生产环境保持自动挂载（开发体验不变）。
 func Default() *Engine {
 	opts := bootstrap.HTTPServiceOptions{
 		HTTPMode: string(resiliencecontract.HTTPModeGin),
@@ -57,8 +62,30 @@ func Default() *Engine {
 		runtime:   rt,
 		ginEngine: engine,
 	}
-	app.EnableDebugDashboard()
+	if !isProductionEnv(rt) {
+		app.EnableDebugDashboard()
+	} else if logger := runtimeLogger(rt); logger != nil {
+		logger.Info("gorp: debug dashboard skipped in production; call EnableDebugDashboard with AdminToken to enable")
+	}
 	return app
+}
+
+// isProductionEnv 判断运行环境是否为生产（app.env 归一化为 prod）。
+// 不依赖 gin.Mode()：gin 默认 DebugMode，未显式设置 GIN_MODE 的生产部署
+// 会被误判为非生产（SEC-03）。
+func isProductionEnv(rt *bootstrap.HTTPServiceRuntime) bool {
+	if rt == nil || rt.Config == nil {
+		return false
+	}
+	return rt.Config.Env() == configprovider.EnvProd
+}
+
+// runtimeLogger 尽力从 runtime 取框架日志（控制台跳过提示用）。
+func runtimeLogger(rt *bootstrap.HTTPServiceRuntime) observabilitycontract.Logger {
+	if rt == nil || rt.Logger == nil {
+		return nil
+	}
+	return rt.Logger
 }
 
 // New creates a minimal gorp Engine.

@@ -161,6 +161,11 @@ func newService(c runtimecontract.Container, cfg serverconfig.Service) transport
 	}
 	engine := gin.New()
 	engine.ContextWithFallback = true
+	// 关闭 gin 引擎级的隐式 XFF 信任（默认 trustedProxies=0.0.0.0/0，
+	// c.ClientIP() 会信任任意来源的伪造头——SEC-02）。框架的 IP 解析
+	// 统一走 middleware 的 SetTrustedProxies + resolveClientIPFromRequest；
+	// 应用确需 gin 原生 ClientIP 信任代理时，可自行 engine.SetTrustedProxies。
+	_ = engine.SetTrustedProxies(nil)
 	engine.Use(injectRequestContainer(c))
 	logger := getLogger(c).With(
 		observabilitycontract.Field{Key: "http_service", Value: cfg.Name},

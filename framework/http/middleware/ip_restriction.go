@@ -167,7 +167,15 @@ func resolveClientIP(c transportcontract.Context, trustedProxies []string, trust
 	if req == nil {
 		return "127.0.0.1"
 	}
+	return resolveClientIPFromRequest(req, trustedProxies, trustedNets)
+}
 
+// resolveClientIPFromRequest 是包内统一的客户端 IP 解析实现：
+// 仅当直连对端为可信代理时才信任 X-Forwarded-For / X-Real-IP，且 XFF 从右向左
+// 扫描、跳过可信代理——取最左值可被客户端预置伪造（SEC-01）。
+// requestClientIP（ip_filter.go）、IPKeyFunc（ratelimit.go）、IPRestriction
+// 三处必须统一复用本实现，避免再次出现解析不一致的绕过。
+func resolveClientIPFromRequest(req *http.Request, trustedProxies []string, trustedNets []*net.IPNet) string {
 	remoteIP := req.RemoteAddr
 	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
 		remoteIP = host

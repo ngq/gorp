@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -58,6 +59,46 @@ func TestTimeout_Exceeded(t *testing.T) {
 	}
 	if body["message"] != "request timeout" {
 		t.Fatalf("expected request timeout, got %v", body["message"])
+	}
+}
+
+func TestTimeout_BufferLimitReturnsError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(TimeoutMiddleware(time.Second))
+	router.GET("/large", func(c *gin.Context) {
+		if _, err := c.Writer.Write(make([]byte, maxTimeoutResponseBytes+1)); err == nil {
+			t.Error("expected timeout response buffer limit error")
+		}
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/large", nil))
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 for oversized buffered response, got %d", recorder.Code)
+	}
+}
+
+func TestTimeout_FlushDoesNotWriteSecondTimeoutResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(TimeoutMiddleware(20 * time.Millisecond))
+	flushed := make(chan struct{})
+	router.GET("/stream", func(c *gin.Context) {
+		_, _ = c.Writer.Write([]byte("started"))
+		c.Writer.Flush()
+		close(flushed)
+		time.Sleep(60 * time.Millisecond)
+		_, _ = c.Writer.Write([]byte("finished"))
+	})
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/stream", nil))
+	<-flushed
+	if recorder.Code == http.StatusGatewayTimeout {
+		t.Fatal("streaming response must not be replaced with a second timeout status")
+	}
+	if !strings.HasPrefix(recorder.Body.String(), "started") {
+		t.Fatalf("expected initial streamed bytes, got %q", recorder.Body.String())
 	}
 }
 

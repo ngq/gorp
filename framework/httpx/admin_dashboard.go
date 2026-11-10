@@ -2,6 +2,7 @@
 package httpx
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -309,16 +310,16 @@ func RegisterAdminDashboard(engine *gin.Engine, container runtimecontract.Contai
 			return
 		}
 
-		// 2. Admin Token verification
+		// 2. Admin Token verification（SEC-04：仅接受 Authorization Bearer 头；
+		// 不再支持 ?token= 查询串——token 会落入反向代理与访问日志。
+		// 比较使用常量时间算法防时序侧信道。）
 		if cfg.AdminToken != "" {
-			token := c.Query("token")
-			if token == "" {
-				authHeader := c.GetHeader("Authorization")
-				if strings.HasPrefix(authHeader, "Bearer ") {
-					token = strings.TrimPrefix(authHeader, "Bearer ")
-				}
+			token := ""
+			authHeader := c.GetHeader("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
 			}
-			if token != cfg.AdminToken {
+			if subtle.ConstantTimeCompare([]byte(token), []byte(cfg.AdminToken)) != 1 {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 					"error": "unauthorized: invalid admin token for debug dashboard",
 				})
@@ -432,13 +433,31 @@ func RegisterAdminDashboard(engine *gin.Engine, container runtimecontract.Contai
 	})
 }
 
+// sensitiveKeySubstrings 是配置脱敏的关键词表（小写匹配）。
+// 覆盖 dsn/uri/credential/auth 等常见凭据载体（SEC-04：此前 dsn 中的
+// user:pass@host 会原样暴露）；key 仍会误伤少量无辜键（如 key_prefix），
+// 但宁可多脱敏不可泄露。
+var sensitiveKeySubstrings = []string{
+	"password", "passwd", "secret", "token", "credential",
+	"dsn", "uri", "auth", "private", "apikey", "api_key",
+}
+
 func maskSecrets(m map[string]any) map[string]any {
 	res := make(map[string]any)
 	for k, v := range m {
 		lowerKey := strings.ToLower(k)
-		if strings.Contains(lowerKey, "password") || strings.Contains(lowerKey, "secret") || strings.Contains(lowerKey, "token") || strings.Contains(lowerKey, "key") {
-			res[k] = "****** (redacted)"
-		} else if nestedMap, ok := v.(map[string]any); ok {
+		masked := false
+		for _, sub := range sensitiveKeySubstrings {
+			if strings.Contains(lowerKey, sub) {
+				res[k] = "****** (redacted)"
+				masked = true
+				break
+			}
+		}
+		if masked {
+			continue
+		}
+		if nestedMap, ok := v.(map[string]any); ok {
 			res[k] = maskSecrets(nestedMap)
 		} else {
 			res[k] = v

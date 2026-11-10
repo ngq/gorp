@@ -114,13 +114,15 @@ func TestResponse_WithGenericError(t *testing.T) {
 
 	httpx.Error(c, errors.New("db connection lost"))
 
+	// FEAT-01：未知错误不得回显内部细节（err.Error() 可能携带 SQL/路径等信息），
+	// 统一返回通用文案；细节走服务端日志。
 	require.Equal(t, http.StatusInternalServerError, w.Code)
 	var resp httpx.Response
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	require.Equal(t, httpx.CodeInternal, resp.Code)
-	require.Equal(t, httpx.Code(13), resp.Code)
-	require.Equal(t, "db connection lost", resp.Message)
+	require.Equal(t, "internal server error", resp.Message)
+	require.NotContains(t, w.Body.String(), "db connection lost")
 }
 
 func TestResponse_NewBizError_FailFast(t *testing.T) {

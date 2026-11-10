@@ -2,11 +2,13 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	securitycontract "github.com/ngq/gorp/framework/contract/security"
@@ -44,6 +46,35 @@ func TestRoutePermissionCache_Basic(t *testing.T) {
 	// Clear
 	cache.Clear()
 	require.Equal(t, 0, cache.Len())
+}
+
+func TestRoutePermissionCache_ExpiresEntries(t *testing.T) {
+	cache := NewRoutePermissionCacheWithTTL(10 * time.Millisecond)
+	cache.Set("GET", "/temporary", PermissionModeAuth)
+	time.Sleep(20 * time.Millisecond)
+	_, ok := cache.Get("GET", "/temporary")
+	require.False(t, ok)
+	require.Equal(t, 0, cache.Len())
+}
+
+func TestRoutePermissionCache_ZeroValue(t *testing.T) {
+	var cache RoutePermissionCache
+	cache.Set("GET", "/health", PermissionModeIgnored)
+	mode, ok := cache.Get("GET", "/health")
+	require.True(t, ok)
+	require.Equal(t, PermissionModeIgnored, mode)
+}
+
+func TestRoutePermissionCache_BoundsEntries(t *testing.T) {
+	cache := NewRoutePermissionCache()
+	for i := 0; i < maxRoutePermissionCacheEntries+10; i++ {
+		cache.Set("GET", fmt.Sprintf("/route/%d", i), PermissionModeAuth)
+	}
+	require.Equal(t, maxRoutePermissionCacheEntries, cache.Len())
+	_, ok := cache.Get("GET", "/route/0")
+	require.False(t, ok)
+	_, ok = cache.Get("GET", fmt.Sprintf("/route/%d", maxRoutePermissionCacheEntries+9))
+	require.True(t, ok)
 }
 
 func TestRoutePermissionCache_Resolve_HitAndMiss(t *testing.T) {

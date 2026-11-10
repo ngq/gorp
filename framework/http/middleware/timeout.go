@@ -80,8 +80,9 @@ func Timeout(timeout time.Duration) transportcontract.Middleware {
 				}
 				buffered.commit(base)
 			case <-ctx.Done():
-				buffered.timeout()
-				writeTimeoutResponse(base)
+				if buffered.timeout() {
+					writeTimeoutResponse(base)
+				}
 			}
 		}
 	}
@@ -126,8 +127,9 @@ func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 			}
 			buffered.commit(base)
 		case <-ctx.Done():
-			buffered.timeout()
-			writeTimeoutResponse(base)
+			if buffered.timeout() {
+				writeTimeoutResponse(base)
+			}
 			c.Abort()
 		}
 	}
@@ -172,7 +174,10 @@ func TimeoutMiddlewareWithHandler(timeout time.Duration, onTimeout func(*gin.Con
 			}
 			buffered.commit(base)
 		case <-ctx.Done():
-			buffered.timeout()
+			if !buffered.timeout() {
+				c.Abort()
+				return
+			}
 			if onTimeout != nil {
 				timeoutContext := c.Copy()
 				timeoutContext.Writer = base
@@ -204,13 +209,17 @@ func cloneGinContextForContinuation(ctx *gin.Context) *gin.Context {
 	return worker
 }
 
+const maxTimeoutResponseBytes = 10 << 20
+
 type timeoutResponseWriter struct {
 	gin.ResponseWriter
-	mu       sync.Mutex
-	header   http.Header
-	body     bytes.Buffer
-	status   int
-	timedOut bool
+	mu        sync.Mutex
+	header    http.Header
+	body      bytes.Buffer
+	status    int
+	timedOut  bool
+	overflow  bool
+	streaming bool
 }
 
 func newTimeoutResponseWriter(base gin.ResponseWriter) *timeoutResponseWriter {
@@ -236,6 +245,13 @@ func (w *timeoutResponseWriter) Write(data []byte) (int, error) {
 	if w.timedOut {
 		return len(data), nil
 	}
+	if w.streaming {
+		return w.ResponseWriter.Write(data)
+	}
+	if w.body.Len()+len(data) > maxTimeoutResponseBytes {
+		w.overflow = true
+		return 0, http.ErrContentLength
+	}
 	return w.body.Write(data)
 }
 func (w *timeoutResponseWriter) WriteString(value string) (int, error) {
@@ -256,26 +272,51 @@ func (w *timeoutResponseWriter) Written() bool {
 	defer w.mu.Unlock()
 	return w.body.Len() > 0 || w.status != http.StatusOK
 }
-func (w *timeoutResponseWriter) Flush()                   {}
+func (w *timeoutResponseWriter) Flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.timedOut || w.overflow {
+		return
+	}
+	copyTimeoutHeaders(w.ResponseWriter.Header(), w.header)
+	w.ResponseWriter.WriteHeader(w.status)
+	if w.body.Len() > 0 {
+		_, _ = w.ResponseWriter.Write(w.body.Bytes())
+		w.body.Reset()
+	}
+	w.ResponseWriter.Flush()
+	w.streaming = true
+}
 func (w *timeoutResponseWriter) Pusher() http.Pusher      { return nil }
 func (w *timeoutResponseWriter) CloseNotify() <-chan bool { return w.ResponseWriter.CloseNotify() }
 func (w *timeoutResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, errors.New("timeout middleware does not support hijacking")
 }
-func (w *timeoutResponseWriter) timeout() {
+func (w *timeoutResponseWriter) timeout() bool {
 	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.streaming {
+		w.timedOut = true
+		return false
+	}
 	w.timedOut = true
 	w.status = http.StatusGatewayTimeout
 	w.body.Reset()
-	w.mu.Unlock()
+	return true
 }
 func (w *timeoutResponseWriter) commit(dst gin.ResponseWriter) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.timedOut {
+	if w.timedOut || w.streaming {
 		return
 	}
 	copyTimeoutHeaders(dst.Header(), w.header)
+	if w.overflow {
+		dst.Header().Set("Content-Type", "application/json; charset=utf-8")
+		dst.WriteHeader(http.StatusInternalServerError)
+		_, _ = dst.Write([]byte(`{"code":13,"reason":"Internal","message":"response exceeds timeout middleware buffer limit","data":null}`))
+		return
+	}
 	dst.WriteHeader(w.status)
 	_, _ = dst.Write(w.body.Bytes())
 }
@@ -289,7 +330,9 @@ func copyTimeoutHeaders(dst, src http.Header) {
 func writeTimeoutResponse(writer http.ResponseWriter) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.WriteHeader(http.StatusGatewayTimeout)
-	_, _ = writer.Write([]byte(`{"code":1006,"message":"request timeout","data":null}`))
+	// code 4 = httpx.CodeDeadlineExceeded（canonical，AIP-193），与 HTTP 504 对齐。
+	// 旧值 1006 是 legacy 词汇（ServiceUnavailable/503），语义错位（FEAT-01）。
+	_, _ = writer.Write([]byte(`{"code":4,"reason":"DeadlineExceeded","message":"request timeout","data":null}`))
 }
 
 // RequestTimeout returns the remaining timeout budget of the current request.

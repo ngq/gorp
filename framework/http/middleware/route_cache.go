@@ -13,6 +13,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
 )
@@ -49,15 +50,36 @@ func RoutePermissionModeFromContext(ctx context.Context) (string, bool) {
 type RouteModeResolver func(ctx context.Context, method, path string) (string, error)
 
 // RoutePermissionCache provides thread-safe in-memory caching of route permission modes.
+const (
+	maxRoutePermissionCacheEntries = 4096
+	defaultRoutePermissionCacheTTL = 5 * time.Minute
+)
+
+type routePermissionEntry struct {
+	mode      string
+	expiresAt time.Time
+}
+
 type RoutePermissionCache struct {
 	mu      sync.RWMutex
-	entries map[string]string
+	entries map[string]routePermissionEntry
+	order   []string
+	ttl     time.Duration
 }
 
 // NewRoutePermissionCache creates an empty route permission cache.
 func NewRoutePermissionCache() *RoutePermissionCache {
+	return NewRoutePermissionCacheWithTTL(defaultRoutePermissionCacheTTL)
+}
+
+// NewRoutePermissionCacheWithTTL creates a route permission cache with an explicit entry TTL.
+func NewRoutePermissionCacheWithTTL(ttl time.Duration) *RoutePermissionCache {
+	if ttl <= 0 {
+		ttl = defaultRoutePermissionCacheTTL
+	}
 	return &RoutePermissionCache{
-		entries: make(map[string]string),
+		entries: make(map[string]routePermissionEntry),
+		ttl:     ttl,
 	}
 }
 
@@ -67,17 +89,57 @@ func routeKey(method, path string) string {
 
 // Get retrieves the cached permission mode for a route.
 func (c *RoutePermissionCache) Get(method, path string) (string, bool) {
+	key := routeKey(method, path)
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	mode, ok := c.entries[routeKey(method, path)]
-	return mode, ok
+	entry, ok := c.entries[key]
+	c.mu.RUnlock()
+	if !ok {
+		return "", false
+	}
+	if !entry.expiresAt.IsZero() && time.Now().After(entry.expiresAt) {
+		c.mu.Lock()
+		if current, exists := c.entries[key]; exists && current.expiresAt == entry.expiresAt {
+			delete(c.entries, key)
+			c.removeOrderLocked(key)
+		}
+		c.mu.Unlock()
+		return "", false
+	}
+	return entry.mode, true
 }
 
 // Set sets the permission mode for a route.
 func (c *RoutePermissionCache) Set(method, path, mode string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries[routeKey(method, path)] = mode
+	c.setLocked(routeKey(method, path), mode)
+}
+
+func (c *RoutePermissionCache) setLocked(key, mode string) {
+	if c.entries == nil {
+		c.entries = make(map[string]routePermissionEntry)
+	}
+	if c.ttl <= 0 {
+		c.ttl = defaultRoutePermissionCacheTTL
+	}
+	if _, exists := c.entries[key]; !exists {
+		if len(c.entries) >= maxRoutePermissionCacheEntries && len(c.order) > 0 {
+			oldest := c.order[0]
+			c.order = c.order[1:]
+			delete(c.entries, oldest)
+		}
+		c.order = append(c.order, key)
+	}
+	c.entries[key] = routePermissionEntry{mode: mode, expiresAt: time.Now().Add(c.ttl)}
+}
+
+func (c *RoutePermissionCache) removeOrderLocked(key string) {
+	for i, candidate := range c.order {
+		if candidate == key {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+			return
+		}
+	}
 }
 
 // SetBatch pre-warms the cache with multiple route entries.
@@ -88,9 +150,9 @@ func (c *RoutePermissionCache) SetBatch(routes map[string]string) {
 		// Key can be "GET:/api/v1/users" or method, path
 		parts := strings.SplitN(k, ":", 2)
 		if len(parts) == 2 {
-			c.entries[routeKey(parts[0], parts[1])] = v
+			c.setLocked(routeKey(parts[0], parts[1]), v)
 		} else {
-			c.entries[k] = v
+			c.setLocked(k, v)
 		}
 	}
 }
@@ -99,14 +161,17 @@ func (c *RoutePermissionCache) SetBatch(routes map[string]string) {
 func (c *RoutePermissionCache) Invalidate(method, path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.entries, routeKey(method, path))
+	key := routeKey(method, path)
+	delete(c.entries, key)
+	c.removeOrderLocked(key)
 }
 
 // Clear flushes all cached route entries.
 func (c *RoutePermissionCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries = make(map[string]string)
+	c.entries = make(map[string]routePermissionEntry)
+	c.order = nil
 }
 
 // Len returns the number of cached routes.

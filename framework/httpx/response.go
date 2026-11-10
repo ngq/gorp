@@ -262,7 +262,10 @@ func parseError(err error) *BizError {
 	if errors.As(err, &appErr) {
 		return fromAppError(appErr)
 	}
-	return &BizError{code: CodeInternal, message: err.Error()}
+	// 未知错误一律返回通用文案（SEC/FEAT-01）：err.Error() 可能携带 SQL 细节、
+	// 文件路径等内部信息，直接回显会泄露到客户端；细节请走服务端日志。
+	// 语义与 legacy 层（framework/http/middleware/response.go）对齐。
+	return &BizError{code: CodeInternal, message: "internal server error"}
 }
 
 func fromAppError(appErr resiliencecontract.AppError) *BizError {
