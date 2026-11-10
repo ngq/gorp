@@ -14,6 +14,7 @@ import (
 	"time"
 
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	"github.com/ngq/gorp/framework/goroutine"
 )
 
@@ -189,13 +190,15 @@ func restoreContextFromEvent(ctx context.Context, event integrationcontract.Even
 		ctx = context.Background()
 	}
 	// 如果是 CloudEvent 类型，自动提取 Extensions 中的 Trace 信息并注入 Context
+	// FEAT-06：注入需用 supportcontract 的 typed key（与 FromTraceIDContext 等
+	// helper 互通），裸字符串 key 与框架读取路径不匹配。
 	if ce, ok := event.(interface{ ExtensionsMap() map[string]any }); ok {
 		ext := ce.ExtensionsMap()
 		if traceID, ok := ext["trace_id"].(string); ok && traceID != "" {
-			ctx = context.WithValue(ctx, "trace_id", traceID)
+			ctx = supportcontract.NewTraceIDContext(ctx, traceID)
 		}
 		if reqID, ok := ext["request_id"].(string); ok && reqID != "" {
-			ctx = context.WithValue(ctx, "request_id", reqID)
+			ctx = supportcontract.NewRequestIDContext(ctx, reqID)
 		}
 	}
 	return ctx

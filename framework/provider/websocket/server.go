@@ -23,6 +23,7 @@ type Server struct {
 	conns        map[*gws.Conn]context.Context
 	config       *transportcontract.WebSocketConfig
 	stopCh       chan struct{}           // 信号通道，用于停止心跳检测 goroutine
+	stopOnce     sync.Once               // CORE-06：保证 stopCh 并发关闭不 double-close panic
 	lastActivity map[*gws.Conn]time.Time // 每个连接的最后活跃时间
 	metrics      *WSMetricsRecorder      // Prometheus 指标记录器
 }
@@ -47,6 +48,7 @@ func NewServerWithConfig(config *transportcontract.WebSocketConfig) *Server {
 		conns:        make(map[*gws.Conn]context.Context),
 		config:       config,
 		stopCh:       make(chan struct{}),
+		stopOnce:     sync.Once{},
 		lastActivity: make(map[*gws.Conn]time.Time),
 		metrics:      NewWSMetricsRecorder(),
 	}
@@ -176,13 +178,8 @@ func (s *Server) Count() int {
 // Shutdown 优雅关闭所有连接。
 // 尊重上下文取消/超时，不在 I/O 期间持锁。
 func (s *Server) Shutdown(ctx context.Context) error {
-	// 停止心跳检测 goroutine
-	select {
-	case <-s.stopCh:
-		// 已关闭
-	default:
-		close(s.stopCh)
-	}
+	// 停止心跳检测 goroutine（CORE-06：sync.Once 保证并发关闭不 double-close panic）
+	s.stopOnce.Do(func() { close(s.stopCh) })
 
 	// 持锁收集连接，然后释放锁
 	s.mu.Lock()

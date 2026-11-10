@@ -270,10 +270,9 @@ func TestMemoryOutboxRetryLimitBoundary(t *testing.T) {
 	}
 }
 
-// TestMemoryOutboxRetryLimitZero verifies that with RetryLimit=0, message is immediately failed
-// without any send attempts.
+// TestMemoryOutboxRetryLimitZero verifies that a zero retry limit uses the safe default.
 //
-// TestMemoryOutboxRetryLimitZero 验证 RetryLimit=0 时消息立即失败，不尝试发送。
+// TestMemoryOutboxRetryLimitZero 验证 RetryLimit=0 时采用安全默认重试次数。
 func TestMemoryOutboxRetryLimitZero(t *testing.T) {
 	sender := &senderStub{err: errors.New("boom")}
 	outbox := NewMemoryOutbox(sender, integrationcontract.OutboxConfig{RetryLimit: 0})
@@ -291,16 +290,15 @@ func TestMemoryOutboxRetryLimitZero(t *testing.T) {
 	// 调用 Process
 	_ = outbox.Process(context.Background())
 
-	// RetryLimit=0 时，消息应立即标记为失败，不尝试发送
-	if msg.Status != integrationcontract.OutboxStatusFailed {
-		t.Fatalf("expected failed status with RetryLimit=0, got %s", msg.Status)
+	// RetryLimit=0 使用默认限制 3，因此首次失败后仍处于 retrying。
+	if msg.Status != integrationcontract.OutboxStatusRetrying {
+		t.Fatalf("expected retrying status with default retry limit, got %s", msg.Status)
 	}
-	if msg.RetryCount != 0 {
-		t.Fatalf("expected retry count 0 with RetryLimit=0, got %d", msg.RetryCount)
+	if msg.RetryCount != 1 {
+		t.Fatalf("expected retry count 1, got %d", msg.RetryCount)
 	}
-	// sender 不应该被调用
-	if len(sender.callIDs) != 0 {
-		t.Fatalf("expected 0 send attempts with RetryLimit=0, got %d", len(sender.callIDs))
+	if len(sender.callIDs) != 1 {
+		t.Fatalf("expected 1 send attempt, got %d", len(sender.callIDs))
 	}
 }
 

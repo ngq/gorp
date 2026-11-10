@@ -2,6 +2,7 @@ package gorm_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	gormoutbox "github.com/ngq/gorp/contrib/outbox/gorm"
@@ -48,4 +49,43 @@ func TestGormOutboxStore_Lifecycle(t *testing.T) {
 	pendingAfter, err := store.GetPending(ctx, 10)
 	require.NoError(t, err)
 	require.Len(t, pendingAfter, 0)
+}
+
+// TestGormOutboxStore_MarkFailedRetriesUntilLimit 锁定 FEAT-02 修复语义：
+// 失败先置 retrying（可重新投递），达到重试上限才进入终态 failed——
+// 恢复 at-least-once，杜绝"broker 一次抖动即永久判死"。
+func TestGormOutboxStore_MarkFailedRetriesUntilLimit(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	store := gormoutbox.NewGormOutboxStoreWithRetryLimit(db, 2)
+	err = store.AutoMigrate()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	msg := &integrationcontract.OutboxMessage{
+		ID:     "msg-retry",
+		Topic:  "user.registered",
+		Status: integrationcontract.OutboxStatusPending,
+	}
+	require.NoError(t, store.Save(ctx, msg))
+
+	// 第 1 次失败 → retrying（仍可被 GetPending 捞到）
+	require.NoError(t, store.MarkFailed(ctx, "msg-retry", errors.New("transient")))
+	pending, err := store.GetPending(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	require.Equal(t, integrationcontract.OutboxStatusRetrying, pending[0].Status)
+
+	// 第 2 次失败（retry_count=2 >= limit=2）→ 终态 failed
+	require.NoError(t, store.MarkFailed(ctx, "msg-retry", errors.New("transient again")))
+	pending, err = store.GetPending(ctx, 10)
+	require.NoError(t, err)
+	require.Empty(t, pending, "failed message must NOT be returned by GetPending")
+
+	// 确认库内终态为 failed 且错误信息已记录
+	var row gormoutbox.GormOutboxModel
+	require.NoError(t, db.Where("id = ?", "msg-retry").First(&row).Error)
+	require.Equal(t, string(integrationcontract.OutboxStatusFailed), row.Status)
+	require.Contains(t, row.Error, "transient")
 }

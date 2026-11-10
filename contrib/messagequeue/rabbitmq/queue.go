@@ -8,6 +8,7 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -107,9 +108,16 @@ func (q *Queue) Close() error {
 	return q.resConn.Close()
 }
 
+// reconnectTimeout 是重连等待的上限：broker 宕机时快速报错而非无限期挂起
+// （REGRESSION-02：context.Background() + 无限退避会让调用方 goroutine 无限堆积）。
+const reconnectTimeout = 10 * time.Second
+
 // getConn 返回当前可用连接，连接断开时自动通过 ResilientConnection 重连。
+// 重连等待带上限：超过即返回错误，调用方可感知并重试，而不是永久阻塞。
 func (q *Queue) getConn() (*amqp.Connection, error) {
-	return q.resConn.Get(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), reconnectTimeout)
+	defer cancel()
+	return q.resConn.Get(ctx)
 }
 
 // getChannel creates a new AMQP channel for short-lived operations.

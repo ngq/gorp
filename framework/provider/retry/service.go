@@ -254,23 +254,42 @@ func (r *RetryService) UpdateConfig(cfg resiliencecontract.RetryConfig) {
 
 // grpcErrorCodeString 从错误中提取 gRPC 状态码字符串（如 "Unavailable"）。
 // 用反射访问 GRPCStatus()/Code()/String()，避免引入 google.golang.org/grpc 依赖；
-// 非 gRPC 错误返回 ""。语义对齐 grpc/status.FromError：遍历 unwrap 链。
+// 非 gRPC 错误返回 ""。语义对齐 grpc/status.FromError：遍历 unwrap 链
+// （含 errors.Join 的多路分支，GRPC-02）。
 // 注：不能用接口断言实现——Go 要求接口方法返回类型与实现完全相同（不可协变），
 // 而 codes.Code 是具体类型，无法用本地接口收窄。
 func grpcErrorCodeString(err error) string {
+	seen := make(map[error]struct{})
+	return grpcErrorCodeWalk(err, seen)
+}
+
+func grpcErrorCodeWalk(err error, seen map[error]struct{}) string {
 	for e := err; e != nil; e = errors.Unwrap(e) {
+		if _, visited := seen[e]; visited {
+			return "" // 环防护
+		}
+		seen[e] = struct{}{}
 		if code := grpcCodeViaReflect(e); code != "" {
 			return code
+		}
+		// errors.Join 产出的多路错误：递归遍历每个分支
+		if joined, ok := e.(interface{ Unwrap() []error }); ok {
+			for _, branch := range joined.Unwrap() {
+				if code := grpcErrorCodeWalk(branch, seen); code != "" {
+					return code
+				}
+			}
 		}
 	}
 	return ""
 }
 
 // grpcCodeViaReflect 通过反射调用 GRPCStatus().Code().String()。
+// 校验方法无入参（GRPC-02）：同名带参方法会导致 Call(nil) panic。
 func grpcCodeViaReflect(err error) string {
 	v := reflect.ValueOf(err)
 	m := v.MethodByName("GRPCStatus")
-	if !m.IsValid() {
+	if !m.IsValid() || m.Type().NumIn() != 0 || m.Type().NumOut() != 1 {
 		return ""
 	}
 	out := m.Call(nil)
@@ -278,7 +297,7 @@ func grpcCodeViaReflect(err error) string {
 		return ""
 	}
 	codeM := out[0].MethodByName("Code")
-	if !codeM.IsValid() {
+	if !codeM.IsValid() || codeM.Type().NumIn() != 0 || codeM.Type().NumOut() != 1 {
 		return ""
 	}
 	codeOut := codeM.Call(nil)
@@ -286,7 +305,7 @@ func grpcCodeViaReflect(err error) string {
 		return ""
 	}
 	strM := codeOut[0].MethodByName("String")
-	if !strM.IsValid() {
+	if !strM.IsValid() || strM.Type().NumIn() != 0 || strM.Type().NumOut() != 1 {
 		return ""
 	}
 	strOut := strM.Call(nil)

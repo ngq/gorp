@@ -90,6 +90,13 @@ func (s *Service) EvaluateBool(ctx context.Context, flagKey string, defaultVal b
 			bucket := int(h.Sum32() % 100)
 			return bucket < rule.Percentage
 		}
+		// FEAT-05：无身份（匿名）请求不得跳过百分比门控——旧实现直接返回
+		// Enabled(true)，金丝雀发布对匿名流量 100% 曝光。匿名请求按
+		// default 语义处理，保证灰度比例对匿名流量同样生效。
+		if boolVal, ok := rule.DefaultValue.(bool); ok {
+			return boolVal
+		}
+		return false
 	}
 
 	// If default value is provided in rule, use it

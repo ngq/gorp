@@ -45,6 +45,9 @@ type MemoryOutbox struct {
 // NewMemoryOutbox 创建新的内存 Outbox。
 // 核心逻辑：初始化消息 map 并存储 sender/config。
 func NewMemoryOutbox(sender integrationcontract.OutboxSender, config integrationcontract.OutboxConfig) *MemoryOutbox {
+	if config.RetryLimit <= 0 {
+		config.RetryLimit = 3
+	}
 	return &MemoryOutbox{
 		messages: make(map[string]*integrationcontract.OutboxMessage),
 		sender:   sender,

@@ -96,10 +96,12 @@ func (p *Provider) Boot(c runtimecontract.Container) error { return nil }
 
 // semaphoreLoadShedder 是 LoadShedder 契约的信号量实现。
 // 每个资源（resource）维护独立的加权信号量，并发已满时 TryAcquire 失败并返回过载错误。
+// defaultMaxCon/config 用 atomic 指针/值存储（CORE-05）：治理热更新 UpdateConfig
+// 与请求路径 getOrCreateEntry 并发读写，裸字段构成 data race。
 type semaphoreLoadShedder struct {
 	semaphores    sync.Map // resource string -> *semaphoreEntry
-	defaultMaxCon int      // 默认最大并发数
-	config        resiliencecontract.LoadSheddingConfig
+	defaultMaxCon atomic.Int64
+	config        atomic.Pointer[resiliencecontract.LoadSheddingConfig]
 }
 
 // newSemaphoreLoadShedder 根据配置创建信号量式 LoadShedder。
@@ -109,10 +111,11 @@ func newSemaphoreLoadShedder(cfg resiliencecontract.LoadSheddingConfig) *semapho
 		// 默认值：GOMAXPROCS * 100，约 100-800 并发
 		defaultMaxCon = runtime.GOMAXPROCS(0) * 100
 	}
-	return &semaphoreLoadShedder{
-		defaultMaxCon: defaultMaxCon,
-		config:        cfg,
-	}
+	cfgCopy := cfg
+	s := &semaphoreLoadShedder{}
+	s.defaultMaxCon.Store(int64(defaultMaxCon))
+	s.config.Store(&cfgCopy)
+	return s
 }
 
 // NewLoadShedderFromConfig 根据配置创建 LoadShedder 实例。
@@ -150,8 +153,10 @@ func (s *semaphoreLoadShedder) UpdateConfig(cfg resiliencecontract.LoadSheddingC
 	if defaultMaxCon <= 0 {
 		defaultMaxCon = runtime.GOMAXPROCS(0) * 100
 	}
-	s.defaultMaxCon = defaultMaxCon
-	s.config = cfg
+	// CORE-05：原子替换，消除与请求路径读取的数据竞态
+	cfgCopy := cfg
+	s.defaultMaxCon.Store(int64(defaultMaxCon))
+	s.config.Store(&cfgCopy)
 
 	// 动态就地更新已有资源对应的信号量条目最大并发（保留在途并发计数）
 	s.semaphores.Range(func(key, value any) bool {
@@ -181,9 +186,11 @@ func (s *semaphoreLoadShedder) getOrCreateEntry(resource string) *semaphoreEntry
 	}
 
 	// 确定该资源的最大并发数
-	maxCon := s.defaultMaxCon
-	if policy, ok := s.config.ResourcePolicies[resource]; ok && policy.MaxConcurrency > 0 {
-		maxCon = policy.MaxConcurrency
+	maxCon := int(s.defaultMaxCon.Load())
+	if cfg := s.config.Load(); cfg != nil {
+		if policy, ok := cfg.ResourcePolicies[resource]; ok && policy.MaxConcurrency > 0 {
+			maxCon = policy.MaxConcurrency
+		}
 	}
 
 	// 慢路径：创建新条目

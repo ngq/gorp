@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"time"
+
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 )
 
 // CloudEventsVersion is the CloudEvents specification version string.
@@ -44,11 +46,17 @@ func NewCloudEvent[T any](ctx context.Context, eventType, source string, data T)
 	ext := make(map[string]any)
 
 	// Extract TraceID / RequestID from context if available
+	// FEAT-06：框架的 trace/request id 走 supportcontract 的私有 typed key，
+	// 裸字符串 key 查询永远落空（透传是死代码）。两路都查以兼容两种写入方式。
 	if ctx != nil {
-		if traceID, ok := ctx.Value("trace_id").(string); ok && traceID != "" {
+		if traceID, ok := supportcontract.FromTraceIDContext(ctx); ok && traceID != "" {
+			ext["trace_id"] = traceID
+		} else if traceID, ok := ctx.Value("trace_id").(string); ok && traceID != "" {
 			ext["trace_id"] = traceID
 		}
-		if reqID, ok := ctx.Value("request_id").(string); ok && reqID != "" {
+		if reqID, ok := supportcontract.FromRequestIDContext(ctx); ok && reqID != "" {
+			ext["request_id"] = reqID
+		} else if reqID, ok := ctx.Value("request_id").(string); ok && reqID != "" {
 			ext["request_id"] = reqID
 		}
 		if traceparent, ok := ctx.Value("traceparent").(string); ok && traceparent != "" {

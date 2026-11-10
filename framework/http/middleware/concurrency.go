@@ -18,6 +18,9 @@ import (
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	transportcontract "github.com/ngq/gorp/framework/contract/transport"
+
+	"github.com/ngq/gorp/framework/provider/loadshedding/bbr"
+	"github.com/ngq/gorp/framework/provider/loadshedding/gradient"
 )
 
 // ConcurrencyLimiter is a lightweight semaphore used by HTTP protection middleware.
@@ -106,11 +109,12 @@ func LoadShedding(maxConcurrent int) transportcontract.Middleware {
 		return func(c transportcontract.Context) {
 			// 优先尝试从容器中获取 LoadShedder 契约实现
 			if shedder := loadShedderFromContext(c); shedder != nil {
-				if err := shedder.Allow(context.Background(), "http"); err != nil {
+				requestCtx := withAdaptiveSamplingContext(c.Context(), shedder)
+				if err := shedder.Allow(requestCtx, "http"); err != nil {
 					respondServiceBusy(c, "server is busy")
 					return
 				}
-				defer shedder.Done(context.Background(), "http", nil)
+				defer shedder.Done(requestCtx, "http", nil)
 
 				if next != nil {
 					next(c)
@@ -182,17 +186,29 @@ func LoadSheddingFromContainer(container runtimecontract.Container, resource str
 				target = c.Request().Method + " " + c.Request().URL.Path
 			}
 
-			// 执行过载保护
-			if err := shedder.Allow(c.Context(), target); err != nil {
+			// 执行过载保护，并为自适应实现注入 RTT 采样起点。
+			requestCtx := withAdaptiveSamplingContext(c.Context(), shedder)
+			if err := shedder.Allow(requestCtx, target); err != nil {
 				respondServiceBusy(c, "server is busy")
 				return
 			}
-			defer shedder.Done(c.Context(), target, nil)
+			defer shedder.Done(requestCtx, target, nil)
 
 			if next != nil {
 				next(c)
 			}
 		}
+	}
+}
+
+func withAdaptiveSamplingContext(ctx context.Context, shedder resiliencecontract.LoadShedder) context.Context {
+	switch shedder.(type) {
+	case *bbr.LoadShedder:
+		return bbr.WithStartTime(ctx)
+	case *gradient.GradientLoadShedder:
+		return gradient.WithStartTime(ctx)
+	default:
+		return ctx
 	}
 }
 

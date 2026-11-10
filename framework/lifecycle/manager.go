@@ -312,14 +312,20 @@ func (m *Manager) stopReverse(ctx context.Context, services []ServiceEntry) erro
 	var lastErr error
 	for i := len(services) - 1; i >= 0; i-- {
 		entry := services[i]
+		// 回滚路径同样必须 runGuarded（GRPC-06）：hook panic 会穿透
+		// Manager.Start，状态卡在 StateStarting 且已启动服务无法优雅关闭。
 		if entry.Hooks != nil {
-			_ = entry.Hooks.OnStopping(ctx)
+			if err := runGuarded(func() error { return entry.Hooks.OnStopping(ctx) }); err != nil {
+				lastErr = err
+			}
 		}
-		if err := entry.Service.Stop(ctx); err != nil {
+		if err := runGuarded(func() error { return entry.Service.Stop(ctx) }); err != nil {
 			lastErr = err
 		}
 		if entry.Hooks != nil {
-			_ = entry.Hooks.OnStopped(ctx)
+			if err := runGuarded(func() error { return entry.Hooks.OnStopped(ctx) }); err != nil {
+				lastErr = err
+			}
 		}
 	}
 	return lastErr

@@ -121,6 +121,7 @@ func (s *Server) Start(ctx context.Context) error {
 	s.running = true
 	s.serveErr = make(chan error, 1)
 	server := s.server
+	errCh := s.serveErr // 捕获本次启动的 channel：重启会替换字段，旧 goroutine 不得关闭新一代的 serveErr
 	logger := s.resolveLogger()
 	go func() {
 		err := server.Serve(lis)
@@ -133,13 +134,18 @@ func (s *Server) Start(ctx context.Context) error {
 				log.Printf("[gorp] grpc server Serve exited: %v", err)
 			}
 			select {
-			case s.serveErr <- err:
+			case errCh <- err:
 			default:
 			}
 		}
-		close(s.serveErr)
+		close(errCh)
 		s.mu.Lock()
-		s.running = false
+		// 仅当容器里仍是本次启动的 server 实例时才复位 running：
+		// Stop 会置空 server（支持重启），重启后字段已是新实例——
+		// 旧 goroutine 的清理不得影响新一代状态（GRPC-01）。
+		if s.server == server {
+			s.running = false
+		}
 		s.mu.Unlock()
 	}()
 

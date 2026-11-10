@@ -56,8 +56,8 @@ func TestSemaphoreLoadShedder_DefaultMaxConcurrency(t *testing.T) {
 	shedder := newSemaphoreLoadShedder(cfg)
 
 	expected := runtime.GOMAXPROCS(0) * 100
-	if shedder.defaultMaxCon != expected {
-		t.Fatalf("expected defaultMaxCon=%d, got %d", expected, shedder.defaultMaxCon)
+	if int(shedder.defaultMaxCon.Load()) != expected {
+		t.Fatalf("expected defaultMaxCon=%d, got %d", expected, shedder.defaultMaxCon.Load())
 	}
 }
 

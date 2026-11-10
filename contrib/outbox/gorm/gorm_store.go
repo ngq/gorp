@@ -31,11 +31,20 @@ func (GormOutboxModel) TableName() string {
 // GormOutboxStore implements OutboxStore contract using GORM.
 type GormOutboxStore struct {
 	db *gorm.DB
+	// retryLimit 是失败重试上限：达到后消息进入终态 failed（FEAT-02）。
+	// 0 表示不重试但至少首发一次（retry_count 从 0 起，首次失败即 1 > 0）。
+	retryLimit int
 }
 
-// NewGormOutboxStore creates a new GormOutboxStore.
+// NewGormOutboxStore creates a new GormOutboxStore with default retry limit (3).
 func NewGormOutboxStore(db *gorm.DB) *GormOutboxStore {
-	return &GormOutboxStore{db: db}
+	return &GormOutboxStore{db: db, retryLimit: 3}
+}
+
+// NewGormOutboxStoreWithRetryLimit creates a GormOutboxStore with an explicit retry limit.
+// limit<=0 表示不重试（首次失败即 failed），但首发仍会执行。
+func NewGormOutboxStoreWithRetryLimit(db *gorm.DB, limit int) *GormOutboxStore {
+	return &GormOutboxStore{db: db, retryLimit: limit}
 }
 
 // AutoMigrate migrates outbox_messages table schema.
@@ -117,6 +126,12 @@ func (s *GormOutboxStore) MarkSent(ctx context.Context, id string) error {
 }
 
 // MarkFailed marks a message status as failed or increments retry count.
+//
+// at-least-once 语义（FEAT-02）：失败后先置 retrying（GetPending 会重新捞取），
+// 仅当重试次数达到 RetryLimit 才进入终态 failed——否则 broker 一次瞬时抖动
+// 就会把消息永久判死，必须人工改库。
+// RetryLimit 通过 option 字符串传递（gorp 的 Updates map 无法引用外部变量参与
+// SQL 表达式），由 NewGormOutboxStore 的 retryLimit 字段提供。
 func (s *GormOutboxStore) MarkFailed(ctx context.Context, id string, err error) error {
 	if s.db == nil {
 		return fmt.Errorf("outbox gorm db is nil")
@@ -125,8 +140,14 @@ func (s *GormOutboxStore) MarkFailed(ctx context.Context, id string, err error) 
 	if err != nil {
 		errMsg = err.Error()
 	}
+	// 条件更新：重试次数未达上限 → retrying；达到上限 → failed。
+	// 用单条带 CASE 的更新保证原子性，避免先读后写的竞态。
+	limit := s.retryLimit
+	if limit < 0 {
+		limit = 0
+	}
 	return s.db.WithContext(ctx).Model(&GormOutboxModel{}).Where("id = ?", id).Updates(map[string]any{
-		"status":      string(integrationcontract.OutboxStatusFailed),
+		"status":      gorm.Expr("CASE WHEN retry_count + 1 >= ? THEN ? ELSE ? END", limit, string(integrationcontract.OutboxStatusFailed), string(integrationcontract.OutboxStatusRetrying)),
 		"retry_count": gorm.Expr("retry_count + 1"),
 		"error":       errMsg,
 	}).Error

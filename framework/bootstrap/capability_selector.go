@@ -154,10 +154,22 @@ func RegisterSelectedMicroserviceProvidersWithOptions(c runtimecontract.Containe
 		SelectDistributedLockProvider(cfg),
 		SelectWebSocketProvider(cfg),
 	}
+	// 按名称去重：gRPC 主线（buildGRPCProviders）会显式注册 rpc.grpc 等能力，
+	// 当配置 rpc.mode=grpc 时选择器会再选出同名 provider——不去重会触发
+	// "provider already registered" 使 gRPC 主线启动失败（REGRESSION-01）。
+	// 已注册的同名 provider 跳过（主线实例优先）。
+	registeredNames := make(map[string]struct{})
+	for _, info := range c.RegisteredProviders() {
+		registeredNames[info.Name] = struct{}{}
+	}
 	for _, p := range selectedProviders {
 		if p == nil {
 			continue
 		}
+		if _, dup := registeredNames[p.Name()]; dup {
+			continue
+		}
+		registeredNames[p.Name()] = struct{}{}
 		if err := c.RegisterProvider(p); err != nil {
 			return err
 		}

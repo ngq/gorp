@@ -15,6 +15,7 @@ import (
 	"time"
 
 	integrationcontract "github.com/ngq/gorp/framework/contract/integration"
+	supportcontract "github.com/ngq/gorp/framework/contract/support"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -393,7 +394,8 @@ func TestLocalEventBus_CloudEventTracePropagation(t *testing.T) {
 	bus := NewLocalEventBus()
 
 	bus.Subscribe("com.gorp.test", func(ctx context.Context, event integrationcontract.Event) error {
-		if tID, ok := ctx.Value("trace_id").(string); ok {
+		// FEAT-06：注入改用 typed key，读取也需走 supportcontract helper
+		if tID, ok := supportcontract.FromTraceIDContext(ctx); ok {
 			capturedTraceID = tID
 		}
 		return nil

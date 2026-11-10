@@ -110,7 +110,12 @@ func (g *GradientLoadShedder) Done(ctx context.Context, resource string, err err
 		if start, ok := ctx.Value(startTimeKey{}).(time.Time); ok {
 			rtt := time.Since(start)
 			sampleRate := g.config.SampleRate
-			if sampleRate <= 1 || g.sampleCounter.Add(1)%sampleRate == 0 || (g.currentRtt > 0 && rtt > g.currentRtt*2) {
+			// FEAT-04/REGRESSION-03：currentRtt 由 RecordSample 持写锁更新，
+			// 此处必须先取读锁快照再判断，否则构成 data race（-race 实证）。
+			g.mu.RLock()
+			currentRtt := g.currentRtt
+			g.mu.RUnlock()
+			if sampleRate <= 1 || g.sampleCounter.Add(1)%sampleRate == 0 || (currentRtt > 0 && rtt > currentRtt*2) {
 				g.RecordSample(rtt)
 			}
 		}
