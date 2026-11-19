@@ -27,7 +27,7 @@ var newOfflineLocalDev bool
 
 // FEAT-07：默认版本必须包含模板引用的 framework/httpx 包（v0.3.0 引入），
 // v0.1.2 会让生成的工程开箱编译失败。发版时与 CHANGELOG 同步更新。
-const defaultFrameworkVersion = "v0.3.2"
+const defaultFrameworkVersion = "v0.3.3"
 
 func runNewEmbedded(cmd *cobra.Command, args []string) error {
 	intent, err := parseNewIntent(args)

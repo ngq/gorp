@@ -354,6 +354,7 @@ type scaffoldInput struct {
 	FrameworkModule  string
 	FrameworkPath    string
 	FrameworkVersion string
+	ContribVersion   string
 	Backend          string
 	WithDB           bool
 	WithSwagger      bool
@@ -362,11 +363,17 @@ type scaffoldInput struct {
 	Governance       string // 治理维度：monolith 或 microservice
 }
 
+const defaultContribVersion = "v0.2.3"
+
 func buildScaffoldData(in scaffoldInput) map[string]any {
 	// 中文说明：
 	// - 如果 FrameworkPath 为空，UseReplace 为 false，不生成 replace 指令；
 	// - 如果 FrameworkPath 非空，UseReplace 为 true，生成 replace 指令。
 	useReplace := strings.TrimSpace(in.FrameworkPath) != ""
+	contribVersion := strings.TrimSpace(in.ContribVersion)
+	if contribVersion == "" {
+		contribVersion = defaultContribVersion
+	}
 	protoUserGoPackage := in.Module + "/proto/user/v1;userv1"
 	protoUserGoPackageLen := len([]byte(protoUserGoPackage))
 	kubeName := toKubernetesName(in.Name)
@@ -387,6 +394,7 @@ func buildScaffoldData(in scaffoldInput) map[string]any {
 		"FrameworkModule":            in.FrameworkModule,
 		"FrameworkPath":              normalizeFrameworkReplacePath(in.FrameworkPath),
 		"FrameworkVersion":           in.FrameworkVersion,
+		"ContribVersion":             contribVersion,
 		"UseReplace":                 useReplace,
 		"Backend":                    in.Backend,
 		"IsGormBackend":              in.Backend == "" || in.Backend == "gorm",

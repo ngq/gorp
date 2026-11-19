@@ -14,7 +14,7 @@ import (
 {{- if .IsGinHTTPMode }}
 	transportcontract "{{.FrameworkModule}}/framework/contract/transport"
 {{- end }}
-	"google.golang.org/grpc"
+	grpcprovider "{{.FrameworkModule}}/framework/provider/rpc/grpc"
 )
 
 // main 是 user 服务的主入口。
@@ -69,8 +69,9 @@ func setup(rt *gorp.HTTPRuntime) error {
 	if err != nil {
 		return err
 	}
-	return registrar.RegisterProto(func(server *grpc.Server) error {
-		usergrpc.RegisterUserService(server, services)
+	return registrar.RegisterProto(func(server any) error {
+		s := grpcprovider.MustGRPCServer(server)
+		usergrpc.RegisterUserService(s, services)
 		return nil
 	})
 }

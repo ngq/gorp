@@ -4,14 +4,23 @@ go 1.23
 
 require (
 	{{.FrameworkModule}} {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/circuitbreaker/sentinel {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/configsource/etcd {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/dlock/redis {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/dtm/dtmsdk {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/registry/etcd {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/serviceauth/token {{.FrameworkVersion}}
-	{{.FrameworkModule}}/contrib/tracing/otel {{.FrameworkVersion}}
+	{{.FrameworkModule}}/contrib/circuitbreaker/sentinel {{.ContribVersion}}
+	{{.FrameworkModule}}/contrib/configsource/etcd {{.ContribVersion}}
+	{{.FrameworkModule}}/contrib/dlock/redis {{.ContribVersion}}
+	{{.FrameworkModule}}/contrib/dtm/dtmsdk {{.ContribVersion}}
+	{{.FrameworkModule}}/contrib/registry/etcd {{.ContribVersion}}
+	{{.FrameworkModule}}/contrib/serviceauth/token {{.ContribVersion}}
+	{{.FrameworkModule}}/contrib/tracing/otel {{.ContribVersion}}
 	github.com/google/wire v0.6.0
 ){{if .UseReplace}}
 
-replace {{.FrameworkModule}} => {{.FrameworkPath}}{{end}}
+replace (
+	{{.FrameworkModule}} => {{.FrameworkPath}}
+	{{.FrameworkModule}}/contrib/circuitbreaker/sentinel => {{.FrameworkPath}}/contrib/circuitbreaker/sentinel
+	{{.FrameworkModule}}/contrib/configsource/etcd => {{.FrameworkPath}}/contrib/configsource/etcd
+	{{.FrameworkModule}}/contrib/dlock/redis => {{.FrameworkPath}}/contrib/dlock/redis
+	{{.FrameworkModule}}/contrib/dtm/dtmsdk => {{.FrameworkPath}}/contrib/dtm/dtmsdk
+	{{.FrameworkModule}}/contrib/registry/etcd => {{.FrameworkPath}}/contrib/registry/etcd
+	{{.FrameworkModule}}/contrib/serviceauth/token => {{.FrameworkPath}}/contrib/serviceauth/token
+	{{.FrameworkModule}}/contrib/tracing/otel => {{.FrameworkPath}}/contrib/tracing/otel
+){{end}}
