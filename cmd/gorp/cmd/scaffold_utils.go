@@ -363,7 +363,7 @@ type scaffoldInput struct {
 	Governance       string // 治理维度：monolith 或 microservice
 }
 
-const defaultContribVersion = "v0.2.3"
+const defaultContribVersion = "v0.3.3"
 
 func buildScaffoldData(in scaffoldInput) map[string]any {
 	// 中文说明：
