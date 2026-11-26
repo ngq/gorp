@@ -35,15 +35,42 @@ import (
 // 支持 YAML、分层覆盖、环境变量覆盖与 env(KEY) 占位符替换。
 // 支持配置源扩展（本地文件/远程配置）。
 // 核心逻辑：持有 viper 实例、委托 Get/Unmarshal 操作。
+const (
+	// EnvConfigFileKey specifies an explicit local config file path overriding <root>/config/.
+	//
+	// EnvConfigFileKey 指定显式本地配置文件路径，设置后将替代 <root>/config/ 目录扫描。
+	EnvConfigFileKey = "APP_CONFIG_FILE"
+)
+
 type Service struct {
-	env    string
-	mu     sync.RWMutex
-	v      *viper.Viper
-	source datacontract.ConfigSource // 配置源（可选）
+	env        string
+	configFile string
+	mu         sync.RWMutex
+	v          *viper.Viper
+	source     datacontract.ConfigSource // 配置源（可选）
 }
 
 func NewService() *Service {
 	return &Service{v: viper.New()}
+}
+
+// NewServiceWithFile creates a config service bound to an explicit config file path.
+//
+// NewServiceWithFile 创建绑定到显式配置文件路径的配置服务实例。
+func NewServiceWithFile(configFile string) *Service {
+	return &Service{
+		configFile: strings.TrimSpace(configFile),
+		v:          viper.New(),
+	}
+}
+
+// SetConfigFile sets or clears an explicit config file path on the service.
+//
+// SetConfigFile 设置或清空服务实例绑定的显式配置文件路径。
+func (s *Service) SetConfigFile(configFile string) {
+	s.mu.Lock()
+	s.configFile = strings.TrimSpace(configFile)
+	s.mu.Unlock()
 }
 
 // NewServiceWithSource 创建带配置源的 Service。
@@ -85,13 +112,17 @@ func (s *Service) Env() string { return s.env }
 func (s *Service) Load(env string) error {
 	env = NormalizeEnv(env)
 
+	s.mu.RLock()
+	explicitFile := s.configFile
+	s.mu.RUnlock()
+
 	root := projectRoot()
 	v := viper.New()
 	v.SetDefault("app.name", "gorp-app")
 	v.SetDefault("app.address", ":8080")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "console")
-	if err := LoadLocalConfigToViper(v, env, root); err != nil {
+	if err := loadLocalConfigWithFileToViper(v, env, root, explicitFile); err != nil {
 		return err
 	}
 
@@ -123,6 +154,10 @@ func (s *Service) Load(env string) error {
 // 由 Config provider 和 ConfigSource.local provider 共用。
 // 核心逻辑：发现基础文件、合并环境覆盖、应用环境变量替换。
 func LoadLocalConfigToViper(v *viper.Viper, env, root string) error {
+	return loadLocalConfigWithFileToViper(v, env, root, "")
+}
+
+func loadLocalConfigWithFileToViper(v *viper.Viper, env, root, explicitFile string) error {
 	if v == nil {
 		return errors.New("config: viper instance is nil")
 	}
@@ -131,10 +166,19 @@ func LoadLocalConfigToViper(v *viper.Viper, env, root string) error {
 		root = projectRoot()
 	}
 
-	configDir := filepath.Join(root, "config")
-
 	// Optional .env
 	_ = gotenv.OverLoad(filepath.Join(root, ".env"))
+
+	if cfgFile := resolveEffectiveConfigFile(explicitFile); cfgFile != "" {
+		if err := readExplicitConfigFileToViper(v, cfgFile); err != nil {
+			return err
+		}
+		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+		v.AutomaticEnv()
+		return nil
+	}
+
+	configDir := filepath.Join(root, "config")
 
 	v.SetConfigType("yaml")
 
@@ -209,6 +253,47 @@ func LoadLocalConfigToViper(v *viper.Viper, env, root string) error {
 	// (used by framework/testing with miniredis).
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	return nil
+}
+
+func resolveEffectiveConfigFile(explicitFile string) string {
+	candidate := strings.TrimSpace(explicitFile)
+	if candidate == "" {
+		candidate = strings.TrimSpace(os.Getenv(EnvConfigFileKey))
+	}
+	if candidate == "" {
+		return ""
+	}
+	if filepath.IsAbs(candidate) {
+		return filepath.Clean(candidate)
+	}
+	if wd, err := os.Getwd(); err == nil {
+		return filepath.Clean(filepath.Join(wd, candidate))
+	}
+	return filepath.Clean(candidate)
+}
+
+func configTypeFromPath(path string) string {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+	switch ext {
+	case "", "yml", "yaml":
+		return "yaml"
+	case "json", "toml", "ini", "properties":
+		return ext
+	default:
+		return "yaml"
+	}
+}
+
+func readExplicitConfigFileToViper(v *viper.Viper, cfgFile string) error {
+	b, err := readFileWithEnvSubst(cfgFile)
+	if err != nil {
+		return fmt.Errorf("read config file (%s): %w", cfgFile, err)
+	}
+	v.SetConfigType(configTypeFromPath(cfgFile))
+	if err := v.ReadConfig(bytes.NewReader(b)); err != nil {
+		return fmt.Errorf("parse config file (%s): %w", cfgFile, err)
+	}
 	return nil
 }
 
@@ -416,7 +501,7 @@ func (s *Service) Reload(ctx context.Context) error {
 
 	root := projectRoot()
 	v := viper.New()
-	if err := LoadLocalConfigToViper(v, s.env, root); err != nil {
+	if err := loadLocalConfigWithFileToViper(v, s.env, root, s.configFile); err != nil {
 		s.mu.Unlock()
 		return err
 	}
@@ -448,9 +533,10 @@ type localConfigWatcher struct {
 
 func newLocalConfigWatcher(parent context.Context, service *Service, key string, interval time.Duration) datacontract.ConfigWatcher {
 	ctx, cancel := context.WithCancel(parent)
-	// 在 service 读锁下取 env：与并发 Load/Reload 的写入构成 data race。
+	// 在 service 读锁下取 env/configFile：与并发 Load/Reload 的写入构成 data race。
 	service.mu.RLock()
 	env := service.env
+	configFile := service.configFile
 	service.mu.RUnlock()
 	w := &localConfigWatcher{
 		ctx:       ctx,
@@ -458,7 +544,7 @@ func newLocalConfigWatcher(parent context.Context, service *Service, key string,
 		service:   service,
 		interval:  interval,
 		callbacks: make(map[string][]func(value any)),
-		lastState: collectLocalConfigState(env),
+		lastState: collectLocalConfigState(env, configFile),
 	}
 	if strings.TrimSpace(key) != "" {
 		w.callbacks[key] = nil
@@ -499,13 +585,14 @@ func (w *localConfigWatcher) loop() {
 }
 
 func (w *localConfigWatcher) checkAndReload() {
-	// Read env under lock to avoid data race with concurrent Load/Reload.
-	// 在锁下读取 env 以避免与并发 Load/Reload 的数据竞态。
+	// Read env/configFile under lock to avoid data race with concurrent Load/Reload.
+	// 在锁下读取 env/configFile 以避免与并发 Load/Reload 的数据竞态。
 	w.service.mu.RLock()
 	env := w.service.env
+	configFile := w.service.configFile
 	w.service.mu.RUnlock()
 
-	currentState := collectLocalConfigState(env)
+	currentState := collectLocalConfigState(env, configFile)
 	w.mu.Lock()
 	if reflect.DeepEqual(currentState, w.lastState) {
 		w.mu.Unlock()
@@ -551,10 +638,17 @@ func (w *localConfigWatcher) checkAndReload() {
 	}
 }
 
-func collectLocalConfigState(env string) map[string]time.Time {
+func collectLocalConfigState(env, explicitFile string) map[string]time.Time {
+	state := make(map[string]time.Time)
+	if cfgFile := resolveEffectiveConfigFile(explicitFile); cfgFile != "" {
+		if info, err := os.Stat(cfgFile); err == nil {
+			state[cfgFile] = info.ModTime()
+		}
+		return state
+	}
+
 	root := projectRoot()
 	configDir := filepath.Join(root, "config")
-	state := make(map[string]time.Time)
 
 	baseFiles, err := discoverBaseFiles(configDir)
 	if err == nil {

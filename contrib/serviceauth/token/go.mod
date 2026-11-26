@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/ngq/gorp v0.3.3
+	github.com/ngq/gorp v0.3.4
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
 )

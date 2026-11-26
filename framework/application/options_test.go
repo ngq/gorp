@@ -7,6 +7,8 @@ package application
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ngq/gorp/framework/bootstrap"
@@ -313,5 +315,30 @@ func TestGovernanceOverrideHelpersMutateHTTPOptions(t *testing.T) {
 	}
 	if cfg.httpOpts.GovernanceProviders["serviceauth"] != "mtls" {
 		t.Fatalf("expected governance provider override captured, got %#v", cfg.httpOpts.GovernanceProviders)
+	}
+}
+
+func TestWithConfigFileBuildsRuntimeFromExplicitPath(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "custom.yaml")
+	content := "app:\n  name: explicit-runtime-svc\n  env: dev\n  address: :18080\nlog:\n  level: info\n  format: console\n"
+	if err := os.WriteFile(cfgPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+
+	rt, err := BuildHTTPRuntime(
+		HTTP(HTTPServiceOptions{DisableGorm: true, DisableRedis: true}),
+		WithConfigFile(cfgPath),
+	)
+	if err != nil {
+		t.Fatalf("BuildHTTPRuntime failed: %v", err)
+	}
+	defer rt.Container.Destroy()
+
+	if rt.ServiceName != "explicit-runtime-svc" {
+		t.Fatalf("expected ServiceName=explicit-runtime-svc, got %q", rt.ServiceName)
+	}
+	if rt.Config.GetString("app.address") != ":18080" {
+		t.Fatalf("expected app.address=:18080, got %q", rt.Config.GetString("app.address"))
 	}
 }

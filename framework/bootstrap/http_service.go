@@ -49,6 +49,7 @@ var (
 // HTTPServiceOptions 描述默认 HTTP 主线的 bootstrap 选项。
 type HTTPServiceOptions struct {
 	ExtraProviders      []runtimecontract.ServiceProvider
+	ConfigFile          string
 	DisableRedis        bool
 	DisableGorm         bool
 	DisableMetrics      bool
@@ -335,7 +336,7 @@ func (rt *HTTPServiceRuntime) UseHTTP(middleware ...transportcontract.Middleware
 // buildHTTPProviders 组装默认 HTTP 主线使用的 provider 列表。
 func buildHTTPProviders(opts HTTPServiceOptions) []runtimecontract.ServiceProvider {
 	providers := make([]runtimecontract.ServiceProvider, 0)
-	providers = append(providers, FoundationProviders()...)
+	providers = append(providers, FoundationProvidersWithConfigFile(opts.ConfigFile)...)
 	if !opts.DisableGorm {
 		providers = append(providers, ORMRuntimeProviders()...)
 	}

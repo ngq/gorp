@@ -5,9 +5,13 @@
 package config
 
 import (
+	"context"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -70,5 +74,81 @@ app:
 	strOut2 := string(out2)
 	require.Contains(t, strOut2, "name: custom_app")
 	require.Contains(t, strOut2, "port: 7777")
+}
+
+func TestServiceLoadAndReloadWithAppConfigFileEnv(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "custom.yaml")
+	require.NoError(t, os.WriteFile(cfgPath, []byte("app:\n  name: ${CUSTOM_SVC_NAME:three-svc}\n  address: :9191\n"), 0o600))
+
+	t.Setenv(EnvConfigFileKey, cfgPath)
+	svc := NewService()
+	require.NoError(t, svc.Load(EnvProd))
+	require.Equal(t, "three-svc", svc.GetString("app.name"))
+	require.Equal(t, ":9191", svc.GetString("app.address"))
+
+	// 更新文件后 Reload 应立即生效
+	require.NoError(t, os.WriteFile(cfgPath, []byte("app:\n  name: three-svc-v2\n  address: :9292\n"), 0o600))
+	require.NoError(t, svc.Reload(context.Background()))
+	require.Equal(t, "three-svc-v2", svc.GetString("app.name"))
+	require.Equal(t, ":9292", svc.GetString("app.address"))
+}
+
+func TestServiceLoadWithAppConfigFileSupportsJSONAndFailsFastOnMissing(t *testing.T) {
+	dir := t.TempDir()
+	jsonPath := filepath.Join(dir, "runtime.json")
+	require.NoError(t, os.WriteFile(jsonPath, []byte(`{"app":{"name":"json-svc","address":":8181"}}`), 0o600))
+
+	t.Setenv(EnvConfigFileKey, jsonPath)
+	svc := NewService()
+	require.NoError(t, svc.Load(EnvDev))
+	require.Equal(t, "json-svc", svc.GetString("app.name"))
+	require.Equal(t, ":8181", svc.GetString("app.address"))
+
+	t.Setenv(EnvConfigFileKey, filepath.Join(dir, "missing.yaml"))
+	require.Error(t, svc.Load(EnvDev))
+}
+
+func TestServiceWithExplicitFileOverridesEnvAndSupportsWatch(t *testing.T) {
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, "from-env.yaml")
+	explicitFile := filepath.Join(dir, "explicit.yaml")
+	require.NoError(t, os.WriteFile(envFile, []byte("app:\n  name: env-app\n"), 0o600))
+	require.NoError(t, os.WriteFile(explicitFile, []byte("app:\n  name: explicit-app\nfeature:\n  flag: initial\n"), 0o600))
+
+	t.Setenv(EnvConfigFileKey, envFile)
+	svc := NewServiceWithFile(explicitFile)
+	require.NoError(t, svc.Load(EnvDev))
+	require.Equal(t, "explicit-app", svc.GetString("app.name"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	watcher, err := svc.Watch(ctx, "feature.flag")
+	require.NoError(t, err)
+	defer func() { _ = watcher.Stop() }()
+
+	var (
+		mu      sync.Mutex
+		updated []string
+	)
+	watcher.OnChange("feature.flag", func(val any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if s, ok := val.(string); ok {
+			updated = append(updated, s)
+		}
+	})
+
+	// 确保 mtime 发生可观测变化
+	time.Sleep(30 * time.Millisecond)
+	require.NoError(t, os.WriteFile(explicitFile, []byte("app:\n  name: explicit-app\nfeature:\n  flag: reloaded\n"), 0o600))
+	now := time.Now().Add(2 * time.Second)
+	require.NoError(t, os.Chtimes(explicitFile, now, now))
+
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(updated) > 0 && updated[len(updated)-1] == "reloaded"
+	}, 3*time.Second, 50*time.Millisecond)
 }
 

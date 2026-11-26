@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/apache/rocketmq-client-go/v2 v2.1.2
-	github.com/ngq/gorp v0.3.3
+	github.com/ngq/gorp v0.3.4
 	github.com/stretchr/testify v1.12.1
 )
 

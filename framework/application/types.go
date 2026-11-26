@@ -63,6 +63,7 @@ type HTTPRouteRegistrar func(router transportcontract.Router, container runtimec
 //
 // HTTPServiceOptions 是 application 包暴露的最小 HTTP 选项视图。
 type HTTPServiceOptions struct {
+	ConfigFile          string
 	DisableRedis        bool
 	DisableGorm         bool
 	DisableMetrics      bool

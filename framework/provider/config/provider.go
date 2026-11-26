@@ -32,6 +32,13 @@ func NewProvider() *Provider {
 	return &Provider{cfg: NewService()}
 }
 
+// NewProviderWithFile creates a config provider bound to an explicit config file path.
+//
+// NewProviderWithFile 创建绑定到显式配置文件路径的配置 provider。
+func NewProviderWithFile(configFile string) *Provider {
+	return &Provider{cfg: NewServiceWithFile(configFile)}
+}
+
 // Name returns provider name for identification.
 //
 // Name 返回 provider 名称，用于标识。

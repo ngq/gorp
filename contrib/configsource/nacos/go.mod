@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
-	github.com/ngq/gorp v0.3.3
+	github.com/ngq/gorp v0.3.4
 	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1
 )

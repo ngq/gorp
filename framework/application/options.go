@@ -22,6 +22,7 @@ package application
 
 import (
 	"errors"
+	"strings"
 
 	resiliencecontract "github.com/ngq/gorp/framework/contract/resilience"
 )
@@ -48,6 +49,9 @@ func HTTP(opts ...HTTPServiceOptions) Option {
 			return
 		}
 		h := opts[0]
+		if h.ConfigFile != "" {
+			cfg.httpOpts.ConfigFile = strings.TrimSpace(h.ConfigFile)
+		}
 		cfg.httpOpts.DisableRedis = h.DisableRedis
 		cfg.httpOpts.DisableGorm = h.DisableGorm
 		cfg.httpOpts.DisableMetrics = h.DisableMetrics
@@ -102,6 +106,15 @@ func Modules(groups ...[]ServiceProvider) Option {
 // WithModule 是 Module 的显式命名入口。
 func WithModule(providers ...ServiceProvider) Option {
 	return Module(providers...)
+}
+
+// WithConfigFile binds an explicit config file path overriding <root>/config/ discovery.
+//
+// WithConfigFile 指定显式配置文件路径，替代默认的 <root>/config/ 目录扫描。
+func WithConfigFile(path string) Option {
+	return optionFunc(func(cfg *runConfig) {
+		cfg.httpOpts.ConfigFile = strings.TrimSpace(path)
+	})
 }
 
 // WithProviders appends provider declarations without changing the startup semantics.

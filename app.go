@@ -280,6 +280,13 @@ func WithModule(providers ...ServiceProvider) Option {
 	return application.WithModule(providers...)
 }
 
+// WithConfigFile binds an explicit config file path overriding <root>/config/ discovery.
+//
+// WithConfigFile 指定显式配置文件路径，替代默认的 <root>/config/ 目录扫描。
+func WithConfigFile(path string) Option {
+	return application.WithConfigFile(path)
+}
+
 // WithProviders appends provider declarations to the startup options.
 //
 // WithProviders 向启动选项追加 provider 声明。

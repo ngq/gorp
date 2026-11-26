@@ -3,7 +3,7 @@ module github.com/ngq/gorp/contrib/configsource/polaris
 go 1.26.0
 
 require (
-	github.com/ngq/gorp v0.3.3
+	github.com/ngq/gorp v0.3.4
 	github.com/polarismesh/polaris-go v1.7.0
 	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1

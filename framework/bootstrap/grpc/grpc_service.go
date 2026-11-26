@@ -40,6 +40,11 @@ type GRPCServiceOptions struct {
 	// ExtraProviders 是额外追加到容器中的 provider 列表。
 	ExtraProviders []runtimecontract.ServiceProvider
 
+	// ConfigFile 指定显式配置文件路径（覆盖默认 <root>/config/ 目录扫描）。
+	//
+	// ConfigFile specifies an explicit config file path overriding <root>/config/ discovery.
+	ConfigFile string
+
 	// GovernanceMode 显式声明运行时治理模式。
 	//
 	// GovernanceMode 显式声明运行时治理模式。
@@ -178,7 +183,7 @@ func NewGRPCServiceRuntime(serviceName string, opts GRPCServiceOptions) (rt *GRP
 // buildGRPCProviders 组装 gRPC 服务主线使用的 provider 列表。
 func buildGRPCProviders(opts GRPCServiceOptions) []runtimecontract.ServiceProvider {
 	providers := make([]runtimecontract.ServiceProvider, 0)
-	providers = append(providers, bootstrap.FoundationProviders()...)
+	providers = append(providers, bootstrap.FoundationProvidersWithConfigFile(opts.ConfigFile)...)
 	providers = append(providers, bootstrap.ORMRuntimeProviders()...)
 	providers = append(providers, bootstrap.DefaultCapabilityProviders()...)
 	providers = append(providers, rpcgrpc.NewProvider())

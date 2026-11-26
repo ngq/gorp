@@ -8,6 +8,8 @@
 package bootstrap
 
 import (
+	"strings"
+
 	runtimecontract "github.com/ngq/gorp/framework/contract/runtime"
 	appProvider "github.com/ngq/gorp/framework/provider/app"
 	authJWTProvider "github.com/ngq/gorp/framework/provider/auth/jwt"
@@ -36,6 +38,27 @@ func FoundationProviders() []runtimecontract.ServiceProvider {
 		hostProvider.NewProvider(),
 		cronProvider.NewProvider(),
 	}
+}
+
+// FoundationProvidersWithConfigFile returns FoundationProviders with an explicit config file
+// when configFile is non-empty, otherwise returning FoundationProviders unchanged.
+//
+// FoundationProvidersWithConfigFile 返回支持显式配置文件路径的基础 provider 集合；
+// configFile 为空时与 FoundationProviders 一致。
+func FoundationProvidersWithConfigFile(configFile string) []runtimecontract.ServiceProvider {
+	providers := FoundationProviders()
+	configFile = strings.TrimSpace(configFile)
+	if configFile == "" {
+		return providers
+	}
+	cfgProviderName := configProvider.NewProvider().Name()
+	for i, p := range providers {
+		if p != nil && p.Name() == cfgProviderName {
+			providers[i] = configProvider.NewProviderWithFile(configFile)
+			break
+		}
+	}
+	return providers
 }
 
 // CoreProviders is an alias for FoundationProviders.

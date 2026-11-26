@@ -3,7 +3,7 @@ module github.com/ngq/gorp/contrib/registry/kubernetes
 go 1.26.0
 
 require (
-	github.com/ngq/gorp v0.3.3
+	github.com/ngq/gorp v0.3.4
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.0
